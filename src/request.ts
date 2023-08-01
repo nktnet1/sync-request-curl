@@ -1,4 +1,3 @@
-// const request = require('sync-curl');
 import { Curl, CurlCode, Easy } from 'node-libcurl';
 import { HttpVerb, Options, Response, BufferEncoding } from './types';
 import { generateQueryString, parseHeaders } from './utils';
@@ -12,23 +11,22 @@ export const request = (method: HttpVerb, url: string, options: Options = {}): R
   // Handle query string
   // ==========================//
 
-  if (options.qs && Object.keys(options.qs).length > 0) {
-    curl.setOpt(Curl.option.URL, `${url}?${generateQueryString(options.qs)}`);
-  } else {
-    curl.setOpt(Curl.option.URL, url);
-  }
+  const queryString = options.qs && Object.keys(options.qs).length > 0
+    ? `?${generateQueryString(options.qs)}`
+    : '';
+
+  curl.setOpt(Curl.option.URL, `${url}${queryString}`);
 
   // ======================================================================= //
   // Handle headers
   // ==========================//
 
   // Incoming headers
-  const httpHeaders: string[] = [];
-  if (options.headers) {
-    Object.entries(options.headers).forEach(([key, value]) => httpHeaders.push(`${key}: ${value}`));
-  }
+  const httpHeaders: string[] = options.headers
+    ? Object.entries(options.headers).map(([key, value]) => `${key}: ${value}`)
+    : []
 
-  // Response headers
+  // Outgoing headers
   const returnedHeaderArray: string[] = [];
   curl.setOpt(Curl.option.HEADERFUNCTION, (headerLine) => {
     returnedHeaderArray.push(headerLine.toString('utf-8').trim());
@@ -58,10 +56,6 @@ export const request = (method: HttpVerb, url: string, options: Options = {}): R
   curl.setOpt(Curl.option.HTTPHEADER, httpHeaders);
   const code = curl.perform();
 
-  // ======================================================================= //
-  // Error handling
-  // ==========================//
-
   if (code !== CurlCode.CURLE_OK) {
     throw new Error(`
       Curl request failed with code ${code}
@@ -75,14 +69,15 @@ export const request = (method: HttpVerb, url: string, options: Options = {}): R
       }
     `);
   }
-  const statusCode = curl.getInfo('RESPONSE_CODE').data;
-  if (typeof statusCode !== 'number') {
-    throw new Error(`Status code ${statusCode} is not of type number!`);
-  }
 
   // ======================================================================= //
   // Finalising return
   // ==========================//
+
+  const statusCode = curl.getInfo('RESPONSE_CODE').data;
+  if (typeof statusCode !== 'number') {
+    throw new Error(`Status code ${statusCode} is not of type number!`);
+  }
 
   const headers = parseHeaders(returnedHeaderArray);
 
@@ -100,10 +95,6 @@ export const request = (method: HttpVerb, url: string, options: Options = {}): R
     return encoding ? body.toString(encoding) : body;
   };
 
-  // ======================================================================= //
-  // Finish
-  // ==========================//
-
   curl.close();
-  return { statusCode, body, getBody, headers };
+  return { statusCode, headers, body, getBody };
 };
