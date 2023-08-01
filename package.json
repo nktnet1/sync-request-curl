@@ -4,7 +4,7 @@
     "type": "git",
     "url": "https://github.com/nktnet1/sync-request-curl"
   },
-  "version": "1.0.4",
+  "version": "1.1.0",
   "files": [
     "dist"
   ],
@@ -13,7 +13,8 @@
   "scripts": {
     "build": "rm -rf dist && npm run build:esm && npm run build:cjs",
     "build:esm": "tsc",
-    "build:cjs": "tsc --module CommonJS --outDir dist/cjs"
+    "build:cjs": "tsc --module CommonJS --outDir dist/cjs",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "sync",
