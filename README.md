@@ -1,4 +1,3 @@
-
 # sync-request-curl
 
 Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but 20 times more quickly.
@@ -6,7 +5,6 @@ Make synchronous web requests similar to [sync-request](https://github.com/Forbe
 Leverages [node-libcurl](https://github.com/JCMais/node-libcurl) for performance as opposed to spawning child processes like sync-request.
 
 This library cannot be used in a browser.
-
 
 - [1. Installation](#1-installation)
 - [2. Usage](#2-usage)
@@ -57,7 +55,7 @@ e.g. `PUT`/`POST`/`GET`/`DELETE`.
 
 ### 2.2. URL
 
-URL as a string.
+URL as a string
 
 e.g. https://toohak.fly.dev
 
@@ -68,8 +66,8 @@ Only the following subset of options are supported for the time being:
 - **`qs`** - an object containing query string values to be appended to the URL, e.g. `{ message: 'Hello, world!' }`
 - **`headers`** - HTTP headers, e.g. `{ token: 'abcdefg' }`
 - **`body`** - body for POST and PUT requests, e.g. `JSON.stringify({ email: 'example@email.com', password: 'comp1531' })`
-- **`json`** - sets body as JSON representation of value and adds `Content-type: application/json` to the headers.
-- **`timeout`** - times out if no response is returned within the given number of milliseconds, e.g. `2000`.
+- **`json`** - sets body as `JSON` representation of value and adds `Content-type: application/json` to the headers, e.g. `{ email: 'example@email.com', password: 'comp1531' }`
+- **`timeout`** - times out if no response is returned within the given number of milliseconds, e.g. `2000`
 
 In [src/types.ts](src/types.ts), the following is defined:
 
