@@ -15,7 +15,20 @@
     "build:esm": "tsc",
     "build:cjs": "tsc --module CommonJS --outDir dist/cjs"
   },
-  "keywords": ["sync-request", "node-libcurl", "curl", "libcurl", "sync", "synchronous", "synchronous request", "request", "http", "https"],
+  "keywords": [
+    "sync",
+    "sync-request",
+    "synchronous",
+    "request",
+    "fast",
+    "performant",
+    "perormance",
+    "http",
+    "https",
+    "curl",
+    "libcurl",
+    "node-libcurl"
+  ],
   "author": "Khiet Tam Nguyen",
   "license": "MIT",
   "description": "Performant library to send synchronous requests. API is similar to sync-request, and leverages node-libcurl",
