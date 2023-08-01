@@ -6,21 +6,21 @@ but up to 20 times more quickly.
 
 Leverages [node-libcurl](https://github.com/JCMais/node-libcurl) for performance as opposed to spawning child processes like sync-request.
 
-* 1. [Installation](#Installation)
-* 2. [Usage](#Usage)
-	* 2.1. [Method](#Method)
-	* 2.2. [URL](#URL)
-	* 2.3. [Options](#Options)
-	* 2.4. [Response](#Response)
-* 3. [License](#License)
-* 4. [Caveats](#Caveats)
+- [1. Installation](#1-installation)
+- [2. Usage](#2-usage)
+	- [2.1. Method](#21-method)
+  - [2.2. URL](#22-url)
+  - [2.3. Options](#23-options)
+  - [2.4. Response](#24-response)
+- [3. License](#3-license)
+- [4. Caveats](#4-caveats)
 
-##  1. <a name='Installation'></a>Installation
+## 1. Installation
 ```
 npm install sync-request-curl
 ```
 
-##  2. <a name='Usage'></a>Usage
+## 2. Usage
 
 ```typescript
 request(method, url, options);
@@ -47,19 +47,19 @@ See [sync-request](https://www.npmjs.com/package/sync-request) for the original 
 
 Please note that this library only supports a subset of the original features, which are summarised below.
 
-###  2.1. <a name='Method'></a>Method
+### 2.1. Method
 
 HTTP method (of type `HttpVerb`)
 
 e.g. `PUT`/`POST`/`GET`/`DELETE`.
 
-###  2.2. <a name='URL'></a>URL
+### 2.2. URL
 
 URL as a string.
 
 e.g. https://toohak.fly.dev
 
-###  2.3. <a name='Options'></a>Options
+### 2.3. Options
 
 Only the following subset of options are supported for the time being:
 
@@ -83,7 +83,7 @@ export interface Options {
 }
 ```
 
-###  2.4. <a name='Response'></a>Response
+### 2.4. Response
 
 - **`statusCode`** - a number representing the HTTP status code (e.g. `200`, `400`, `401`, `403`)
 - **`headers`** - HTTP response headers
@@ -101,11 +101,11 @@ export interface Response {
 }
 ```
 
-##  3. <a name='License'></a>License
+## 3. License
 
 MIT
 
-##  4. <a name='Caveats'></a>Caveats
+## 4. Caveats
 
 This library was developed mainly to improve performance with sending synchronous requests in NodeJS.
 
