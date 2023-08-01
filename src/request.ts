@@ -2,7 +2,7 @@ import { Curl, CurlCode, Easy } from 'node-libcurl';
 import { HttpVerb, Options, Response, BufferEncoding } from './types';
 import { generateQueryString, parseHeaders } from './utils';
 
-export const request = (method: HttpVerb, url: string, options: Options = {}): Response => {
+const request = (method: HttpVerb, url: string, options: Options = {}): Response => {
   const curl = new Easy();
   curl.setOpt(Curl.option.CUSTOMREQUEST, method);
   curl.setOpt(Curl.option.TIMEOUT, options.timeout || false);
@@ -98,3 +98,5 @@ export const request = (method: HttpVerb, url: string, options: Options = {}): R
   curl.close();
   return { statusCode, headers, body, getBody };
 };
+
+export default request;
