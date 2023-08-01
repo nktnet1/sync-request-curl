@@ -63,7 +63,17 @@ export const request = (method: HttpVerb, url: string, options: Options = {}): R
   // ==========================//
 
   if (code !== CurlCode.CURLE_OK) {
-    throw new Error(`This shouldn't happen :(. Curl request failed with code: ${code}`);
+    throw new Error(`
+      Curl request failed with code ${code}
+      Please look up libcurl error code!
+        - https://curl.se/libcurl/c/libcurl-errors.html
+
+      DEBUG: {
+        method: "${method}",
+        url: "${url}",
+        options: ${JSON.stringify(options)}
+      }
+    `);
   }
   const statusCode = curl.getInfo('RESPONSE_CODE').data;
   if (typeof statusCode !== 'number') {
@@ -78,7 +88,14 @@ export const request = (method: HttpVerb, url: string, options: Options = {}): R
 
   const getBody = (encoding?: BufferEncoding): string | Buffer => {
     if (statusCode >= 300) {
-      throw new Error(`Server responded with status code ${statusCode}\n${body.toString()}\nUse 'res.body' instead of 'res.getBody()' to not have any errors thrown.`);
+      throw new Error(`
+        Server responded with status code ${statusCode}
+
+        Body: ${body.toString()}
+
+        Use 'res.body' instead of 'res.getBody()' to not have any errors thrown.
+        The status code (in this case, ${statusCode}) can be checked manually with res.statusCode.
+      `);
     }
     return encoding ? body.toString(encoding) : body;
   };
