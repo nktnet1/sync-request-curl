@@ -1,10 +1,12 @@
 
 # sync-request-curl
 
-Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request),
-but up to 20 times more quickly.
+Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but 20 times more quickly.
 
 Leverages [node-libcurl](https://github.com/JCMais/node-libcurl) for performance as opposed to spawning child processes like sync-request.
+
+This library cannot be used in a browser.
+
 
 - [1. Installation](#1-installation)
 - [2. Usage](#2-usage)

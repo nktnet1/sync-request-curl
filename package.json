@@ -4,7 +4,7 @@
     "type": "git",
     "url": "https://github.com/nktnet1/sync-request-curl"
   },
-  "version": "1.1.1",
+  "version": "1.1.2",
   "files": [
     "dist"
   ],
@@ -20,10 +20,16 @@
     "sync",
     "sync-request",
     "synchronous",
+    "synchronous-request",
     "request",
     "fast",
+    "quick",
+    "request",
+    "fast",
+    "quick",
     "performant",
-    "perormance",
+    "performant",
+    "peformance",
     "http",
     "https",
     "curl",
@@ -32,7 +38,7 @@
   ],
   "author": "Khiet Tam Nguyen",
   "license": "MIT",
-  "description": "Performant library to send synchronous requests. API is similar to sync-request, and leverages node-libcurl",
+  "description": "Fast way to send synchronous web requests. API is a subset of the original sync-request, leverages node-libcurl",
   "dependencies": {
     "node-libcurl": "^3.0.0"
   },
