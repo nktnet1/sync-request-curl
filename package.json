@@ -1,0 +1,28 @@
+{
+  "name": "sync-request-curl",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nktnet1/sync-request-curl"
+  },
+  "version": "1.0.0",
+  "files": [
+    "dist"
+  ],
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "scripts": {
+    "build": "rm -rf dist && npm run build:esm && npm run build:cjs",
+    "build:esm": "tsc",
+    "build:cjs": "tsc --module CommonJS --outDir dist/cjs"
+  },
+  "keywords": ["sync-request", "node-libcurl", "curl", "libcurl", "sync", "synchronous", "synchronous request", "request", "http", "https"],
+  "author": "Khiet Tam Nguyen",
+  "license": "MIT",
+  "description": "Performant library to send synchronous requests. API is similar to sync-request, and leverages node-libcurl",
+  "dependencies": {
+    "node-libcurl": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.4.5"
+  }
+}

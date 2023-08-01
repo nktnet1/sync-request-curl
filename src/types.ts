@@ -1,0 +1,42 @@
+import { IncomingHttpHeaders, OutgoingHttpHeaders } from 'http';
+
+export interface Options {
+  headers?: IncomingHttpHeaders;
+  timeout?: number;
+  qs?: {
+    [key: string]: any;
+  };
+  json?: any;
+  body?: string | Buffer | NodeJS.ReadableStream;
+}
+
+export interface Response {
+  statusCode: number;
+  headers: OutgoingHttpHeaders;
+  body: string | Buffer;
+  getBody: (encoding?: BufferEncoding) => string | Buffer;
+}
+
+export type HttpVerb =
+  | 'GET'
+  | 'HEAD'
+  | 'POST'
+  | 'PUT'
+  | 'DELETE'
+  | 'CONNECT'
+  | 'OPTIONS'
+  | 'TRACE'
+  | 'PATCH';
+
+export type BufferEncoding =
+  | 'ascii'
+  | 'utf8'
+  | 'utf-8'
+  | 'utf16le'
+  | 'ucs2'
+  | 'ucs-2'
+  | 'base64'
+  | 'base64url'
+  | 'latin1'
+  | 'binary'
+  | 'hex';
