@@ -34,9 +34,11 @@ export interface Options {
   body?: string | Buffer | NodeJS.ReadableStream;
 }
 
+export type GetBody = <B extends BufferEncoding | undefined>(arg?: B) => B extends BufferEncoding ? string : Buffer;
 export interface Response {
+
   statusCode: number;
   headers: OutgoingHttpHeaders;
   body: string | Buffer;
-  getBody: (encoding?: BufferEncoding) => string | Buffer;
+  getBody: GetBody;
 }

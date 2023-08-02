@@ -1,5 +1,5 @@
 import { Curl, CurlCode, Easy } from 'node-libcurl';
-import { HttpVerb, Options, Response, BufferEncoding } from './types';
+import { HttpVerb, Options, Response, GetBody } from './types';
 import { handleQs, parseHeaders } from './utils';
 
 const request = (method: HttpVerb, url: string, options: Options = {}): Response => {
@@ -74,13 +74,15 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
   // ==========================//
 
   const statusCode = curl.getInfo('RESPONSE_CODE').data;
+
+  /* istanbul ignore next */
   if (typeof statusCode !== 'number') {
     throw new Error(`Status code ${statusCode} is not of type number!`);
   }
 
   const headers = parseHeaders(returnedHeaderArray);
 
-  const getBody = (encoding?: BufferEncoding): string | Buffer => {
+  const getBody: GetBody = (encoding?) => {
     if (statusCode >= 300) {
       throw new Error(`
         Server responded with status code ${statusCode}
@@ -91,7 +93,10 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
         The status code (in this case, ${statusCode}) can be checked manually with res.statusCode.
       `);
     }
-    return encoding ? body.toString(encoding) : body;
+    if (typeof encoding === 'string') {
+      return body.toString(encoding) as any;
+    }
+    return body;
   };
 
   curl.close();
