@@ -45,7 +45,7 @@
   ],
   "author": "Khiet Tam Nguyen",
   "license": "MIT",
-  "description": "Fast way to send synchronous web requests in NodeJS. API is a subset of sync-request. Leverages node-libcurl for speed. Cannot be used in a browser,",
+  "description": "Fast way to send synchronous web requests in NodeJS. API is a subset of sync-request. Leverages node-libcurl for speed. Cannot be used in a browser.",
   "dependencies": {
     "node-libcurl": "^3.0.0"
   },
