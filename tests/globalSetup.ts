@@ -2,7 +2,7 @@ import { setup as setupDevServer } from 'jest-dev-server';
 import { HOST as host, PORT as port, DEBUG as debug } from './config';
 
 module.exports = async () => {
-  const command = 'npx jest tests/internal/server';
+  const command = 'npx ts-node tests/server';
   globalThis.servers = await setupDevServer({
     host,
     port,

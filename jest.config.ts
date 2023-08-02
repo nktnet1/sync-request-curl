@@ -9,12 +9,9 @@ const config: Config = {
   modulePathIgnorePatterns: ['<rootDir>/dist/'],
   forceExit: false,
   detectOpenHandles: true,
-
-  testPathIgnorePatterns: [],
   transform: {
     '^.+\\.(ts|tsx|js)$': 'ts-jest'
   },
-  testRegex: '(/__tests__/.*|(\\.|/)(test|spec))\\.(jsx?|tsx?)$',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
 };
 
