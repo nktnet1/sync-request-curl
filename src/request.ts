@@ -23,7 +23,9 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
 
   // Incoming headers
   const httpHeaders: string[] = options.headers
-    ? Object.entries(options.headers).map(([key, value]) => `${key}: ${value}`)
+    ? Object.entries(options.headers)
+      .filter(([_, value]) => value !== undefined)
+      .map(([key, value]) => value === '' ? `${key};` : `${key}: ${value}`)
     : []
 
   // Outgoing headers
