@@ -4,7 +4,7 @@ Make synchronous web requests similar to [sync-request](https://github.com/Forbe
 
 Leverages [node-libcurl](https://github.com/JCMais/node-libcurl) for performance as opposed to spawning child processes like sync-request.
 
-This library cannot be used in a browser.
+This library was designed to run on NodeJS. It cannot be used in a browser.
 
 - [1. Installation](#1-installation)
 - [2. Usage](#2-usage)
@@ -109,6 +109,6 @@ MIT
 
 This library was developed mainly to improve performance with sending synchronous requests in NodeJS.
 
-It was designed to work with UNIX-like systems for UNSW students enrolled in COMP1531 Software Fundamentals.
+It was designed to work with UNIX-like systems for UNSW students enrolled in COMP1531 Software Engineering Fundamentals.
 
 Tested to be working on Arch & Debian Linux. Since [node-libcurl](https://github.com/JCMais/node-libcurl) is the core of this module, it is likely also compatible with other operating systems such as MacOS and Windows.

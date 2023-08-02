@@ -40,7 +40,7 @@
 
     "@typescript-eslint/no-var-requires": 0,
     "@typescript-eslint/no-explicit-any": 0,
- 
+
     "no-var": "warn",
     "object-shorthand": 0, // ["warn", "properties"],
 
@@ -189,7 +189,7 @@
       "allowTernary": true,
       "allowTaggedTemplates": true
     }],
-    
+
     "no-use-before-define": ["error", { "functions": false, "classes": false, "variables": false }],
     "no-useless-call": "error",
     "no-useless-computed-key": "error",
