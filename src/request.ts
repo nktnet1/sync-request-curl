@@ -26,7 +26,7 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
     ? Object.entries(options.headers)
       .filter(([_, value]) => value !== undefined)
       .map(([key, value]) => value === '' ? `${key};` : `${key}: ${value}`)
-    : []
+    : [];
 
   // Outgoing headers
   const returnedHeaderArray: string[] = [];

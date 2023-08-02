@@ -1,22 +1,5 @@
 import { IncomingHttpHeaders, OutgoingHttpHeaders } from 'http';
 
-export interface Options {
-  headers?: IncomingHttpHeaders;
-  timeout?: number;
-  qs?: {
-    [key: string]: any;
-  };
-  json?: any;
-  body?: string | Buffer | NodeJS.ReadableStream;
-}
-
-export interface Response {
-  statusCode: number;
-  headers: OutgoingHttpHeaders;
-  body: string | Buffer;
-  getBody: (encoding?: BufferEncoding) => string | Buffer;
-}
-
 export type HttpVerb =
   | 'GET'
   | 'HEAD'
@@ -40,3 +23,20 @@ export type BufferEncoding =
   | 'latin1'
   | 'binary'
   | 'hex';
+
+export interface Options {
+  headers?: IncomingHttpHeaders;
+  timeout?: number;
+  qs?: {
+    [key: string]: any;
+  };
+  json?: any;
+  body?: string | Buffer | NodeJS.ReadableStream;
+}
+
+export interface Response {
+  statusCode: number;
+  headers: OutgoingHttpHeaders;
+  body: string | Buffer;
+  getBody: (encoding?: BufferEncoding) => string | Buffer;
+}
