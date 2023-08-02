@@ -4,7 +4,7 @@
     "declaration": true,
     "esModuleInterop": true,
     "lib": ["es5", "es2015", "esnext", "dom"],
-    "types": ["node"],
+    "types": ["node", "jest"],
     "module": "es2015",
     "moduleResolution": "node",
     "noImplicitAny": true,
@@ -15,6 +15,6 @@
     "target": "es6"
   },
   "include": [
-      "src/**/*.ts"
-  ]
+    "src/**/*.ts",
+  ],
 }
