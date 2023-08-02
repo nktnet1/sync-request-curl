@@ -95,9 +95,9 @@ In [src/types.ts](src/types.ts), the following is defined:
 ```typescript
 export interface Response {
   statusCode: number;
-  headers: OutgoingHttpHeaders;
+  headers: IncomingHttpHeaders;
   body: string | Buffer;
-  getBody: (encoding?: BufferEncoding) => string | Buffer;
+  getBody: (encoding?: BufferEncoding) => string | Buffer; // simplified
 }
 ```
 
