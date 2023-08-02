@@ -7,7 +7,7 @@ export const handleQs = (url: string, qs: { [key: string]: any }): string => {
   Object.entries(qs).forEach(([key, value]) => {
     if (Array.isArray(value)) {
       queryParams.delete(key);
-      value.forEach((item) => queryParams.append(key, item.toString()));
+      value.forEach((item, i) => queryParams.append(`${key}[${i}]`, item.toString()));
     } else {
       queryParams.set(key, value.toString());
     }

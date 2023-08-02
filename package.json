@@ -4,7 +4,7 @@
     "type": "git",
     "url": "https://github.com/nktnet1/sync-request-curl"
   },
-  "version": "1.2.0",
+  "version": "1.2.1",
   "files": [
     "dist"
   ],
@@ -12,6 +12,7 @@
   "module": "dist/esm/index.js",
   "scripts": {
     "start": "ts-node tests/server",
+    "dev": "ts-node-dev tests/server",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "lint-fix": "eslint --fix 'src/**/*.{ts,js}'",

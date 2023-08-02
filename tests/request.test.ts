@@ -39,10 +39,22 @@ describe('GET requests', () => {
     expect(res).toMatchObject({ code: 400, json: { error: "Cannot echo 'echo'!" } });
   });
 
+  test('GET request with array of one number', () => {
+    const value = [1];
+    const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
+    expect(res).toMatchObject({ code: 200, json: { value: ['1'] } });
+  });
+
   test('GET request with array of numbers', () => {
     const value = [1, 2, 3];
     const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
     expect(res).toMatchObject({ code: 200, json: { value: ['1', '2', '3'] } });
+  });
+
+  test('GET request with empty array', () => {
+    const value = [];
+    const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
+    expect(res).toMatchObject({ code: 200, json: {} });
   });
 });
 
