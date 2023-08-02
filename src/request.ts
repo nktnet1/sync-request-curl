@@ -1,6 +1,6 @@
 import { Curl, CurlCode, Easy } from 'node-libcurl';
 import { HttpVerb, Options, Response, BufferEncoding } from './types';
-import { generateQueryString, parseHeaders } from './utils';
+import { handleQs, parseHeaders } from './utils';
 
 const request = (method: HttpVerb, url: string, options: Options = {}): Response => {
   const curl = new Easy();
@@ -11,11 +11,8 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
   // Handle query string
   // ==========================//
 
-  const queryString = options.qs && Object.keys(options.qs).length > 0
-    ? `?${generateQueryString(options.qs)}`
-    : '';
-
-  curl.setOpt(Curl.option.URL, `${url}${queryString}`);
+  url = options.qs && Object.keys(options.qs).length ? handleQs(url, options.qs) : url;
+  curl.setOpt(Curl.option.URL, url);
 
   // ======================================================================= //
   // Handle headers

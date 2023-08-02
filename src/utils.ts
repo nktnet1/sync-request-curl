@@ -1,9 +1,21 @@
 import { IncomingHttpHeaders } from 'http';
 
-export const generateQueryString = (qs: Record<string, string | number>): string => {
-  return Object.entries(qs)
-    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-    .join('&');
+export const handleQs = (url: string, qs: { [key: string]: any }): string => {
+  const urlObj = new URL(url);
+  const queryParams = urlObj.searchParams;
+
+  Object.entries(qs).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      queryParams.delete(key);
+      value.forEach((item) => queryParams.append(key, item.toString()));
+    } else {
+      queryParams.set(key, value.toString());
+    }
+  });
+
+  urlObj.search = queryParams.toString();
+
+  return urlObj.href;
 };
 
 export const parseHeaders = (headerLines: string[]): IncomingHttpHeaders => {
