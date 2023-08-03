@@ -1,8 +1,16 @@
 # sync-request-curl
 
-[![Pipeline](https://github.com/nktnet1/sync-request-curl/actions/workflows/pipeline.yml/badge.svg)](https://github.com/nktnet1/sync-request-curl/actions/workflows/pipeline.yml)
+[![pipeline](https://github.com/nktnet1/sync-request-curl/actions/workflows/pipeline.yml/badge.svg)](https://github.com/nktnet1/sync-request-curl/actions/workflows/pipeline.yml)
 &nbsp;
 [![codecov](https://codecov.io/gh/nktnet1/sync-request-curl/branch/main/graph/badge.svg?token=RAC7SKJTGU)](https://codecov.io/gh/nktnet1/sync-request-curl)
+&nbsp;
+![NPM License](https://img.shields.io/npm/l/sync-request-curl)
+&nbsp;
+![NPM Downloads](https://img.shields.io/npm/dw/sync-request-curl)
+&nbsp;
+![Release](https://img.shields.io/npm/v/sync-request-curl)
+&nbsp;
+[![Maintainability](https://api.codeclimate.com/v1/badges/3ec8c0ddebe848926277/maintainability)](https://codeclimate.com/github/nktnet1/sync-request-curl/maintainability)
 
 Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but 20 times more quickly.
 
@@ -81,7 +89,6 @@ const response = request(
     },
   }
 );
-
 console.log('Status Code:', response.statusCode);
 const jsonBody = JSON.parse(response.body.toString());
 console.log('Returned JSON Object:', jsonBody);
@@ -137,14 +144,14 @@ Only the following subset of options is supported for the time being:
     <td>
       Sets the body as a JSON representation of the value and automatically adds <code>Content-type: application/json</code> to the header.</td>
     <td>
-    <code>{ email: 'example@email.com', password: 'comp1531' }</code></td>
+    <code>{ email: 'ab@c.com', password: 'comp1531' }</code></td>
   </tr>
   <tr>
     <td>body</td>
     <td>
       Body for POST and PUT requests. We recommended using <code>json</code> instead for JSON payloads, otherwise the <code>Content-Type</code> will need to be set manually.
     </td>
-    <td><code>JSON.stringify({ email: 'ab@cd.com', password: 'comp1531' })</code></td>
+    <td><code>JSON.stringify({ email: 'ab@c.com', password: 'comp1531' })</code></td>
   </tr>
   <tr>
     <td>timeout</td>

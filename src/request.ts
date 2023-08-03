@@ -1,63 +1,43 @@
 import { Curl, CurlCode, Easy } from 'node-libcurl';
 import { HttpVerb, Options, Response, GetBody } from './types';
 import { handleQs, parseHeaders } from './utils';
+import { IncomingHttpHeaders } from 'http';
 
-const request = (method: HttpVerb, url: string, options: Options = {}): Response => {
-  const curl = new Easy();
-  curl.setOpt(Curl.option.CUSTOMREQUEST, method);
-  curl.setOpt(Curl.option.TIMEOUT, options.timeout || false);
-  curl.setOpt(Curl.option.FOLLOWLOCATION, options.followRedirects === undefined || options.followRedirects);
-  curl.setOpt(Curl.option.MAXREDIRS, options.maxRedirects || Number.MAX_SAFE_INTEGER);
-
-  // ======================================================================= //
-  // Handle query string
-  // ==========================//
-
-  url = options.qs && Object.keys(options.qs).length ? handleQs(url, options.qs) : url;
+const handleQueryString = (curl: Easy, url: string, qs?: { [key: string]: any }) => {
+  url = qs && Object.keys(qs).length ? handleQs(url, qs) : url;
   curl.setOpt(Curl.option.URL, url);
+  return url;
+};
 
-  // ======================================================================= //
-  // Handle headers
-  // ==========================//
-
-  // Incoming headers
-  const httpHeaders: string[] = options.headers
-    ? Object.entries(options.headers)
+const handleIncomingHeaders = (curl: Easy, headers?: IncomingHttpHeaders) => {
+  return headers
+    ? Object.entries(headers)
       .filter(([_, value]) => value !== undefined)
       .map(([key, value]) => value === '' ? `${key};` : `${key}: ${value}`)
     : [];
+};
 
-  // Outgoing headers
-  const returnedHeaderArray: string[] = [];
+const handleOutgoingHeaders = (curl: Easy, returnedHeaderArray: string[]) => {
   curl.setOpt(Curl.option.HEADERFUNCTION, (headerLine) => {
     returnedHeaderArray.push(headerLine.toString('utf-8').trim());
     return headerLine.length;
   });
+};
 
-  // ======================================================================= //
-  // Handle JSON/body
-  // ==========================//
-
+const handleBody = (curl: Easy, options: Options, buffer: { body: Buffer }, httpHeaders: string[]) => {
   if (options.json) {
     httpHeaders.push('Content-Type: application/json');
     curl.setOpt(Curl.option.POSTFIELDS, JSON.stringify(options.json));
   } else if (options.body) {
     curl.setOpt(Curl.option.POSTFIELDS, String(options.body));
   }
-  let body = Buffer.alloc(0);
   curl.setOpt(Curl.option.WRITEFUNCTION, (buff, nmemb, size) => {
-    body = Buffer.concat([body, buff.slice(0, nmemb * size)]);
+    buffer.body = Buffer.concat([buffer.body, buff.subarray(0, nmemb * size)]);
     return nmemb * size;
   });
+};
 
-  // ======================================================================= //
-  // Execute request
-  // ==========================//
-
-  curl.setOpt(Curl.option.HTTPHEADER, httpHeaders);
-
-  const code = curl.perform();
-
+const checkValidCurlCode = (code: CurlCode, method: HttpVerb, url: string, options: Options) => {
   if (code !== CurlCode.CURLE_OK) {
     throw new Error(`
       Curl request failed with code ${code}
@@ -71,36 +51,51 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
       }
     `);
   }
-  url = curl.getInfo('EFFECTIVE_URL').data as string;
+};
 
-  // ======================================================================= //
-  // Finalising return
-  // ==========================//
+const checkGetBodyStatus = (statusCode: number, body: Buffer) => {
+  if (statusCode >= 300) {
+    throw new Error(`
+      Server responded with status code ${statusCode}
 
-  const statusCode = curl.getInfo('RESPONSE_CODE').data;
+      Body: ${body.toString()}
 
-  /* istanbul ignore next */
-  if (typeof statusCode !== 'number' || isNaN(statusCode)) {
-    throw new Error(`Status code ${statusCode} is either NaN or not of type number! Type: ${typeof statusCode}`);
+      Use 'res.body' instead of 'res.getBody()' to not have any errors thrown.
+      The status code (in this case, ${statusCode}) can be checked manually with res.statusCode.
+    `);
   }
+};
+
+const request = (method: HttpVerb, url: string, options: Options = {}): Response => {
+  const curl = new Easy();
+  curl.setOpt(Curl.option.CUSTOMREQUEST, method);
+  curl.setOpt(Curl.option.TIMEOUT, options.timeout || false);
+  curl.setOpt(Curl.option.FOLLOWLOCATION, options.followRedirects === undefined || options.followRedirects);
+  curl.setOpt(Curl.option.MAXREDIRS, options.maxRedirects || Number.MAX_SAFE_INTEGER);
+
+  handleQueryString(curl, url, options.qs);
+
+  const httpHeaders = handleIncomingHeaders(curl, options.headers);
+  const returnedHeaderArray: string[] = [];
+  handleOutgoingHeaders(curl, returnedHeaderArray);
+
+  const bufferWrap = { body: Buffer.alloc(0) };
+  handleBody(curl, options, bufferWrap, httpHeaders);
+
+  curl.setOpt(Curl.option.HTTPHEADER, httpHeaders);
+
+  const code = curl.perform();
+  checkValidCurlCode(code, method, url, options);
+
+  url = curl.getInfo('EFFECTIVE_URL').data as string;
+  const statusCode = curl.getInfo('RESPONSE_CODE').data as number;
+  const body = bufferWrap.body;
 
   const headers = parseHeaders(returnedHeaderArray);
 
   const getBody: GetBody = (encoding?) => {
-    if (statusCode >= 300) {
-      throw new Error(`
-        Server responded with status code ${statusCode}
-
-        Body: ${body.toString()}
-
-        Use 'res.body' instead of 'res.getBody()' to not have any errors thrown.
-        The status code (in this case, ${statusCode}) can be checked manually with res.statusCode.
-      `);
-    }
-    if (typeof encoding === 'string') {
-      return body.toString(encoding) as any;
-    }
-    return body;
+    checkGetBodyStatus(statusCode, body);
+    return typeof encoding === 'string' ? body.toString(encoding) as any : body;
   };
 
   curl.close();
