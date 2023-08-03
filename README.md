@@ -1,8 +1,6 @@
 # sync-request-curl
 
-![Pipeline Status](https://github.com/nktnet1/sync-request-curl/actions/workflows/test.yml/badge.svg)
-
-[![codecov](https://codecov.io/gh/nktnet1/sync-request-curl/branch/master/graph/badge.svg)](https://codecov.io/gh/nktnet1/sync-request-curl)
+[![codecov](https://codecov.io/gh/nktnet1/sync-request-curl/branch/main/graph/badge.svg?token=RAC7SKJTGU)](https://codecov.io/gh/nktnet1/sync-request-curl)
 
 Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but 20 times more quickly.
 
