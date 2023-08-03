@@ -63,23 +63,62 @@ e.g. https://toohak.fly.dev
 
 Only the following subset of options are supported for the time being:
 
-- **`qs`** - an object containing query string values to be appended to the URL, e.g. `{ message: 'Hello, world!' }`
-- **`headers`** - HTTP headers, e.g. `{ token: 'abcdefg' }`
-- **`body`** - body for POST and PUT requests, e.g. `JSON.stringify({ email: 'example@email.com', password: 'comp1531' })`
-- **`json`** - sets body as `JSON` representation of value and adds `Content-type: application/json` to the headers, e.g. `{ email: 'example@email.com', password: 'comp1531' }`
-- **`timeout`** - times out if no response is returned within the given number of milliseconds, e.g. `2000`
+<table>
+  <tr>
+    <th>Option</th>
+    <th>Description</th>
+    <th>Example</th>
+  </tr>
+  <tr>
+    <td><code>qs</code></td>
+    <td>An object containing query string values to be appended to the URL.</td>
+    <td><code>{ message: 'Hello, world!' }</code></td>
+  </tr>
+  <tr>
+    <td><code>headers</code></td>
+    <td>HTTP headers to be included in the request.</td>
+    <td><code>{ token: 'abcdefg' }</code></td>
+  </tr>
+  <tr>
+    <td><code>json</code></td>
+    <td>Sets the body as a JSON representation of the value and adds <code>Content-type: application/json</code> header.</td>
+    <td><code>{ email: 'example@email.com', password: 'comp1531' }</code></td>
+  </tr>
+  <tr>
+    <td><code>body</code></td>
+    <td>Body for POST and PUT requests. It is recommended to use <code>json</code> instead for JSON payloads.</td>
+    <td><code>JSON.stringify({ email: 'example@email.com', password: 'comp1531' })</code></td>
+  </tr>
+  <tr>
+    <td><code>timeout</code></td>
+    <td>Times out if no response is returned within the given number of milliseconds.</td>
+    <td><code>2000</code></td>
+  </tr>
+  <tr>
+    <td><code>followRedirects</code></td>
+    <td>Defaults to true, but can be set to false to not follow any redirects (302) automatically</td>
+    <td><code>false</code></td>
+  </tr>
+  <tr>
+    <td><code>maxRedirects</code></td>
+    <td>Sets the maximum number of redirects to follow before throwing an Error. Default: <code>Number.MAX_SAFE_INTEGER</code>.</td>
+    <td><code>3</code></td>
+  </tr>
+</table>
 
 In [src/types.ts](src/types.ts), the following is defined:
 
 ```typescript
 export interface Options {
   headers?: IncomingHttpHeaders;
-  timeout?: number;
   qs?: {
     [key: string]: any;
   };
   json?: any;
+  timeout?: number;
   body?: string | Buffer | NodeJS.ReadableStream;
+  followRedirects?: boolean;
+  maxRedirects?: number;
 }
 ```
 
