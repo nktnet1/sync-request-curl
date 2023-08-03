@@ -1,5 +1,4 @@
 import request, { HttpVerb, Options } from '../src';
-// import request, { HttpVerb, Options } from 'sync-request';
 import { SERVER_URL } from './app/config';
 
 // ========================================================================= //
