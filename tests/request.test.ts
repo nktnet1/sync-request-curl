@@ -144,7 +144,7 @@ describe('Redirects', () => {
     expect(res).toMatchObject({ code: 302 });
   });
 
-  test.only('Redirect once', () => {
+  test('Redirect once', () => {
     const res = wrapperRequest('GET', SERVER_URL + '/redirect/source', { followRedirects: true });
     expect(res).toMatchObject({ code: 200, json: { message: 'Redirect success!' } });
   });

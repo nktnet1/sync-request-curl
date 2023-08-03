@@ -32,6 +32,8 @@ export interface Options {
   };
   json?: any;
   body?: string | Buffer | NodeJS.ReadableStream;
+  followRedirects?: boolean;
+  maxRedirects?: number;
 }
 
 export type GetBody = <B extends BufferEncoding | undefined>(arg?: B) => B extends BufferEncoding ? string : Buffer;

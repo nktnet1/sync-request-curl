@@ -6,6 +6,8 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
   const curl = new Easy();
   curl.setOpt(Curl.option.CUSTOMREQUEST, method);
   curl.setOpt(Curl.option.TIMEOUT, options.timeout || false);
+  curl.setOpt(Curl.option.FOLLOWLOCATION, options.followRedirects || false);
+  curl.setOpt(Curl.option.MAXREDIRS, options.maxRedirects || Number.MAX_SAFE_INTEGER);
 
   // ======================================================================= //
   // Handle query string
@@ -53,6 +55,7 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
   // ==========================//
 
   curl.setOpt(Curl.option.HTTPHEADER, httpHeaders);
+
   const code = curl.perform();
 
   if (code !== CurlCode.CURLE_OK) {
@@ -76,8 +79,8 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
   const statusCode = curl.getInfo('RESPONSE_CODE').data;
 
   /* istanbul ignore next */
-  if (typeof statusCode !== 'number') {
-    throw new Error(`Status code ${statusCode} is not of type number!`);
+  if (typeof statusCode !== 'number' || isNaN(statusCode)) {
+    throw new Error(`Status code ${statusCode} is either NaN or not of type number! Type: ${typeof statusCode}`);
   }
 
   const headers = parseHeaders(returnedHeaderArray);
