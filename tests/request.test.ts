@@ -158,6 +158,23 @@ describe('Redirects', () => {
     const wrap = () => wrapperRequest('GET', SERVER_URL + '/redirect/source', { qs: { redirectNumber: 3 }, maxRedirects: 2 });
     expect(wrap).toThrow(Error);
   });
+
+  test('Final url returned not redirected', () => {
+    const res = wrapperRequest('GET', SERVER_URL + '/redirect/source', { followRedirects: false });
+    expect(res.rawResponse.url).toStrictEqual(SERVER_URL + '/redirect/source');
+  });
+
+  test('Final url returned is the redirect version', () => {
+    const res = wrapperRequest('GET', SERVER_URL + '/redirect/source');
+    expect(res.rawResponse.url).toStrictEqual(SERVER_URL + '/redirect/destination');
+  });
+
+  test('External URL redirect - https://picsum.photos/200/300', () => {
+    const redirectResponse = wrapperRequest('GET', 'https://picsum.photos/200/300');
+    expect(redirectResponse).toMatchObject({ code: 200 });
+    const noRedirect = wrapperRequest('GET', 'https://picsum.photos/200/300', { followRedirects: false });
+    expect(noRedirect).toMatchObject({ code: 302 });
+  });
 });
 
 // ========================================================================= //
