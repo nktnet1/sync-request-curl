@@ -4,7 +4,7 @@
     "type": "git",
     "url": "https://github.com/nktnet1/sync-request-curl"
   },
-  "version": "1.3.1",
+  "version": "1.3.2",
   "files": [
     "dist"
   ],
@@ -15,8 +15,8 @@
     "dev": "ts-node-dev tests/server",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "lint": "eslint 'src/**/*.{ts,js}'",
-    "lint:fix": "eslint --fix 'src/**/*.{ts,js}'",
+    "lint": "eslint './**/*.{ts,js}'",
+    "lint:fix": "eslint --fix './**/*.{ts,js}'",
     "build": "rm -rf dist && npm run build:esm && npm run build:cjs",
     "build:esm": "tsc",
     "build:cjs": "tsc --module CommonJS --outDir dist/cjs",
