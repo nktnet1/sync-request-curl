@@ -28,7 +28,23 @@ On MacOS, there may be an error in the installation process. In most cases can b
 request(method, url, options);
 ```
 
-Example with `GET` request
+<details closed>
+<summary>Examples (click to view)</summary>
+
+<br/>
+
+`GET` request without options
+
+```typescript
+import request from 'sync-request-curl';
+
+const response = request('GET', 'https://comp1531quiz.alwaysdata.net');
+console.log('Status Code:', response.statusCode);
+const jsonBody = JSON.parse(response.body.toString());
+console.log('Returned JSON object:', jsonBody);
+```
+
+**`GET`** request with query string parameters
 
 ```typescript
 import request from 'sync-request-curl';
@@ -37,30 +53,40 @@ const response = request(
   'GET',
   'https://comp1531forum.alwaysdata.net/echo/echo',
   {
-    qs: { message: 'Hello, world!' }
+    qs: { message: 'Hello, world!' },
   }
 );
-
 console.log('Status Code:', response.statusCode);
 const jsonBody = JSON.parse(response.body.toString());
 console.log('Returned JSON object:', jsonBody);
 ```
 
-Example with `POST` request
+**`POST`** request with headers and JSON payload
 
 ```typescript
+import request from 'sync-request-curl';
+
 const response = request(
   'POST',
-  'https://comp1531forum.alwaysdata.net/post/create',
+  'https://comp1531quiz.alwaysdata.net/quiz/create',
   {
-    json: { title: 'New Post', sender: 'Tam', content: 'Example POST request' }
+    headers: { lab08quizsecret: "bruno's fight club" },
+    json: {
+      quizTitle: 'New Quiz',
+      quizSynopsis: 'Sync request curl example'
+    },
   }
 );
 
 console.log('Status Code:', response.statusCode);
 const jsonBody = JSON.parse(response.body.toString());
 console.log('Returned JSON Object:', jsonBody);
+
 ```
+
+</details>
+
+<br/>
 
 See [sync-request](https://www.npmjs.com/package/sync-request) for the original documentation.
 
@@ -158,8 +184,8 @@ export interface Options {
 - **`statusCode`** - a number representing the HTTP status code (e.g. `200`, `400`, `401`, `403`)
 - **`headers`** - HTTP response headers
 - **`body`** - a string or buffer - use `body.toString()` for common use cases in combination with `JSON.parse()`
-- **`getBody`** - a function with an optional `encoding` argument that returns the `body` if `encoding` is `undefined`, otherwise `body.toString(encoding)`. If the `statusCode >= 300`, an `Error` is thrown instead.
-- **`url`** - the final URL with query string parameters appended and if any redirection occurred.
+- **`getBody`** - a function with an optional `encoding` argument that returns the `body` if `encoding` is undefined, otherwise `body.toString(encoding)`. If `statusCode >= 300`, an `Error` is thrown instead.
+- **`url`** - the final URL used in the request after all redirections and with the query string parameters appended.
 
 In [src/types.ts](src/types.ts), the following is defined:
 
