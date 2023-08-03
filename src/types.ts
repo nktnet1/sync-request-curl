@@ -43,4 +43,5 @@ export interface Response {
   headers: IncomingHttpHeaders;
   body: string | Buffer;
   getBody: GetBody;
+  url: string;
 }

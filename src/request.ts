@@ -71,6 +71,7 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
       }
     `);
   }
+  url = curl.getInfo('EFFECTIVE_URL').data as string;
 
   // ======================================================================= //
   // Finalising return
@@ -103,7 +104,7 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
   };
 
   curl.close();
-  return { statusCode, headers, body, getBody };
+  return { statusCode, headers, body, getBody, url };
 };
 
 export default request;

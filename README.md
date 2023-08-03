@@ -61,7 +61,7 @@ e.g. https://toohak.fly.dev
 
 ### 2.3. Options
 
-Only the following subset of options are supported for the time being:
+Only the following subset of options is supported for the time being:
 
 <table>
   <tr>
@@ -70,38 +70,50 @@ Only the following subset of options are supported for the time being:
     <th>Example</th>
   </tr>
   <tr>
-    <td><code>qs</code></td>
-    <td>An object containing query string values to be appended to the URL.</td>
+    <td>qs</td>
+    <td>
+      An object containing query string parameters which will be appended to the URL.
+    </td>
     <td><code>{ message: 'Hello, world!' }</code></td>
   </tr>
   <tr>
-    <td><code>headers</code></td>
-    <td>HTTP headers to be included in the request.</td>
+    <td>headers</td>
+    <td>
+      HTTP headers for the request.
+    </td>
     <td><code>{ token: 'abcdefg' }</code></td>
   </tr>
   <tr>
-    <td><code>json</code></td>
-    <td>Sets the body as a JSON representation of the value and adds <code>Content-type: application/json</code> header.</td>
-    <td><code>{ email: 'example@email.com', password: 'comp1531' }</code></td>
+    <td>json</td>
+    <td>
+      Sets the body as a JSON representation of the value and automatically adds <code>Content-type: application/json</code> to the header.</td>
+    <td>
+    <code>{ email: 'example@email.com', password: 'comp1531' }</code></td>
   </tr>
   <tr>
-    <td><code>body</code></td>
-    <td>Body for POST and PUT requests. It is recommended to use <code>json</code> instead for JSON payloads.</td>
+    <td>body</td>
+    <td>
+      Body for POST and PUT requests. We recommended using <code>json</code> instead for JSON payloads, otherwise the <code>Content-Type</code> will need to be set manually.
+    </td>
     <td><code>JSON.stringify({ email: 'example@email.com', password: 'comp1531' })</code></td>
   </tr>
   <tr>
-    <td><code>timeout</code></td>
-    <td>Times out if no response is returned within the given number of milliseconds.</td>
-    <td><code>2000</code></td>
+    <td>timeout</td>
+    <td>
+      Times out if no response is returned within the given number of milliseconds
+    </td>
+    <td><code>2000<code></td>
   </tr>
   <tr>
-    <td><code>followRedirects</code></td>
-    <td>Defaults to true, but can be set to false to not follow any redirects (302) automatically</td>
+    <td>followRedirects</td>
+    <td>
+      Defaults to true, but can be set to false to not follow any redirects (302) automatically
+    </td>
     <td><code>false</code></td>
   </tr>
   <tr>
-    <td><code>maxRedirects</code></td>
-    <td>Sets the maximum number of redirects to follow before throwing an Error. Default: <code>Number.MAX_SAFE_INTEGER</code>.</td>
+    <td>maxRedirects</td>
+    <td>Sets the maximum number of redirects to follow before throwing an Error. Defaults to <code>NumberMAX_SAFE_INTEGER</code>.</td>
     <td><code>3</code></td>
   </tr>
 </table>
@@ -126,8 +138,9 @@ export interface Options {
 
 - **`statusCode`** - a number representing the HTTP status code (e.g. `200`, `400`, `401`, `403`)
 - **`headers`** - HTTP response headers
-- **`body`** - a string or buffer - use `body.toString()` for common use cases.
+- **`body`** - a string or buffer - use `body.toString()` for common use cases in combination with `JSON.parse()`
 - **`getBody`** - a function with an optional `encoding` argument that returns the `body` if `encoding` is `undefined`, otherwise `body.toString(encoding)`. If the `statusCode >= 300`, an `Error` is thrown instead.
+- **`url`** - the final URL with query string parameters appended and if any redirection occurred.
 
 In [src/types.ts](src/types.ts), the following is defined:
 
@@ -137,6 +150,7 @@ export interface Response {
   headers: IncomingHttpHeaders;
   body: string | Buffer;
   getBody: (encoding?: BufferEncoding) => string | Buffer; // simplified
+  url: string;
 }
 ```
 

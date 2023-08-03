@@ -33,6 +33,12 @@ describe('GET requests', () => {
     expect(res).toMatchObject({ code: 200, json: { value } });
   });
 
+  test('GET request url returned correctly parsed', () => {
+    const value = 'comp1531';
+    const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
+    expect(res.rawResponse.url).toStrictEqual(SERVER_URL + '/echo?value=comp1531');
+  });
+
   test('GET request with query string, error 400', () => {
     const value = 'echo';
     const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
