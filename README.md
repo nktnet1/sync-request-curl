@@ -28,7 +28,7 @@ On MacOS, there may be an error in the installation process. In most cases can b
 request(method, url, options);
 ```
 
-e.g.
+Example with `GET` request
 
 ```typescript
 import request from 'sync-request-curl';
@@ -41,8 +41,25 @@ const response = request(
   }
 );
 
-console.log(response.statusCode)
-console.log(response.body.toString());
+console.log('Status Code:', response.statusCode);
+const jsonBody = JSON.parse(response.body.toString());
+console.log('Returned JSON object:', jsonBody);
+```
+
+Example with `POST` request
+
+```typescript
+const response = request(
+  'POST',
+  'https://comp1531forum.alwaysdata.net/post/create',
+  {
+    json: { title: 'New Post', sender: 'Tam', content: 'Example POST request' }
+  }
+);
+
+console.log('Status Code:', response.statusCode);
+const jsonBody = JSON.parse(response.body.toString());
+console.log('Returned JSON Object:', jsonBody);
 ```
 
 See [sync-request](https://www.npmjs.com/package/sync-request) for the original documentation.
