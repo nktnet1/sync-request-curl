@@ -140,7 +140,7 @@ Only the following subset of options is supported for the time being:
     <td>
       Body for POST and PUT requests. We recommended using <code>json</code> instead for JSON payloads, otherwise the <code>Content-Type</code> will need to be set manually.
     </td>
-    <td><code>JSON.stringify({ email: 'example@email.com', password: 'comp1531' })</code></td>
+    <td><code>JSON.stringify({ email: 'ab@cd.com', password: 'comp1531' })</code></td>
   </tr>
   <tr>
     <td>timeout</td>
