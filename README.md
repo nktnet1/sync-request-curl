@@ -12,7 +12,7 @@
 &nbsp;
 [![NPM Downloads](https://img.shields.io/npm/dw/sync-request-curl)](https://npm-stat.com/charts.html?package=sync-request-curl)
 &nbsp;
-[![GitHub stars](https://img.shields.io/github/stars/nktnet1/sync-request-curl.svg?style=social)(https://github.com/nktnet1/sync-request-curl)]
+[![GitHub stars](https://img.shields.io/github/stars/nktnet1/sync-request-curl.svg?style=social)](https://github.com/nktnet1/sync-request-curl)
 
 Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but 20 times more quickly.
 
