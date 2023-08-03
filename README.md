@@ -171,7 +171,7 @@ Only the following subset of options is supported for the time being:
   </tr>
   <tr>
     <td>maxRedirects</td>
-    <td>Sets the maximum number of redirects to follow before throwing an Error. Defaults to <code>NumberMAX_SAFE_INTEGER</code>.</td>
+    <td>Sets the maximum number of redirects to follow before throwing an Error. Defaults to <code>Number.MAX_SAFE_INTEGER</code>.</td>
     <td><code>3</code></td>
   </tr>
 </table>
@@ -214,7 +214,7 @@ export interface Response {
 
 ## 3. License
 
-MIT
+[MIT](https://opensource.org/license/mit/)
 
 ## 4. Caveats
 
