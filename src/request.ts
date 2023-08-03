@@ -1,20 +1,11 @@
 import { Curl, Easy } from 'node-libcurl';
 import { HttpVerb, Options, Response, GetBody } from './types';
-import { checkGetBodyStatus, checkValidCurlCode, handleQs, parseHeaders } from './utils';
-import { IncomingHttpHeaders } from 'http';
+import { checkGetBodyStatus, checkValidCurlCode, handleQs, parseReturnedHeaders, parseIncomingHeaders } from './utils';
 
 const handleQueryString = (curl: Easy, url: string, qs?: { [key: string]: any }) => {
   url = qs && Object.keys(qs).length ? handleQs(url, qs) : url;
   curl.setOpt(Curl.option.URL, url);
   return url;
-};
-
-const handleIncomingHeaders = (curl: Easy, headers?: IncomingHttpHeaders) => {
-  return headers
-    ? Object.entries(headers)
-      .filter(([_, value]) => value !== undefined)
-      .map(([key, value]) => value === '' ? `${key};` : `${key}: ${value}`)
-    : [];
 };
 
 const handleOutgoingHeaders = (curl: Easy, returnedHeaderArray: string[]) => {
@@ -46,7 +37,7 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
 
   handleQueryString(curl, url, options.qs);
 
-  const httpHeaders = handleIncomingHeaders(curl, options.headers);
+  const httpHeaders = parseIncomingHeaders(options.headers);
   const returnedHeaderArray: string[] = [];
   handleOutgoingHeaders(curl, returnedHeaderArray);
 
@@ -62,7 +53,7 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
   const statusCode = curl.getInfo('RESPONSE_CODE').data as number;
   const body = bufferWrap.body;
 
-  const headers = parseHeaders(returnedHeaderArray);
+  const headers = parseReturnedHeaders(returnedHeaderArray);
 
   const getBody: GetBody = (encoding?) => {
     checkGetBodyStatus(statusCode, body);

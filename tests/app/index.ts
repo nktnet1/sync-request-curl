@@ -36,10 +36,9 @@ app.put('/pueko', (req: Request, res: Response) => {
 
 app.get('/redirect/source', (req: Request, res: Response) => {
   const redirectNumber = parseInt(req.query.redirectNumber as string);
-  if (redirectNumber > 0) {
-    return res.redirect(302, `/redirect/source?redirectNumber=${redirectNumber - 1}`);
-  }
-  res.redirect(302, '/redirect/destination');
+  return redirectNumber > 0
+    ? res.redirect(302, `/redirect/source?redirectNumber=${redirectNumber - 1}`)
+    : res.redirect(302, '/redirect/destination');
 });
 
 app.get('/redirect/destination', (_: Request, res: Response) => {

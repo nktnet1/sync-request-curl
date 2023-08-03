@@ -175,7 +175,7 @@ describe('Redirects', () => {
     expect(res.rawResponse.url).toStrictEqual(SERVER_URL + '/redirect/destination');
   });
 
-  test('External URL redirect - https://picsum.photos/200/300', () => {
+  test.skip('External URL redirect - https://picsum.photos/200/300', () => {
     const redirectResponse = wrapperRequest('GET', 'https://picsum.photos/200/300');
     expect(redirectResponse).toMatchObject({ code: 200 });
     const noRedirect = wrapperRequest('GET', 'https://picsum.photos/200/300', { followRedirects: false });

@@ -20,7 +20,15 @@ export const handleQs = (url: string, qs: { [key: string]: any }): string => {
   return urlObj.href;
 };
 
-export const parseHeaders = (headerLines: string[]): IncomingHttpHeaders => {
+export const parseIncomingHeaders = (headers?: IncomingHttpHeaders): string[] => {
+  return headers
+    ? Object.entries(headers)
+      .filter(([_, value]) => value !== undefined)
+      .map(([key, value]) => value === '' ? `${key};` : `${key}: ${value}`)
+    : [];
+};
+
+export const parseReturnedHeaders = (headerLines: string[]): IncomingHttpHeaders => {
   return headerLines.reduce((acc, header) => {
     const [name, ...values] = header.split(':');
     if (name && values.length > 0) {
