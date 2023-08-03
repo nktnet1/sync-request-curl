@@ -1,5 +1,5 @@
 import { setup as setupDevServer } from 'jest-dev-server';
-import { HOST as host, PORT as port, DEBUG as debug } from './config';
+import { HOST as host, PORT as port, DEBUG as debug } from './app/config';
 
 module.exports = async () => {
   const command = 'npx ts-node tests/server';

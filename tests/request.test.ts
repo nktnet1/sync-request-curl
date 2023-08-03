@@ -1,6 +1,6 @@
 import request, { HttpVerb, Options } from '../src';
 // import request, { HttpVerb, Options } from 'sync-request';
-import { SERVER_URL } from './config';
+import { SERVER_URL } from './app/config';
 
 // ========================================================================= //
 
@@ -133,6 +133,20 @@ describe('res.getBody()', () => {
     const res = wrapperRequest('GET', SERVER_URL);
     const body: string = res.rawResponse.getBody('utf-8');
     expect(typeof body).toBe('string');
+  });
+});
+
+// ========================================================================= //
+
+describe('Redirects', () => {
+  test('No redirect by default', () => {
+    const res = wrapperRequest('GET', SERVER_URL + '/redirect/source');
+    expect(res).toMatchObject({ code: 302 });
+  });
+
+  test.only('Redirect once', () => {
+    const res = wrapperRequest('GET', SERVER_URL + '/redirect/source', { followRedirects: true });
+    expect(res).toMatchObject({ code: 200, json: { message: 'Redirect success!' } });
   });
 });
 
