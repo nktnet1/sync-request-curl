@@ -34,11 +34,15 @@ app.put('/pueko', (req: Request, res: Response) => {
   res.json({ value });
 });
 
-app.get('/redirect/source', (_, res) => {
+app.get('/redirect/source', (req: Request, res: Response) => {
+  const redirectNumber = parseInt(req.query.redirectNumber as string);
+  if (redirectNumber > 0) {
+    return res.redirect(302, `/redirect/source?redirectNumber=${redirectNumber - 1}`);
+  }
   res.redirect(302, '/redirect/destination');
 });
 
-app.get('/redirect/destination', (_, res) => {
+app.get('/redirect/destination', (_: Request, res: Response) => {
   res.status(200).json({ message: 'Redirect success!' });
 });
 

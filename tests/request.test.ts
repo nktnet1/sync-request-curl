@@ -139,14 +139,24 @@ describe('res.getBody()', () => {
 // ========================================================================= //
 
 describe('Redirects', () => {
-  test('No redirect by default', () => {
-    const res = wrapperRequest('GET', SERVER_URL + '/redirect/source');
+  test('No redirect', () => {
+    const res = wrapperRequest('GET', SERVER_URL + '/redirect/source', { followRedirects: false });
     expect(res).toMatchObject({ code: 302 });
   });
 
-  test('Redirect once', () => {
+  test('Explicit redirect', () => {
     const res = wrapperRequest('GET', SERVER_URL + '/redirect/source', { followRedirects: true });
     expect(res).toMatchObject({ code: 200, json: { message: 'Redirect success!' } });
+  });
+
+  test('Implicit redirect (default)', () => {
+    const res = wrapperRequest('GET', SERVER_URL + '/redirect/source');
+    expect(res).toMatchObject({ code: 200, json: { message: 'Redirect success!' } });
+  });
+
+  test('Max redirect 2, causes error', () => {
+    const wrap = () => wrapperRequest('GET', SERVER_URL + '/redirect/source', { qs: { redirectNumber: 3 }, maxRedirects: 2 });
+    expect(wrap).toThrow(Error);
   });
 });
 
