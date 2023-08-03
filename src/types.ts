@@ -26,11 +26,11 @@ export type BufferEncoding =
 
 export interface Options {
   headers?: IncomingHttpHeaders;
-  timeout?: number;
   qs?: {
     [key: string]: any;
   };
   json?: any;
+  timeout?: number;
   body?: string | Buffer | NodeJS.ReadableStream;
   followRedirects?: boolean;
   maxRedirects?: number;
