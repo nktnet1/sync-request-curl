@@ -4,11 +4,11 @@
 &nbsp;
 [![codecov](https://codecov.io/gh/nktnet1/sync-request-curl/branch/main/graph/badge.svg?token=RAC7SKJTGU)](https://codecov.io/gh/nktnet1/sync-request-curl)
 &nbsp;
-![NPM License](https://img.shields.io/npm/l/sync-request-curl)
+[![NPM License](https://img.shields.io/npm/l/sync-request-curl)](https://opensource.org/license/mit/)
 &nbsp;
-![NPM Downloads](https://img.shields.io/npm/dw/sync-request-curl)
+[![NPM Downloads](https://img.shields.io/npm/dw/sync-request-curl)](https://npm-stat.com/charts.html?package=sync-request-curl)
 &nbsp;
-![Release](https://img.shields.io/npm/v/sync-request-curl)
+[![Release](https://img.shields.io/npm/v/sync-request-curl)](https://www.npmjs.com/package/sync-request-curl?activeTab=versions)
 &nbsp;
 [![Maintainability](https://api.codeclimate.com/v1/badges/3ec8c0ddebe848926277/maintainability)](https://codeclimate.com/github/nktnet1/sync-request-curl/maintainability)
 
