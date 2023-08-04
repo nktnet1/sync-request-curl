@@ -61,6 +61,24 @@ describe('GET requests', () => {
     const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
     expect(res).toMatchObject({ code: 200, json: {} });
   });
+
+  test('GET request with undefined value', () => {
+    const value = undefined;
+    const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
+    expect(res).toMatchObject({ code: 200, json: {} });
+  });
+
+  test('GET request with empty string', () => {
+    const value = '';
+    const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
+    expect(res).toMatchObject({ code: 200, json: { value: '' } });
+  });
+
+  test('GET request with null value', () => {
+    const value = null;
+    const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
+    expect(res).toMatchObject({ code: 200, json: { value: '' } });
+  });
 });
 
 // ========================================================================= //
