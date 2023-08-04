@@ -52,7 +52,7 @@ request(method, url, options);
 ```typescript
 import request from 'sync-request-curl';
 
-const response = request('GET', 'https://comp1531quiz.alwaysdata.net');
+const response = request('GET', 'https://comp1531namesages.alwaysdata.net');
 console.log('Status Code:', response.statusCode);
 const jsonBody = JSON.parse(response.body.toString());
 console.log('Returned JSON object:', jsonBody);
