@@ -181,9 +181,7 @@ In [src/types.ts](src/types.ts), the following is defined:
 ```typescript
 export interface Options {
   headers?: IncomingHttpHeaders;
-  qs?: {
-    [key: string]: any;
-  };
+  qs?: { [key: string]: any };
   json?: any;
   timeout?: number;
   body?: string | Buffer | NodeJS.ReadableStream;

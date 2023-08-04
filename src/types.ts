@@ -26,9 +26,7 @@ export type BufferEncoding =
 
 export interface Options {
   headers?: IncomingHttpHeaders;
-  qs?: {
-    [key: string]: any;
-  };
+  qs?: { [key: string]: any };
   json?: any;
   timeout?: number;
   body?: string | Buffer | NodeJS.ReadableStream;
@@ -36,7 +34,9 @@ export interface Options {
   maxRedirects?: number;
 }
 
-export type GetBody = <B extends BufferEncoding | undefined>(arg?: B) => B extends BufferEncoding ? string : Buffer;
+// Infer tpe `string` if encoding is specified, otherwise `string | Buffer
+export type GetBody = <encoding extends BufferEncoding | undefined>(arg?: encoding)
+  => encoding extends BufferEncoding ? string : Buffer;
 
 export interface Response {
   statusCode: number;
