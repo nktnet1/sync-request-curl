@@ -30,6 +30,7 @@ const handleBody = (curl: Easy, options: Options, buffer: { body: Buffer }, http
 
 const request = (method: HttpVerb, url: string, options: Options = {}): Response => {
   const curl = new Easy();
+
   curl.setOpt(Curl.option.CUSTOMREQUEST, method);
   curl.setOpt(Curl.option.TIMEOUT, options.timeout || false);
   curl.setOpt(Curl.option.FOLLOWLOCATION, options.followRedirects === undefined || options.followRedirects);
@@ -45,16 +46,13 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
   handleBody(curl, options, bufferWrap, httpHeaders);
 
   curl.setOpt(Curl.option.HTTPHEADER, httpHeaders);
-
   const code = curl.perform();
   checkValidCurlCode(code, method, url, options);
 
   url = curl.getInfo('EFFECTIVE_URL').data as string;
   const statusCode = curl.getInfo('RESPONSE_CODE').data as number;
   const body = bufferWrap.body;
-
   const headers = parseReturnedHeaders(returnedHeaderArray);
-
   const getBody: GetBody = (encoding?) => {
     checkGetBodyStatus(statusCode, body);
     return typeof encoding === 'string' ? body.toString(encoding) as any : body;

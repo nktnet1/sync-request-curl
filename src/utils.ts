@@ -9,9 +9,11 @@ export const handleQs = (url: string, qs: { [key: string]: any }): string => {
   Object.entries(qs).forEach(([key, value]) => {
     if (Array.isArray(value)) {
       queryParams.delete(key);
-      value.forEach((item, i) => queryParams.append(`${key}[${i}]`, item.toString()));
-    } else {
-      queryParams.set(key, value.toString());
+      value.forEach((item, i) => queryParams.append(`${key}[${i}]`, String(item)));
+    } else if (value === null) {
+      queryParams.set(key, '');
+    } else if (value !== undefined) {
+      queryParams.set(key, String(value));
     }
   });
 
