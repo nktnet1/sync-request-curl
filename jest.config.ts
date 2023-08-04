@@ -13,6 +13,7 @@ const config: Config = {
     '^.+\\.(ts|tsx|js)$': 'ts-jest'
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  collectCoverageFrom: ['src/**/*.ts', '!tests'],
 };
 
 export default config;
