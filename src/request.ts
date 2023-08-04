@@ -29,34 +29,39 @@ const handleBody = (curl: Easy, options: Options, buffer: { body: Buffer }, http
 };
 
 const request = (method: HttpVerb, url: string, options: Options = {}): Response => {
+  // Initialing curl object with custom options
   const curl = new Easy();
-
   curl.setOpt(Curl.option.CUSTOMREQUEST, method);
   curl.setOpt(Curl.option.TIMEOUT, options.timeout || false);
   curl.setOpt(Curl.option.FOLLOWLOCATION, options.followRedirects === undefined || options.followRedirects);
   curl.setOpt(Curl.option.MAXREDIRS, options.maxRedirects || Number.MAX_SAFE_INTEGER);
 
+  // Query string parameters
   handleQueryString(curl, url, options.qs);
 
+  // Headers (both incoming and outgoing)
   const httpHeaders = parseIncomingHeaders(options.headers);
   const returnedHeaderArray: string[] = [];
   handleOutgoingHeaders(curl, returnedHeaderArray);
 
+  // Body (and JSON)
   const bufferWrap = { body: Buffer.alloc(0) };
   handleBody(curl, options, bufferWrap, httpHeaders);
 
+  // Execute request
   curl.setOpt(Curl.option.HTTPHEADER, httpHeaders);
   const code = curl.perform();
   checkValidCurlCode(code, method, url, options);
 
-  url = curl.getInfo('EFFECTIVE_URL').data as string;
+  // Creating return object
   const statusCode = curl.getInfo('RESPONSE_CODE').data as number;
-  const body = bufferWrap.body;
   const headers = parseReturnedHeaders(returnedHeaderArray);
+  const body = bufferWrap.body;
   const getBody: GetBody = (encoding?) => {
     checkGetBodyStatus(statusCode, body);
     return typeof encoding === 'string' ? body.toString(encoding) as any : body;
   };
+  url = curl.getInfo('EFFECTIVE_URL').data as string;
 
   curl.close();
   return { statusCode, headers, body, getBody, url };

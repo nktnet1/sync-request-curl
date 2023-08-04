@@ -4,21 +4,17 @@ import { HttpVerb, Options } from './types';
 
 export const handleQs = (url: string, qs: { [key: string]: any }): string => {
   const urlObj = new URL(url);
-  const queryParams = urlObj.searchParams;
-
   Object.entries(qs).forEach(([key, value]) => {
     if (Array.isArray(value)) {
-      queryParams.delete(key);
-      value.forEach((item, i) => queryParams.append(`${key}[${i}]`, String(item)));
+      urlObj.searchParams.delete(key);
+      value.forEach((item, i) => urlObj.searchParams.append(`${key}[${i}]`, String(item)));
     } else if (value === null) {
-      queryParams.set(key, '');
+      urlObj.searchParams.set(key, '');
     } else if (value !== undefined) {
-      queryParams.set(key, String(value));
+      urlObj.searchParams.set(key, String(value));
     }
   });
-
-  urlObj.search = queryParams.toString();
-
+  urlObj.search = urlObj.searchParams.toString();
   return urlObj.href;
 };
 
