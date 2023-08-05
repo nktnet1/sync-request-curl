@@ -30,11 +30,13 @@ This library was designed to run on NodeJS. It cannot be used in a browser.
 - [4. Caveats](#4-caveats)
 
 ## 1. Installation
+
 ```
 npm install sync-request-curl
 ```
 
-On MacOS, there may be an error in the installation process. In most cases can be fixed by following this [GitHub issue](https://github.com/JCMais/node-libcurl/issues/296).
+On MacOS, there may be an error in the installation process.
+This can often be fixed by following this [GitHub issue](https://github.com/JCMais/node-libcurl/issues/296).
 
 ## 2. Usage
 
