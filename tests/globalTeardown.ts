@@ -1,14 +1,6 @@
-import { ChildProcessWithoutNullStreams } from 'child_process';
-import { teardown as teardownDevServer } from 'jest-dev-server';
-
-interface SpawndChildProcess extends ChildProcessWithoutNullStreams {
-  destroy: () => Promise<void>;
-}
+import { teardown } from 'jest-dev-server';
 
 module.exports = async () => {
-  globalThis.servers.forEach((child: SpawndChildProcess) => {
-    child.kill('SIGINT');
-  });
-
-  await teardownDevServer(globalThis.servers);
+  globalThis.servers.forEach(child => child.kill('SIGINT'));
+  await teardown(globalThis.servers);
 };

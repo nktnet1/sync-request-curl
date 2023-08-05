@@ -57,7 +57,7 @@ describe('GET requests', () => {
   });
 
   test('GET request with empty array', () => {
-    const value = [];
+    const value: string[] = [];
     const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
     expect(res).toMatchObject({ code: 200, json: {} });
   });

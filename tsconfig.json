@@ -6,14 +6,16 @@
     "lib": ["es5", "es2015", "esnext", "dom"],
     "types": ["node", "jest"],
     "moduleResolution": "node",
-    "noImplicitAny": false,
+    "noImplicitAny": true,
     "noUnusedLocals": true,
     "sourceMap": true,
     "strict": true,
     "outDir": "dist/esm",
+    "skipLibCheck": true,
     "target": "es6"
   },
   "include": [
     "src/**/*.ts",
+    "global.d.ts"
   ],
 }
