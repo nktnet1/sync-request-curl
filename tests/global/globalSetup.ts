@@ -1,5 +1,5 @@
 import { setup } from 'jest-dev-server';
-import { HOST as host, PORT as port, DEBUG as debug } from './app/config';
+import { HOST as host, PORT as port, DEBUG as debug } from '../app/config';
 
 module.exports = async () => {
   const command = 'npm run start';

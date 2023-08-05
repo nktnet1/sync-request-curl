@@ -16,6 +16,6 @@
   },
   "include": [
     "src/**/*.ts",
-    "global.d.ts"
+    "tests/global/global.d.ts"
   ],
 }

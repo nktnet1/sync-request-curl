@@ -11,7 +11,7 @@
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "scripts": {
-    "start": "ts-node tests/server",
+    "start": "ts-node tests/app/server",
     "dev": "ts-node-dev --watch tests/app tests/server",
     "test": "jest",
     "test:coverage": "jest --coverage",
