@@ -6,9 +6,13 @@
 &nbsp;
 [![Maintainability](https://api.codeclimate.com/v1/badges/3ec8c0ddebe848926277/maintainability)](https://codeclimate.com/github/nktnet1/sync-request-curl/maintainability)
 
-[![Known Vulnerabilities](https://snyk.io/test/github/nktnet1/sync-request-curl/badge.svg)](https://snyk.io/test/github/nktnet1/sync-request-curl)
+[![Snyk Security](https://snyk.io/test/github/nktnet1/sync-request-curl/badge.svg)](https://snyk.io/test/github/nktnet1/sync-request-curl)
+&nbsp;
+![GitHub top language](https://img.shields.io/github/languages/top/nktnet1/sync-request-curl)
+&nbsp;
+[![Depfu Dependencies](https://badges.depfu.com/badges/6c4074c4d23ad57ee2bfd9ff90456090/overview.svg)](https://depfu.com/github/nktnet1/sync-request-curl?project_id=39032)
 
-[![Release](https://img.shields.io/npm/v/sync-request-curl)](https://www.npmjs.com/package/sync-request-curl?activeTab=versions)
+[![NPM Version](https://img.shields.io/npm/v/sync-request-curl?logo=npm)](https://www.npmjs.com/package/sync-request-curl?activeTab=versions)
 &nbsp;
 [![NPM License](https://img.shields.io/npm/l/sync-request-curl)](https://opensource.org/license/mit/)
 &nbsp;
