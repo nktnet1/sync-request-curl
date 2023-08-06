@@ -6,6 +6,8 @@
 &nbsp;
 [![Maintainability](https://api.codeclimate.com/v1/badges/3ec8c0ddebe848926277/maintainability)](https://codeclimate.com/github/nktnet1/sync-request-curl/maintainability)
 
+[![Known Vulnerabilities](https://snyk.io/test/github/nktnet1/sync-request-curl/badge.svg)](https://snyk.io/test/github/nktnet1/sync-request-curl)
+
 [![Release](https://img.shields.io/npm/v/sync-request-curl)](https://www.npmjs.com/package/sync-request-curl?activeTab=versions)
 &nbsp;
 [![NPM License](https://img.shields.io/npm/l/sync-request-curl)](https://opensource.org/license/mit/)
