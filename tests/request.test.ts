@@ -121,6 +121,27 @@ describe('Headers', () => {
 
 // ========================================================================= //
 
+describe('Correctly set content-length', () => {
+  test('No options', () => {
+    const res = wrapperRequest('POST', SERVER_URL + '/content/length');
+    expect(res).toMatchObject({ code: 200, json: { length: '0' } });
+  });
+
+  test('JSON payload', () => {
+    const json = { message: 'hi', sender: 'Tam' };
+    const res = wrapperRequest('POST', SERVER_URL + '/content/length', { json });
+    expect(res).toMatchObject({ code: 200, json: { length: '31' } });
+  });
+
+  test('Body payload', () => {
+    const body = '{"message":"hi","sender":"Tam"}';
+    const res = wrapperRequest('POST', SERVER_URL + '/content/length', { body });
+    expect(res).toMatchObject({ code: 200, json: { length: '31' } });
+  });
+});
+
+// ========================================================================= //
+
 describe('Body (instead of JSON)', () => {
   test('PUT request code 401', () => {
     const value = { value: 'pueko' };

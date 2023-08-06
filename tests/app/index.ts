@@ -46,6 +46,10 @@ app.get('/redirect/destination', (_: Request, res: Response) => {
   res.status(200).json({ message: 'Redirect success!' });
 });
 
+app.post('/content/length', (req: Request, res: Response) => {
+  res.status(200).json({ length: req.headers['content-length'] });
+});
+
 app.use(errorHandler());
 
 export default app;
