@@ -16,12 +16,15 @@ const handleOutgoingHeaders = (curl: Easy, returnedHeaderArray: string[]) => {
 };
 
 const handleBody = (curl: Easy, options: Options, buffer: { body: Buffer }, httpHeaders: string[]) => {
+  let payload = '';
   if (options.json) {
     httpHeaders.push('Content-Type: application/json');
-    curl.setOpt(Curl.option.POSTFIELDS, JSON.stringify(options.json));
+    payload = JSON.stringify(options.json);
   } else if (options.body) {
-    curl.setOpt(Curl.option.POSTFIELDS, String(options.body));
+    payload = options.body.toString();
   }
+  httpHeaders.push(`Content-Length: ${payload.length}`);
+  curl.setOpt(Curl.option.POSTFIELDS, payload);
   curl.setOpt(Curl.option.WRITEFUNCTION, (buff, nmemb, size) => {
     buffer.body = Buffer.concat([buffer.body, buff.subarray(0, nmemb * size)]);
     return nmemb * size;

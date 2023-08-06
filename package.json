@@ -12,7 +12,7 @@
   "module": "dist/esm/index.js",
   "scripts": {
     "start": "ts-node tests/app/server",
-    "dev": "ts-node-dev --watch tests/app tests/server",
+    "dev": "ts-node-dev --watch tests/app tests/app/server",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "lint": "eslint './**/*.{ts,js}'",
