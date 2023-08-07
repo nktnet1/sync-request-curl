@@ -182,6 +182,11 @@ Only the following subset of options is supported for the time being:
     <td>Sets the maximum number of redirects to follow before throwing an Error. Defaults to <code>Number.MAX_SAFE_INTEGER</code>.</td>
     <td><code>3</code></td>
   </tr>
+  <tr>
+    <td>sslVerifypeer</td>
+    <td> Defaults to true, but can be set to false to send insecure requests. This can be useful on Windows which can sometimes have SSL issues (Curlcode 60).</td>
+    <td><code>false</code></td>
+  </tr>
 </table>
 
 In [src/types.ts](src/types.ts), the following is defined:
@@ -195,6 +200,7 @@ export interface Options {
   body?: string | Buffer;
   followRedirects?: boolean;
   maxRedirects?: number;
+  sslVerifypeer?: boolean;
 }
 ```
 

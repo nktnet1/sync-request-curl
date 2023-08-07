@@ -32,6 +32,7 @@ export interface Options {
   body?: string | Buffer;
   followRedirects?: boolean;
   maxRedirects?: number;
+  sslVerifypeer?: boolean;
 }
 
 // Infer tpe `string` if encoding is specified, otherwise `string | Buffer
