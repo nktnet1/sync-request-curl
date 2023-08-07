@@ -29,7 +29,7 @@ export interface Options {
   qs?: { [key: string]: any };
   json?: any;
   timeout?: number;
-  body?: string | Buffer | NodeJS.ReadableStream;
+  body?: string | Buffer;
   followRedirects?: boolean;
   maxRedirects?: number;
 }
