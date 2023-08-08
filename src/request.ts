@@ -38,7 +38,7 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
   curl.setOpt(Curl.option.TIMEOUT, options.timeout || 0);
   curl.setOpt(Curl.option.FOLLOWLOCATION, options.followRedirects === undefined || options.followRedirects);
   curl.setOpt(Curl.option.MAXREDIRS, options.maxRedirects || Number.MAX_SAFE_INTEGER);
-  curl.setOpt(Curl.option.SSL_VERIFYPEER, Boolean(options.insecure));
+  curl.setOpt(Curl.option.SSL_VERIFYPEER, !options.insecure);
 
   // Query string parameters
   handleQueryString(curl, url, options.qs);
