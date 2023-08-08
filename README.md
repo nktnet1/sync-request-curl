@@ -210,20 +210,37 @@ Below are some additional options available from [node-libcurl](https://github.c
     <td><code>true</code></td>
     <td><code>false</code></td>
   </tr>
+  <tr>
+    <td>setEasyOptions</td>
+    <td>Optional callback to set additional curl options for the <a href='https://curl.se/libcurl/c/easy_setopt_options.html'>Easy Interface</a>. This has priority over existing options.</td>
+    <td><code>(curl, options) => { curl.setOpt(options.FOLLOWLOCATION, false); };</code></td>
+    <td><code>undefined</code></td>
+  </tr>
 </table>
 
-In [src/types.ts](src/types.ts), the following is defined:
+<br/>
+
+In [src/types.ts](src/types.ts), the `Options` interface following is defined as:
 
 ```typescript
 export interface Options {
+  /*
+   * sync-request options
+   */
   headers?: IncomingHttpHeaders;
   qs?: { [key: string]: any };
   json?: any;
-  timeout?: number;
   body?: string | Buffer;
+
+  timeout?: number;
   followRedirects?: boolean;
   maxRedirects?: number;
+
+  /*
+   * node-libcurl options
+   */
   insecure?: boolean;
+  setEasyOptions?: SetEasyOptionCallback;
 }
 ```
 
@@ -235,7 +252,7 @@ export interface Options {
 - **`getBody`** - a function with an optional `encoding` argument that returns the `body` if `encoding` is undefined, otherwise `body.toString(encoding)`. If `statusCode >= 300`, an `Error` is thrown instead.
 - **`url`** - the final URL used in the request after all redirections and with the query string parameters appended.
 
-In [src/types.ts](src/types.ts), the following is defined:
+In [src/types.ts](src/types.ts), the `Response` interface is defined as:
 
 ```typescript
 export interface Response {
