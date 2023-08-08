@@ -28,11 +28,12 @@ export interface Options {
   headers?: IncomingHttpHeaders;
   qs?: { [key: string]: any };
   json?: any;
-  timeout?: number;
   body?: string | Buffer;
+
+  timeout?: number;
   followRedirects?: boolean;
   maxRedirects?: number;
-  sslVerifypeer?: boolean;
+  insecure?: boolean;
 }
 
 // Infer tpe `string` if encoding is specified, otherwise `string | Buffer

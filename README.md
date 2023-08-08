@@ -134,6 +134,7 @@ Only the following subset of options is supported for the time being:
     <th>Option</th>
     <th>Description</th>
     <th>Example</th>
+    <th>Default</th>
   </tr>
   <tr>
     <td>qs</td>
@@ -141,6 +142,7 @@ Only the following subset of options is supported for the time being:
       An object containing query string parameters which will be appended to the URL.
     </td>
     <td><code>{ message: 'Hello, world!' }</code></td>
+    <td><code>undefined</code></td>
   </tr>
   <tr>
     <td>headers</td>
@@ -148,6 +150,7 @@ Only the following subset of options is supported for the time being:
       HTTP headers for the request.
     </td>
     <td><code>{ token: 'abcdefg' }</code></td>
+    <td><code>undefined</code></td>
   </tr>
   <tr>
     <td>json</td>
@@ -155,6 +158,7 @@ Only the following subset of options is supported for the time being:
       Sets the body as a JSON representation of the value and automatically adds <code>Content-type: application/json</code> to the header.</td>
     <td>
     <code>{ email: 'ab@c.com', password: 'comp1531' }</code></td>
+    <td><code>undefined</code></td>
   </tr>
   <tr>
     <td>body</td>
@@ -162,6 +166,7 @@ Only the following subset of options is supported for the time being:
       Body for POST and PUT requests. We recommended using <code>json</code> instead for JSON payloads, otherwise the <code>Content-Type</code> will need to be set manually.
     </td>
     <td><code>JSON.stringify({ email: 'ab@c.com', password: 'comp1531' })</code></td>
+    <td><code>undefined</code></td>
   </tr>
   <tr>
     <td>timeout</td>
@@ -169,22 +174,26 @@ Only the following subset of options is supported for the time being:
       Times out if no response is returned within the given number of milliseconds
     </td>
     <td><code>2000<code></td>
+    <td><code>0</code><br/>(never times out)</td>
   </tr>
   <tr>
     <td>followRedirects</td>
     <td>
-      Defaults to true, but can be set to false to not follow any redirects (302) automatically
+      Whether redirects (status code 302) should be followed automatically
     </td>
     <td><code>false</code></td>
+    <td><code>true</code></td>
   </tr>
   <tr>
     <td>maxRedirects</td>
-    <td>Sets the maximum number of redirects to follow before throwing an Error. Defaults to <code>Number.MAX_SAFE_INTEGER</code>.</td>
+    <td>Sets the maximum number of redirects to follow before throwing an Error.</td>
     <td><code>3</code></td>
+    <td><code>Number.MAX_SAFE_INTEGER</code></td>
   </tr>
   <tr>
-    <td>sslVerifypeer</td>
-    <td> Defaults to true, but can be set to false to send insecure requests. This can be useful on Windows which can sometimes have SSL issues (Curlcode 60).</td>
+    <td>insecure</td>
+    <td> Set to false to send insecure requests. This can be useful on Windows which can sometimes have SSL issues (Curlcode 60).</td>
+    <td><code>true</code></td>
     <td><code>false</code></td>
   </tr>
 </table>
