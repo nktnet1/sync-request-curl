@@ -141,7 +141,13 @@ Only the following options from [sync-request](https://www.npmjs.com/package/syn
     <td>
       An object containing query string parameters which will be appended to the URL.
     </td>
-    <td><code>{ message: 'Hello, world!' }</code></td>
+    <td>
+<pre>
+{
+  message: 'Hi'
+}
+</pre>
+    </td>
     <td><code>undefined</code></td>
   </tr>
   <tr>
@@ -149,7 +155,13 @@ Only the following options from [sync-request](https://www.npmjs.com/package/syn
     <td>
       HTTP headers for the request.
     </td>
-    <td><code>{ token: 'abcdefg' }</code></td>
+    <td>
+<pre>
+{
+  token: 'abc'
+}
+</pre>
+    </td>
     <td><code>undefined</code></td>
   </tr>
   <tr>
@@ -157,7 +169,11 @@ Only the following options from [sync-request](https://www.npmjs.com/package/syn
     <td>
       Sets the body as a JSON representation of the value and automatically adds <code>Content-type: application/json</code> to the header.</td>
     <td>
-    <code>{ email: 'ab@c.com', password: 'comp1531' }</code></td>
+<pre>{
+  email: 'ab@c.com',
+  password: 'comp1531'
+}</pre>
+    </td>
     <td><code>undefined</code></td>
   </tr>
   <tr>
@@ -165,7 +181,11 @@ Only the following options from [sync-request](https://www.npmjs.com/package/syn
     <td>
       Body for POST and PUT requests. We recommended using <code>json</code> instead for JSON payloads, otherwise the <code>Content-Type</code> will need to be set manually.
     </td>
-    <td><code>JSON.stringify({ email: 'ab@c.com', password: 'comp1531' })</code></td>
+    <td>
+<pre>JSON.stringify({
+  email: 'ab@c.com',
+  password: 'comp1531'
+}) </pre></td>
     <td><code>undefined</code></td>
   </tr>
   <tr>
@@ -173,7 +193,7 @@ Only the following options from [sync-request](https://www.npmjs.com/package/syn
     <td>
       Times out if no response is returned within the given number of milliseconds
     </td>
-    <td><code>2000<code></td>
+    <td><pre>2000</pre></td>
     <td><code>0</code><br/>(never times out)</td>
   </tr>
   <tr>
@@ -181,13 +201,13 @@ Only the following options from [sync-request](https://www.npmjs.com/package/syn
     <td>
       Whether redirects (status code 302) should be followed automatically
     </td>
-    <td><code>false</code></td>
+    <td><pre>false</pre></td>
     <td><code>true</code></td>
   </tr>
   <tr>
     <td>maxRedirects</td>
     <td>Sets the maximum number of redirects to follow before throwing an Error.</td>
-    <td><code>3</code></td>
+    <td><pre>3</pre></td>
     <td><code>Number.MAX_SAFE_INTEGER</code></td>
   </tr>
 
@@ -207,13 +227,17 @@ Below are some additional options available from [node-libcurl](https://github.c
   <tr>
     <td>insecure</td>
     <td> Set to false to send insecure requests. This can be useful on Windows which can sometimes have SSL issues (Curlcode 60).</td>
-    <td><code>true</code></td>
+    <td><pre>true</pre></td>
     <td><code>false</code></td>
   </tr>
   <tr>
     <td>setEasyOptions</td>
     <td>Optional callback to set additional curl options for the <a href='https://curl.se/libcurl/c/easy_setopt_options.html'>Easy Interface</a>. This has priority over existing options.</td>
-    <td><code>(curl, options) => { curl.setOpt(options.FOLLOWLOCATION, false); };</code></td>
+    <td>
+<pre>(c, o) => {
+  c.setOpt(o.MAXREDIRS, 3);
+};</pre>
+    </td>
     <td><code>undefined</code></td>
   </tr>
 </table>
