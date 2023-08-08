@@ -22,9 +22,9 @@
 
 Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but 20 times more quickly.
 
-Leverages [node-libcurl](https://github.com/JCMais/node-libcurl) for performance as opposed to spawning child processes like sync-request.
+Leverages [node-libcurl](https://github.com/JCMais/node-libcurl) for performance instead of spawning child processes like sync-request.
 
-This library was designed to run on NodeJS. It cannot be used in a browser.
+This library was designed to run on NodeJS. It will not work in a browser.
 
 - [1. Installation](#1-installation)
 - [2. Usage](#2-usage)
@@ -33,7 +33,8 @@ This library was designed to run on NodeJS. It cannot be used in a browser.
   - [2.3. Options](#23-options)
   - [2.4. Response](#24-response)
 - [3. License](#3-license)
-- [4. Caveats](#4-caveats)
+- [4. Windows/MacOS](#4-windowsmacos)
+- [5. Caveats](#5-caveats)
 
 ## 1. Installation
 
@@ -41,8 +42,7 @@ This library was designed to run on NodeJS. It cannot be used in a browser.
 npm install sync-request-curl
 ```
 
-On MacOS, there may be an error in the installation process.
-This can often be fixed by following this [GitHub issue](https://github.com/JCMais/node-libcurl/issues/296).
+Please also refer to the [Windows/MacOS](#4-windowsmacos) section for known issues and workarounds.
 
 ## 2. Usage
 
@@ -127,7 +127,7 @@ e.g. https://toohak.fly.dev
 
 ### 2.3. Options
 
-Only the following subset of options from [sync-request](https://www.npmjs.com/package/sync-request) is supported for the time being:
+Only the following options from [sync-request](https://www.npmjs.com/package/sync-request) are supported for the time being:
 
 <table>
   <tr>
@@ -268,10 +268,34 @@ export interface Response {
 
 [MIT](https://opensource.org/license/mit/)
 
-## 4. Caveats
+## 4. Windows/MacOS
+
+### 4.1. Windows
+
+Your requests may unexpectedly fail with a [Libcurl Error](https://curl.se/libcurl/c/libcurl-errors.html) (code 60, CURLE_PEER_FAILED_VERIFICATION) when using NodeJS natively on Windows.
+
+The reason is covered in the below resources:
+- https://github.com/JCMais/node-libcurl/issues/301
+- https://stackoverflow.com/a/34883260/22324694
+
+One quick workaround is to set the `insecure` option to `true` when sending your requests. This is the same as setting the Libcurl Easy's equivalent [SSL_VERIFYPEER](https://curl.se/libcurl/c/CURLOPT_SSL_VERIFYPEER.html) to `0`, or using `curl` in the command line with the [`-k` or `--insecure`](https://curl.se/docs/manpage.html#-k) option.
+
+Alternatively, consider using [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/install).
+
+### 4.2. MacOS
+
+The build for MacOS may fail during the installation process.
+
+In most cases, this can be fixed by following these Github issues:
+- https://github.com/JCMais/node-libcurl/issues/296
+- https://github.com/JCMais/node-libcurl/issues/382
+
+Otherwise, we recommend uninstalling this library and using [sync-request](https://github.com/JCMais/node-libcurl/issues/382) instead.
+
+## 5. Caveats
 
 This library was developed mainly to improve performance with sending synchronous requests in NodeJS.
 
 It was designed to work with UNIX-like systems for UNSW students enrolled in COMP1531 Software Engineering Fundamentals.
 
-Tested to be working on Arch & Debian Linux. Since [node-libcurl](https://github.com/JCMais/node-libcurl) is the core of this module, it is likely also compatible with other operating systems such as MacOS and Windows.
+It has been tested to be working on Arch & Debian Linux and is compatible with Windows/MacOS

@@ -39,8 +39,8 @@ export const parseReturnedHeaders = (headerLines: string[]): IncomingHttpHeaders
 export const checkValidCurlCode = (code: CurlCode, method: HttpVerb, url: string, options: Options) => {
   if (code !== CurlCode.CURLE_OK) {
     throw new Error(`
-      Curl request failed with code ${code}
-      Please look up libcurl error code!
+      Curl request failed with code ${code}.
+      Please look up the Libcurl Error (code ${code}) here:
         - https://curl.se/libcurl/c/libcurl-errors.html
 
       DEBUG: {
