@@ -33,9 +33,10 @@ This library was designed to run on NodeJS. It will not work in a browser.
   - [2.3. Options](#23-options)
   - [2.4. Response](#24-response)
 - [3. License](#3-license)
-- [4. Windows/MacOS](#4-windowsmacos)
+- [4. Compatibility](#4-compatibility)
   - [4.1. Windows](#41-windows)
   - [4.2. MacOS](#42-macos)
+  - [4.3. Linux](#43-linux)
 - [5. Caveats](#5-caveats)
 
 ## 1. Installation
@@ -44,7 +45,7 @@ This library was designed to run on NodeJS. It will not work in a browser.
 npm install sync-request-curl
 ```
 
-Please also refer to the [Windows/MacOS](#4-windowsmacos) section for known issues and workarounds.
+Please also refer to the [compatibility](#4-compatibility) section for known issues and workarounds.
 
 ## 2. Usage
 
@@ -194,7 +195,7 @@ JSON.stringify({
   <tr>
     <td>timeout</td>
     <td>
-      Times out if no response is returned within the given number of milliseconds
+      Times out if no response is returned within the given number of milliseconds.
     </td>
     <td><pre>2000</pre></td>
     <td><code>0</code><br/>(no timeout)</td>
@@ -202,7 +203,7 @@ JSON.stringify({
   <tr>
     <td>followRedirects</td>
     <td>
-      Sets whether redirects (status code 302) should be followed automatically
+      Sets whether redirects (status code 302) should be followed automatically.
     </td>
     <td><pre>false</pre></td>
     <td><code>true</code></td>
@@ -229,7 +230,7 @@ Below are some additional options available from [node-libcurl](https://github.c
   </tr>
   <tr>
     <td>insecure</td>
-    <td> Set to false to send insecure requests. This can be useful on Windows which can sometimes have SSL issues (Curlcode 60).</td>
+    <td> Set to false to send insecure requests. This can be useful on Windows which can sometimes have SSL issues (Libcurl code 60).</td>
     <td><pre>true</pre></td>
     <td><code>false</code></td>
   </tr>
@@ -327,13 +328,13 @@ DEALING S IN THE SOFTWARE.
 
 </details>
 
-<br/>
-
-## 4. Windows/MacOS
+## 4. Compatibility
 
 ### 4.1. Windows
 
-Your requests may unexpectedly fail with a [Libcurl Error](https://curl.se/libcurl/c/libcurl-errors.html) (code 60, CURLE_PEER_FAILED_VERIFICATION) when using NodeJS natively on Windows.
+For installation issues, be sure to review the [Windows Build Requirements](https://github.com/JCMais/node-libcurl#building-on-windows) from node-libcurl's documentation.
+
+In addition, your requests may unexpectedly fail with a [Libcurl Error](https://curl.se/libcurl/c/libcurl-errors.html) (code 60, CURLE_PEER_FAILED_VERIFICATION) when using NodeJS natively on Windows.
 
 The reason is covered in the below resources:
 - https://github.com/JCMais/node-libcurl/issues/301
@@ -351,7 +352,15 @@ In most cases, this can be fixed by following these Github issues:
 - https://github.com/JCMais/node-libcurl/issues/296
 - https://github.com/JCMais/node-libcurl/issues/382
 
-Otherwise, we recommend uninstalling this library and using [sync-request](https://github.com/JCMais/node-libcurl/issues/382) instead.
+and carefully reviewing the [MacOS Build Requirements](https://github.com/JCMais/node-libcurl#building-on-macos) from node-libcurl's documentation. Otherwise, we recommend uninstalling this library and installing [sync-request](https://github.com/JCMais/node-libcurl/issues/382).
+
+### 4.3. Linux
+
+In rare cases, the build for distributions such as Debian or Ubuntu may fail. This is attributed to missing dependencies such as Python or Libcurl. Below are some related issues:
+- https://github.com/JCMais/node-libcurl/issues/374
+- https://github.com/JCMais/node-libcurl/issues/376
+
+Be sure to also check the [Linux Build Requirements](https://github.com/JCMais/node-libcurl#building-on-linux) from node-libcurl's documentation.
 
 ## 5. Caveats
 
