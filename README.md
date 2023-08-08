@@ -60,9 +60,9 @@ request(method, url, options);
 ```typescript
 import request from 'sync-request-curl';
 
-const response = request('GET', 'https://comp1531namesages.alwaysdata.net');
-console.log('Status Code:', response.statusCode);
-const jsonBody = JSON.parse(response.body.toString());
+const res = request('GET', 'https://comp1531namesages.alwaysdata.net');
+console.log('Status Code:', res.statusCode);
+const jsonBody = JSON.parse(res.body.toString());
 console.log('Returned JSON object:', jsonBody);
 ```
 
@@ -71,15 +71,15 @@ console.log('Returned JSON object:', jsonBody);
 ```typescript
 import request from 'sync-request-curl';
 
-const response = request(
+const res = request(
   'GET',
   'https://comp1531forum.alwaysdata.net/echo/echo',
   {
     qs: { message: 'Hello, world!' },
   }
 );
-console.log('Status Code:', response.statusCode);
-const jsonBody = JSON.parse(response.body.toString());
+console.log('Status Code:', res.statusCode);
+const jsonBody = JSON.parse(res.body.toString());
 console.log('Returned JSON object:', jsonBody);
 ```
 
@@ -88,7 +88,7 @@ console.log('Returned JSON object:', jsonBody);
 ```typescript
 import request from 'sync-request-curl';
 
-const response = request(
+const res = request(
   'POST',
   'https://comp1531quiz.alwaysdata.net/quiz/create',
   {
@@ -99,8 +99,8 @@ const response = request(
     },
   }
 );
-console.log('Status Code:', response.statusCode);
-const jsonBody = JSON.parse(response.body.toString());
+console.log('Status Code:', res.statusCode);
+const jsonBody = JSON.parse(res.body.toString());
 console.log('Returned JSON Object:', jsonBody);
 
 ```
@@ -353,4 +353,4 @@ This library was developed mainly to improve performance with sending synchronou
 
 It was designed to work with UNIX-like systems for UNSW students enrolled in COMP1531 Software Engineering Fundamentals.
 
-It has been tested to be working on Arch & Debian Linux and is compatible with Windows/MacOS
+It has been tested to be working on Arch & Debian Linux and is compatible with Windows/MacOS.
