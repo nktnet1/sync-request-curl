@@ -55,12 +55,17 @@ request(method, url, options);
 <details closed>
 <summary>Examples (click to view)</summary>
 
+<br/>
+
 `GET` request without options
 
 ```typescript
 import request from 'sync-request-curl';
 
-const res = request('GET', 'https://comp1531namesages.alwaysdata.net');
+const res = request(
+    'GET',
+    'https://comp1531namesages.alwaysdata.net'
+);
 console.log('Status Code:', res.statusCode);
 const jsonBody = JSON.parse(res.body.toString());
 console.log('Returned JSON object:', jsonBody);
@@ -102,7 +107,6 @@ const res = request(
 console.log('Status Code:', res.statusCode);
 const jsonBody = JSON.parse(res.body.toString());
 console.log('Returned JSON Object:', jsonBody);
-
 ```
 
 </details>
@@ -116,7 +120,7 @@ Please note that this library only supports a subset of the original features wh
 ### 2.1. Method
 
 HTTP method (of type `HttpVerb`)
-- e.g. `PUT`/`POST`/`GET`/`DELETE`.
+- e.g. `PUT`/`POST`/`GET`/`DELETE`
 
 ### 2.2. URL
 
@@ -294,10 +298,10 @@ export interface Response {
 
 ## 3. License
 
-
-
 <details closed>
-<summary><a href="https://opensource.org/license/mit" target="_blank">MIT</a></summary>
+<summary>Massachusetts Institute of Technology (<a href="https://opensource.org/license/mit" target="_blank">MIT</a>)</summary>
+
+<br/>
 
 ```
 Copyright (c) 2023 Khiet Tam Nguyen
@@ -322,6 +326,8 @@ DEALING S IN THE SOFTWARE.
 ```
 
 </details>
+
+<br/>
 
 ## 4. Windows/MacOS
 
