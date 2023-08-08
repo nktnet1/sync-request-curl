@@ -193,12 +193,12 @@ JSON.stringify({
       Times out if no response is returned within the given number of milliseconds
     </td>
     <td><pre>2000</pre></td>
-    <td><code>0</code><br/>(never times out)</td>
+    <td><code>0</code><br/>(no timeout)</td>
   </tr>
   <tr>
     <td>followRedirects</td>
     <td>
-      Whether redirects (status code 302) should be followed automatically
+      Sets whether redirects (status code 302) should be followed automatically
     </td>
     <td><pre>false</pre></td>
     <td><code>true</code></td>
@@ -207,7 +207,7 @@ JSON.stringify({
     <td>maxRedirects</td>
     <td>Sets the maximum number of redirects to follow before throwing an Error.</td>
     <td><pre>3</pre></td>
-    <td><code>Number.MAX_SAFE_INTEGER</code></td>
+    <td><code>-1</code><br/>(no limit)</td>
   </tr>
 
 </table>
