@@ -34,6 +34,8 @@ This library was designed to run on NodeJS. It will not work in a browser.
   - [2.4. Response](#24-response)
 - [3. License](#3-license)
 - [4. Windows/MacOS](#4-windowsmacos)
+  - [4.1. Windows](#41-windows)
+  - [4.2. MacOS](#42-macos)
 - [5. Caveats](#5-caveats)
 
 ## 1. Installation
@@ -52,8 +54,6 @@ request(method, url, options);
 
 <details closed>
 <summary>Examples (click to view)</summary>
-
-<br/>
 
 `GET` request without options
 
@@ -109,21 +109,19 @@ console.log('Returned JSON Object:', jsonBody);
 
 <br/>
 
-See [sync-request](https://www.npmjs.com/package/sync-request) for the original documentation.
+See [sync-request](https://www.npmjs.com/package/sync-request) for the original documentation. All Libcurl Errors will contain a non-zero integer code that can be looked up [here](https://curl.se/libcurl/c/libcurl-errors.html).
 
-Please note that this library only supports a subset of the original features, which are summarised below.
+Please note that this library only supports a subset of the original features which are summarised below.
 
 ### 2.1. Method
 
 HTTP method (of type `HttpVerb`)
-
-e.g. `PUT`/`POST`/`GET`/`DELETE`.
+- e.g. `PUT`/`POST`/`GET`/`DELETE`.
 
 ### 2.2. URL
 
 URL as a string
-
-e.g. https://toohak.fly.dev
+- e.g. https://toohak.fly.dev
 
 ### 2.3. Options
 
@@ -144,7 +142,7 @@ Only the following options from [sync-request](https://www.npmjs.com/package/syn
     <td>
 <pre>
 {
-  message: 'Hi'
+  message: 'Hi!'
 }
 </pre>
     </td>
@@ -158,7 +156,7 @@ Only the following options from [sync-request](https://www.npmjs.com/package/syn
     <td>
 <pre>
 {
-  token: 'abc'
+  token: 'abcde'
 }
 </pre>
     </td>
@@ -170,8 +168,8 @@ Only the following options from [sync-request](https://www.npmjs.com/package/syn
       Sets the body as a JSON representation of the value and automatically adds <code>Content-type: application/json</code> to the header.</td>
     <td>
 <pre>{
-  email: 'ab@c.com',
-  password: 'comp1531'
+  name: 'Tam',
+  course: 1531
 }</pre>
     </td>
     <td><code>undefined</code></td>
@@ -182,9 +180,10 @@ Only the following options from [sync-request](https://www.npmjs.com/package/syn
       Body for POST and PUT requests. We recommended using <code>json</code> instead for JSON payloads, otherwise the <code>Content-Type</code> will need to be set manually.
     </td>
     <td>
-<pre>JSON.stringify({
-  email: 'ab@c.com',
-  password: 'comp1531'
+<pre>
+JSON.stringify({
+  name: 'Tam',
+  course: 1531
 }) </pre></td>
     <td><code>undefined</code></td>
   </tr>
@@ -234,9 +233,14 @@ Below are some additional options available from [node-libcurl](https://github.c
     <td>setEasyOptions</td>
     <td>Optional callback to set additional curl options for the <a href='https://curl.se/libcurl/c/easy_setopt_options.html'>Easy Interface</a>. This has priority over existing options.</td>
     <td>
-<pre>(c, o) => {
-  c.setOpt(o.MAXREDIRS, 3);
-};</pre>
+<pre>
+(curl, opt) => {
+  curl.setOpt(
+    opt.MAXREDIRS,
+    3
+  );
+};
+</pre>
     </td>
     <td><code>undefined</code></td>
   </tr>
