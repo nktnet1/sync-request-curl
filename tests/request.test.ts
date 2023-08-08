@@ -102,19 +102,19 @@ describe('POST Requests', () => {
 describe('Headers', () => {
   test('DELETE request with headers, code 401', () => {
     const value = 'header';
-    const res = wrapperRequest('DELETE', SERVER_URL + '/header', { headers: { value } });
+    const res = wrapperRequest('DELETE', SERVER_URL + '/delete', { headers: { value } });
     expect(res).toMatchObject({ code: 401, json: { error: "Cannot header 'header'!" } });
   });
 
   test('DELETE request with headers, valid value', () => {
     const value = 'abcdefghijklmnopqrstuvwxyz';
-    const res = wrapperRequest('DELETE', SERVER_URL + '/header', { headers: { value } });
+    const res = wrapperRequest('DELETE', SERVER_URL + '/delete', { headers: { value } });
     expect(res).toMatchObject({ code: 200, json: { value } });
   });
 
   test('DELETE request with headers, empty string', () => {
     const value = '';
-    const res = wrapperRequest('DELETE', SERVER_URL + '/header', { headers: { value } });
+    const res = wrapperRequest('DELETE', SERVER_URL + '/delete', { headers: { value } });
     expect(res).toMatchObject({ code: 200, json: { value } });
   });
 });
@@ -231,7 +231,7 @@ describe('Errors', () => {
 
   test('getBody() throw error for 401 status code', () => {
     const value = 'header';
-    const res = wrapperRequest('DELETE', SERVER_URL + '/header', { headers: { value } });
+    const res = wrapperRequest('DELETE', SERVER_URL + '/delete', { headers: { value } });
     expect(res.code).toBe(401);
     expect(() => res.rawResponse.getBody()).toThrow(Error);
   });

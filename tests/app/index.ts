@@ -17,7 +17,7 @@ app.get('/get', (req: Request, res: Response) => {
   res.json({ value });
 });
 
-app.delete('/header', (req: Request, res: Response) => {
+app.delete('/delete', (req: Request, res: Response) => {
   const value = req.headers.value;
   if (value === 'header') throw new createHttpError.Unauthorized("Cannot header 'header'!");
   res.json({ value });
