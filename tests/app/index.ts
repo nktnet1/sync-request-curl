@@ -11,27 +11,27 @@ app.use(morgan('dev'));
 
 app.get('/', (_: Request, res: Response) => res.json({ message: 'Hello, world!' }));
 
-app.get('/echo', (req: Request, res: Response) => {
+app.get('/get', (req: Request, res: Response) => {
   const value = req.query.value;
   if (value === 'echo') throw new createHttpError.BadRequest("Cannot echo 'echo'!");
   res.json({ value });
 });
 
-app.delete('/heako', (req: Request, res: Response) => {
+app.delete('/header', (req: Request, res: Response) => {
   const value = req.headers.value;
-  if (value === 'heako') throw new createHttpError.Unauthorized("Cannot heako 'heako'!");
+  if (value === 'header') throw new createHttpError.Unauthorized("Cannot header 'header'!");
   res.json({ value });
 });
 
-app.post('/poeko', (req: Request, res: Response) => {
+app.post('/post', (req: Request, res: Response) => {
   const value = req.body.value;
-  if (value === 'poeko') throw new createHttpError.BadRequest("Cannot poeko 'poeko'!");
+  if (value === 'post') throw new createHttpError.BadRequest("Cannot post 'post'!");
   res.json({ value });
 });
 
-app.put('/pueko', (req: Request, res: Response) => {
+app.put('/put', (req: Request, res: Response) => {
   const value = req.body.value;
-  if (value === 'pueko') throw new createHttpError.Forbidden("Cannot pueko 'pueko'!");
+  if (value === 'put') throw new createHttpError.Forbidden("Cannot put 'put'!");
   res.json({ value });
 });
 

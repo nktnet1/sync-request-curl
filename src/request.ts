@@ -35,9 +35,10 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
   // Initialing curl object with custom options
   const curl = new Easy();
   curl.setOpt(Curl.option.CUSTOMREQUEST, method);
-  curl.setOpt(Curl.option.TIMEOUT, options.timeout || false);
+  curl.setOpt(Curl.option.TIMEOUT, options.timeout || 0);
   curl.setOpt(Curl.option.FOLLOWLOCATION, options.followRedirects === undefined || options.followRedirects);
   curl.setOpt(Curl.option.MAXREDIRS, options.maxRedirects || Number.MAX_SAFE_INTEGER);
+  curl.setOpt(Curl.option.SSL_VERIFYPEER, Boolean(options.insecure));
 
   // Query string parameters
   handleQueryString(curl, url, options.qs);
