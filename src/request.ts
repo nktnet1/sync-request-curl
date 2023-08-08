@@ -52,8 +52,13 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
   const bufferWrap = { body: Buffer.alloc(0) };
   handleBody(curl, options, bufferWrap, httpHeaders);
 
-  // Execute request
   curl.setOpt(Curl.option.HTTPHEADER, httpHeaders);
+
+  if (options.setEasyOptions) {
+    options.setEasyOptions(curl, Curl.option);
+  }
+
+  // Execute request
   const code = curl.perform();
   checkValidCurlCode(code, method, url, options);
 
