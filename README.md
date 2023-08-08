@@ -237,7 +237,7 @@ Below are some additional options available from [node-libcurl](https://github.c
 (curl, opt) => {
   curl.setOpt(
     opt.URL,
-    'http://0'
+    'www.ck'
   );
 };
 </pre>
