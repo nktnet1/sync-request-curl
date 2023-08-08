@@ -127,7 +127,7 @@ e.g. https://toohak.fly.dev
 
 ### 2.3. Options
 
-Only the following subset of options is supported for the time being:
+Only the following subset of options from [sync-request](https://www.npmjs.com/package/sync-request) is supported for the time being:
 
 <table>
   <tr>
@@ -190,6 +190,20 @@ Only the following subset of options is supported for the time being:
     <td><code>3</code></td>
     <td><code>Number.MAX_SAFE_INTEGER</code></td>
   </tr>
+
+</table>
+
+<br/>
+
+Below are some additional options available from [node-libcurl](https://github.com/JCMais/node-libcurl):
+
+<table>
+  <tr>
+    <th>Option</th>
+    <th>Description</th>
+    <th>Example</th>
+    <th>Default</th>
+  </tr>
   <tr>
     <td>insecure</td>
     <td> Set to false to send insecure requests. This can be useful on Windows which can sometimes have SSL issues (Curlcode 60).</td>
@@ -209,7 +223,7 @@ export interface Options {
   body?: string | Buffer;
   followRedirects?: boolean;
   maxRedirects?: number;
-  sslVerifypeer?: boolean;
+  insecure?: boolean;
 }
 ```
 
