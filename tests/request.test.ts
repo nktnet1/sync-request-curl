@@ -1,9 +1,9 @@
-import request, { HttpVerb, Options } from '../src';
 import { SERVER_URL } from './app/config';
+import request, { HttpVerb, Options } from '../src';
 
 // ========================================================================= //
 
-const wrapperRequest = (method: HttpVerb, url: string, option?: Options) => {
+export const wrapperRequest = (method: HttpVerb, url: string, option?: Options) => {
   const rawResponse = request(method, url, option);
   let json: any;
   try {
@@ -28,55 +28,55 @@ describe('GET requests', () => {
 
   test('GET request with query string', () => {
     const value = 'Hello, world!';
-    const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
+    const res = wrapperRequest('GET', SERVER_URL + '/get', { qs: { value } });
     expect(res).toMatchObject({ code: 200, json: { value } });
   });
 
   test('GET request url returned correctly parsed', () => {
     const value = 'comp1531';
-    const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
-    expect(res.rawResponse.url).toStrictEqual(SERVER_URL + '/echo?value=comp1531');
+    const res = wrapperRequest('GET', SERVER_URL + '/get', { qs: { value } });
+    expect(res.rawResponse.url).toStrictEqual(SERVER_URL + '/get?value=comp1531');
   });
 
   test('GET request with query string, error 400', () => {
     const value = 'echo';
-    const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
+    const res = wrapperRequest('GET', SERVER_URL + '/get', { qs: { value } });
     expect(res).toMatchObject({ code: 400, json: { error: "Cannot echo 'echo'!" } });
   });
 
   test('GET request with array of one number', () => {
     const value = [1];
-    const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
+    const res = wrapperRequest('GET', SERVER_URL + '/get', { qs: { value } });
     expect(res).toMatchObject({ code: 200, json: { value: ['1'] } });
   });
 
   test('GET request with array of numbers', () => {
     const value = [1, 2, 3];
-    const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
+    const res = wrapperRequest('GET', SERVER_URL + '/get', { qs: { value } });
     expect(res).toMatchObject({ code: 200, json: { value: ['1', '2', '3'] } });
   });
 
   test('GET request with empty array', () => {
     const value: string[] = [];
-    const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
+    const res = wrapperRequest('GET', SERVER_URL + '/get', { qs: { value } });
     expect(res).toMatchObject({ code: 200, json: {} });
   });
 
   test('GET request with undefined value', () => {
     const value = undefined;
-    const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
+    const res = wrapperRequest('GET', SERVER_URL + '/get', { qs: { value } });
     expect(res).toMatchObject({ code: 200, json: {} });
   });
 
   test('GET request with empty string', () => {
     const value = '';
-    const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
+    const res = wrapperRequest('GET', SERVER_URL + '/get', { qs: { value } });
     expect(res).toMatchObject({ code: 200, json: { value: '' } });
   });
 
   test('GET request with null value', () => {
     const value = null;
-    const res = wrapperRequest('GET', SERVER_URL + '/echo', { qs: { value } });
+    const res = wrapperRequest('GET', SERVER_URL + '/get', { qs: { value } });
     expect(res).toMatchObject({ code: 200, json: { value: '' } });
   });
 });
@@ -86,14 +86,14 @@ describe('GET requests', () => {
 describe('POST Requests', () => {
   test('POST request with array of numbers', () => {
     const value = [1, 2, 3];
-    const res = wrapperRequest('POST', SERVER_URL + '/poeko', { json: { value } });
+    const res = wrapperRequest('POST', SERVER_URL + '/post', { json: { value } });
     expect(res).toMatchObject({ code: 200, json: { value: [1, 2, 3] } });
   });
 
   test('POST request with error 400', () => {
-    const value = 'poeko';
-    const res = wrapperRequest('POST', SERVER_URL + '/poeko', { json: { value } });
-    expect(res).toMatchObject({ code: 400, json: { error: "Cannot poeko 'poeko'!" } });
+    const value = 'post';
+    const res = wrapperRequest('POST', SERVER_URL + '/post', { json: { value } });
+    expect(res).toMatchObject({ code: 400, json: { error: "Cannot post 'post'!" } });
   });
 });
 
@@ -101,20 +101,20 @@ describe('POST Requests', () => {
 
 describe('Headers', () => {
   test('DELETE request with headers, code 401', () => {
-    const value = 'heako';
-    const res = wrapperRequest('DELETE', SERVER_URL + '/heako', { headers: { value } });
-    expect(res).toMatchObject({ code: 401, json: { error: "Cannot heako 'heako'!" } });
+    const value = 'header';
+    const res = wrapperRequest('DELETE', SERVER_URL + '/header', { headers: { value } });
+    expect(res).toMatchObject({ code: 401, json: { error: "Cannot header 'header'!" } });
   });
 
   test('DELETE request with headers, valid value', () => {
     const value = 'abcdefghijklmnopqrstuvwxyz';
-    const res = wrapperRequest('DELETE', SERVER_URL + '/heako', { headers: { value } });
+    const res = wrapperRequest('DELETE', SERVER_URL + '/header', { headers: { value } });
     expect(res).toMatchObject({ code: 200, json: { value } });
   });
 
   test('DELETE request with headers, empty string', () => {
     const value = '';
-    const res = wrapperRequest('DELETE', SERVER_URL + '/heako', { headers: { value } });
+    const res = wrapperRequest('DELETE', SERVER_URL + '/header', { headers: { value } });
     expect(res).toMatchObject({ code: 200, json: { value } });
   });
 });
@@ -144,20 +144,20 @@ describe('Correctly set content-length', () => {
 
 describe('Body (instead of JSON)', () => {
   test('PUT request code 401', () => {
-    const value = { value: 'pueko' };
+    const value = { value: 'put' };
     const res = wrapperRequest(
       'PUT',
-      SERVER_URL + '/pueko',
+      SERVER_URL + '/put',
       { body: JSON.stringify(value), headers: { 'content-type': 'application/json' } }
     );
-    expect(res).toMatchObject({ code: 403, json: { error: "Cannot pueko 'pueko'!" } });
+    expect(res).toMatchObject({ code: 403, json: { error: "Cannot put 'put'!" } });
   });
 
   test('PUT request using valid value in body', () => {
     const value = { value: 'Hello, world!' };
     const res = wrapperRequest(
       'PUT',
-      SERVER_URL + '/pueko',
+      SERVER_URL + '/put',
       { body: JSON.stringify(value), headers: { 'Content-Type': 'application/json' } }
     );
     expect(res).toMatchObject({ code: 200, json: { value: value.value } });
@@ -230,8 +230,8 @@ describe('Errors', () => {
   });
 
   test('getBody() throw error for 401 status code', () => {
-    const value = 'heako';
-    const res = wrapperRequest('DELETE', SERVER_URL + '/heako', { headers: { value } });
+    const value = 'header';
+    const res = wrapperRequest('DELETE', SERVER_URL + '/header', { headers: { value } });
     expect(res.code).toBe(401);
     expect(() => res.rawResponse.getBody()).toThrow(Error);
   });
