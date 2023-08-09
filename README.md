@@ -12,13 +12,13 @@
 
 [![NPM Version](https://img.shields.io/npm/v/sync-request-curl?logo=npm)](https://www.npmjs.com/package/sync-request-curl?activeTab=versions)
 &nbsp;
-[![npm bundle size](https://img.shields.io/bundlephobia/min/sync-request-curl)](https://bundlephobia.com/package/sync-request-curl@1.5.9)
+[![npm bundle size](https://img.shields.io/bundlephobia/min/sync-request-curl)](https://bundlephobia.com/package/sync-request-curl)
+&nbsp;
+[![Depfu Dependencies](https://badges.depfu.com/badges/6c4074c4d23ad57ee2bfd9ff90456090/overview.svg)](https://depfu.com/github/nktnet1/sync-request-curl?project_id=39032)
 &nbsp;
 [![NPM Downloads](https://img.shields.io/npm/dw/sync-request-curl)](https://npm-stat.com/charts.html?package=sync-request-curl)
 &nbsp;
 [![NPM License](https://img.shields.io/npm/l/sync-request-curl)](https://opensource.org/license/mit/)
-&nbsp;
-[![Depfu Dependencies](https://badges.depfu.com/badges/6c4074c4d23ad57ee2bfd9ff90456090/overview.svg)](https://depfu.com/github/nktnet1/sync-request-curl?project_id=39032)
 &nbsp;
 [![GitHub stars](https://img.shields.io/github/stars/nktnet1/sync-request-curl.svg?style=social)](https://github.com/nktnet1/sync-request-curl)
 
