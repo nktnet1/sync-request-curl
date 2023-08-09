@@ -5,26 +5,32 @@
 [![codecov](https://codecov.io/gh/nktnet1/sync-request-curl/branch/main/graph/badge.svg?token=RAC7SKJTGU)](https://codecov.io/gh/nktnet1/sync-request-curl)
 &nbsp;
 [![Maintainability](https://api.codeclimate.com/v1/badges/3ec8c0ddebe848926277/maintainability)](https://codeclimate.com/github/nktnet1/sync-request-curl/maintainability)
-
+&nbsp;
 [![Snyk Security](https://snyk.io/test/github/nktnet1/sync-request-curl/badge.svg)](https://snyk.io/test/github/nktnet1/sync-request-curl)
 &nbsp;
-[![GitHub top language](https://img.shields.io/github/languages/top/nktnet1/sync-request-curl)](https://github.com/search?q=repo%3Anktnet1%2Fsync-request-curl++language%3ATypeScript&type=code)
-&nbsp;
-[![Depfu Dependencies](https://badges.depfu.com/badges/6c4074c4d23ad57ee2bfd9ff90456090/overview.svg)](https://depfu.com/github/nktnet1/sync-request-curl?project_id=39032)
+[![GitHub top language](https://img.shields.io/github/languages/top/nktnet1/sync-request-curl?logo=github)](https://github.com/search?q=repo%3Anktnet1%2Fsync-request-curl++language%3ATypeScript&type=code)
 
 [![NPM Version](https://img.shields.io/npm/v/sync-request-curl?logo=npm)](https://www.npmjs.com/package/sync-request-curl?activeTab=versions)
 &nbsp;
-[![NPM License](https://img.shields.io/npm/l/sync-request-curl)](https://opensource.org/license/mit/)
+[![npm bundle size](https://img.shields.io/bundlephobia/min/sync-request-curl?logo=npm)](https://bundlephobia.com/package/sync-request-curl@1.5.9)
 &nbsp;
 [![NPM Downloads](https://img.shields.io/npm/dw/sync-request-curl)](https://npm-stat.com/charts.html?package=sync-request-curl)
 &nbsp;
+[![NPM License](https://img.shields.io/npm/l/sync-request-curl)](https://opensource.org/license/mit/)
+&nbsp;
+[![Depfu Dependencies](https://badges.depfu.com/badges/6c4074c4d23ad57ee2bfd9ff90456090/overview.svg)](https://depfu.com/github/nktnet1/sync-request-curl?project_id=39032)
+&nbsp;
 [![GitHub stars](https://img.shields.io/github/stars/nktnet1/sync-request-curl.svg?style=social)](https://github.com/nktnet1/sync-request-curl)
+
+---
 
 Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but 20 times more quickly.
 
 Leverages [node-libcurl](https://github.com/JCMais/node-libcurl) for performance instead of spawning child processes like sync-request.
 
 This library was designed to run on NodeJS. It will not work in a browser.
+
+---
 
 - [1. Installation](#1-installation)
 - [2. Usage](#2-usage)
