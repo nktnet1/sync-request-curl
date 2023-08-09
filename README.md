@@ -45,7 +45,7 @@ This library was designed to run on NodeJS. It will not work in a browser.
 npm install sync-request-curl
 ```
 
-Please also refer to the [compatibility](#4-compatibility) section for known issues and workarounds.
+Please refer to the [compatibility](#4-compatibility) section for known issues and workarounds for Windows, MacOS and Linux.
 
 ## 2. Usage
 
@@ -182,7 +182,7 @@ Only the following options from [sync-request](https://www.npmjs.com/package/syn
   <tr>
     <td>body</td>
     <td>
-      Body for POST and PUT requests. We recommended using <code>json</code> instead for JSON payloads, otherwise the <code>Content-Type</code> will need to be set manually.
+      String body for PATCH, POST and PUT requests. We recommended using <code>json</code> instead for JSON payloads, otherwise the <code>Content-Type</code> will need to be set manually.
     </td>
     <td>
 <pre>
@@ -230,7 +230,7 @@ Below are some additional options available from [node-libcurl](https://github.c
   </tr>
   <tr>
     <td>insecure</td>
-    <td> Set to false to send insecure requests. This can be useful on Windows which can sometimes have SSL issues (Libcurl code 60).</td>
+    <td> Set to true to send insecure requests. This can be useful on Windows which may have SSL issues (Libcurl code 60).</td>
     <td><pre>true</pre></td>
     <td><code>false</code></td>
   </tr>
