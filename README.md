@@ -8,11 +8,11 @@
 &nbsp;
 [![Snyk Security](https://snyk.io/test/github/nktnet1/sync-request-curl/badge.svg)](https://snyk.io/test/github/nktnet1/sync-request-curl)
 &nbsp;
-[![GitHub top language](https://img.shields.io/github/languages/top/nktnet1/sync-request-curl?logo=github)](https://github.com/search?q=repo%3Anktnet1%2Fsync-request-curl++language%3ATypeScript&type=code)
+[![GitHub top language](https://img.shields.io/github/languages/top/nktnet1/sync-request-curl)](https://github.com/search?q=repo%3Anktnet1%2Fsync-request-curl++language%3ATypeScript&type=code)
 
 [![NPM Version](https://img.shields.io/npm/v/sync-request-curl?logo=npm)](https://www.npmjs.com/package/sync-request-curl?activeTab=versions)
 &nbsp;
-[![npm bundle size](https://img.shields.io/bundlephobia/min/sync-request-curl?logo=npm)](https://bundlephobia.com/package/sync-request-curl@1.5.9)
+[![npm bundle size](https://img.shields.io/bundlephobia/min/sync-request-curl)](https://bundlephobia.com/package/sync-request-curl@1.5.9)
 &nbsp;
 [![NPM Downloads](https://img.shields.io/npm/dw/sync-request-curl)](https://npm-stat.com/charts.html?package=sync-request-curl)
 &nbsp;
