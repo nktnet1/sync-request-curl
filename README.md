@@ -1,4 +1,6 @@
-# [![Sync Request Curl](logo.svg)]()
+<div align="center">
+
+# [![Sync Request Curl](logo.svg)](https://github.com/nktnet1/sync-request-curl)
 
 [![pipeline](https://github.com/nktnet1/sync-request-curl/actions/workflows/pipeline.yml/badge.svg)](https://github.com/nktnet1/sync-request-curl/actions/workflows/pipeline.yml)
 &nbsp;
@@ -29,6 +31,8 @@ Make synchronous web requests similar to [sync-request](https://github.com/Forbe
 Leverages [node-libcurl](https://github.com/JCMais/node-libcurl) for performance instead of spawning child processes like sync-request.
 
 This library was designed to run on NodeJS. It will not work in a browser.
+
+</div>
 
 ---
 
