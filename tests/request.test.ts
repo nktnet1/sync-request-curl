@@ -117,6 +117,13 @@ describe('Headers', () => {
     const res = wrapperRequest('DELETE', SERVER_URL + '/delete', { headers: { value } });
     expect(res).toMatchObject({ code: 200, json: { value } });
   });
+
+  test('Returned headers has no upper case letters', () => {
+    const res = wrapperRequest('DELETE', SERVER_URL + '/delete', { headers: { value: 'example' } });
+    for (const header in res.rawResponse.headers) {
+      expect(header).toMatch(/^[^A-Z]*$/);
+    }
+  });
 });
 
 // ========================================================================= //

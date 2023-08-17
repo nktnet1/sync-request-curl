@@ -30,7 +30,7 @@ export const parseReturnedHeaders = (headerLines: string[]): IncomingHttpHeaders
   return headerLines.reduce((acc, header) => {
     const [name, ...values] = header.split(':');
     if (name && values.length > 0) {
-      acc[name.trim()] = values.join(':').trim();
+      acc[name.trim().toLowerCase()] = values.join(':').trim();
     }
     return acc;
   }, {} as IncomingHttpHeaders);
