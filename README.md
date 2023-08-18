@@ -290,7 +290,7 @@ export interface Options {
 ### 2.4. Response
 
 - **`statusCode`** - a number representing the HTTP status code (e.g. `200`, `400`, `401`, `403`)
-- **`headers`** - HTTP response headers
+- **`headers`** - HTTP response headers. The keys/properties of the object will always be in lowercase, e.g. `"content-type"` instead of `"Content-Type"`
 - **`body`** - a string or buffer - use `body.toString()` for common use cases in combination with `JSON.parse()`
 - **`getBody`** - a function with an optional `encoding` argument that returns the `body` if `encoding` is undefined, otherwise `body.toString(encoding)`. If `statusCode >= 300`, an `Error` is thrown instead.
 - **`url`** - the final URL used in the request after all redirections and with the query string parameters appended.
