@@ -42,6 +42,7 @@ This library was designed to run on NodeJS. It will not work in a browser.
   - [2.2. URL](#22-url)
   - [2.3. Options](#23-options)
   - [2.4. Response](#24-response)
+  - [2.5. Errors](#25-Errors)
 - [3. License](#3-license)
 - [4. Compatibility](#4-compatibility)
   - [4.1. Windows](#41-windows)
