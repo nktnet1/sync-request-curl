@@ -124,7 +124,7 @@ console.log('Returned JSON Object:', jsonBody);
 
 <br/>
 
-See [sync-request](https://www.npmjs.com/package/sync-request) for the original documentation. All Libcurl Errors will contain a non-zero integer code that can be looked up [here](https://curl.se/libcurl/c/libcurl-errors.html).
+See [sync-request](https://www.npmjs.com/package/sync-request) for the original documentation. See the [Errors](#25-errors) section for information on libcurl errors.
 
 Please note that this library only supports a subset of the original features which are summarised below.
 
@@ -291,9 +291,9 @@ export interface Options {
 
 - **`statusCode`** - a number representing the HTTP status code (e.g. `200`, `400`, `401`, `403`)
 - **`headers`** - HTTP response headers. The keys/properties of the object will always be in lowercase, e.g. `"content-type"` instead of `"Content-Type"`
-- **`body`** - a string or buffer - use `body.toString()` for common use cases in combination with `JSON.parse()`
-- **`getBody`** - a function with an optional `encoding` argument that returns the `body` if `encoding` is undefined, otherwise `body.toString(encoding)`. If `statusCode >= 300`, an `Error` is thrown instead.
-- **`url`** - the final URL used in the request after all redirections and with the query string parameters appended.
+- **`body`** - a string or buffer - for JSON responses, use `JSON.parse(response.body.toString())` to get the returned data as an object
+- **`getBody`** - a function with an optional `encoding` argument that returns the `body` if `encoding` is undefined, otherwise `body.toString(encoding)`. If `statusCode >= 300`, an `Error` is thrown instead
+- **`url`** - the final URL used in the request after all redirections are followed, and with the query string parameters appended
 
 In [src/types.ts](src/types.ts), the `Response` interface is defined as:
 
@@ -306,6 +306,23 @@ export interface Response {
   url: string;
 }
 ```
+
+### 2.5. Errors
+
+All Libcurl Errors will contain a non-zero integer code that can be looked up here:
+- https://curl.se/libcurl/c/libcurl-errors.html
+
+A few common errors are:
+
+1. CURLE_COULDNT_CONNECT (7)
+    - Failed to connect() to host or proxy.
+    - **HINT**: This means that the server could not be reached. For local development (e.g. in testing), ensure that your server has started successfully, or that it did not crash while handling a previous request
+1. CURLE_URL_MALFORMAT (3)
+    - The URL was not properly formatted.
+    - **HINT**: The request was not successful because your input URL is invalid, e.g. missing domain, protocol or port. Try printing out your input URL, or if it is a GET request, access it directly in a browser
+1. CURLE_PEER_FAILED_VERIFICATION (60)
+    - The remote server's SSL certificate or SSH fingerprint was deemed not OK. This error code has been unified with CURLE_SSL_CACERT since 7.62.0. Its previous value was 51
+    - **HINT**: See the [Windows](#41-windows) compatibility section for an explanation and potential workaround
 
 ## 3. License
 
