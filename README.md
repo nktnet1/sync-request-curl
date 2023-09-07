@@ -75,8 +75,8 @@ request(method, url, options);
 import request from 'sync-request-curl';
 
 const res = request(
-    'GET',
-    'https://comp1531namesages.alwaysdata.net'
+  'GET',
+  'https://comp1531namesages.alwaysdata.net'
 );
 console.log('Status Code:', res.statusCode);
 const jsonBody = JSON.parse(res.body.toString());
