@@ -1,6 +1,7 @@
 import { IncomingHttpHeaders } from 'http';
 import { CurlCode } from 'node-libcurl';
 import { HttpVerb, Options } from './types';
+import { CurlError } from './errors';
 
 export const handleQs = (url: string, qs: { [key: string]: any }): string => {
   const urlObj = new URL(url);
@@ -38,7 +39,7 @@ export const parseReturnedHeaders = (headerLines: string[]): IncomingHttpHeaders
 
 export const checkValidCurlCode = (code: CurlCode, method: HttpVerb, url: string, options: Options) => {
   if (code !== CurlCode.CURLE_OK) {
-    throw new Error(`
+    throw new CurlError(code, `
       Curl request failed with code ${code}.
       Please look up the Libcurl Error (code ${code}) here:
         - https://curl.se/libcurl/c/libcurl-errors.html
