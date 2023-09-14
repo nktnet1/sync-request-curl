@@ -310,7 +310,9 @@ export interface Response {
 
 ### 2.5. Errors
 
-All Libcurl Errors will contain a non-zero integer code that can be looked up here:
+When using the `response.getBody()` function, a generic [Error](https://nodejs.org/api/errors.html) object is thrown.
+
+If there are issues with the request, a `CurlError` will be thrown. This will contain a non-zero `code` property that corresponds to Libcurl Errors which can be looked up here:
 - https://curl.se/libcurl/c/libcurl-errors.html
 
 A few common errors are:
@@ -324,6 +326,39 @@ A few common errors are:
 1. CURLE_PEER_FAILED_VERIFICATION (60)
     - The remote server's SSL certificate or SSH fingerprint was deemed not OK. This error code has been unified with CURLE_SSL_CACERT since 7.62.0. Its previous value was 51
     - **HINT**: See the [Windows](#41-windows) compatibility section for an explanation and potential workaround
+
+It is possible to check the curl code as follows:
+
+```typescript
+import request, { CurlError } from 'sync-request-curl';
+
+try {
+  request('GET', 'https://google.fake.url.com');
+} catch (error) {
+  if (error instanceof CurlError) {
+    // outputs 6 (CURLE_COULDNT_RESOLVE_HOST)
+    console.log(error.code);
+  }
+}
+```
+
+In [src/errors.ts](src/errors.ts), the `CurlError` class is defined as:
+
+```typescript
+export class CurlError extends Error {
+  // https://curl.se/libcurl/c/libcurl-errors.html
+  code: number;
+  constructor(code: number, message: string) {
+    super(message);
+    if (code < 1 || code > 99) {
+      throw new Error(`CurlError code must be between 0 and 99. Given: ${code}`);
+    }
+    this.code = code;
+    Object.setPrototypeOf(this, CurlError.prototype);
+  }
+}
+```
+
 
 ## 3. License
 
