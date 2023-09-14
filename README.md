@@ -312,7 +312,7 @@ export interface Response {
 
 When using the `response.getBody()` function, a generic [Error](https://nodejs.org/api/errors.html) object is thrown.
 
-If there are issues with the request, a `CurlError` will be thrown. This will contain a non-zero `code` property that corresponds to Libcurl Errors which can be looked up here:
+If there are issues with the request, a `CurlError` will be thrown. This will contain a non-zero `code` property that corresponds to a specific Libcurl Error from this documentation:
 - https://curl.se/libcurl/c/libcurl-errors.html
 
 A few common errors are:
@@ -329,6 +329,9 @@ A few common errors are:
 
 It is possible to check the curl code as follows:
 
+<details closed>
+<summary>Example (click to view)</summary>
+
 ```typescript
 import request, { CurlError } from 'sync-request-curl';
 
@@ -341,6 +344,8 @@ try {
   }
 }
 ```
+
+</details>
 
 In [src/errors.ts](src/errors.ts), the `CurlError` class is defined as:
 
