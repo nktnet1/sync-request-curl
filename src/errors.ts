@@ -4,7 +4,7 @@ export class CurlError extends Error {
   constructor(code: number, message: string) {
     super(message);
     if (code < 1 || code > 99) {
-      throw new Error(`CurlError code must be between 0 and 99. Given: ${code}`);
+      throw new Error(`CurlError code must be between 1 and 99. Given: ${code}`);
     }
     this.code = code;
     Object.setPrototypeOf(this, CurlError.prototype);
