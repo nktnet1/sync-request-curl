@@ -3,7 +3,6 @@
 # [![Sync Request Curl](logo.svg)](https://github.com/nktnet1/sync-request-curl)
 
 [![pipeline](https://github.com/nktnet1/sync-request-curl/actions/workflows/pipeline.yml/badge.svg)](https://github.com/nktnet1/sync-request-curl/actions/workflows/pipeline.yml)
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fnktnet1%2Fsync-request-curl.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fnktnet1%2Fsync-request-curl?ref=badge_shield)
 &nbsp;
 [![codecov](https://codecov.io/gh/nktnet1/sync-request-curl/branch/main/graph/badge.svg?token=RAC7SKJTGU)](https://codecov.io/gh/nktnet1/sync-request-curl)
 &nbsp;
@@ -15,15 +14,25 @@
 
 [![NPM Version](https://img.shields.io/npm/v/sync-request-curl?logo=npm)](https://www.npmjs.com/package/sync-request-curl?activeTab=versions)
 &nbsp;
-[![npm bundle size](https://badgen.net/bundlephobia/min/sync-request-curl)](https://bundlephobia.com/package/sync-request-curl)
+[![install size](https://packagephobia.com/badge?p=sync-request-curl)](https://packagephobia.com/result?p=sync-request-curl)
 &nbsp;
 [![Depfu Dependencies](https://badges.depfu.com/badges/6c4074c4d23ad57ee2bfd9ff90456090/overview.svg)](https://depfu.com/github/nktnet1/sync-request-curl?project_id=39032)
 &nbsp;
-[![NPM Downloads](https://img.shields.io/npm/dw/sync-request-curl)](https://npm-stat.com/charts.html?package=sync-request-curl)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fnktnet1%2Fsync-request-curl.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fnktnet1%2Fsync-request-curl?ref=badge_shield)
 &nbsp;
 [![NPM License](https://img.shields.io/npm/l/sync-request-curl)](https://opensource.org/license/mit/)
 &nbsp;
 [![GitHub stars](https://img.shields.io/github/stars/nktnet1/sync-request-curl.svg?style=social)](https://github.com/nktnet1/sync-request-curl)
+
+[![Downloads Total](https://badgen.net/npm/dt/sync-request-curl)](https://github.com/nktnet1/sync-request-curl)
+&nbsp;
+[![Downloads Total](https://badgen.net/npm/dy/sync-request-curl)](https://github.com/nktnet1/sync-request-curl)
+&nbsp;
+[![Downloads Monthly](https://badgen.net/npm/dm/sync-request-curl)](https://github.com/nktnet1/sync-request-curl)
+&nbsp;
+[![Downloads Weekly](https://badgen.net/npm/dw/sync-request-curl)](https://github.com/nktnet1/sync-request-curl)
+&nbsp;
+[![Downloads Daily](https://badgen.net/npm/dd/sync-request-curl)](https://github.com/nktnet1/sync-request-curl)
 
 ---
 
@@ -357,7 +366,7 @@ export class CurlError extends Error {
   constructor(code: number, message: string) {
     super(message);
     if (code < 1 || code > 99) {
-      throw new Error(`CurlError code must be between 0 and 99. Given: ${code}`);
+      throw new Error(`CurlError code must be between 1 and 99. Given: ${code}`);
     }
     this.code = code;
     Object.setPrototypeOf(this, CurlError.prototype);
@@ -395,10 +404,9 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALING S IN THE SOFTWARE.
 ```
 
-</details>
-
-
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fnktnet1%2Fsync-request-curl.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fnktnet1%2Fsync-request-curl?ref=badge_large)
+
+</details>
 
 ## 4. Compatibility
 
