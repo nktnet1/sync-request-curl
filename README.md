@@ -42,7 +42,7 @@ Leverages [node-libcurl](https://github.com/JCMais/node-libcurl) for performance
 
 This library was designed to run on NodeJS. It will not work in a browser.
 
-[![Try with Replit](https://replit.com/badge?caption=Try%20with%20Replit)](https://replit.com/@nktnet1/sync-request-curl-example)
+[![Try with Replit](https://replit.com/badge?caption=Try%20with%20Replit)](https://replit.com/@nktnet1/sync-request-curl-example#index.js)
 
 </div>
 
@@ -81,7 +81,7 @@ request(method, url, options);
 
 <br/>
 
-Try with [Replit](https://replit.com/@nktnet1/sync-request-curl-example).
+Try with [Replit](https://replit.com/@nktnet1/sync-request-curl-example#index.js).
 
 `GET` request without options
 
