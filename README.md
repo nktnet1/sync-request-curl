@@ -24,15 +24,15 @@
 &nbsp;
 [![GitHub stars](https://img.shields.io/github/stars/nktnet1/sync-request-curl.svg?style=social)](https://github.com/nktnet1/sync-request-curl)
 
-[![Downloads Total](https://badgen.net/npm/dt/sync-request-curl)](https://github.com/nktnet1/sync-request-curl)
+[![Downloads Total](https://badgen.net/npm/dt/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
 &nbsp;
-[![Downloads Total](https://badgen.net/npm/dy/sync-request-curl)](https://github.com/nktnet1/sync-request-curl)
+[![Downloads Total](https://badgen.net/npm/dy/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
 &nbsp;
-[![Downloads Monthly](https://badgen.net/npm/dm/sync-request-curl)](https://github.com/nktnet1/sync-request-curl)
+[![Downloads Monthly](https://badgen.net/npm/dm/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
 &nbsp;
-[![Downloads Weekly](https://badgen.net/npm/dw/sync-request-curl)](https://github.com/nktnet1/sync-request-curl)
+[![Downloads Weekly](https://badgen.net/npm/dw/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
 &nbsp;
-[![Downloads Daily](https://badgen.net/npm/dd/sync-request-curl)](https://github.com/nktnet1/sync-request-curl)
+[![Downloads Daily](https://badgen.net/npm/dd/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
 
 ---
 
@@ -41,6 +41,8 @@ Make synchronous web requests similar to [sync-request](https://github.com/Forbe
 Leverages [node-libcurl](https://github.com/JCMais/node-libcurl) for performance instead of spawning child processes like sync-request.
 
 This library was designed to run on NodeJS. It will not work in a browser.
+
+[![Try with Replit](https://replit.com/badge?caption=Try%20with%20Replit)](https://replit.com/@nktnet1/sync-request-curl-example)
 
 </div>
 
@@ -78,6 +80,8 @@ request(method, url, options);
 <summary>Examples (click to view)</summary>
 
 <br/>
+
+Try with [Replit](https://replit.com/@nktnet1/sync-request-curl-example).
 
 `GET` request without options
 
