@@ -3,6 +3,7 @@ pull_request_rules:
     conditions:
       - author=depfu[bot]
       - base=main
+      - status-success=continuous-integration
     actions:
       merge:
         method: merge
