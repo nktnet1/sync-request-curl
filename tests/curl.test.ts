@@ -7,12 +7,12 @@ describe('Callback setEasyOptions', () => {
   };
 
   test('Curl easy option set for headers', () => {
-    const res = request('DELETE', SERVER_URL + '/delete', { setEasyOptions });
+    const res = request('DELETE', `${SERVER_URL}/delete`, { setEasyOptions });
     expect(JSON.parse(res.body.toString())).toStrictEqual({ value: 'Tammy McTamtam' });
   });
 
   test('Curl easy option set, override headers', () => {
-    const res = request('DELETE', SERVER_URL + '/delete', { headers: { value: 'override me' }, setEasyOptions });
+    const res = request('DELETE', `${SERVER_URL}/delete`, { headers: { value: 'override me' }, setEasyOptions });
     expect(JSON.parse(res.body.toString())).toStrictEqual({ value: 'Tammy McTamtam' });
   });
 });
