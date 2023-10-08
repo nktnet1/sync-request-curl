@@ -50,6 +50,13 @@ app.post('/content/length', (req: Request, res: Response) => {
   res.status(200).json({ length: req.headers['content-length'] });
 });
 
+app.post('/timeout', (req: Request, res: Response) => {
+  const startTime = new Date().getTime();
+  console.log(startTime);
+  while (new Date().getTime() - startTime < req.body.timeout) { /* zzzZZ */ }
+  res.status(200).json({});
+});
+
 app.use(errorHandler());
 
 export default app;

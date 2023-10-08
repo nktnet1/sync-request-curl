@@ -118,7 +118,7 @@ describe('Headers', () => {
     expect(res).toMatchObject({ code: 200, json: { value } });
   });
 
-  test.only('Returned headers has no upper case letters', () => {
+  test('Returned headers has no upper case letters', () => {
     const res = wrapperRequest('DELETE', `${SERVER_URL}/delete`, { headers: { value: 'example' } });
     for (const header in res.rawResponse.headers) {
       if (Object.prototype.hasOwnProperty.call(res.rawResponse.headers, header)) {
@@ -227,6 +227,20 @@ describe('Redirects', () => {
     expect(redirectResponse).toMatchObject({ code: 200 });
     const noRedirect = wrapperRequest('GET', 'https://picsum.photos/200/300', { followRedirects: false });
     expect(noRedirect).toMatchObject({ code: 302 });
+  });
+});
+
+// ========================================================================= //
+
+describe('Timeouts', () => {
+  test('Timeout after 1 second', () => {
+    expect(
+      () => wrapperRequest(
+        'POST',
+        `${SERVER_URL}/timeout`,
+        { json: { timeout: 1000 }, timeout: 200 }
+      )
+    ).toThrow(Error);
   });
 });
 
