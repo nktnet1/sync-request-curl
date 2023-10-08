@@ -208,7 +208,11 @@ describe('Redirects', () => {
   });
 
   test('Max redirect 2, causes error', () => {
-    const wrap = () => wrapperRequest('GET', `${SERVER_URL}/redirect/source`, { qs: { redirectNumber: 3 }, maxRedirects: 2 });
+    const wrap = () => wrapperRequest(
+      'GET',
+      `${SERVER_URL}/redirect/source`,
+      { qs: { redirectNumber: 3 }, maxRedirects: 2 }
+    );
     expect(wrap).toThrow(Error);
   });
 

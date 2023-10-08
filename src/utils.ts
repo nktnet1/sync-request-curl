@@ -68,13 +68,11 @@ export const parseReturnedHeaders = (headerLines: string[]): IncomingHttpHeaders
 };
 
 /**
- * Checks if a CurlCode is valid and throws a CurlError if it's not.
+ * Checks CURL code and throws a `CurlError` if it indicates failure.
  *
- * @param {CurlCode} code - The CurlCode to check.
- * @param {HttpVerb} method - The HTTP method used in the request.
- * @param {string} url - The URL of the request.
- * @param {Options} options - The options used in the request.
- * @throws {CurlError} if the CurlCode is not CURLE_OK.
+ * @param {CurlCode} code - The CURL error code to check.
+ * @param {RequestInputs} requestInputs - input parameters for the CURL request.
+ * @throws {CurlError} Throws a `CurlError` if the CURL code indicates failure.
  */
 export const checkValidCurlCode = (code: CurlCode, requestInputs: RequestInputs) => {
   if (code !== CurlCode.CURLE_OK) {
@@ -107,7 +105,8 @@ export const checkGetBodyStatus = (statusCode: number, body: Buffer) => {
       Body: ${body.toString()}
 
       Use 'res.body' instead of 'res.getBody()' to not have any errors thrown.
-      The status code (in this case, ${statusCode}) can be checked manually with res.statusCode.
+      The status code (in this case, ${statusCode}) can be checked manually
+      with res.statusCode.
     `);
   }
 };

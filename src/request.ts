@@ -14,7 +14,6 @@ import {
  * @param {HttpVerb} method - The HTTP method (e.g., 'GET', 'POST', 'PUT')
  * @param {Options} options - configuration options for the request.
  * @returns {Easy} an initialized libcurl Easy object with default options
- * ```
  */
 const createCurlObjectWithDefaults = (method: HttpVerb, options: Options): Easy => {
   const curl = new Easy();
