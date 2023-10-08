@@ -22,7 +22,7 @@
 &nbsp;
 [![NPM License](https://img.shields.io/npm/l/sync-request-curl)](https://opensource.org/license/mit/)
 &nbsp;
-[![GitHub issues](https://img.shields.io/github/issues/nktnet1/sync-request-curl.svg?style=social)](https://github.com/nktnet1/sync-request-curl)
+[![GitHub issues](https://img.shields.io/github/issues/nktnet1/sync-request-curl.svg?style=social)](https://github.com/nktnet1/sync-request-curl/issues)
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=nktnet1_sync-request-curl&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=nktnet1_sync-request-curl)
 &nbsp;
@@ -32,7 +32,7 @@
 &nbsp;
 [![codebeat badge](https://codebeat.co/badges/8bdb4562-0492-4c1c-8b02-e69c94373d60)](https://codebeat.co/projects/github-com-nktnet1-sync-request-curl-main)
 &nbsp;
-[![GitHub stars](https://img.shields.io/github/stars/nktnet1/sync-request-curl.svg?style=social)](https://github.com/nktnet1/sync-request-curl)
+[![GitHub stars](https://img.shields.io/github/stars/nktnet1/sync-request-curl.svg?style=social)](https://github.com/nktnet1/sync-request-curl/stargazers)
 
 [![Downloads Total](https://badgen.net/npm/dt/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
 &nbsp;
@@ -82,6 +82,8 @@ Please refer to the [compatibility](#4-compatibility) section for known issues a
 
 ## 2. Usage
 
+Try with [Replit](https://replit.com/@nktnet1/sync-request-curl-example#index.js).
+
 ```typescript
 request(method, url, options);
 ```
@@ -90,8 +92,6 @@ request(method, url, options);
 <summary>Examples (click to view)</summary>
 
 <br/>
-
-Try with [Replit](https://replit.com/@nktnet1/sync-request-curl-example#index.js).
 
 `GET` request without options
 
@@ -148,10 +148,6 @@ console.log('Returned JSON Object:', jsonBody);
 </details>
 
 <br/>
-
-See [sync-request](https://www.npmjs.com/package/sync-request) for the original documentation. See the [Errors](#25-errors) section for information on libcurl errors.
-
-Please note that this library only supports a subset of the original features which are summarised below.
 
 ### 2.1. Method
 
@@ -351,7 +347,7 @@ A few common errors are:
     - The remote server's SSL certificate or SSH fingerprint was deemed not OK. This error code has been unified with CURLE_SSL_CACERT since 7.62.0. Its previous value was 51
     - **HINT**: See the [Windows](#41-windows) compatibility section for an explanation and potential workaround
 
-It is possible to check the curl code as follows:
+It is possible to check the cURL code as follows:
 
 <details closed>
 <summary>Example (click to view)</summary>
@@ -458,8 +454,8 @@ Be sure to also check the [Linux Build Requirements](https://github.com/JCMais/n
 
 ## 5. Caveats
 
-This library was developed mainly to improve performance with sending synchronous requests in NodeJS.
+See [sync-request](https://www.npmjs.com/package/sync-request) for the original documentation. Please note that **sync-request-curl** only supports a subset of the original features in sync-request and additional features through leveraging [node-libcurl](https://www.npmjs.com/package/node-libcurl).
 
-It was designed to work with UNIX-like systems for UNSW students enrolled in COMP1531 Software Engineering Fundamentals.
+**sync-request-curl** was developed to improve performance with sending synchronous requests in NodeJS. It is also free from the sync-request bug which leaves an orphaned sync-rpc process, resulting in a [leaked handle being detected in Jest](https://github.com/ForbesLindesay/sync-request/issues/129).
 
-It has been tested to be working on Arch & Debian Linux and is compatible with Windows/MacOS.
+**sync-request-curl** was designed to work with UNIX-like systems for UNSW students enrolled in [COMP1531 Software Engineering Fundamentals](https://webcms3.cse.unsw.edu.au/COMP1531/23T2/outline). It has been tested on Alpine, Arch, Debian and Ubuntu Linux and is compatible with Windows/MacOS.
