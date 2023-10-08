@@ -25,9 +25,7 @@ export type BufferEncoding =
   | 'binary'
   | 'hex';
 
-export interface SetEasyOptionCallback {
-  (curl: Easy, curlOption: CurlOption): void;
-}
+export type SetEasyOptionCallback = (curl: Easy, curlOption: CurlOption) => void;
 
 export interface Options {
   /*
