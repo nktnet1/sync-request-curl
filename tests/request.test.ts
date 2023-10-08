@@ -35,7 +35,7 @@ describe('GET requests', () => {
   test('GET request url returned correctly parsed', () => {
     const value = 'comp1531';
     const res = wrapperRequest('GET', `${SERVER_URL}/get`, { qs: { value } });
-    expect(res.rawResponse.url).toStrictEqual(SERVER_URL + '/get?value=comp1531');
+    expect(res.rawResponse.url).toStrictEqual(`${SERVER_URL}/get?value=comp1531`);
   });
 
   test('GET request with query string, error 400', () => {
@@ -120,8 +120,10 @@ describe('Headers', () => {
 
   test('Returned headers has no upper case letters', () => {
     const res = wrapperRequest('DELETE', `${SERVER_URL}/delete`, { headers: { value: 'example' } });
-    for (const header in Object.keys(res.rawResponse.headers)) {
-      expect(header).toMatch(/^[^A-Z]*$/);
+    for (const header in res.rawResponse.headers) {
+      if (res.rawResponse.headers.hasOwnProperty(header)) {
+        expect(header).toMatch(/^[^A-Z]*$/);
+      }
     }
   });
 });

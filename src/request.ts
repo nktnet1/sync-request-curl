@@ -113,6 +113,12 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
   const statusCode = curl.getInfo('RESPONSE_CODE').data as number;
   const headers = parseReturnedHeaders(returnedHeaderArray);
   const body = bufferWrap.body;
+
+  /**
+   * Get the body of a response with an optional encoding.
+   * @throws {Error} if the status code is >= 300.
+   * @returns {Buffer | string} buffer body by default, string body with encoding
+   */
   const getBody: GetBody = (encoding?) => {
     checkGetBodyStatus(statusCode, body);
     return typeof encoding === 'string' ? body.toString(encoding) as any : body;
