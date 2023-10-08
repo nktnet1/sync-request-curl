@@ -2,12 +2,28 @@ import { Curl, Easy } from 'node-libcurl';
 import { HttpVerb, Options, Response, GetBody } from './types';
 import { checkGetBodyStatus, checkValidCurlCode, handleQs, parseReturnedHeaders, parseIncomingHeaders } from './utils';
 
-const handleQueryString = (curl: Easy, url: string, qs?: { [key: string]: any }) => {
+/**
+ * Handles query string parameters in a URL, modifies the URL if necessary, and
+ * sets it as the CURLOPT_URL option in the given cURL Easy object.
+ *
+ * @param {Easy} curl - The cURL easy handle.
+ * @param {string} url - The URL to handle query string parameters for.
+ * @param {Object.<string, any>} qs - An object containing query string parameters to modify or append.
+ * @returns {string} The modified URL with the updated query string parameters.
+ */
+const handleQueryString = (curl: Easy, url: string, qs?: { [key: string]: any }): string => {
   url = qs && Object.keys(qs).length ? handleQs(url, qs) : url;
   curl.setOpt(Curl.option.URL, url);
   return url;
 };
 
+/**
+ * Sets up a callback function for the cURL Easy object to handle returned
+ * headers and populate the input array with header lines.
+ *
+ * @param {Easy} curl - The cURL easy handle.
+ * @param {string[]} returnedHeaderArray - An array to store the returned header lines.
+ */
 const handleOutgoingHeaders = (curl: Easy, returnedHeaderArray: string[]) => {
   curl.setOpt(Curl.option.HEADERFUNCTION, (headerLine) => {
     returnedHeaderArray.push(headerLine.toString('utf-8').trim());
@@ -15,6 +31,16 @@ const handleOutgoingHeaders = (curl: Easy, returnedHeaderArray: string[]) => {
   });
 };
 
+/**
+ * Prepares the request body and headers for a cURL request based on provided
+ * options. Also sets up a callback function for the cURL Easy object to handle
+ * returned body and populates the input buffet.
+ *
+ * @param {Easy} curl - The cURL easy handle.
+ * @param {Options} options - Options for configuring the request.
+ * @param {{ body: Buffer }} buffer - wrapped buffer for the returned body.
+ * @param {string[]} httpHeaders - HTTP headers for the request.
+ */
 const handleBody = (curl: Easy, options: Options, buffer: { body: Buffer }, httpHeaders: string[]) => {
   let payload = '';
   if (options.json) {
@@ -31,6 +57,14 @@ const handleBody = (curl: Easy, options: Options, buffer: { body: Buffer }, http
   });
 };
 
+/**
+ * Performs an HTTP request using cURL with the specified parameters
+ *
+ * @param {HttpVerb} method - The HTTP method for the request (e.g., 'GET', 'POST').
+ * @param {string} url - The URL to make the request to.
+ * @param {Options} [options={}] - An object to configure the request.
+ * @returns {Response} - HTTP response consisting of status code, headers, and body.
+ */
 const request = (method: HttpVerb, url: string, options: Options = {}): Response => {
   // Initialing curl object with custom options
   const curl = new Easy();
