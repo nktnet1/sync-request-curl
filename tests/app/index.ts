@@ -52,7 +52,6 @@ app.post('/content/length', (req: Request, res: Response) => {
 
 app.post('/timeout', (req: Request, res: Response) => {
   const startTime = new Date().getTime();
-  console.log(startTime);
   while (new Date().getTime() - startTime < req.body.timeout) { /* zzzZZ */ }
   res.status(200).json({});
 });

@@ -22,6 +22,16 @@
 &nbsp;
 [![NPM License](https://img.shields.io/npm/l/sync-request-curl)](https://opensource.org/license/mit/)
 &nbsp;
+[![GitHub issues](https://img.shields.io/github/issues/nktnet1/sync-request-curl.svg?style=social)](https://github.com/nktnet1/sync-request-curl)
+
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=nktnet1_sync-request-curl&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=nktnet1_sync-request-curl)
+&nbsp;
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/f222c2e572fc41b7b45c3591c3575a9d)](https://app.codacy.com/gh/nktnet1/sync-request-curl/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+&nbsp;
+[![DeepSource](https://app.deepsource.com/gh/nktnet1/sync-request-curl.svg/?label=active+issues&show_trend=true&token=OTP6tE2be4X1kvxZRsxRh25e)](https://app.deepsource.com/gh/nktnet1/sync-request-curl/)
+&nbsp;
+[![codebeat badge](https://codebeat.co/badges/8bdb4562-0492-4c1c-8b02-e69c94373d60)](https://codebeat.co/projects/github-com-nktnet1-sync-request-curl-main)
+&nbsp;
 [![GitHub stars](https://img.shields.io/github/stars/nktnet1/sync-request-curl.svg?style=social)](https://github.com/nktnet1/sync-request-curl)
 
 [![Downloads Total](https://badgen.net/npm/dt/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
@@ -332,14 +342,14 @@ If there are issues with the request, a `CurlError` will be thrown. This will co
 A few common errors are:
 
 1. CURLE_COULDNT_CONNECT (7)
-    - Failed to connect() to host or proxy.
-    - **HINT**: This means that the server could not be reached. For local development (e.g. in testing), ensure that your server has started successfully, or that it did not crash while handling a previous request
+  - Failed to connect() to host or proxy.
+  - **HINT**: This means that the server could not be reached. For local development (e.g. in testing), ensure that your server has started successfully, or that it did not crash while handling a previous request
 1. CURLE_URL_MALFORMAT (3)
-    - The URL was not properly formatted.
-    - **HINT**: The request was not successful because your input URL is invalid, e.g. missing domain, protocol or port. Try printing out your input URL, or if it is a GET request, access it directly in a browser
+  - The URL was not properly formatted.
+  - **HINT**: The request was not successful because your input URL is invalid, e.g. missing domain, protocol or port. Try printing out your input URL, or if it is a GET request, access it directly in a browser
 1. CURLE_PEER_FAILED_VERIFICATION (60)
-    - The remote server's SSL certificate or SSH fingerprint was deemed not OK. This error code has been unified with CURLE_SSL_CACERT since 7.62.0. Its previous value was 51
-    - **HINT**: See the [Windows](#41-windows) compatibility section for an explanation and potential workaround
+  - The remote server's SSL certificate or SSH fingerprint was deemed not OK. This error code has been unified with CURLE_SSL_CACERT since 7.62.0. Its previous value was 51
+  - **HINT**: See the [Windows](#41-windows) compatibility section for an explanation and potential workaround
 
 It is possible to check the curl code as follows:
 
