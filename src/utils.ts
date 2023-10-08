@@ -3,6 +3,18 @@ import { CurlCode } from 'node-libcurl';
 import { HttpVerb, Options } from './types';
 import { CurlError } from './errors';
 
+/**
+ * Handles query string parameters in a URL by modifying or appending them
+ * based on the provided object.
+ *
+ * Arrays of primitives, e.g. { quizIds: [1,2,3] }, will be of the form:
+ *   https://google.com.au/?quizIds%5B0%5D=0&quizIds%5B1%5D=1&quizIds%5B2%5D=2
+ *   i.e. https://www.google.com.au/?quizIds[0]=0&quizIds[1]=1&quizIds[2]=2
+ *
+ * @param {string} url - The URL to handle query string parameters for.
+ * @param {Object.<string, any>} qs - query string parameters to modify or append.
+ * @returns {string} The modified URL with the updated query string parameters.
+ */
 export const handleQs = (url: string, qs: { [key: string]: any }): string => {
   const urlObj = new URL(url);
   Object.entries(qs).forEach(([key, value]) => {
@@ -19,6 +31,12 @@ export const handleQs = (url: string, qs: { [key: string]: any }): string => {
   return urlObj.href;
 };
 
+/**
+ * Parses incoming HTTP headers to an array of formatted strings.
+ *
+ * @param {IncomingHttpHeaders} headers - The header object to parse.
+ * @returns {string[]} An array of formatted header strings.
+ */
 export const parseIncomingHeaders = (headers?: IncomingHttpHeaders): string[] => {
   return headers
     ? Object.entries(headers)
@@ -27,6 +45,12 @@ export const parseIncomingHeaders = (headers?: IncomingHttpHeaders): string[] =>
     : [];
 };
 
+/**
+ * Parses an array of header lines as IncomingHttpHeaders.
+ *
+ * @param {string[]} headerLines - An array of header lines to parse.
+ * @returns {IncomingHttpHeaders} An object containing parsed headers.
+ */
 export const parseReturnedHeaders = (headerLines: string[]): IncomingHttpHeaders => {
   return headerLines.reduce((acc, header) => {
     const [name, ...values] = header.split(':');
@@ -37,6 +61,15 @@ export const parseReturnedHeaders = (headerLines: string[]): IncomingHttpHeaders
   }, {} as IncomingHttpHeaders);
 };
 
+/**
+ * Checks if a CurlCode is valid and throws a CurlError if it's not.
+ *
+ * @param {CurlCode} code - The CurlCode to check.
+ * @param {HttpVerb} method - The HTTP method used in the request.
+ * @param {string} url - The URL of the request.
+ * @param {Options} options - The options used in the request.
+ * @throws {CurlError} if the CurlCode is not CURLE_OK.
+ */
 export const checkValidCurlCode = (code: CurlCode, method: HttpVerb, url: string, options: Options) => {
   if (code !== CurlCode.CURLE_OK) {
     throw new CurlError(code, `
@@ -53,6 +86,13 @@ export const checkValidCurlCode = (code: CurlCode, method: HttpVerb, url: string
   }
 };
 
+/**
+ * Checks the status code and body of an HTTP response
+ *
+ * @param {number} statusCode - The status code of the HTTP response.
+ * @param {Buffer} body - The body of the HTTP response.
+ * @throws {Error} if the status code is >= 300.
+ */
 export const checkGetBodyStatus = (statusCode: number, body: Buffer) => {
   if (statusCode >= 300) {
     throw new Error(`
