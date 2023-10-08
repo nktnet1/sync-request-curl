@@ -1,5 +1,5 @@
 import { SERVER_URL } from './app/config';
-import request, { HttpVerb, Options } from '../src';
+import request, { CurlError, HttpVerb, Options } from '../src';
 
 // ========================================================================= //
 
@@ -233,14 +233,20 @@ describe('Redirects', () => {
 // ========================================================================= //
 
 describe('Timeouts', () => {
-  test('Timeout after 1 second', () => {
-    expect(
-      () => wrapperRequest(
-        'POST',
+  test('Timeout after 1 second - CURLE_OPERATION_TIMEDOUT (28)', () => {
+    const timeoutRequest = () => wrapperRequest(
+      'POST',
         `${SERVER_URL}/timeout`,
         { json: { timeout: 1000 }, timeout: 200 }
-      )
-    ).toThrow(Error);
+    );
+    expect(timeoutRequest).toThrow(CurlError);
+
+    try {
+      timeoutRequest();
+    } catch (error) {
+      expect(error).toBeInstanceOf(CurlError);
+      expect((error as CurlError).code).toStrictEqual(28);
+    }
   });
 });
 

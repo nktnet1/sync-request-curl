@@ -9,13 +9,34 @@ import {
 } from './utils';
 
 /**
+ * Create a libcurl Easy object with default configurations
+ *
+ * @param {HttpVerb} method - The HTTP method (e.g., 'GET', 'POST', 'PUT')
+ * @param {Options} options - configuration options for the request.
+ * @returns {Easy} an initialized libcurl Easy object with default options
+ * ```
+ */
+const createCurlObjectWithDefaults = (method: HttpVerb, options: Options): Easy => {
+  const curl = new Easy();
+  curl.setOpt(Curl.option.CUSTOMREQUEST, method);
+  curl.setOpt(Curl.option.TIMEOUT_MS, options.timeout ?? 0);
+  curl.setOpt(
+    Curl.option.FOLLOWLOCATION, options.followRedirects === undefined ||
+    options.followRedirects
+  );
+  curl.setOpt(Curl.option.MAXREDIRS, options.maxRedirects ?? -1);
+  curl.setOpt(Curl.option.SSL_VERIFYPEER, !options.insecure);
+  return curl;
+};
+
+/**
  * Handles query string parameters in a URL, modifies the URL if necessary,
  * and sets it as the CURLOPT_URL option in the given cURL Easy object.
  *
- * @param {Easy} curl - The cURL easy handle.
- * @param {string} url - The URL to handle query string parameters for.
+ * @param {Easy} curl - The cURL easy handle
+ * @param {string} url - The URL to handle query string parameters for
  * @param {Object.<string, any>} qs - query string parameters for the request
- * @returns {string} The modified URL with the updated query string parameters.
+ * @returns {string} The modified URL with the updated query string parameters
  */
 const handleQueryString = (
   curl: Easy, url: string, qs?: { [key: string]: any }
@@ -29,8 +50,8 @@ const handleQueryString = (
  * Sets up a callback function for the cURL Easy object to handle returned
  * headers and populate the input array with header lines.
  *
- * @param {Easy} curl - The cURL easy handle.
- * @param {string[]} returnedHeaderArray - array for returned header lines.
+ * @param {Easy} curl - The cURL easy handle
+ * @param {string[]} returnedHeaderArray - array for returned header lines
  */
 const handleOutgoingHeaders = (curl: Easy, returnedHeaderArray: string[]) => {
   curl.setOpt(Curl.option.HEADERFUNCTION, (headerLine) => {
@@ -44,10 +65,10 @@ const handleOutgoingHeaders = (curl: Easy, returnedHeaderArray: string[]) => {
  * options. Also sets up a callback function for the cURL Easy object to handle
  * returned body and populates the input buffet.
  *
- * @param {Easy} curl - The cURL easy handle.
- * @param {Options} options - Options for configuring the request.
- * @param {{ body: Buffer }} buffer - wrapped buffer for the returned body.
- * @param {string[]} httpHeaders - HTTP headers for the request.
+ * @param {Easy} curl - The cURL easy handle
+ * @param {Options} options - Options for configuring the request
+ * @param {{ body: Buffer }} buffer - wrapped buffer for the returned body
+ * @param {string[]} httpHeaders - HTTP headers for the request
  */
 const handleBody = (
   curl: Easy, options: Options, buffer: { body: Buffer }, httpHeaders: string[]
@@ -68,26 +89,16 @@ const handleBody = (
 };
 
 /**
- * Performs an HTTP request using cURL with the specified parameters
+ * Performs an HTTP request using cURL with the specified parameters.
  *
- * @param {HttpVerb} method - The HTTP method for the request (e.g., 'GET', 'POST').
- * @param {string} url - The URL to make the request to.
- * @param {Options} [options={}] - An object to configure the request.
- * @returns {Response} - HTTP response consisting of status code, headers, and body.
+ * @param {HttpVerb} method - The HTTP method for the request (e.g., 'GET', 'POST')
+ * @param {string} url - The URL to make the request to
+ * @param {Options} [options={}] - An object to configure the request
+ * @returns {Response} - HTTP response consisting of status code, headers, and body
  */
 const request = (method: HttpVerb, url: string, options: Options = {}): Response => {
-  // Initialing curl object with custom options
-  const curl = new Easy();
-  curl.setOpt(Curl.option.CUSTOMREQUEST, method);
-  curl.setOpt(Curl.option.TIMEOUT_MS, options.timeout ?? 0);
-  curl.setOpt(
-    Curl.option.FOLLOWLOCATION, options.followRedirects === undefined ||
-    options.followRedirects
-  );
-  curl.setOpt(Curl.option.MAXREDIRS, options.maxRedirects ?? -1);
-  curl.setOpt(Curl.option.SSL_VERIFYPEER, !options.insecure);
+  const curl = createCurlObjectWithDefaults(method, options);
 
-  // Query string parameters
   handleQueryString(curl, url, options.qs);
 
   // Headers (both incoming and outgoing)
@@ -98,7 +109,6 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
   // Body (and JSON)
   const bufferWrap = { body: Buffer.alloc(0) };
   handleBody(curl, options, bufferWrap, httpHeaders);
-
   curl.setOpt(Curl.option.HTTPHEADER, httpHeaders);
 
   if (options.setEasyOptions) {
@@ -107,22 +117,24 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
 
   // Execute request
   const code = curl.perform();
-  checkValidCurlCode(code, method, url, options);
+  checkValidCurlCode(code, { method, url, options });
 
   // Creating return object
   const statusCode = curl.getInfo('RESPONSE_CODE').data as number;
   const headers = parseReturnedHeaders(returnedHeaderArray);
-  const body = bufferWrap.body;
+  const { body } = bufferWrap;
 
   /**
    * Get the body of a response with an optional encoding.
-   * @throws {Error} if the status code is >= 300.
+   *
+   * @throws {Error} if the status code is >= 300
    * @returns {Buffer | string} buffer body by default, string body with encoding
    */
   const getBody: GetBody = (encoding?) => {
     checkGetBodyStatus(statusCode, body);
     return typeof encoding === 'string' ? body.toString(encoding) as any : body;
   };
+
   url = curl.getInfo('EFFECTIVE_URL').data as string;
 
   curl.close();

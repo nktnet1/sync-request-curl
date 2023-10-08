@@ -11,7 +11,7 @@ describe('CurlError class', () => {
 });
 
 describe('Requests that give Libcurl error', () => {
-  test('Request non-existent server, should give Curlcode 6', () => {
+  test('Request non-existent server- CURLE_COULDNT_RESOLVE_HOST (6)', () => {
     const invalidUrl = 'https://google.fake.url.com';
     expect(() => request('GET', invalidUrl)).toThrow(CurlError);
     try {

@@ -3,6 +3,12 @@ import { CurlCode } from 'node-libcurl';
 import { HttpVerb, Options } from './types';
 import { CurlError } from './errors';
 
+interface RequestInputs {
+  method: HttpVerb,
+  url: string,
+  options: Options;
+}
+
 /**
  * Handles query string parameters in a URL by modifying or appending them
  * based on the provided object.
@@ -17,7 +23,7 @@ import { CurlError } from './errors';
  */
 export const handleQs = (url: string, qs: { [key: string]: any }): string => {
   const urlObj = new URL(url);
-  Object.entries(qs).forEach(([key, value]) => {
+  for (const [key, value] of Object.entries(qs)) {
     if (Array.isArray(value)) {
       urlObj.searchParams.delete(key);
       value.forEach((item, i) => urlObj.searchParams.append(`${key}[${i}]`, String(item)));
@@ -26,7 +32,7 @@ export const handleQs = (url: string, qs: { [key: string]: any }): string => {
     } else if (value !== undefined) {
       urlObj.searchParams.set(key, String(value));
     }
-  });
+  }
   urlObj.search = urlObj.searchParams.toString();
   return urlObj.href;
 };
@@ -70,7 +76,7 @@ export const parseReturnedHeaders = (headerLines: string[]): IncomingHttpHeaders
  * @param {Options} options - The options used in the request.
  * @throws {CurlError} if the CurlCode is not CURLE_OK.
  */
-export const checkValidCurlCode = (code: CurlCode, method: HttpVerb, url: string, options: Options) => {
+export const checkValidCurlCode = (code: CurlCode, requestInputs: RequestInputs) => {
   if (code !== CurlCode.CURLE_OK) {
     throw new CurlError(code, `
       Curl request failed with code ${code}.
@@ -78,9 +84,9 @@ export const checkValidCurlCode = (code: CurlCode, method: HttpVerb, url: string
         - https://curl.se/libcurl/c/libcurl-errors.html
 
       DEBUG: {
-        method: "${method}",
-        url: "${url}",
-        options: ${JSON.stringify(options)}
+        method: "${requestInputs.method}",
+        url: "${requestInputs.url}",
+        options: ${JSON.stringify(requestInputs.options)}
       }
     `);
   }
