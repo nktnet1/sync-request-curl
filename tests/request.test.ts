@@ -120,7 +120,7 @@ describe('Headers', () => {
 
   test('Returned headers has no upper case letters', () => {
     const res = wrapperRequest('DELETE', SERVER_URL + '/delete', { headers: { value: 'example' } });
-    for (const header in res.rawResponse.headers) {
+    for (const header of Object.keys(res.rawResponse.headers)) {
       expect(header).toMatch(/^[^A-Z]*$/);
     }
   });
