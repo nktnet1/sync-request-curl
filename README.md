@@ -60,16 +60,16 @@ This library was designed to run on NodeJS. It will not work in a browser.
 
 - [1. Installation](#1-installation)
 - [2. Usage](#2-usage)
-	- [2.1. Method](#21-method)
-  - [2.2. URL](#22-url)
-  - [2.3. Options](#23-options)
-  - [2.4. Response](#24-response)
-  - [2.5. Errors](#25-Errors)
+    - [2.1. Method](#21-method)
+    - [2.2. URL](#22-url)
+    - [2.3. Options](#23-options)
+    - [2.4. Response](#24-response)
+    - [2.5. Errors](#25-Errors)
 - [3. License](#3-license)
 - [4. Compatibility](#4-compatibility)
-  - [4.1. Windows](#41-windows)
-  - [4.2. MacOS](#42-macos)
-  - [4.3. Linux](#43-linux)
+    - [4.1. Windows](#41-windows)
+    - [4.2. MacOS](#42-macos)
+    - [4.3. Linux](#43-linux)
 - [5. Caveats](#5-caveats)
 
 ## 1. Installation
@@ -342,14 +342,14 @@ If there are issues with the request, a `CurlError` will be thrown. This will co
 A few common errors are:
 
 1. CURLE_COULDNT_CONNECT (7)
-  - Failed to connect() to host or proxy.
-  - **HINT**: This means that the server could not be reached. For local development (e.g. in testing), ensure that your server has started successfully, or that it did not crash while handling a previous request
+    - Failed to connect() to host or proxy.
+    - **HINT**: This means that the server could not be reached. For local development (e.g. in testing), ensure that your server has started successfully, or that it did not crash while handling a previous request
 1. CURLE_URL_MALFORMAT (3)
-  - The URL was not properly formatted.
-  - **HINT**: The request was not successful because your input URL is invalid, e.g. missing domain, protocol or port. Try printing out your input URL, or if it is a GET request, access it directly in a browser
+    - The URL was not properly formatted.
+    - **HINT**: The request was not successful because your input URL is invalid, e.g. missing domain, protocol or port. Try printing out your input URL, or if it is a GET request, access it directly in a browser
 1. CURLE_PEER_FAILED_VERIFICATION (60)
-  - The remote server's SSL certificate or SSH fingerprint was deemed not OK. This error code has been unified with CURLE_SSL_CACERT since 7.62.0. Its previous value was 51
-  - **HINT**: See the [Windows](#41-windows) compatibility section for an explanation and potential workaround
+    - The remote server's SSL certificate or SSH fingerprint was deemed not OK. This error code has been unified with CURLE_SSL_CACERT since 7.62.0. Its previous value was 51
+    - **HINT**: See the [Windows](#41-windows) compatibility section for an explanation and potential workaround
 
 It is possible to check the curl code as follows:
 
