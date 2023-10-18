@@ -4,12 +4,16 @@
     "type": "git",
     "url": "https://github.com/nktnet1/sync-request-curl"
   },
-  "version": "2.1.5",
+  "version": "2.1.6",
   "files": [
     "dist"
   ],
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
+  "exports": {
+    "require": "./dist/cjs/index.js",
+    "import": "./dist/esm/index.js"
+  },
   "scripts": {
     "start": "ts-node tests/app/server",
     "dev": "ts-node-dev --watch tests/app tests/app/server",
@@ -53,10 +57,10 @@
     "node-libcurl": "^3.0.0"
   },
   "devDependencies": {
-    "@types/express": "^4.17.19",
-    "@types/jest": "^29.5.5",
-    "@types/morgan": "^1.9.6",
-    "@types/node": "^20.8.6",
+    "@types/express": "^4.17.20",
+    "@types/jest": "^29.5.6",
+    "@types/morgan": "^1.9.7",
+    "@types/node": "^20.8.7",
     "@typescript-eslint/eslint-plugin": "^6.8.0",
     "@typescript-eslint/parser": "^6.8.0",
     "eslint": "^8.51.0",
