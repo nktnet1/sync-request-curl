@@ -1,8 +1,6 @@
 import { SERVER_URL } from './app/config';
 import request, { HttpVerb } from '../src';
 
-// import request, { HttpVerb } from 'sync-request';
-
 describe.each([
   '😂',
   '🥲',

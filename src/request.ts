@@ -35,14 +35,12 @@ const createCurlObjectWithDefaults = (method: HttpVerb, options: Options): Easy 
  * @param {Easy} curl - The cURL easy handle
  * @param {string} url - The URL to handle query string parameters for
  * @param {Object.<string, any>} qs - query string parameters for the request
- * @returns {string} The modified URL with the updated query string parameters
  */
 const handleQueryString = (
   curl: Easy, url: string, qs?: { [key: string]: any }
-): string => {
+): void => {
   url = qs && Object.keys(qs).length ? handleQs(url, qs) : url;
   curl.setOpt(Curl.option.URL, url);
-  return url;
 };
 
 /**
@@ -69,9 +67,9 @@ const handleOutgoingHeaders = (curl: Easy, returnedHeaderArray: string[]) => {
  * @param {{ body: Buffer }} buffer - wrapped buffer for the returned body
  * @param {string[]} httpHeaders - HTTP headers for the request
  */
-const handleBody = (
+const handleBodyAndRequestHeaders = (
   curl: Easy, options: Options, buffer: { body: Buffer }, httpHeaders: string[]
-) => {
+): void => {
   let payload = '';
   if (options.json) {
     httpHeaders.push('Content-Type: application/json');
@@ -85,6 +83,8 @@ const handleBody = (
     buffer.body = Buffer.concat([buffer.body, buff.subarray(0, nmemb * size)]);
     return nmemb * size;
   });
+
+  curl.setOpt(Curl.option.HTTPHEADER, httpHeaders);
 };
 
 /**
@@ -97,18 +97,15 @@ const handleBody = (
  */
 const request = (method: HttpVerb, url: string, options: Options = {}): Response => {
   const curl = createCurlObjectWithDefaults(method, options);
-
   handleQueryString(curl, url, options.qs);
 
-  // Headers (both incoming and outgoing)
-  const httpHeaders = parseIncomingHeaders(options.headers);
+  // Body/JSON and Headers (incoming)
+  const bufferWrap = { body: Buffer.alloc(0) };
+  handleBodyAndRequestHeaders(curl, options, bufferWrap, parseIncomingHeaders(options.headers));
+
+  // Headers (outgoing)
   const returnedHeaderArray: string[] = [];
   handleOutgoingHeaders(curl, returnedHeaderArray);
-
-  // Body (and JSON)
-  const bufferWrap = { body: Buffer.alloc(0) };
-  handleBody(curl, options, bufferWrap, httpHeaders);
-  curl.setOpt(Curl.option.HTTPHEADER, httpHeaders);
 
   if (options.setEasyOptions) {
     options.setEasyOptions(curl, Curl.option);
