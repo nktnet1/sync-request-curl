@@ -79,7 +79,7 @@ const handleBody = (
   } else if (options.body) {
     payload = options.body.toString();
   }
-  httpHeaders.push(`Content-Length: ${payload.length}`);
+  httpHeaders.push(`Content-Length: ${Buffer.byteLength(payload, 'utf-8')}`);
   curl.setOpt(Curl.option.POSTFIELDS, payload);
   curl.setOpt(Curl.option.WRITEFUNCTION, (buff, nmemb, size) => {
     buffer.body = Buffer.concat([buffer.body, buff.subarray(0, nmemb * size)]);
