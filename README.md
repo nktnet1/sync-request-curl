@@ -36,7 +36,7 @@
 
 [![Downloads Total](https://badgen.net/npm/dt/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
 &nbsp;
-[![Downloads Total](https://badgen.net/npm/dy/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
+[![Downloads Yearly](https://badgen.net/npm/dy/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
 &nbsp;
 [![Downloads Monthly](https://badgen.net/npm/dm/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
 &nbsp;
@@ -275,7 +275,7 @@ Below are some additional options available from [node-libcurl](https://github.c
     opt.URL,
     'www.ck'
   );
-};
+}
 </pre>
     </td>
     <td><code>undefined</code></td>
