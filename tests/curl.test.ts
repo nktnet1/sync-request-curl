@@ -1,7 +1,7 @@
 import { SERVER_URL } from './app/config';
 import request, { SetEasyOptionCallback } from '../src';
 
-describe('Callback setEasyOptions', () => {
+describe('Callback setEasyOptions headers override', () => {
   const setEasyOptions: SetEasyOptionCallback = (curl, options) => {
     curl.setOpt(options.HTTPHEADER, ['value: Tammy McTamtam']);
   };
