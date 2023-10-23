@@ -1,5 +1,5 @@
 import { IncomingHttpHeaders } from 'http';
-import { CurlOption, Easy } from 'node-libcurl';
+import { CurlOption, Easy } from 'easy-libcurl';
 
 export type HttpVerb =
   | 'GET'

@@ -4,7 +4,7 @@
     "type": "git",
     "url": "https://github.com/nktnet1/sync-request-curl"
   },
-  "version": "2.1.6",
+  "version": "2.1.7",
   "files": [
     "dist"
   ],
@@ -27,30 +27,24 @@
     "sync",
     "sync-request",
     "synchronous",
-    "synchronous-request",
     "request",
     "fast",
-    "faster",
     "quick",
-    "quicker",
     "speed",
-    "speedy",
-    "performant",
     "performance",
-    "high performance",
-    "high performing",
     "http",
     "https",
     "curl",
     "libcurl",
     "node-libcurl",
+    "easy-libcurl",
     "comp1531"
   ],
   "author": "Khiet Tam Nguyen",
   "license": "MIT",
   "description": "Fast way to send synchronous web requests in NodeJS. API is a subset of sync-request. Leverages node-libcurl for high performance. Cannot be used in a browser.",
   "dependencies": {
-    "node-libcurl": "^3.0.0"
+    "easy-libcurl": "^1.0.3"
   },
   "devDependencies": {
     "@types/express": "^4.17.20",

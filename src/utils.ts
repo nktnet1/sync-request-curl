@@ -1,5 +1,5 @@
 import { IncomingHttpHeaders } from 'http';
-import { CurlCode } from 'node-libcurl';
+import { CurlCode } from 'easy-libcurl';
 import { HttpVerb, Options } from './types';
 import { CurlError } from './errors';
 
