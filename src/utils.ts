@@ -1,5 +1,5 @@
 import { IncomingHttpHeaders } from 'http';
-import { CurlCode } from 'easy-libcurl';
+import { CurlCode, Easy } from 'easy-libcurl';
 import { HttpVerb, Options } from './types';
 import { CurlError } from './errors';
 
@@ -77,8 +77,10 @@ export const parseReturnedHeaders = (headerLines: string[]): IncomingHttpHeaders
 export const checkValidCurlCode = (code: CurlCode, requestInputs: RequestInputs) => {
   if (code !== CurlCode.CURLE_OK) {
     throw new CurlError(code, `
-      Curl request failed with code ${code}.
-      Please look up the Libcurl Error (code ${code}) here:
+      Curl request failed with code ${code}:
+        - ${Easy.strError(code)}
+
+      You can also look up the Libcurl Error (code ${code}) here:
         - https://curl.se/libcurl/c/libcurl-errors.html
 
       DEBUG: {
