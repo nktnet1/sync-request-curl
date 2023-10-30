@@ -1,6 +1,5 @@
-import { teardown } from 'jest-dev-server';
+import { stopServer } from 'sync-dev-server';
 
 module.exports = async () => {
-  globalThis.servers.forEach(child => child.kill('SIGINT'));
-  await teardown(globalThis.servers);
+  stopServer(globalThis.server, 'SIGINT');
 };

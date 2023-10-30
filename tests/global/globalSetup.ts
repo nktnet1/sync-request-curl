@@ -1,14 +1,13 @@
-import { setup } from 'jest-dev-server';
-import { HOST as host, PORT as port, DEBUG as debug } from '../app/config';
+import { startServer } from 'sync-dev-server';
+import { HOST as host, PORT as port } from '../app/config';
 
 module.exports = async () => {
   const command = 'npm run start';
-  globalThis.servers = await setup({
+  globalThis.server = startServer(command, {
     host,
     port,
-    debug,
-    command,
-    launchTimeout: 50 * 1000,
+    debug: false,
+    timeout: 50 * 1000,
     usedPortAction: 'ignore',
   });
 };
