@@ -1,5 +1,5 @@
 import { stopServer } from 'sync-dev-server';
 
-module.exports = async () => {
+module.exports = () => {
   stopServer(globalThis.server, 'SIGINT');
 };

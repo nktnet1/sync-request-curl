@@ -1,7 +1,7 @@
 import { startServer } from 'sync-dev-server';
 import { HOST as host, PORT as port } from '../app/config';
 
-module.exports = async () => {
+module.exports = () => {
   const command = 'npm run start';
   globalThis.server = startServer(command, {
     host,
