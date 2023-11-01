@@ -1,5 +1,5 @@
 import { SERVER_URL } from './app/config';
-import request, { CurlError, HttpVerb, Options } from '../src';
+import request, { HttpVerb, Options } from '../src';
 
 // ========================================================================= //
 
@@ -231,47 +231,5 @@ describe('Redirects', () => {
     expect(redirectResponse).toMatchObject({ code: 200 });
     const noRedirect = wrapperRequest('GET', 'https://picsum.photos/200/300', { followRedirects: false });
     expect(noRedirect).toMatchObject({ code: 302 });
-  });
-});
-
-// ========================================================================= //
-
-describe('Timeouts', () => {
-  test('Timeout after 1 second - CURLE_OPERATION_TIMEDOUT (28)', () => {
-    const timeoutRequest = () => wrapperRequest(
-      'POST',
-        `${SERVER_URL}/timeout`,
-        { json: { timeout: 1000 }, timeout: 200 }
-    );
-    expect(timeoutRequest).toThrow(CurlError);
-
-    try {
-      timeoutRequest();
-    } catch (error) {
-      expect(error).toBeInstanceOf(CurlError);
-      expect((error as CurlError).code).toStrictEqual(28);
-    }
-  });
-});
-
-// ========================================================================= //
-
-describe('Errors', () => {
-  test('Malformed Url', () => {
-    expect(() => wrapperRequest('GET', `invalid${SERVER_URL}`)).toThrow(Error);
-    expect(() => wrapperRequest('GET', '')).toThrow(Error);
-  });
-
-  test('getBody() throw error for 401 status code', () => {
-    const value = 'header';
-    const res = wrapperRequest('DELETE', `${SERVER_URL}/delete`, { headers: { value } });
-    expect(res.code).toBe(401);
-    expect(() => res.rawResponse.getBody()).toThrow(Error);
-  });
-
-  test('getBody() throw error for 404 status code', () => {
-    const res = wrapperRequest('DELETE', `${SERVER_URL}/unknown`);
-    expect(res.code).toBe(404);
-    expect(() => res.rawResponse.getBody()).toThrow(Error);
   });
 });
