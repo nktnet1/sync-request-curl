@@ -1,6 +1,16 @@
 import request, { CurlError } from '../src';
 import { SERVER_URL } from './app/config';
 
+const checkCurlError = (requestWrapped: () => void, code: number): void => {
+  expect(requestWrapped).toThrow(CurlError);
+  try {
+    requestWrapped();
+  } catch (error) {
+    expect(error).toBeInstanceOf(CurlError);
+    expect((error as CurlError).code).toStrictEqual(code);
+  }
+};
+
 describe('CurlError class', () => {
   test('new Curlcode > 99', () => {
     expect(() => new CurlError(100, 'Error 100')).toThrow(Error);
@@ -13,24 +23,12 @@ describe('CurlError class', () => {
 
 describe('Requests that give Libcurl error', () => {
   test('Malformed URL (not properly formatted)', () => {
-    expect(() => request('GET', '')).toThrow(CurlError);
-    try {
-      request('GET', '');
-    } catch (error) {
-      expect(error).toBeInstanceOf(CurlError);
-      expect((error as CurlError).code).toStrictEqual(3);
-    }
+    checkCurlError(() => request('GET', ''), 3);
   });
 
   test('Request non-existent server- CURLE_COULDNT_RESOLVE_HOST (6)', () => {
     const invalidUrl = 'https://google.fake.url.com';
-    expect(() => request('GET', invalidUrl)).toThrow(CurlError);
-    try {
-      request('GET', invalidUrl);
-    } catch (error) {
-      expect(error).toBeInstanceOf(CurlError);
-      expect((error as CurlError).code).toStrictEqual(6);
-    }
+    checkCurlError(() => request('GET', invalidUrl), 6);
   });
 
   test('Timeout after 1 second - CURLE_OPERATION_TIMEDOUT (28)', () => {
@@ -39,14 +37,7 @@ describe('Requests that give Libcurl error', () => {
         `${SERVER_URL}/timeout`,
         { json: { timeout: 1000 }, timeout: 200 }
     );
-    expect(timeoutRequest).toThrow(CurlError);
-
-    try {
-      timeoutRequest();
-    } catch (error) {
-      expect(error).toBeInstanceOf(CurlError);
-      expect((error as CurlError).code).toStrictEqual(28);
-    }
+    checkCurlError(timeoutRequest, 28);
   });
 });
 
