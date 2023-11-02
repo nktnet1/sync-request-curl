@@ -44,7 +44,7 @@
   "license": "MIT",
   "description": "Fast way to send synchronous web requests in NodeJS. API is a subset of sync-request. Leverages node-libcurl for high performance. Cannot be used in a browser.",
   "dependencies": {
-    "easy-libcurl": "^1.0.5"
+    "easy-libcurl": "^1.0.6"
   },
   "devDependencies": {
     "@types/express": "^4.17.20",
