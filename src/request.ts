@@ -25,6 +25,7 @@ const createCurlObjectWithDefaults = (method: HttpVerb, options: Options): Easy 
   );
   curl.setOpt(Curl.option.MAXREDIRS, options.maxRedirects ?? -1);
   curl.setOpt(Curl.option.SSL_VERIFYPEER, !options.insecure);
+  curl.setOpt(Curl.option.NOBODY, method === 'HEAD');
   return curl;
 };
 

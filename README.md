@@ -154,6 +154,8 @@ console.log('Returned JSON Object:', jsonBody);
 HTTP method (of type `HttpVerb`)
 - e.g. `PUT`/`POST`/`GET`/`DELETE`
 
+Note that for the `HEAD` method, [CURLOPT_NOBODY](https://curl.se/libcurl/c/CURLOPT_NOBODY.html) is set to `true` automatically by **sync-request-curl**.
+
 ### 2.2. URL
 
 URL as a string

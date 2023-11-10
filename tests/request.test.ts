@@ -126,6 +126,11 @@ describe('Headers', () => {
       }
     }
   });
+
+  test('HEAD requests should not contain a body', () => {
+    const res = request('HEAD', `${SERVER_URL}/get`);
+    expect(res.body.toString()).toStrictEqual('');
+  });
 });
 
 // ========================================================================= //
