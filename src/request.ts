@@ -75,10 +75,11 @@ const handleBodyAndRequestHeaders = (
   if (options.json) {
     httpHeaders.push('Content-Type: application/json');
     payload = JSON.stringify(options.json);
+    httpHeaders.push(`Content-Length: ${Buffer.byteLength(payload, 'utf-8')}`);
   } else if (options.body) {
+    httpHeaders.push(`Content-Length: ${Buffer.byteLength(options.body, 'utf-8')}`);
     payload = options.body.toString();
   }
-  httpHeaders.push(`Content-Length: ${Buffer.byteLength(payload, 'utf-8')}`);
   curl.setOpt(Curl.option.POSTFIELDS, payload);
   curl.setOpt(Curl.option.WRITEFUNCTION, (buff, nmemb, size) => {
     buffer.body = Buffer.concat([buffer.body, buff.subarray(0, nmemb * size)]);
