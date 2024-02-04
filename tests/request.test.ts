@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { SERVER_URL } from './app/config';
 import request, { HttpVerb, Options } from '../src';
 
@@ -151,6 +152,14 @@ describe('Correctly set content-length', () => {
     const body = '{"message":"hi","sender":"Tam"}';
     const res = wrapperRequest('POST', `${SERVER_URL}/content/length`, { body });
     expect(res).toMatchObject({ code: 200, json: { length: '31' } });
+  });
+
+  // https://github.com/nktnet1/sync-request-curl/issues/116
+  test('Body buffer from file', () => {
+    const body = fs.readFileSync('./tests/data/length-165.dmp');
+    expect(Buffer.byteLength(body)).toStrictEqual(165);
+    const res = wrapperRequest('POST', `${SERVER_URL}/content/length`, { body });
+    expect(res).toMatchObject({ code: 200, json: { length: '165' } });
   });
 });
 
