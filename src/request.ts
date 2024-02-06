@@ -59,6 +59,45 @@ const handleOutgoingHeaders = (curl: Easy, returnedHeaderArray: string[]) => {
 };
 
 /**
+ * Sets the JSON payload for the curl request.
+ * @param {Easy} curl - The curl object.
+ * @param {any} json - The JSON body to be sent
+ * @param {string[]} httpHeaders - HTTP headers for the request
+ */
+const setJSONPayload = (curl: Easy, json: any, httpHeaders: string[]): void => {
+  httpHeaders.push('Content-Type: application/json');
+  const payload = JSON.stringify(json);
+  httpHeaders.push(`Content-Length: ${Buffer.byteLength(payload, 'utf-8')}`);
+  curl.setOpt(Curl.option.POSTFIELDS, payload);
+};
+
+/**
+ * Sets the buffer payload for the curl request.
+ * @param {Easy} curl - The curl object.
+ * @param {string | Buffer} body - The body to be sent in the request.
+ * @param {string[]} httpHeaders - HTTP headers for the request
+ */
+const setBodyPayload = (curl: Easy, body: string | Buffer, httpHeaders: string[]): void => {
+  if (Buffer.isBuffer(body)) {
+    let position = 0;
+    curl.setOpt(Curl.option.POST, true);
+    curl.setOpt(Curl.option.POSTFIELDSIZE, -1);
+    curl.setOpt(Curl.option.READFUNCTION, (buffer: Buffer, size: number, nmemb: number): number => {
+      const amountToRead = size * nmemb;
+      if (position === body.length) {
+        return 0;
+      }
+      const totalWritten = body.copy(buffer, 0, position, Math.min(amountToRead, body.length));
+      position += totalWritten;
+      return totalWritten;
+    });
+  } else {
+    curl.setOpt(Curl.option.POSTFIELDS, body);
+    httpHeaders.push(`Content-Length: ${Buffer.byteLength(body, 'utf-8')}`);
+  }
+};
+
+/**
  * Prepares the request body and headers for a cURL request based on provided
  * options. Also sets up a callback function for the cURL Easy object to handle
  * returned body and populates the input buffet.
@@ -71,16 +110,13 @@ const handleOutgoingHeaders = (curl: Easy, returnedHeaderArray: string[]) => {
 const handleBodyAndRequestHeaders = (
   curl: Easy, options: Options, buffer: { body: Buffer }, httpHeaders: string[]
 ): void => {
-  let payload = '';
   if (options.json) {
-    httpHeaders.push('Content-Type: application/json');
-    payload = JSON.stringify(options.json);
-    httpHeaders.push(`Content-Length: ${Buffer.byteLength(payload, 'utf-8')}`);
+    setJSONPayload(curl, options.json, httpHeaders);
   } else if (options.body) {
-    httpHeaders.push(`Content-Length: ${Buffer.byteLength(options.body, 'utf-8')}`);
-    payload = options.body.toString();
+    setBodyPayload(curl, options.body, httpHeaders);
+  } else {
+    httpHeaders.push('Content-Length: 0');
   }
-  curl.setOpt(Curl.option.POSTFIELDS, payload);
   curl.setOpt(Curl.option.WRITEFUNCTION, (buff, nmemb, size) => {
     buffer.body = Buffer.concat([buffer.body, buff.subarray(0, nmemb * size)]);
     return nmemb * size;

@@ -7,6 +7,7 @@ import request, { HttpVerb, Options } from '../src';
 export const wrapperRequest = (method: HttpVerb, url: string, option?: Options) => {
   const rawResponse = request(method, url, option);
   let json: any;
+
   try {
     json = JSON.parse(rawResponse.body.toString());
   } catch (error: any) {
@@ -139,27 +140,50 @@ describe('Headers', () => {
 describe('Correctly set content-length', () => {
   test('No options', () => {
     const res = wrapperRequest('POST', `${SERVER_URL}/content/length`);
-    expect(res).toMatchObject({ code: 200, json: { length: '0' } });
+    expect(res).toMatchObject({ code: 200, json: { headerLength: 0 } });
   });
 
   test('JSON payload', () => {
     const json = { message: 'hi', sender: 'Tam' };
     const res = wrapperRequest('POST', `${SERVER_URL}/content/length`, { json });
-    expect(res).toMatchObject({ code: 200, json: { length: '31' } });
+    expect(res).toMatchObject({ code: 200, json: { headerLength: 31 } });
   });
 
   test('Body payload', () => {
     const body = '{"message":"hi","sender":"Tam"}';
     const res = wrapperRequest('POST', `${SERVER_URL}/content/length`, { body });
-    expect(res).toMatchObject({ code: 200, json: { length: '31' } });
+    expect(res).toMatchObject({ code: 200, json: { headerLength: 31 } });
+  });
+});
+
+// ========================================================================= //
+
+// https://github.com/nktnet1/sync-request-curl/issues/116
+describe('Sending a buffer', () => {
+  const body = fs.readFileSync('./tests/data/length-165.dmp');
+  test('Body buffer from file', () => {
+    expect(Buffer.byteLength(body)).toStrictEqual(165);
+    const res = wrapperRequest('POST', `${SERVER_URL}/content/length`, {
+      body,
+      headers: {
+        'Content-Type': 'application/timestamp-query',
+      },
+    });
+    expect(res).toMatchObject({ code: 200, json: { serverBufferLength: 165 } });
   });
 
-  // https://github.com/nktnet1/sync-request-curl/issues/116
-  test('Body buffer from file', () => {
-    const body = fs.readFileSync('./tests/data/length-165.dmp');
-    expect(Buffer.byteLength(body)).toStrictEqual(165);
-    const res = wrapperRequest('POST', `${SERVER_URL}/content/length`, { body });
-    expect(res).toMatchObject({ code: 200, json: { length: '165' } });
+  test('External URL for buffer', () => {
+    const res = request(
+      'POST',
+      'https://acsk.privatbank.ua/services/tsp/',
+      {
+        headers: {
+          'Content-Type': 'application/timestamp-query',
+        },
+        body,
+      }
+    );
+    expect(res.statusCode).toStrictEqual(200);
   });
 });
 
@@ -184,6 +208,11 @@ describe('Body (instead of JSON)', () => {
       { body: JSON.stringify(value), headers: { 'Content-Type': 'application/json' } }
     );
     expect(res).toMatchObject({ code: 200, json: { value: value.value } });
+  });
+
+  test('Empty body', () => {
+    const res = wrapperRequest('PUT', `${SERVER_URL}/put`, { body: '' });
+    expect(res).toMatchObject({ code: 200, json: {} });
   });
 });
 

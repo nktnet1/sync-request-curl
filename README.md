@@ -145,6 +145,26 @@ const jsonBody = JSON.parse(res.body.toString());
 console.log('Returned JSON Object:', jsonBody);
 ```
 
+Using a proxy URL (Note: replace with your own proxy details)
+```javascript
+import request from 'sync-request-curl';
+
+const res = request(
+  'GET',
+  'https://ipinfo.io/json',
+  {
+    setEasyOptions: (curl, options) => {
+      curl.setOpt(options.PROXY, 'http://your-proxy-url:port');
+      curl.setOpt(options.PROXYUSERPWD, 'proxyUsername:proxyPassword');
+    },
+  }
+);
+
+console.log('Status Code:', res.statusCode);
+const jsonBody = JSON.parse(res.body.toString());
+console.log(jsonBody);
+```
+
 </details>
 
 <br/>
