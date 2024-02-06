@@ -175,7 +175,7 @@ describe('Sending a buffer', () => {
   test('External URL for buffer', () => {
     const res = request(
       'POST',
-      'http://acsk.privatbank.ua/services/tsp/',
+      'https://acsk.privatbank.ua/services/tsp/',
       {
         headers: {
           'Content-Type': 'application/timestamp-query',
