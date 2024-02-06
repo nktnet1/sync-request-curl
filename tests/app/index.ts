@@ -2,12 +2,16 @@ import express, { json, Request, Response } from 'express';
 import errorHandler from './errorHandler';
 import createHttpError from 'http-errors';
 import morgan from 'morgan';
+import bodyParser from 'body-parser';
 
 const app = express();
 
 app.disable('x-powered-by');
-app.use(json());
 app.use(morgan('dev'));
+app.use(bodyParser.raw({
+  type: 'application/timestamp-query'
+}));
+app.use(json());
 
 app.get('/', (_: Request, res: Response) => res.json({ message: 'Hello, world!' }));
 
@@ -47,7 +51,11 @@ app.get('/redirect/destination', (_: Request, res: Response) => {
 });
 
 app.post('/content/length', (req: Request, res: Response) => {
-  res.status(200).json({ length: req.headers['content-length'] });
+  res.status(200).json({
+    headerLength: parseInt(req.headers['content-length'] as string),
+    // See bodyparser middleware options above.
+    serverBufferLength: req.body.length
+  });
 });
 
 app.post('/timeout', (req: Request, res: Response) => {
