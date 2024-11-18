@@ -39,14 +39,17 @@ jobs:
         run: npm test -- --coverage
 
       - name: Upload coverage reports to Codecov
+        if: github.ref_name == 'main'
         uses: codecov/codecov-action@v3
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Publish coverage
+        if: github.ref_name == 'main'
         uses: paambaati/codeclimate-action@v3.2.0
         env:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
         with:
           coverageLocations: |
             ${{github.workspace}}/coverage/lcov.info:lcov
+
