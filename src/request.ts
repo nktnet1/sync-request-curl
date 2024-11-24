@@ -1,4 +1,4 @@
-import { Curl, Easy } from 'easy-libcurl';
+import { Curl, Easy } from 'node-libcurl';
 import { HttpVerb, Options, Response, GetBody } from './types';
 import {
   checkGetBodyStatus,

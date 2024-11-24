@@ -30,13 +30,13 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm i
 
       - name: Run ESLint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Run tests with coverage
-        run: npm test -- --coverage
+        run: pnpm test -- --coverage
 
       - name: Upload coverage reports to Codecov
         if: github.ref_name == 'main'

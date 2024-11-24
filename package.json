@@ -18,10 +18,10 @@
     "lint": "eslint './**/*.ts'",
     "lint:fix": "eslint --fix './**/*.ts'",
     "tsc": "tsc --noEmit",
-    "build": "rm -rf dist && npm run build:esm && npm run build:cjs",
+    "build": "rm -rf dist && pnpm run build:esm && pnpm run build:cjs",
     "build:esm": "tsc",
     "build:cjs": "tsc --module CommonJS --outDir dist/cjs",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "pnpm run build"
   },
   "keywords": [
     "sync",
