@@ -13,7 +13,7 @@ app.use(bodyParser.raw({
 }));
 app.use(json());
 
-app.get('/', (_: Request, res: Response) => res.json({ message: 'Hello, world!' }));
+app.get('/', (_: Request, res: Response) => { res.json({ message: 'Hello, world!' }); });
 
 app.get('/get', (req: Request, res: Response) => {
   const value = req.query.value;
