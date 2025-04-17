@@ -5,10 +5,6 @@ import { logger } from 'hono/logger';
 const app = new Hono();
 
 app.use('*', logger());
-app.use('*', async (c, next) => {
-  c.res.headers.delete('x-powered-by');
-  await next();
-});
 
 app.get('/', (c) => {
   return c.json({ message: 'Hello, world!' });
@@ -16,7 +12,6 @@ app.get('/', (c) => {
 
 app.get('/get', (c) => {
   const value = c.req.query('value');
-  console.log(value);
   if (value === 'echo') throw new HTTPException(400, { message: "Cannot echo 'echo'!" });
   return c.json({ value });
 });
@@ -57,7 +52,6 @@ app.post('/content/length', async (c) => {
   const buffer = await c.req.arrayBuffer();
   return c.json({
     headerLength: contentLength,
-    // See bodyparser middleware options above.
     serverBufferLength: buffer.byteLength
   });
 });
