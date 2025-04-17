@@ -4,7 +4,7 @@
     "declaration": true,
     "esModuleInterop": true,
     "lib": ["es5", "es2015", "esnext", "dom"],
-    "types": ["node", "jest"],
+    "types": ["node"],
     "moduleResolution": "node",
     "noImplicitAny": true,
     "noUnusedLocals": true,

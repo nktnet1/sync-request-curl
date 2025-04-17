@@ -1,5 +1,6 @@
 import { SERVER_URL } from './app/config';
 import request, { SetEasyOptionCallback } from '../src';
+import { describe, expect, test } from 'vitest';
 
 describe('Callback setEasyOptions headers override', () => {
   const setEasyOptions: SetEasyOptionCallback = (curl, options) => {

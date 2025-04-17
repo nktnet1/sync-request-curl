@@ -1,4 +1,5 @@
 import request, { CurlError } from '../src';
+import { describe, expect, test } from 'vitest';
 import { SERVER_URL } from './app/config';
 
 const checkCurlError = (requestWrapped: () => void, code: number): void => {
