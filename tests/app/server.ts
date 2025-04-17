@@ -5,7 +5,7 @@ import app from '.';
 const server = serve({
   fetch: app.fetch,
   port: PORT,
-  hostname: HOST, 
+  hostname: HOST,
 }, () => {
   console.log(`Hono Server started and awaiting requests at the URL: '${SERVER_URL}'`);
 });
