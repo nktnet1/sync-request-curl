@@ -99,16 +99,19 @@ export const checkValidCurlCode = (code: CurlCode, requestInputs: RequestInputs)
  * @param {Buffer} body - The body of the HTTP response.
  * @throws {Error} if the status code is >= 300.
  */
-export const checkGetBodyStatus = (statusCode: number, body: Buffer) => {
+export const checkValidStatusCode = (statusCode: number, body: Buffer) => {
   if (statusCode >= 300) {
     throw new Error(`
-      Server responded with status code ${statusCode}
+Server responded with status code
+  ${statusCode}
 
-      Body: ${body.toString()}
+Body:
+  ${body.toString()}
 
-      Use 'res.body' instead of 'res.getBody()' to not have any errors thrown.
-      The status code (in this case, ${statusCode}) can be checked manually
-      with res.statusCode.
+Use 'res.body' instead of 'res.getBody()' to not have any errors thrown.
+
+The status code (in this case, ${statusCode}) can be checked manually
+with res.statusCode.
     `);
   }
 };

@@ -82,6 +82,9 @@ Please refer to the [compatibility](#4-compatibility) section for known issues a
 
 ## 2. Usage
 
+> [!TIP]
+> Starting from `sync-request-curl@3.2.0`, you can replace `JSON.parse(res.body.toString())` with `res.getJSON()`.
+
 Try with [Replit](https://replit.com/@nktnet1/sync-request-curl-example#index.js).
 
 ```typescript
@@ -140,6 +143,7 @@ const res = request(
     },
   }
 );
+
 console.log('Status Code:', res.statusCode);
 const jsonBody = JSON.parse(res.body.toString());
 console.log('Returned JSON Object:', jsonBody);
@@ -334,9 +338,10 @@ export interface Options {
 
 - **`statusCode`** - a number representing the HTTP status code (e.g. `200`, `400`, `401`, `403`)
 - **`headers`** - HTTP response headers. The keys/properties of the object will always be in lowercase, e.g. `"content-type"` instead of `"Content-Type"`
+- **`url`** - the final URL used in the request after all redirections are followed and all query string parameters appended
 - **`body`** - a string or buffer - for JSON responses, use `JSON.parse(response.body.toString())` to get the returned data as an object
 - **`getBody`** - a function with an optional `encoding` argument that returns the `body` if `encoding` is undefined, otherwise `body.toString(encoding)`. If `statusCode >= 300`, an `Error` is thrown instead
-- **`url`** - the final URL used in the request after all redirections are followed, and with the query string parameters appended
+- **`getJSON`** - a function that returns the body as `JSON`. an `Error` is thrown if the body cannot be parsed.
 
 In [src/types.ts](src/types.ts), the `Response` interface is defined as:
 
@@ -344,9 +349,10 @@ In [src/types.ts](src/types.ts), the `Response` interface is defined as:
 export interface Response {
   statusCode: number;
   headers: IncomingHttpHeaders;
+  url: string;
   body: string | Buffer;
   getBody: (encoding?: BufferEncoding) => string | Buffer; // simplified
-  url: string;
+  getJSON: <T = any>(encoding?: BufferEncoding) => T
 }
 ```
 
