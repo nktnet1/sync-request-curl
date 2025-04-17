@@ -1,69 +1,78 @@
-import express, { json, Request, Response } from 'express';
-import errorHandler from './errorHandler';
-import createHttpError from 'http-errors';
-import morgan from 'morgan';
-import bodyParser from 'body-parser';
+import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
+import { logger } from 'hono/logger';
 
-const app = express();
+const app = new Hono();
 
-app.disable('x-powered-by');
-app.use(morgan('dev'));
-app.use(bodyParser.raw({
-  type: 'application/timestamp-query'
-}));
-app.use(json());
-
-app.get('/', (_: Request, res: Response) => { res.json({ message: 'Hello, world!' }); });
-
-app.get('/get', (req: Request, res: Response) => {
-  const value = req.query.value;
-  if (value === 'echo') throw new createHttpError.BadRequest("Cannot echo 'echo'!");
-  res.json({ value });
+app.use('*', logger());
+app.use('*', async (c, next) => {
+  c.res.headers.delete('x-powered-by');
+  await next();
 });
 
-app.delete('/delete', (req: Request, res: Response) => {
-  const value = req.headers.value;
-  if (value === 'header') throw new createHttpError.Unauthorized("Cannot header 'header'!");
-  res.json({ value });
+app.get('/', (c) => {
+  return c.json({ message: 'Hello, world!' });
 });
 
-app.post('/post', (req: Request, res: Response) => {
-  const value = req.body.value;
-  if (value === 'post') throw new createHttpError.BadRequest("Cannot post 'post'!");
-  res.json({ value });
+app.get('/get', (c) => {
+  const value = c.req.query('value');
+  console.log(value);
+  if (value === 'echo') throw new HTTPException(400, { message: "Cannot echo 'echo'!" });
+  return c.json({ value });
 });
 
-app.put('/put', (req: Request, res: Response) => {
-  const value = req.body.value;
-  if (value === 'put') throw new createHttpError.Forbidden("Cannot put 'put'!");
-  res.json({ value });
+app.delete('/delete', (c) => {
+  const value = c.req.header('value');
+  if (value === 'header') throw new HTTPException(401, { message: "Cannot header 'header'!" });
+  return c.json({ value });
 });
 
-app.get('/redirect/source', (req: Request, res: Response) => {
-  const redirectNumber = parseInt(req.query.redirectNumber as string);
+app.post('/post', async (c) => {
+  const body = await c.req.json();
+  const value = body.value;
+  if (value === 'post') throw new HTTPException(400, { message: "Cannot post 'post'!" });
+  return c.json({ value });
+});
+
+app.put('/put', async (c) => {
+  const body = await c.req.json();
+  const value = body.value;
+  if (value === 'put') throw new HTTPException(403, { message: "Cannot put 'put'!" });
+  return c.json({ value });
+});
+
+app.get('/redirect/source', (c) => {
+  const redirectNumber = parseInt(c.req.query('redirectNumber') as string);
   return redirectNumber > 0
-    ? res.redirect(302, `/redirect/source?redirectNumber=${redirectNumber - 1}`)
-    : res.redirect(302, '/redirect/destination');
+    ? c.redirect(`/redirect/source?redirectNumber=${redirectNumber - 1}`, 302)
+    : c.redirect('/redirect/destination', 302);
 });
 
-app.get('/redirect/destination', (_: Request, res: Response) => {
-  res.status(200).json({ message: 'Redirect success!' });
+app.get('/redirect/destination', (c) => {
+  return c.json({ message: 'Redirect success!' });
 });
 
-app.post('/content/length', (req: Request, res: Response) => {
-  res.status(200).json({
-    headerLength: parseInt(req.headers['content-length'] as string),
+app.post('/content/length', async (c) => {
+  const contentLength = parseInt(c.req.header('content-length') as string);
+  const buffer = await c.req.arrayBuffer();
+  return c.json({
+    headerLength: contentLength,
     // See bodyparser middleware options above.
-    serverBufferLength: req.body.length
+    serverBufferLength: buffer.byteLength
   });
 });
 
-app.post('/timeout', (req: Request, res: Response) => {
+app.post('/timeout', async (c) => {
+  const body = await c.req.json();
   const startTime = new Date().getTime();
-  while (new Date().getTime() - startTime < req.body.timeout) { /* zzzZZ */ }
-  res.status(200).json({});
+  while (new Date().getTime() - startTime < body.timeout) { /* zzzZZ */ }
+  return c.json({});
 });
 
-app.use(errorHandler());
+app.onError((err, c) => {
+  const status = err instanceof HTTPException ? err.status : 500;
+  const message = err instanceof HTTPException ? err.message : 'Internal Server Error';
+  return c.json({ error: message }, status);
+});
 
 export default app;
