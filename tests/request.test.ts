@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { SERVER_URL } from './app/config';
 import request, { HttpVerb, Options } from '../src';
+import { describe, expect, test } from 'vitest';
 
 // ========================================================================= //
 

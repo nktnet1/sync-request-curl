@@ -1,2 +1,5 @@
 onlyBuiltDependencies:
   - node-libcurl
+
+ignoredBuiltDependencies:
+  - esbuild

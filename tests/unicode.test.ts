@@ -1,3 +1,4 @@
+import { describe, expect, test } from 'vitest';
 import { SERVER_URL } from './app/config';
 import request, { HttpVerb } from '../src';
 
