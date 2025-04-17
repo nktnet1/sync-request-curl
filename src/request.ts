@@ -1,7 +1,7 @@
 import { Curl, Easy } from 'node-libcurl';
-import { HttpVerb, Options, Response, GetBody } from './types';
+import { HttpVerb, Options, Response, GetBody, GetJSON } from './types';
 import {
-  checkGetBodyStatus,
+  checkValidStatusCode,
   checkValidCurlCode,
   handleQs,
   parseReturnedHeaders,
@@ -165,14 +165,39 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
    * @returns {Buffer | string} buffer body by default, string body with encoding
    */
   const getBody: GetBody = (encoding?) => {
-    checkGetBodyStatus(statusCode, body);
+    checkValidStatusCode(statusCode, body);
     return typeof encoding === 'string' ? body.toString(encoding) as any : body;
+  };
+
+  /**
+ * Get the JSON-parsed body of a response.
+ *
+ * @throws {Error} if the body is nto a valid JSON
+ * @returns {any} parsed JSON body
+ */
+  const getJSON: GetJSON = (encoding?) => {
+    try {
+      return JSON.parse(body.toString(encoding));
+    } catch (err) {
+      throw new Error(`
+The server body response for
+  - ${method}
+  - ${url}
+cannot be parsed as JSON.
+
+Body:
+  ${body.toString(encoding)}
+
+JSON-Parsing Error Message:
+  ${err instanceof Error ? err.message : String(err)}
+      `);
+    }
   };
 
   url = curl.getInfo('EFFECTIVE_URL').data as string;
 
   curl.close();
-  return { statusCode, headers, body, getBody, url };
+  return { statusCode, headers, url, body, getBody, getJSON };
 };
 
 export default request;

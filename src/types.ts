@@ -48,13 +48,16 @@ export interface Options {
 }
 
 // Infer type `string` if encoding is specified, otherwise `string | Buffer
-export type GetBody = <encoding extends BufferEncoding | undefined>(arg?: encoding)
-  => encoding extends BufferEncoding ? string : Buffer;
+export type GetBody = <Encoding extends BufferEncoding | undefined>(arg?: Encoding)
+  => Encoding extends BufferEncoding ? string : Buffer;
+
+export type GetJSON = <T = any>(encoding?: BufferEncoding) => T;
 
 export interface Response {
   statusCode: number;
   headers: IncomingHttpHeaders;
+  url: string;
   body: string | Buffer;
   getBody: GetBody;
-  url: string;
+  getJSON: GetJSON;
 }

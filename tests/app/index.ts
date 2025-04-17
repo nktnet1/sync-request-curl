@@ -63,6 +63,10 @@ app.post('/timeout', async (c) => {
   return c.json({});
 });
 
+app.post('/text', async (c) => {
+  return c.text('Hello world!');
+});
+
 app.onError((err, c) => {
   const status = err instanceof HTTPException ? err.status : 500;
   const message = err instanceof HTTPException ? err.message : 'Internal Server Error';
