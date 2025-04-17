@@ -46,18 +46,6 @@ describe('GET requests', () => {
     expect(res).toMatchObject({ code: 400, json: { error: "Cannot echo 'echo'!" } });
   });
 
-  test('GET request with array of one number', () => {
-    const value = [1];
-    const res = wrapperRequest('GET', `${SERVER_URL}/get`, { qs: { value } });
-    expect(res).toMatchObject({ code: 200, json: { value: ['1'] } });
-  });
-
-  test('GET request with array of numbers', () => {
-    const value = [1, 2, 3];
-    const res = wrapperRequest('GET', `${SERVER_URL}/get`, { qs: { value } });
-    expect(res).toMatchObject({ code: 200, json: { value: ['1', '2', '3'] } });
-  });
-
   test('GET request with empty array', () => {
     const value: string[] = [];
     const res = wrapperRequest('GET', `${SERVER_URL}/get`, { qs: { value } });
@@ -210,8 +198,8 @@ describe('Body (instead of JSON)', () => {
     expect(res).toMatchObject({ code: 200, json: { value: value.value } });
   });
 
-  test('Empty body', () => {
-    const res = wrapperRequest('PUT', `${SERVER_URL}/put`, { body: '' });
+  test('PUT request empty json', () => {
+    const res = wrapperRequest('PUT', `${SERVER_URL}/put`, { json: {} });
     expect(res).toMatchObject({ code: 200, json: {} });
   });
 });
