@@ -13,5 +13,5 @@ export default function setup() {
 
   return () => {
     stopServer(globalThis.server, 'SIGINT');
-  }
+  };
 };
