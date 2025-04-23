@@ -91,7 +91,7 @@ app.post('/upload', async (c) => {
             lastModified: fileContent.lastModified,
           },
         }
-  );
+  ).sort((a, b) => a.name.localeCompare(b.name));
   return c.json(returnedBody);
 });
 
