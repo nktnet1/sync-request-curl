@@ -1,5 +1,5 @@
 import { Curl, Easy, HttpPostField } from 'node-libcurl';
-import { HttpVerb, Options, Response, GetBody, GetJSON } from './types';
+import { HttpVerb, Options, Response, GetJSON } from './@types';
 import {
   checkValidStatusCode,
   checkValidCurlCode,
@@ -7,6 +7,8 @@ import {
   parseReturnedHeaders,
   parseIncomingHeaders,
 } from './utils';
+import type { JsonValue } from './@types/json';
+import type { BufferEncoding } from './@types';
 
 /**
  * Create a libcurl Easy object with default configurations
@@ -15,13 +17,16 @@ import {
  * @param {Options} options - configuration options for the request.
  * @returns {Easy} an initialized libcurl Easy object with default options
  */
-const createCurlObjectWithDefaults = (method: HttpVerb, options: Options): Easy => {
+const createCurlObjectWithDefaults = (
+  method: HttpVerb,
+  options: Options
+): Easy => {
   const curl = new Easy();
   curl.setOpt(Curl.option.CUSTOMREQUEST, method);
   curl.setOpt(Curl.option.TIMEOUT_MS, options.timeout ?? 0);
   curl.setOpt(
-    Curl.option.FOLLOWLOCATION, options.followRedirects === undefined ||
-    options.followRedirects
+    Curl.option.FOLLOWLOCATION,
+    options.followRedirects === undefined || options.followRedirects
   );
   curl.setOpt(Curl.option.MAXREDIRS, options.maxRedirects ?? -1);
   curl.setOpt(Curl.option.SSL_VERIFYPEER, !options.insecure);
@@ -35,10 +40,12 @@ const createCurlObjectWithDefaults = (method: HttpVerb, options: Options): Easy 
  *
  * @param {Easy} curl - The cURL easy handle
  * @param {string} url - The URL to handle query string parameters for
- * @param {Object.<string, any>} qs - query string parameters for the request
+ * @param {Object.<string, JsonValue>} qs - query string parameters for the request
  */
 const handleQueryString = (
-  curl: Easy, url: string, qs?: { [key: string]: any }
+  curl: Easy,
+  url: string,
+  qs?: { [key: string]: JsonValue }
 ): void => {
   url = qs && Object.keys(qs).length ? handleQs(url, qs) : url;
   curl.setOpt(Curl.option.URL, url);
@@ -61,10 +68,10 @@ const handleOutgoingHeaders = (curl: Easy, returnedHeaderArray: string[]) => {
 /**
  * Sets the JSON payload for the curl request.
  * @param {Easy} curl - The curl object.
- * @param {any} json - The JSON body to be sent
+ * @param {JsonValue} json - The JSON body to be sent
  * @param {string[]} httpHeaders - HTTP headers for the request
  */
-const setJSONPayload = (curl: Easy, json: any, httpHeaders: string[]): void => {
+const setJSONPayload = (curl: Easy, json: JsonValue, httpHeaders: string[]): void => {
   httpHeaders.push('Content-Type: application/json');
   const payload = JSON.stringify(json);
   httpHeaders.push(`Content-Length: ${Buffer.byteLength(payload, 'utf-8')}`);
@@ -77,20 +84,32 @@ const setJSONPayload = (curl: Easy, json: any, httpHeaders: string[]): void => {
  * @param {string | Buffer} body - The body to be sent in the request.
  * @param {string[]} httpHeaders - HTTP headers for the request
  */
-const setBodyPayload = (curl: Easy, body: string | Buffer, httpHeaders: string[]): void => {
+const setBodyPayload = (
+  curl: Easy,
+  body: string | Buffer,
+  httpHeaders: string[]
+): void => {
   if (Buffer.isBuffer(body)) {
     let position = 0;
     curl.setOpt(Curl.option.POST, true);
     curl.setOpt(Curl.option.POSTFIELDSIZE, -1);
-    curl.setOpt(Curl.option.READFUNCTION, (buffer: Buffer, size: number, nmemb: number): number => {
-      const amountToRead = size * nmemb;
-      if (position === body.length) {
-        return 0;
+    curl.setOpt(
+      Curl.option.READFUNCTION,
+      (buffer: Buffer, size: number, nmemb: number): number => {
+        const amountToRead = size * nmemb;
+        if (position === body.length) {
+          return 0;
+        }
+        const totalWritten = body.copy(
+          buffer,
+          0,
+          position,
+          Math.min(amountToRead, body.length)
+        );
+        position += totalWritten;
+        return totalWritten;
       }
-      const totalWritten = body.copy(buffer, 0, position, Math.min(amountToRead, body.length));
-      position += totalWritten;
-      return totalWritten;
-    });
+    );
   } else {
     curl.setOpt(Curl.option.POSTFIELDS, body);
     httpHeaders.push(`Content-Length: ${Buffer.byteLength(body, 'utf-8')}`);
@@ -117,7 +136,10 @@ const setFormPayload = (curl: Easy, formData: HttpPostField[]) => {
  * @param {string[]} httpHeaders - HTTP headers for the request
  */
 const handleBodyAndRequestHeaders = (
-  curl: Easy, options: Options, buffer: { body: Buffer }, httpHeaders: string[]
+  curl: Easy,
+  options: Options,
+  buffer: { body: Buffer },
+  httpHeaders: string[]
 ): void => {
   if (options.json) {
     setJSONPayload(curl, options.json, httpHeaders);
@@ -144,13 +166,22 @@ const handleBodyAndRequestHeaders = (
  * @param {Options} [options={}] - An object to configure the request
  * @returns {Response} - HTTP response consisting of status code, headers, and body
  */
-const request = (method: HttpVerb, url: string, options: Options = {}): Response => {
+const request = (
+  method: HttpVerb,
+  url: string,
+  options: Options = {}
+): Response => {
   const curl = createCurlObjectWithDefaults(method, options);
   handleQueryString(curl, url, options.qs);
 
   // Body/JSON and Headers (incoming)
   const bufferWrap = { body: Buffer.alloc(0) };
-  handleBodyAndRequestHeaders(curl, options, bufferWrap, parseIncomingHeaders(options.headers));
+  handleBodyAndRequestHeaders(
+    curl,
+    options,
+    bufferWrap,
+    parseIncomingHeaders(options.headers)
+  );
 
   // Headers (outgoing)
   const returnedHeaderArray: string[] = [];
@@ -175,17 +206,19 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
    * @throws {Error} if the status code is >= 300
    * @returns {Buffer | string} buffer body by default, string body with encoding
    */
-  const getBody: GetBody = (encoding?) => {
+  function getBody<Encoding extends BufferEncoding>(encoding: Encoding): string;
+  function getBody(encoding?: undefined): Buffer;
+  function getBody(encoding?: BufferEncoding): string | Buffer {
     checkValidStatusCode(statusCode, body);
-    return typeof encoding === 'string' ? body.toString(encoding) as any : body;
-  };
+    return encoding ? body.toString(encoding) : body;
+  }
 
   /**
- * Get the JSON-parsed body of a response.
- *
- * @throws {Error} if the body is nto a valid JSON
- * @returns {any} parsed JSON body
- */
+   * Get the JSON-parsed body of a response.
+   *
+   * @throws {Error} if the body is into a valid JSON
+   * @returns {JsonValue} parsed JSON body
+   */
   const getJSON: GetJSON = (encoding?) => {
     try {
       return JSON.parse(body.toString(encoding));

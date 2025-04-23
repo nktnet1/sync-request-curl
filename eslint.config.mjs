@@ -51,6 +51,12 @@ export default [{
       vars: 'all',
     }],
 
+    'no-use-before-define': 'off',
+    '@typescript-eslint/no-use-before-define': 'warn',
+
+    'no-redeclare': 'off',
+    '@typescript-eslint/no-redeclare': 'error',
+
     '@typescript-eslint/no-var-requires': 0,
     '@typescript-eslint/no-explicit-any': 0,
     'no-var': 'warn',
@@ -283,10 +289,6 @@ export default [{
     'no-octal-escape': 'error',
     'no-proto': 'error',
 
-    'no-redeclare': ['error', {
-      builtinGlobals: false,
-    }],
-
     'no-regex-spaces': 'error',
     'no-return-assign': ['error', 'except-parens'],
 
@@ -321,12 +323,6 @@ export default [{
       allowShortCircuit: true,
       allowTernary: true,
       allowTaggedTemplates: true,
-    }],
-
-    'no-use-before-define': ['error', {
-      functions: false,
-      classes: false,
-      variables: false,
     }],
 
     'no-useless-call': 'error',

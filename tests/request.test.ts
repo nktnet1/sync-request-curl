@@ -1,8 +1,8 @@
 import fs from 'fs';
-import { SERVER_URL } from './app/config';
-import request, { HttpVerb, Options } from '../src';
 import { describe, expect, test } from 'vitest';
 import path from 'path';
+import { SERVER_URL } from './app/config';
+import request, { HttpVerb, JsonValue, Options } from '../src';
 
 // ========================================================================= //
 
@@ -12,12 +12,16 @@ export const wrapperRequest = (
   option?: Options
 ) => {
   const rawResponse = request(method, url, option);
-  let json: any;
+  let json: JsonValue;
 
   try {
     json = JSON.parse(rawResponse.body.toString());
-  } catch (error: any) {
-    json = { error: `Failed to parse JSON: ${error.message}` };
+  } catch (error: unknown) {
+    json = {
+      error: `Failed to parse JSON: ${
+        error instanceof Error ? error.message : error
+      }`,
+    };
   }
   return {
     rawResponse,
@@ -244,7 +248,7 @@ describe('Body (instead of JSON)', () => {
 describe('res.getBody()', () => {
   test('Using getBody() with no encoding', () => {
     const res = wrapperRequest('GET', SERVER_URL);
-    const body = res.rawResponse.getBody();
+    const body: Buffer = res.rawResponse.getBody();
     expect(body).toBeInstanceOf(Buffer);
   });
 
