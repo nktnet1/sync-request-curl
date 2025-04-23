@@ -285,10 +285,10 @@ JSON.stringify({
 <pre>
 [{
   name: '1',
-  file: '/path',
+  file: '/path'
 }, {
   name: '2',
-  contents: 'a',
+  contents: 'a'
 }],
 </pre></td>
     <td><code>undefined</code></td>
