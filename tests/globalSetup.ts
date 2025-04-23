@@ -1,6 +1,9 @@
 import { startServer, stopServer } from 'sync-dev-server';
 import { HOST as host, PORT as port } from './app/config';
 
+/**
+ * Starts and stops a server for HTTP testing
+ */
 export default function setup() {
   const command = 'pnpm start';
   globalThis.server = startServer(command, {
