@@ -154,7 +154,6 @@ console.log('Returned JSON Object:', jsonBody);
 ```typescript
 import request from 'sync-request-curl';
 
-const testFileLocation = ;
 const res = request(
   'POST',
   'https://example.com/upload',
