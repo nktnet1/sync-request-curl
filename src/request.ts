@@ -97,6 +97,11 @@ const setBodyPayload = (curl: Easy, body: string | Buffer, httpHeaders: string[]
   }
 };
 
+/**
+ * Sets the buffer payload for the curl request.
+ * @param {Easy} curl - The curl object.
+ * @param {Array<HttpPostField>} formData - list of files/contents to be sent
+ */
 const setFormPayload = (curl: Easy, formData: HttpPostField[]) => {
   curl.setOpt(Curl.option.HTTPPOST, formData);
 };
