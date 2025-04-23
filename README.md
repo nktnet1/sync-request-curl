@@ -213,8 +213,6 @@ URL as a string
 
 ### 2.3. Options
 
-Only the following options from [sync-request](https://www.npmjs.com/package/sync-request) are supported for the time being:
-
 <table>
   <tr>
     <th>Option</th>
@@ -236,6 +234,7 @@ Only the following options from [sync-request](https://www.npmjs.com/package/syn
     </td>
     <td><code>undefined</code></td>
   </tr>
+
   <tr>
     <td>headers</td>
     <td>
@@ -262,6 +261,7 @@ Only the following options from [sync-request](https://www.npmjs.com/package/syn
     </td>
     <td><code>undefined</code></td>
   </tr>
+
   <tr>
     <td>body</td>
     <td>
@@ -293,14 +293,6 @@ JSON.stringify({
 </pre></td>
     <td><code>undefined</code></td>
   </tr>
-  <tr>
-    <td>timeout</td>
-    <td>
-      Times out if no response is returned within the given number of milliseconds.
-    </td>
-    <td><pre>2000</pre></td>
-    <td><code>0</code><br/>(no timeout)</td>
-  </tr>
 
   <tr>
     <td>timeout</td>
@@ -310,6 +302,7 @@ JSON.stringify({
     <td><pre>2000</pre></td>
     <td><code>0</code><br/>(no timeout)</td>
   </tr>
+
   <tr>
     <td>followRedirects</td>
     <td>
@@ -318,6 +311,7 @@ JSON.stringify({
     <td><pre>false</pre></td>
     <td><code>true</code></td>
   </tr>
+
   <tr>
     <td>maxRedirects</td>
     <td>Sets the maximum number of redirects to follow before throwing an Error.</td>
@@ -325,19 +319,6 @@ JSON.stringify({
     <td><code>-1</code><br/>(no limit)</td>
   </tr>
 
-</table>
-
-<br/>
-
-Below are some additional options available from [node-libcurl](https://github.com/JCMais/node-libcurl):
-
-<table>
-  <tr>
-    <th>Option</th>
-    <th>Description</th>
-    <th>Example</th>
-    <th>Default</th>
-  </tr>
   <tr>
     <td>insecure</td>
     <td> Set to true to send insecure requests. This can be useful on Windows which may have SSL issues (Libcurl code 60).</td>
@@ -367,11 +348,15 @@ In [src/types.ts](src/types.ts), the `Options` interface following is defined as
 
 ```typescript
 export interface Options {
-  /*
-   * sync-request options
-   */
+export interface Options {
   headers?: IncomingHttpHeaders;
   qs?: { [key: string]: any };
+
+  // You should only specify one of these.
+  // They are processed in the order listed below.
+  //
+  // When no json, body or formdata is provided, Content-Length = 0
+  // will be set in the headers.
   json?: any;
   body?: string | Buffer;
   formData?: HttpPostField[];
@@ -379,12 +364,9 @@ export interface Options {
   timeout?: number;
   followRedirects?: boolean;
   maxRedirects?: number;
-
-  /*
-   * node-libcurl options
-   */
   insecure?: boolean;
   setEasyOptions?: SetEasyOptionCallback;
+}
 }
 ```
 
