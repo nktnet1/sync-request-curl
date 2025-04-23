@@ -1,4 +1,4 @@
-import { Curl, Easy } from 'node-libcurl';
+import { Curl, Easy, HttpPostField } from 'node-libcurl';
 import { HttpVerb, Options, Response, GetBody, GetJSON } from './types';
 import {
   checkValidStatusCode,
@@ -97,6 +97,10 @@ const setBodyPayload = (curl: Easy, body: string | Buffer, httpHeaders: string[]
   }
 };
 
+const setFormPayload = (curl: Easy, formData: HttpPostField[]) => {
+  curl.setOpt(Curl.option.HTTPPOST, formData);
+};
+
 /**
  * Prepares the request body and headers for a cURL request based on provided
  * options. Also sets up a callback function for the cURL Easy object to handle
@@ -114,6 +118,8 @@ const handleBodyAndRequestHeaders = (
     setJSONPayload(curl, options.json, httpHeaders);
   } else if (options.body) {
     setBodyPayload(curl, options.body, httpHeaders);
+  } else if (options.formData) {
+    setFormPayload(curl, options.formData);
   } else {
     httpHeaders.push('Content-Length: 0');
   }

@@ -1,5 +1,5 @@
 import { IncomingHttpHeaders } from 'http';
-import { CurlOption, Easy } from 'node-libcurl';
+import { CurlOption, Easy, HttpPostField } from 'node-libcurl';
 
 export type HttpVerb =
   | 'GET'
@@ -35,6 +35,7 @@ export interface Options {
   qs?: { [key: string]: any };
   json?: any;
   body?: string | Buffer;
+  formData?: HttpPostField[];
 
   timeout?: number;
   followRedirects?: boolean;
