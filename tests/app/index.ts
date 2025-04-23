@@ -12,27 +12,35 @@ app.get('/', (c) => {
 
 app.get('/get', (c) => {
   const value = c.req.query('value');
-  if (value === 'echo') throw new HTTPException(400, { message: "Cannot echo 'echo'!" });
+  if (value === 'echo') {
+    throw new HTTPException(400, { message: "Cannot echo 'echo'!" });
+  }
   return c.json({ value });
 });
 
 app.delete('/delete', (c) => {
   const value = c.req.header('value');
-  if (value === 'header') throw new HTTPException(401, { message: "Cannot header 'header'!" });
+  if (value === 'header') {
+    throw new HTTPException(401, { message: "Cannot header 'header'!" });
+  }
   return c.json({ value });
 });
 
 app.post('/post', async (c) => {
   const body = await c.req.json();
   const value = body.value;
-  if (value === 'post') throw new HTTPException(400, { message: "Cannot post 'post'!" });
+  if (value === 'post') {
+    throw new HTTPException(400, { message: "Cannot post 'post'!" });
+  }
   return c.json({ value });
 });
 
 app.put('/put', async (c) => {
   const body = await c.req.json();
   const value = body.value;
-  if (value === 'put') throw new HTTPException(403, { message: "Cannot put 'put'!" });
+  if (value === 'put') {
+    throw new HTTPException(403, { message: "Cannot put 'put'!" });
+  }
   return c.json({ value });
 });
 
@@ -52,14 +60,16 @@ app.post('/content/length', async (c) => {
   const buffer = await c.req.arrayBuffer();
   return c.json({
     headerLength: contentLength,
-    serverBufferLength: buffer.byteLength
+    serverBufferLength: buffer.byteLength,
   });
 });
 
 app.post('/timeout', async (c) => {
   const body = await c.req.json();
   const startTime = new Date().getTime();
-  while (new Date().getTime() - startTime < body.timeout) { /* zzzZZ */ }
+  while (new Date().getTime() - startTime < body.timeout) {
+    /* zzzZZ */
+  }
   return c.json({});
 });
 
@@ -67,9 +77,28 @@ app.post('/text', async (c) => {
   return c.text('Hello world!');
 });
 
+app.post('/upload', async (c) => {
+  const body = await c.req.parseBody();
+  const returnedBody = Object.entries(body).map(([name, fileContent]) =>
+    typeof fileContent === 'string'
+      ? { name, content: fileContent }
+      : {
+          name,
+          file: {
+            name: fileContent.name,
+            size: fileContent.size,
+            type: fileContent.type,
+            lastModified: fileContent.lastModified,
+          },
+        }
+  ).sort((a, b) => a.name.localeCompare(b.name));
+  return c.json(returnedBody);
+});
+
 app.onError((err, c) => {
   const status = err instanceof HTTPException ? err.status : 500;
-  const message = err instanceof HTTPException ? err.message : 'Internal Server Error';
+  const message =
+    err instanceof HTTPException ? err.message : 'Internal Server Error';
   return c.json({ error: message }, status);
 });
 

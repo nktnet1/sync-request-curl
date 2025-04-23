@@ -149,6 +149,33 @@ const jsonBody = JSON.parse(res.body.toString());
 console.log('Returned JSON Object:', jsonBody);
 ```
 
+**`POST`** request for file upload using multipart/form-data
+
+```typescript
+import request from 'sync-request-curl';
+
+const testFileLocation = ;
+const res = request(
+  'POST',
+  'https://example.com/upload',
+  {
+    formData: [
+      {
+        name: 'example-file',
+        file: './path/to/file.txt',
+        type: 'text/plain',
+      },
+      {
+        name: 'example-content',
+        contents: 'Example Content!',
+      },
+    ],
+  }
+);
+
+console.log('Status Code:', res.statusCode);
+```
+
 Using a proxy URL (Note: replace with your own proxy details)
 ```javascript
 import request from 'sync-request-curl';
@@ -249,6 +276,33 @@ JSON.stringify({
 }) </pre></td>
     <td><code>undefined</code></td>
   </tr>
+
+  <tr>
+    <td>formData</td>
+    <td>
+      Array of <a href="https://github.com/JCMais/node-libcurl/blob/6bb4f99183af64354067970d9c91d5fedc6b8709/lib/types/HttpPostField.ts#L12-L40">HttpPostField</a> from node-libcurl, used for file uploads with multipart/form-data.
+    </td>
+    <td>
+<pre>
+[{
+  name: '1',
+  file: '/path',
+}, {
+  name: '2',
+  contents: 'a',
+}],
+</pre></td>
+    <td><code>undefined</code></td>
+  </tr>
+  <tr>
+    <td>timeout</td>
+    <td>
+      Times out if no response is returned within the given number of milliseconds.
+    </td>
+    <td><pre>2000</pre></td>
+    <td><code>0</code><br/>(no timeout)</td>
+  </tr>
+
   <tr>
     <td>timeout</td>
     <td>
@@ -321,6 +375,7 @@ export interface Options {
   qs?: { [key: string]: any };
   json?: any;
   body?: string | Buffer;
+  formData?: HttpPostField[];
 
   timeout?: number;
   followRedirects?: boolean;
