@@ -350,14 +350,14 @@ In [src/types.ts](src/types.ts), the `Options` interface following is defined as
 export interface Options {
 export interface Options {
   headers?: IncomingHttpHeaders;
-  qs?: { [key: string]: any };
+  qs?: { [key: string]: JsonValue };
 
   // You should only specify one of these.
   // They are processed in the order listed below.
   //
   // When no json, body or formdata is provided, Content-Length = 0
   // will be set in the headers.
-  json?: any;
+  json?: JsonValue;
   body?: string | Buffer;
   formData?: HttpPostField[];
 
@@ -388,7 +388,7 @@ export interface Response {
   url: string;
   body: string | Buffer;
   getBody: (encoding?: BufferEncoding) => string | Buffer; // simplified
-  getJSON: <T = any>(encoding?: BufferEncoding) => T
+  getJSON: <T extends JsonValue>(encoding?: BufferEncoding) => T
 }
 ```
 
