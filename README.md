@@ -329,12 +329,6 @@ JSON.stringify({
 
 
   <tr>
-    <th>Option</th>
-    <th>Description</th>
-    <th>Example</th>
-    <th>Default</th>
-  </tr>
-  <tr>
     <td>insecure</td>
     <td> Set to true to send insecure requests. This can be useful on Windows which may have SSL issues (Libcurl code 60).</td>
     <td><pre>true</pre></td>
