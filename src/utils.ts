@@ -1,8 +1,7 @@
 import { IncomingHttpHeaders } from 'http';
 import { CurlCode, Easy } from 'node-libcurl';
-import { HttpVerb, Options } from './@types';
+import { HttpVerb, Options } from './types';
 import { CurlError } from './errors';
-import { JsonValue } from './@types/json';
 
 interface RequestInputs {
   method: HttpVerb,
@@ -19,10 +18,10 @@ interface RequestInputs {
  *   i.e. https://www.google.com.au/?quizIds[0]=0&quizIds[1]=1&quizIds[2]=2
  *
  * @param {string} url - The URL to handle query string parameters for.
- * @param {Object.<string, JsonValue>} qs - query string parameters to modify or append.
+ * @param {Object.<string, any>} qs - query string parameters to modify or append.
  * @returns {string} The modified URL with the updated query string parameters.
  */
-export const handleQs = (url: string, qs: { [key: string]: JsonValue }): string => {
+export const handleQs = (url: string, qs: { [key: string]: any }): string => {
   const urlObj = new URL(url);
   for (const [key, value] of Object.entries(qs)) {
     if (Array.isArray(value)) {
@@ -109,7 +108,7 @@ Server responded with status code
 Body:
   ${body.toString()}
 
-Use 'res.body' instead of 'res.getBody()' to not have errors thrown.
+Use 'res.body' instead of 'res.getBody()' to not have any errors thrown.
 
 The status code (in this case, ${statusCode}) can be checked manually
 with res.statusCode.

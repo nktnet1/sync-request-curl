@@ -46,11 +46,11 @@
 
 ---
 
-Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but up to 20 times more quickly.
+Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but 20 times more quickly.
 
 Leverages [node-libcurl](https://github.com/JCMais/node-libcurl) for performance instead of spawning child processes like sync-request.
 
-Designed to run on NodeJS. It will not work in a browser.
+This library was designed to run on NodeJS. It will not work in a browser.
 
 [![Try with Replit](https://replit.com/badge?caption=Try%20with%20Replit)](https://replit.com/@nktnet1/sync-request-curl-example#index.js)
 
@@ -213,6 +213,8 @@ URL as a string
 
 ### 2.3. Options
 
+Only the following options from [sync-request](https://www.npmjs.com/package/sync-request) are supported for the time being:
+
 <table>
   <tr>
     <th>Option</th>
@@ -234,7 +236,6 @@ URL as a string
     </td>
     <td><code>undefined</code></td>
   </tr>
-
   <tr>
     <td>headers</td>
     <td>
@@ -261,7 +262,6 @@ URL as a string
     </td>
     <td><code>undefined</code></td>
   </tr>
-
   <tr>
     <td>body</td>
     <td>
@@ -293,7 +293,6 @@ JSON.stringify({
 </pre></td>
     <td><code>undefined</code></td>
   </tr>
-
   <tr>
     <td>timeout</td>
     <td>
@@ -304,6 +303,14 @@ JSON.stringify({
   </tr>
 
   <tr>
+    <td>timeout</td>
+    <td>
+      Times out if no response is returned within the given number of milliseconds.
+    </td>
+    <td><pre>2000</pre></td>
+    <td><code>0</code><br/>(no timeout)</td>
+  </tr>
+  <tr>
     <td>followRedirects</td>
     <td>
       Sets whether redirects (status code 302) should be followed automatically.
@@ -311,7 +318,6 @@ JSON.stringify({
     <td><pre>false</pre></td>
     <td><code>true</code></td>
   </tr>
-
   <tr>
     <td>maxRedirects</td>
     <td>Sets the maximum number of redirects to follow before throwing an Error.</td>
@@ -319,6 +325,19 @@ JSON.stringify({
     <td><code>-1</code><br/>(no limit)</td>
   </tr>
 
+</table>
+
+<br/>
+
+Below are some additional options available from [node-libcurl](https://github.com/JCMais/node-libcurl):
+
+<table>
+  <tr>
+    <th>Option</th>
+    <th>Description</th>
+    <th>Example</th>
+    <th>Default</th>
+  </tr>
   <tr>
     <td>insecure</td>
     <td> Set to true to send insecure requests. This can be useful on Windows which may have SSL issues (Libcurl code 60).</td>
@@ -348,24 +367,24 @@ In [src/types.ts](src/types.ts), the `Options` interface following is defined as
 
 ```typescript
 export interface Options {
+  /*
+   * sync-request options
+   */
   headers?: IncomingHttpHeaders;
-  qs?: { [key: string]: JsonValue };
-
-  // You should only specify one of these.
-  // They are processed in the order listed below.
-  //
-  // When no json, body or formdata is provided, Content-Length = 0
-  // will be set in the headers.
-  json?: JsonValue;
+  qs?: { [key: string]: any };
+  json?: any;
   body?: string | Buffer;
   formData?: HttpPostField[];
 
   timeout?: number;
   followRedirects?: boolean;
   maxRedirects?: number;
+
+  /*
+   * node-libcurl options
+   */
   insecure?: boolean;
   setEasyOptions?: SetEasyOptionCallback;
-}
 }
 ```
 
@@ -376,7 +395,7 @@ export interface Options {
 - **`url`** - the final URL used in the request after all redirections are followed and all query string parameters appended
 - **`body`** - a string or buffer - for JSON responses, use `JSON.parse(response.body.toString())` to get the returned data as an object
 - **`getBody`** - a function with an optional `encoding` argument that returns the `body` if `encoding` is undefined, otherwise `body.toString(encoding)`. If `statusCode >= 300`, an `Error` is thrown instead
-- **`getJSON`** - a function that returns the body parsed as `JSON`. An `Error` is thrown if the body cannot be parsed.
+- **`getJSON`** - a function that returns the body as `JSON`. an `Error` is thrown if the body cannot be parsed.
 
 In [src/types.ts](src/types.ts), the `Response` interface is defined as:
 
@@ -387,7 +406,7 @@ export interface Response {
   url: string;
   body: string | Buffer;
   getBody: (encoding?: BufferEncoding) => string | Buffer; // simplified
-  getJSON: <T extends JsonValue>(encoding?: BufferEncoding) => T
+  getJSON: <T = any>(encoding?: BufferEncoding) => T
 }
 ```
 
@@ -410,7 +429,7 @@ A few common errors are:
     - The remote server's SSL certificate or SSH fingerprint was deemed not OK. This error code has been unified with CURLE_SSL_CACERT since 7.62.0. Its previous value was 51
     - **HINT**: See the [Windows](#41-windows) compatibility section for an explanation and potential workaround
 
-It is possible to check the Curl code as follows:
+It is possible to check the cURL code as follows:
 
 <details closed>
 <summary>Example (click to view)</summary>

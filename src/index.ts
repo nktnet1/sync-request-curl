@@ -1,24 +1,14 @@
 import request from './request';
 import { CurlError } from './errors';
 
+// ES Modules (ESM)
 export type {
   HttpVerb,
   BufferEncoding,
   Options,
   Response,
-  SetEasyOptionCallback,
-} from './@types';
-
-export type {
-  JsonArray,
-  JsonObject,
-  JsonPrimitiveOptional,
-  JsonValue,
-} from './@types/json';
-
-export type { HttpPostField } from 'node-libcurl';
-
-// ES Modules (ESM)
+  SetEasyOptionCallback
+} from './types';
 export default request;
 export { CurlError };
 

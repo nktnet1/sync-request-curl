@@ -1,6 +1,5 @@
 import { IncomingHttpHeaders } from 'http';
 import { CurlOption, Easy, HttpPostField } from 'node-libcurl';
-import { JsonValue } from './json';
 
 export type HttpVerb =
   | 'GET'
@@ -26,38 +25,34 @@ export type BufferEncoding =
   | 'binary'
   | 'hex';
 
-export type SetEasyOptionCallback = (
-  curl: Easy,
-  curlOption: CurlOption
-) => void;
+export type SetEasyOptionCallback = (curl: Easy, curlOption: CurlOption) => void;
 
 export interface Options {
+  /*
+   * sync-request options
+   */
   headers?: IncomingHttpHeaders;
-  qs?: { [key: string]: JsonValue };
-
-  // You should only specify one of these.
-  // They are processed in the order listed below.
-  //
-  // When no json, body or formdata is provided, Content-Length = 0
-  // will be set in the headers.
-  json?: JsonValue;
+  qs?: { [key: string]: any };
+  json?: any;
   body?: string | Buffer;
   formData?: HttpPostField[];
 
   timeout?: number;
   followRedirects?: boolean;
   maxRedirects?: number;
+
+  /*
+   * node-libcurl options
+   */
   insecure?: boolean;
   setEasyOptions?: SetEasyOptionCallback;
 }
 
 // Infer type `string` if encoding is specified, otherwise `string | Buffer
-export type GetBody = {
-  <Encoding extends BufferEncoding>(encoding: Encoding): string;
-  (encoding?: undefined): Buffer;
-};
+export type GetBody = <Encoding extends BufferEncoding | undefined>(arg?: Encoding)
+  => Encoding extends BufferEncoding ? string : Buffer;
 
-export type GetJSON = <T extends JsonValue>(encoding?: BufferEncoding) => T;
+export type GetJSON = <T = any>(encoding?: BufferEncoding) => T;
 
 export interface Response {
   statusCode: number;
