@@ -348,7 +348,6 @@ In [src/types.ts](src/types.ts), the `Options` interface following is defined as
 
 ```typescript
 export interface Options {
-export interface Options {
   headers?: IncomingHttpHeaders;
   qs?: { [key: string]: JsonValue };
 
