@@ -1,5 +1,5 @@
 import { Curl, Easy, HttpPostField } from 'node-libcurl';
-import { HttpVerb, Options, Response, GetBody, GetJSON } from './types';
+import { HttpVerb, Options, Response, BufferEncoding, GetJSON } from './types';
 import {
   checkValidStatusCode,
   checkValidCurlCode,
@@ -175,15 +175,18 @@ const request = (method: HttpVerb, url: string, options: Options = {}): Response
    * @throws {Error} if the status code is >= 300
    * @returns {Buffer | string} buffer body by default, string body with encoding
    */
-  const getBody: GetBody = (encoding?) => {
+
+  function getBody<Encoding extends BufferEncoding>(encoding: Encoding): string;
+  function getBody(encoding?: undefined): Buffer;
+  function getBody(encoding?: BufferEncoding): string | Buffer {
     checkValidStatusCode(statusCode, body);
-    return typeof encoding === 'string' ? body.toString(encoding) as any : body;
+    return encoding ? body.toString(encoding) : body;
   };
 
   /**
  * Get the JSON-parsed body of a response.
  *
- * @throws {Error} if the body is nto a valid JSON
+ * @throws {Error} if the body is into a valid JSON
  * @returns {any} parsed JSON body
  */
   const getJSON: GetJSON = (encoding?) => {

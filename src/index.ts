@@ -1,7 +1,6 @@
 import request from './request';
 import { CurlError } from './errors';
 
-// ES Modules (ESM)
 export type {
   HttpVerb,
   BufferEncoding,
@@ -9,6 +8,10 @@ export type {
   Response,
   SetEasyOptionCallback
 } from './types';
+
+export type { HttpPostField } from 'node-libcurl';
+
+// ES Modules (ESM)
 export default request;
 export { CurlError };
 

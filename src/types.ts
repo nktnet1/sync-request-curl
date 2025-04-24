@@ -28,11 +28,14 @@ export type BufferEncoding =
 export type SetEasyOptionCallback = (curl: Easy, curlOption: CurlOption) => void;
 
 export interface Options {
-  /*
-   * sync-request options
-   */
   headers?: IncomingHttpHeaders;
   qs?: { [key: string]: any };
+
+  // You should only specify one of these.
+  // They are processed in the order listed below.
+  //
+  // When no json, body or formdata is provided, Content-Length = 0
+  // will be set in the headers.
   json?: any;
   body?: string | Buffer;
   formData?: HttpPostField[];
@@ -41,16 +44,15 @@ export interface Options {
   followRedirects?: boolean;
   maxRedirects?: number;
 
-  /*
-   * node-libcurl options
-   */
   insecure?: boolean;
   setEasyOptions?: SetEasyOptionCallback;
 }
 
 // Infer type `string` if encoding is specified, otherwise `string | Buffer
-export type GetBody = <Encoding extends BufferEncoding | undefined>(arg?: Encoding)
-  => Encoding extends BufferEncoding ? string : Buffer;
+export type GetBody = {
+  <Encoding extends BufferEncoding>(encoding: Encoding): string;
+  (encoding?: undefined): Buffer;
+};
 
 export type GetJSON = <T = any>(encoding?: BufferEncoding) => T;
 
