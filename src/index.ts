@@ -1,12 +1,11 @@
 import request from './request';
-export { CurlError } from './errors';
 
 export type {
   HttpVerb,
   BufferEncoding,
   Options,
   Response,
-  SetEasyOptionCallback
+  SetEasyOptionCallback,
 } from './types';
 
 export type { HttpPostField } from 'node-libcurl';
