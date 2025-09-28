@@ -1,5 +1,5 @@
 import request from './request';
-import { CurlError } from './errors';
+export { CurlError } from './errors';
 
 export type {
   HttpVerb,
@@ -11,11 +11,4 @@ export type {
 
 export type { HttpPostField } from 'node-libcurl';
 
-// ES Modules (ESM)
 export default request;
-export { CurlError };
-
-// CommonJS (CJS)
-module.exports = request;
-module.exports.default = request;
-module.exports.CurlError = CurlError;
