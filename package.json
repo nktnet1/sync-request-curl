@@ -11,8 +11,8 @@
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "scripts": {
-    "start": "ts-node tests/app/server",
-    "dev": "ts-node-dev --watch tests/app tests/app/server",
+    "start": "tsx tests/app/server",
+    "dev": "tsx watch --include ./tests/app ./tests/app/server.ts",
     "test": "vitest run",
     "tc": "vitest run --coverage",
     "lint": "eslint './**/*.ts'",
@@ -54,8 +54,7 @@
     "globals": "^16.1.0",
     "hono": "^4.7.9",
     "sync-dev-server": "^1.0.4",
-    "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0",
+    "tsx": "^4.20.6",
     "typescript": "^5.8.3",
     "vitest": "^3.1.3"
   },
