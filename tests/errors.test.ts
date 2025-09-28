@@ -1,6 +1,7 @@
-import request, { CurlError } from '../src';
 import { describe, expect, test } from 'vitest';
 import { SERVER_URL } from './app/config';
+import request from '../src';
+import { CurlError } from '../src/errors';
 
 const checkCurlError = (requestWrapped: () => void, code: number): void => {
   expect(requestWrapped).toThrow(CurlError);
@@ -33,11 +34,11 @@ describe('Requests that give Libcurl error', () => {
   });
 
   test('Timeout after 1 second - CURLE_OPERATION_TIMEDOUT (28)', () => {
-    const timeoutRequest = () => request(
-      'POST',
-        `${SERVER_URL}/timeout`,
-        { json: { timeout: 1000 }, timeout: 200 }
-    );
+    const timeoutRequest = () =>
+      request('POST', `${SERVER_URL}/timeout`, {
+        json: { timeout: 1000 },
+        timeout: 200,
+      });
     checkCurlError(timeoutRequest, 28);
   });
 });
@@ -45,7 +46,9 @@ describe('Requests that give Libcurl error', () => {
 describe('Other errors', () => {
   test('getBody() throw error for 401 status code', () => {
     const value = 'header';
-    const res = request('DELETE', `${SERVER_URL}/delete`, { headers: { value } });
+    const res = request('DELETE', `${SERVER_URL}/delete`, {
+      headers: { value },
+    });
     expect(res.statusCode).toBe(401);
     expect(() => res.getBody()).toThrow(Error);
   });
