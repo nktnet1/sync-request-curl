@@ -60,16 +60,16 @@ Designed to run on NodeJS. It will not work in a browser.
 
 - [1. Installation](#1-installation)
 - [2. Usage](#2-usage)
-    - [2.1. Method](#21-method)
-    - [2.2. URL](#22-url)
-    - [2.3. Options](#23-options)
-    - [2.4. Response](#24-response)
-    - [2.5. Errors](#25-Errors)
+  - [2.1. Method](#21-method)
+  - [2.2. URL](#22-url)
+  - [2.3. Options](#23-options)
+  - [2.4. Response](#24-response)
+  - [2.5. Errors](#25-Errors)
 - [3. License](#3-license)
 - [4. Compatibility](#4-compatibility)
-    - [4.1. Windows](#41-windows)
-    - [4.2. MacOS](#42-macos)
-    - [4.3. Linux](#43-linux)
+  - [4.1. Windows](#41-windows)
+  - [4.2. MacOS](#42-macos)
+  - [4.3. Linux](#43-linux)
 - [5. Caveats](#5-caveats)
 
 ## 1. Installation
@@ -101,10 +101,7 @@ request(method, url, options);
 ```typescript
 import request from 'sync-request-curl';
 
-const res = request(
-  'GET',
-  'https://comp1531namesages.alwaysdata.net'
-);
+const res = request('GET', 'https://comp1531namesages.alwaysdata.net');
 console.log('Status Code:', res.statusCode);
 const jsonBody = JSON.parse(res.body.toString());
 console.log('Returned JSON object:', jsonBody);
@@ -115,13 +112,9 @@ console.log('Returned JSON object:', jsonBody);
 ```typescript
 import request from 'sync-request-curl';
 
-const res = request(
-  'GET',
-  'https://comp1531forum.alwaysdata.net/echo/echo',
-  {
-    qs: { message: 'Hello, world!' },
-  }
-);
+const res = request('GET', 'https://comp1531forum.alwaysdata.net/echo/echo', {
+  qs: { message: 'Hello, world!' },
+});
 console.log('Status Code:', res.statusCode);
 const jsonBody = JSON.parse(res.body.toString());
 console.log('Returned JSON object:', jsonBody);
@@ -132,17 +125,13 @@ console.log('Returned JSON object:', jsonBody);
 ```typescript
 import request from 'sync-request-curl';
 
-const res = request(
-  'POST',
-  'https://comp1531quiz.alwaysdata.net/quiz/create',
-  {
-    headers: { lab08quizsecret: "bruno's fight club" },
-    json: {
-      quizTitle: 'New Quiz',
-      quizSynopsis: 'Sync request curl example'
-    },
-  }
-);
+const res = request('POST', 'https://comp1531quiz.alwaysdata.net/quiz/create', {
+  headers: { lab08quizsecret: "bruno's fight club" },
+  json: {
+    quizTitle: 'New Quiz',
+    quizSynopsis: 'Sync request curl example',
+  },
+});
 
 console.log('Status Code:', res.statusCode);
 const jsonBody = JSON.parse(res.body.toString());
@@ -154,41 +143,34 @@ console.log('Returned JSON Object:', jsonBody);
 ```typescript
 import request from 'sync-request-curl';
 
-const res = request(
-  'POST',
-  'https://example.com/upload',
-  {
-    formData: [
-      {
-        name: 'example-file',
-        file: './path/to/file.txt',
-        type: 'text/plain',
-      },
-      {
-        name: 'example-content',
-        contents: 'Example Content!',
-      },
-    ],
-  }
-);
+const res = request('POST', 'https://example.com/upload', {
+  formData: [
+    {
+      name: 'example-file',
+      file: './path/to/file.txt',
+      type: 'text/plain',
+    },
+    {
+      name: 'example-content',
+      contents: 'Example Content!',
+    },
+  ],
+});
 
 console.log('Status Code:', res.statusCode);
 ```
 
 Using a proxy URL (Note: replace with your own proxy details)
+
 ```javascript
 import request from 'sync-request-curl';
 
-const res = request(
-  'GET',
-  'https://ipinfo.io/json',
-  {
-    setEasyOptions: (curl, options) => {
-      curl.setOpt(options.PROXY, 'http://your-proxy-url:port');
-      curl.setOpt(options.PROXYUSERPWD, 'proxyUsername:proxyPassword');
-    },
-  }
-);
+const res = request('GET', 'https://ipinfo.io/json', {
+  setEasyOptions: (curl, options) => {
+    curl.setOpt(options.PROXY, 'http://your-proxy-url:port');
+    curl.setOpt(options.PROXYUSERPWD, 'proxyUsername:proxyPassword');
+  },
+});
 
 console.log('Status Code:', res.statusCode);
 const jsonBody = JSON.parse(res.body.toString());
@@ -202,6 +184,7 @@ console.log(jsonBody);
 ### 2.1. Method
 
 HTTP method (of type `HttpVerb`)
+
 - e.g. `PUT`/`POST`/`GET`/`DELETE`
 
 Note that for the `HEAD` method, [CURLOPT_NOBODY](https://curl.se/libcurl/c/CURLOPT_NOBODY.html) is set to `true` automatically by **sync-request-curl**.
@@ -209,6 +192,7 @@ Note that for the `HEAD` method, [CURLOPT_NOBODY](https://curl.se/libcurl/c/CURL
 ### 2.2. URL
 
 URL as a string
+
 - e.g. https://toohak.fly.dev
 
 ### 2.3. Options
@@ -220,7 +204,6 @@ URL as a string
     <th>Example</th>
     <th>Default</th>
   </tr>
-
 
   <tr>
     <td>qs</td>
@@ -251,7 +234,6 @@ URL as a string
     <td><code>undefined</code></td>
   </tr>
 
-
   <tr>
     <td>json</td>
     <td>
@@ -264,7 +246,6 @@ URL as a string
     </td>
     <td><code>undefined</code></td>
   </tr>
-
 
   <tr>
     <td>body</td>
@@ -279,7 +260,6 @@ JSON.stringify({
 }) </pre></td>
     <td><code>undefined</code></td>
   </tr>
-
 
   <tr>
     <td>formData</td>
@@ -308,8 +288,6 @@ JSON.stringify({
     <td><code>0</code><br/>(no timeout)</td>
   </tr>
 
-
-
   <tr>
     <td>followRedirects</td>
     <td>
@@ -319,7 +297,6 @@ JSON.stringify({
     <td><code>true</code></td>
   </tr>
 
-
   <tr>
     <td>maxRedirects</td>
     <td>Sets the maximum number of redirects to follow before throwing an Error.</td>
@@ -327,14 +304,12 @@ JSON.stringify({
     <td><code>-1</code><br/>(no limit)</td>
   </tr>
 
-
   <tr>
     <td>insecure</td>
     <td> Set to true to send insecure requests. This can be useful on Windows which may have SSL issues (Libcurl code 60).</td>
     <td><pre>true</pre></td>
     <td><code>false</code></td>
   </tr>
-
 
   <tr>
     <td>setEasyOptions</td>
@@ -398,7 +373,7 @@ export interface Response {
   url: string;
   body: string | Buffer;
   getBody: (encoding?: BufferEncoding) => string | Buffer; // simplified
-  getJSON: <T = any>(encoding?: BufferEncoding) => T
+  getJSON: <T = any>(encoding?: BufferEncoding) => T;
 }
 ```
 
@@ -407,19 +382,20 @@ export interface Response {
 When using the `response.getBody()` function, a generic [Error](https://nodejs.org/api/errors.html) object is thrown.
 
 If there are issues with the request, a `CurlError` will be thrown. This will contain a non-zero `code` property that corresponds to a specific Libcurl Error from this documentation:
+
 - https://curl.se/libcurl/c/libcurl-errors.html
 
 A few common errors are:
 
 1. CURLE_COULDNT_CONNECT (7)
-    - Failed to connect() to host or proxy.
-    - **HINT**: This means that the server could not be reached. For local development (e.g. in testing), ensure that your server has started successfully, or that it did not crash while handling a previous request
+   - Failed to connect() to host or proxy.
+   - **HINT**: This means that the server could not be reached. For local development (e.g. in testing), ensure that your server has started successfully, or that it did not crash while handling a previous request
 1. CURLE_URL_MALFORMAT (3)
-    - The URL was not properly formatted.
-    - **HINT**: The request was not successful because your input URL is invalid, e.g. missing domain, protocol or port. Try printing out your input URL, or if it is a GET request, access it directly in a browser
+   - The URL was not properly formatted.
+   - **HINT**: The request was not successful because your input URL is invalid, e.g. missing domain, protocol or port. Try printing out your input URL, or if it is a GET request, access it directly in a browser
 1. CURLE_PEER_FAILED_VERIFICATION (60)
-    - The remote server's SSL certificate or SSH fingerprint was deemed not OK. This error code has been unified with CURLE_SSL_CACERT since 7.62.0. Its previous value was 51
-    - **HINT**: See the [Windows](#41-windows) compatibility section for an explanation and potential workaround
+   - The remote server's SSL certificate or SSH fingerprint was deemed not OK. This error code has been unified with CURLE_SSL_CACERT since 7.62.0. Its previous value was 51
+   - **HINT**: See the [Windows](#41-windows) compatibility section for an explanation and potential workaround
 
 It is possible to check the Curl code as follows:
 
@@ -427,7 +403,8 @@ It is possible to check the Curl code as follows:
 <summary>Example (click to view)</summary>
 
 ```typescript
-import request, { CurlError } from 'sync-request-curl';
+import { CurlError } from 'sync-request-curl/errors';
+import request from 'sync-request-curl';
 
 try {
   request('GET', 'https://google.fake.url.com');
@@ -450,14 +427,15 @@ export class CurlError extends Error {
   constructor(code: number, message: string) {
     super(message);
     if (code < 1 || code > 99) {
-      throw new Error(`CurlError code must be between 1 and 99. Given: ${code}`);
+      throw new Error(
+        `CurlError code must be between 1 and 99. Given: ${code}`
+      );
     }
     this.code = code;
     Object.setPrototypeOf(this, CurlError.prototype);
   }
 }
 ```
-
 
 ## 3. License
 
@@ -501,6 +479,7 @@ For installation issues, be sure to review the [Windows Build Requirements](http
 In addition, your requests may unexpectedly fail with a [Libcurl Error](https://curl.se/libcurl/c/libcurl-errors.html) (code 60, CURLE_PEER_FAILED_VERIFICATION) when using NodeJS natively on Windows.
 
 The reason is covered in the below resources:
+
 - https://github.com/JCMais/node-libcurl/issues/301
 - https://stackoverflow.com/a/34883260/22324694
 
@@ -513,6 +492,7 @@ Alternatively, consider using [Windows Subsystem for Linux (WSL)](https://learn.
 The build for MacOS may fail during the installation process.
 
 In most cases, this can be fixed by following these Github issues:
+
 - https://github.com/JCMais/node-libcurl/issues/296
 - https://github.com/JCMais/node-libcurl/issues/382
 
@@ -521,6 +501,7 @@ and carefully reviewing the [MacOS Build Requirements](https://github.com/JCMais
 ### 4.3. Linux
 
 In rare cases, the build for distributions such as Debian or Ubuntu may fail. This is attributed to missing dependencies such as Python or Libcurl. Below are some related issues:
+
 - https://github.com/JCMais/node-libcurl/issues/374
 - https://github.com/JCMais/node-libcurl/issues/376
 

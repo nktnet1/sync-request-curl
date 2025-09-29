@@ -4,12 +4,10 @@
     "type": "git",
     "url": "https://github.com/nktnet1/sync-request-curl"
   },
-  "version": "3.3.3",
+  "version": "3.3.4-beta.2",
   "files": [
     "dist"
   ],
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.js",
   "scripts": {
     "start": "tsx tests/app/server",
     "dev": "tsx watch --include ./tests/app ./tests/app/server.ts",
@@ -18,9 +16,7 @@
     "lint": "eslint './**/*.ts'",
     "lint:fix": "eslint --fix './**/*.ts'",
     "tsc": "tsc --noEmit",
-    "build": "rm -rf dist && pnpm run build:esm && pnpm run build:cjs",
-    "build:esm": "tsc",
-    "build:cjs": "tsc --module CommonJS --outDir dist/cjs",
+    "build": "tsdown",
     "prepublishOnly": "pnpm run build"
   },
   "keywords": [
@@ -54,6 +50,7 @@
     "globals": "^16.4.0",
     "hono": "^4.9.9",
     "sync-dev-server": "^1.1.2",
+    "tsdown": "^0.15.5",
     "tsx": "^4.20.6",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
@@ -61,5 +58,19 @@
   "packageManager": "pnpm@10.17.1",
   "dependencies": {
     "node-libcurl": "^4.1.0"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./errors": {
+      "import": "./dist/errors.mjs",
+      "require": "./dist/errors.js"
+    },
+    "./package.json": "./package.json"
   }
 }

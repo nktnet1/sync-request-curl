@@ -1,21 +1,13 @@
 import request from './request';
-import { CurlError } from './errors';
 
 export type {
   HttpVerb,
   BufferEncoding,
   Options,
   Response,
-  SetEasyOptionCallback
+  SetEasyOptionCallback,
 } from './types';
 
 export type { HttpPostField } from 'node-libcurl';
 
-// ES Modules (ESM)
 export default request;
-export { CurlError };
-
-// CommonJS (CJS)
-module.exports = request;
-module.exports.default = request;
-module.exports.CurlError = CurlError;
