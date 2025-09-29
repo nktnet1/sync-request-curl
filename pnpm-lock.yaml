@@ -43,8 +43,8 @@ importers:
         specifier: ^4.9.9
         version: 4.9.9
       sync-dev-server:
-        specifier: ^1.1.0
-        version: 1.1.0
+        specifier: ^1.1.2
+        version: 1.1.2
       tsdown:
         specifier: ^0.15.5
         version: 0.15.5(typescript@5.9.2)
@@ -1622,8 +1622,8 @@ packages:
     resolution: {integrity: sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==}
     engines: {node: '>=8'}
 
-  sync-dev-server@1.1.0:
-    resolution: {integrity: sha512-NuYLPVxr81DWy3j66Koii8TU1hQHznEVymU9obmN8/TWtfd1nnMmUJHYuBMzZNlJH3pQxuouiMAn8+MUa3mb4Q==}
+  sync-dev-server@1.1.2:
+    resolution: {integrity: sha512-dT4VUuH5qlJU8jmrbiG6Tf0j/oVjdbIUAhdboN+SHl9rp9dgb/oGWK2YTTxDOSYfuWZ7SLzR1/IrOOzTcrkVRA==}
 
   tar@6.2.1:
     resolution: {integrity: sha512-DZ4yORTwrbTj/7MZYq2w+/ZFdI6OZ/f9SFHR+71gIVUZhOQPHzVCLpvRnPgyaMpfWxxk/4ONva3GQSyNIKRv6A==}
@@ -3381,7 +3381,7 @@ snapshots:
     dependencies:
       has-flag: 4.0.0
 
-  sync-dev-server@1.1.0:
+  sync-dev-server@1.1.2:
     dependencies:
       command-exists: 1.2.9
       dns-lookup-sync: 1.0.0
