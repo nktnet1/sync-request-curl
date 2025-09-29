@@ -1,3 +1,4 @@
+import request from '../src';
 import { startServer, stopServer } from 'sync-dev-server';
 import { HOST as host, PORT as port } from './app/config';
 
@@ -6,13 +7,20 @@ import { HOST as host, PORT as port } from './app/config';
  */
 export default function setup() {
   const command = 'pnpm start';
-  console.log(`[VITEST] Attempting to start server with ${command} in ${__filename}`);
   const server = startServer(command, {
     host,
     port,
     debug: true,
     timeout: 5 * 1000,
     usedPortAction: 'ignore',
+    isServerReadyFn: () => {
+      try {
+        const response = request('GET', `http://${host}:${port}`);
+        return Boolean(response.getJSON('utf-8').message);
+      } catch {
+        return false;
+      }
+    },
   });
 
   return () => {
