@@ -59,20 +59,20 @@
   "dependencies": {
     "node-libcurl": "^5.0.1"
   },
-  "main": "./dist/index.js",
+  "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/index.d.cts",
   "engines": {
     "node": ">=22.14"
   },
   "exports": {
     ".": {
       "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "require": "./dist/index.cjs"
     },
     "./errors": {
       "import": "./dist/errors.mjs",
-      "require": "./dist/errors.js"
+      "require": "./dist/errors.cjs"
     },
     "./package.json": "./package.json"
   }
