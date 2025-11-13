@@ -14,8 +14,6 @@
 
 [![NPM Version](https://img.shields.io/npm/v/sync-request-curl?logo=npm)](https://www.npmjs.com/package/sync-request-curl?activeTab=versions)
 &nbsp;
-[![install size](https://packagephobia.com/badge?p=sync-request-curl)](https://packagephobia.com/result?p=sync-request-curl)
-&nbsp;
 [![Depfu Dependencies](https://badges.depfu.com/badges/6c4074c4d23ad57ee2bfd9ff90456090/overview.svg)](https://depfu.com/github/nktnet1/sync-request-curl?project_id=39032)
 &nbsp;
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fnktnet1%2Fsync-request-curl.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fnktnet1%2Fsync-request-curl?ref=badge_shield)
@@ -30,19 +28,7 @@
 &nbsp;
 [![DeepSource](https://app.deepsource.com/gh/nktnet1/sync-request-curl.svg/?label=active+issues&show_trend=true&token=OTP6tE2be4X1kvxZRsxRh25e)](https://app.deepsource.com/gh/nktnet1/sync-request-curl/)
 &nbsp;
-[![codebeat badge](https://codebeat.co/badges/8bdb4562-0492-4c1c-8b02-e69c94373d60)](https://codebeat.co/projects/github-com-nktnet1-sync-request-curl-main)
-&nbsp;
 [![GitHub stars](https://img.shields.io/github/stars/nktnet1/sync-request-curl.svg?style=social)](https://github.com/nktnet1/sync-request-curl/stargazers)
-
-[![Downloads Total](https://badgen.net/npm/dt/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
-&nbsp;
-[![Downloads Yearly](https://badgen.net/npm/dy/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
-&nbsp;
-[![Downloads Monthly](https://badgen.net/npm/dm/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
-&nbsp;
-[![Downloads Weekly](https://badgen.net/npm/dw/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
-&nbsp;
-[![Downloads Daily](https://badgen.net/npm/dd/sync-request-curl)](https://moiva.io/?npm=sync-request-curl)
 
 ---
 
