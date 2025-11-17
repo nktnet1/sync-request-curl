@@ -60,6 +60,6 @@
   },
   "packageManager": "pnpm@10.17.1",
   "dependencies": {
-    "node-libcurl": "^4.1.0"
+    "node-libcurl": "^5.0.0"
   }
 }
