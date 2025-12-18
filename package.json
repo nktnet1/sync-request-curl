@@ -67,12 +67,12 @@
   },
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.mjs"
     },
     "./errors": {
-      "import": "./dist/errors.mjs",
-      "require": "./dist/errors.cjs"
+      "require": "./dist/errors.cjs",
+      "import": "./dist/errors.mjs"
     },
     "./package.json": "./package.json"
   }
