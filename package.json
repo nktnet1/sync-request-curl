@@ -4,12 +4,10 @@
     "type": "git",
     "url": "https://github.com/nktnet1/sync-request-curl"
   },
-  "version": "3.3.3",
+  "version": "4.0.0-beta.1",
   "files": [
     "dist"
   ],
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.js",
   "scripts": {
     "start": "tsx tests/app/server",
     "dev": "tsx watch --include ./tests/app ./tests/app/server.ts",
@@ -18,9 +16,7 @@
     "lint": "eslint './**/*.ts'",
     "lint:fix": "eslint --fix './**/*.ts'",
     "tsc": "tsc --noEmit",
-    "build": "rm -rf dist && pnpm run build:esm && pnpm run build:cjs",
-    "build:esm": "tsc",
-    "build:cjs": "tsc --module CommonJS --outDir dist/cjs",
+    "build": "tsdown",
     "prepublishOnly": "pnpm run build"
   },
   "keywords": [
@@ -43,23 +39,41 @@
   "license": "MIT",
   "description": "Fast way to send synchronous web requests in NodeJS. API is a subset of sync-request. Leverages node-libcurl for high performance. Cannot be used in a browser.",
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.1",
-    "@eslint/js": "^9.36.0",
-    "@hono/node-server": "^1.19.4",
-    "@types/node": "^24.5.2",
-    "@typescript-eslint/eslint-plugin": "^8.44.1",
-    "@typescript-eslint/parser": "^8.44.1",
-    "@vitest/coverage-v8": "3.2.4",
-    "eslint": "^9.36.0",
-    "globals": "^16.4.0",
-    "hono": "^4.9.9",
+    "@eslint/eslintrc": "^3.3.3",
+    "@eslint/js": "^9.39.2",
+    "@hono/node-server": "^1.19.7",
+    "@types/node": "^25.0.3",
+    "@typescript-eslint/eslint-plugin": "^8.50.0",
+    "@typescript-eslint/parser": "^8.50.0",
+    "@vitest/coverage-v8": "4.0.16",
+    "eslint": "^9.39.2",
+    "globals": "^16.5.0",
+    "hono": "^4.11.1",
     "sync-dev-server": "^1.1.2",
-    "tsx": "^4.20.6",
-    "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "tsdown": "^0.18.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.16"
   },
-  "packageManager": "pnpm@10.17.1",
+  "packageManager": "pnpm@10.26.0",
   "dependencies": {
-    "node-libcurl": "^4.1.0"
+    "node-libcurl": "^5.0.1"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "engines": {
+    "node": ">=22.14"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./errors": {
+      "import": "./dist/errors.mjs",
+      "require": "./dist/errors.cjs"
+    },
+    "./package.json": "./package.json"
   }
 }
