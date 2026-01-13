@@ -20,7 +20,7 @@ importers:
         version: 9.39.2
       '@hono/node-server':
         specifier: ^1.19.7
-        version: 1.19.7(hono@4.11.1)
+        version: 1.19.7(hono@4.11.4)
       '@types/node':
         specifier: ^25.0.3
         version: 25.0.3
@@ -41,7 +41,7 @@ importers:
         version: 16.5.0
       hono:
         specifier: ^4.11.1
-        version: 4.11.1
+        version: 4.11.4
       sync-dev-server:
         specifier: ^1.1.2
         version: 1.1.2
@@ -1151,8 +1151,8 @@ packages:
   has-unicode@2.0.1:
     resolution: {integrity: sha512-8Rf9Y83NBReMnx0gFzA8JImQACstCYWUplepDa9xprwwtmgEZUF0h/i5xSA625zB/I37EtrswSST6OXxwaaIJQ==}
 
-  hono@4.11.1:
-    resolution: {integrity: sha512-KsFcH0xxHes0J4zaQgWbYwmz3UPOOskdqZmItstUG93+Wk1ePBLkLGwbP9zlmh1BFUiL8Qp+Xfu9P7feJWpGNg==}
+  hono@4.11.4:
+    resolution: {integrity: sha512-U7tt8JsyrxSRKspfhtLET79pU8K+tInj5QZXs1jSugO1Vq5dFj3kmZsRldo29mTBfcjDRVRXrEZ6LS63Cog9ZA==}
     engines: {node: '>=16.9.0'}
 
   hookable@5.5.3:
@@ -2052,9 +2052,9 @@ snapshots:
       '@eslint/core': 0.17.0
       levn: 0.4.1
 
-  '@hono/node-server@1.19.7(hono@4.11.1)':
+  '@hono/node-server@1.19.7(hono@4.11.4)':
     dependencies:
-      hono: 4.11.1
+      hono: 4.11.4
 
   '@humanfs/core@0.19.1': {}
 
@@ -2769,7 +2769,7 @@ snapshots:
 
   has-unicode@2.0.1: {}
 
-  hono@4.11.1: {}
+  hono@4.11.4: {}
 
   hookable@5.5.3: {}
 
