@@ -42,9 +42,9 @@
     "@eslint/eslintrc": "^3.3.3",
     "@eslint/js": "^9.39.2",
     "@hono/node-server": "^1.19.9",
-    "@types/node": "^25.0.8",
-    "@typescript-eslint/eslint-plugin": "^8.53.0",
-    "@typescript-eslint/parser": "^8.53.0",
+    "@types/node": "^25.0.9",
+    "@typescript-eslint/eslint-plugin": "^8.53.1",
+    "@typescript-eslint/parser": "^8.53.1",
     "@vitest/coverage-v8": "4.0.17",
     "eslint": "^9.39.2",
     "globals": "^17.0.0",
@@ -55,9 +55,9 @@
     "typescript": "^5.9.3",
     "vitest": "^4.0.17"
   },
-  "packageManager": "pnpm@10.28.0",
+  "packageManager": "pnpm@10.28.1",
   "dependencies": {
-    "node-libcurl": "^5.0.1"
+    "node-libcurl": "5.0.1"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
