@@ -233,7 +233,9 @@ Body:
 
 JSON-Parsing Error Message:
   ${err instanceof Error ? err.message : String(err)}
-      `);
+      `,
+      { cause: err }
+      );
     }
   };
 

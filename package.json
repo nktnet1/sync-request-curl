@@ -1,5 +1,6 @@
 {
   "name": "sync-request-curl",
+  "type": "module",
   "repository": {
     "type": "git",
     "url": "https://github.com/nktnet1/sync-request-curl"
@@ -39,23 +40,23 @@
   "license": "MIT",
   "description": "Fast way to send synchronous web requests in NodeJS. API is a subset of sync-request. Leverages node-libcurl for high performance. Cannot be used in a browser.",
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.3",
-    "@eslint/js": "^9.39.2",
-    "@hono/node-server": "^1.19.9",
-    "@types/node": "^25.2.0",
-    "@typescript-eslint/eslint-plugin": "^8.54.0",
-    "@typescript-eslint/parser": "^8.54.0",
-    "@vitest/coverage-v8": "4.0.18",
-    "eslint": "^9.39.2",
-    "globals": "^17.3.0",
-    "hono": "^4.11.7",
+    "@eslint/eslintrc": "^3.3.5",
+    "@eslint/js": "^10.0.1",
+    "@hono/node-server": "^1.19.14",
+    "@types/node": "^25.6.0",
+    "@typescript-eslint/eslint-plugin": "^8.58.2",
+    "@typescript-eslint/parser": "^8.58.2",
+    "@vitest/coverage-v8": "4.1.4",
+    "eslint": "^10.2.1",
+    "globals": "^17.5.0",
+    "hono": "^4.12.14",
     "sync-dev-server": "^1.1.2",
-    "tsdown": "^0.20.1",
+    "tsdown": "^0.21.9",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.4"
   },
-  "packageManager": "pnpm@10.28.2",
+  "packageManager": "pnpm@10.33.0",
   "dependencies": {
     "node-libcurl": "^5.0.2"
   },
@@ -63,16 +64,16 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
   "engines": {
-    "node": ">=22.14"
+    "node": ">=22"
   },
   "exports": {
     ".": {
-      "require": "./dist/index.cjs",
-      "import": "./dist/index.mjs"
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
     },
     "./errors": {
-      "require": "./dist/errors.cjs",
-      "import": "./dist/errors.mjs"
+      "import": "./dist/errors.mjs",
+      "require": "./dist/errors.cjs"
     },
     "./package.json": "./package.json"
   }

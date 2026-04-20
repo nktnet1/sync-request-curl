@@ -73,7 +73,7 @@ app.post('/timeout', async (c) => {
   return c.json({});
 });
 
-app.post('/text', async (c) => {
+app.post('/text', (c) => {
   return c.text('Hello world!');
 });
 
