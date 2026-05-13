@@ -1,6 +1,9 @@
 import type { IncomingHttpHeaders } from "http";
 import type { CurlOption, Easy, HttpPostField } from "node-libcurl";
 
+// biome-ignore lint/suspicious/noExplicitAny: to match sync-request input type
+export type CustomJsonType = any;
+
 export type HttpVerb =
 	| "GET"
 	| "HEAD"
@@ -32,14 +35,14 @@ export type SetEasyOptionCallback = (
 
 export interface Options {
 	headers?: IncomingHttpHeaders;
-	qs?: { [key: string]: any };
+	qs?: { [key: string]: CustomJsonType };
 
 	// You should only specify one of these.
 	// They are processed in the order listed below.
 	//
 	// When no json, body or formdata is provided, Content-Length = 0
 	// will be set in the headers.
-	json?: any;
+	json?: CustomJsonType;
 	body?: string | Buffer;
 	formData?: HttpPostField[];
 
@@ -57,7 +60,7 @@ export type GetBody = {
 	(encoding?: undefined): Buffer;
 };
 
-export type GetJSON = <T = any>(encoding?: BufferEncoding) => T;
+export type GetJSON = <T = CustomJsonType>(encoding?: BufferEncoding) => T;
 
 export interface Response {
 	statusCode: number;

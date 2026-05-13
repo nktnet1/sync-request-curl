@@ -1,5 +1,8 @@
 name: Pipeline
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -17,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [24.x, 22.x]
+        node-version: [22.x, 24.x]
       fail-fast: true
 
     steps:
@@ -35,11 +38,11 @@ jobs:
       - name: Install dependencies
         run: pnpm i
 
-      - name: Run ESLint
-        run: pnpm run lint
+      - name: Run lint
+        run: pnpm lint
 
       - name: Run tests with coverage
-        run: pnpm test -- --coverage
+        run: pnpm tc
 
       - name: Upload coverage reports to Codecov
         if: github.ref_name == 'main'

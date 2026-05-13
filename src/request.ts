@@ -1,6 +1,7 @@
 import { Curl, Easy, type HttpPostField } from "node-libcurl";
 import type {
 	BufferEncoding,
+	CustomJsonType,
 	GetJSON,
 	HttpVerb,
 	Options,
@@ -49,7 +50,7 @@ const createCurlObjectWithDefaults = (
 const handleQueryString = (
 	curl: Easy,
 	url: string,
-	qs?: { [key: string]: any },
+	qs?: { [key: string]: unknown },
 ): void => {
 	url = qs && Object.keys(qs).length ? handleQs(url, qs) : url;
 	curl.setOpt(Curl.option.URL, url);
@@ -75,7 +76,11 @@ const handleOutgoingHeaders = (curl: Easy, returnedHeaderArray: string[]) => {
  * @param {any} json - The JSON body to be sent
  * @param {string[]} httpHeaders - HTTP headers for the request
  */
-const setJSONPayload = (curl: Easy, json: any, httpHeaders: string[]): void => {
+const setJSONPayload = (
+	curl: Easy,
+	json: CustomJsonType,
+	httpHeaders: string[],
+): void => {
 	httpHeaders.push("Content-Type: application/json");
 	const payload = JSON.stringify(json);
 	httpHeaders.push(`Content-Length: ${Buffer.byteLength(payload, "utf-8")}`);
