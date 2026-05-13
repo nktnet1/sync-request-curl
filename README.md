@@ -414,7 +414,7 @@ export class CurlError extends Error {
     super(message);
     if (code < 1 || code > 99) {
       throw new Error(
-        `CurlError code must be between 1 and 99. Given: ${code}`
+        `CurlError code must be between 1 and 99. Given: ${code}`,
       );
     }
     this.code = code;

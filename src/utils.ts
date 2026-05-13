@@ -1,12 +1,12 @@
-import { IncomingHttpHeaders } from 'http';
-import { CurlCode, Easy } from 'node-libcurl';
-import { HttpVerb, Options } from './types';
-import { CurlError } from './errors';
+import type { IncomingHttpHeaders } from "http";
+import { CurlCode, Easy } from "node-libcurl";
+import { CurlError } from "./errors";
+import type { HttpVerb, Options } from "./types";
 
 interface RequestInputs {
-  method: HttpVerb,
-  url: string,
-  options: Options;
+	method: HttpVerb;
+	url: string;
+	options: Options;
 }
 
 /**
@@ -21,20 +21,25 @@ interface RequestInputs {
  * @param {Object.<string, any>} qs - query string parameters to modify or append.
  * @returns {string} The modified URL with the updated query string parameters.
  */
-export const handleQs = (url: string, qs: { [key: string]: any }): string => {
-  const urlObj = new URL(url);
-  for (const [key, value] of Object.entries(qs)) {
-    if (Array.isArray(value)) {
-      urlObj.searchParams.delete(key);
-      value.forEach((item, i) => urlObj.searchParams.append(`${key}[${i}]`, String(item)));
-    } else if (value === null) {
-      urlObj.searchParams.set(key, '');
-    } else if (value !== undefined) {
-      urlObj.searchParams.set(key, String(value));
-    }
-  }
-  urlObj.search = urlObj.searchParams.toString();
-  return urlObj.href;
+export const handleQs = (
+	url: string,
+	qs: { [key: string]: unknown },
+): string => {
+	const urlObj = new URL(url);
+	for (const [key, value] of Object.entries(qs)) {
+		if (Array.isArray(value)) {
+			urlObj.searchParams.delete(key);
+			value.forEach((item, i) => {
+				urlObj.searchParams.append(`${key}[${i}]`, String(item));
+			});
+		} else if (value === null) {
+			urlObj.searchParams.set(key, "");
+		} else if (value !== undefined) {
+			urlObj.searchParams.set(key, String(value));
+		}
+	}
+	urlObj.search = urlObj.searchParams.toString();
+	return urlObj.href;
 };
 
 /**
@@ -43,12 +48,14 @@ export const handleQs = (url: string, qs: { [key: string]: any }): string => {
  * @param {IncomingHttpHeaders} headers - The header object to parse.
  * @returns {string[]} An array of formatted header strings.
  */
-export const parseIncomingHeaders = (headers?: IncomingHttpHeaders): string[] => {
-  return headers
-    ? Object.entries(headers)
-      .filter(([_, value]) => value !== undefined)
-      .map(([key, value]) => value === '' ? `${key};` : `${key}: ${value}`)
-    : [];
+export const parseIncomingHeaders = (
+	headers?: IncomingHttpHeaders,
+): string[] => {
+	return headers
+		? Object.entries(headers)
+				.filter(([_, value]) => value !== undefined)
+				.map(([key, value]) => (value === "" ? `${key};` : `${key}: ${value}`))
+		: [];
 };
 
 /**
@@ -57,14 +64,16 @@ export const parseIncomingHeaders = (headers?: IncomingHttpHeaders): string[] =>
  * @param {string[]} headerLines - An array of header lines to parse.
  * @returns {IncomingHttpHeaders} An object containing parsed headers.
  */
-export const parseReturnedHeaders = (headerLines: string[]): IncomingHttpHeaders => {
-  return headerLines.reduce((acc, header) => {
-    const [name, ...values] = header.split(':');
-    if (name && values.length > 0) {
-      acc[name.trim().toLowerCase()] = values.join(':').trim();
-    }
-    return acc;
-  }, {} as IncomingHttpHeaders);
+export const parseReturnedHeaders = (
+	headerLines: string[],
+): IncomingHttpHeaders => {
+	return headerLines.reduce((acc, header) => {
+		const [name, ...values] = header.split(":");
+		if (name && values.length > 0) {
+			acc[name.trim().toLowerCase()] = values.join(":").trim();
+		}
+		return acc;
+	}, {} as IncomingHttpHeaders);
 };
 
 /**
@@ -74,9 +83,14 @@ export const parseReturnedHeaders = (headerLines: string[]): IncomingHttpHeaders
  * @param {RequestInputs} requestInputs - input parameters for the CURL request.
  * @throws {CurlError} Throws a `CurlError` if the CURL code indicates failure.
  */
-export const checkValidCurlCode = (code: CurlCode, requestInputs: RequestInputs) => {
-  if (code !== CurlCode.CURLE_OK) {
-    throw new CurlError(code, `
+export const checkValidCurlCode = (
+	code: CurlCode,
+	requestInputs: RequestInputs,
+) => {
+	if (code !== CurlCode.CURLE_OK) {
+		throw new CurlError(
+			code,
+			`
       Curl request failed with code ${code}:
         - ${Easy.strError(code)}
 
@@ -88,8 +102,9 @@ export const checkValidCurlCode = (code: CurlCode, requestInputs: RequestInputs)
         url: "${requestInputs.url}",
         options: ${JSON.stringify(requestInputs.options)}
       }
-    `);
-  }
+    `,
+		);
+	}
 };
 
 /**
@@ -100,8 +115,8 @@ export const checkValidCurlCode = (code: CurlCode, requestInputs: RequestInputs)
  * @throws {Error} if the status code is >= 300.
  */
 export const checkValidStatusCode = (statusCode: number, body: Buffer) => {
-  if (statusCode >= 300) {
-    throw new Error(`
+	if (statusCode >= 300) {
+		throw new Error(`
 Server responded with status code
   ${statusCode}
 
@@ -113,5 +128,5 @@ Use 'res.body' instead of 'res.getBody()' to not have any errors thrown.
 The status code (in this case, ${statusCode}) can be checked manually
 with res.statusCode.
     `);
-  }
+	}
 };

@@ -1,14 +1,17 @@
-import { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from "express";
 
 /**
  * Express error handler middleware.
  * - https://expressjs.com/en/guide/error-handling.html
  */
-const errorHandler = () => (err: any, _req: Request, res: Response, next: NextFunction) => {
-  const statusCode = err.status ?? err.statusCode ?? 500;
-  console.log(statusCode === 500 ? err : { statusCode, message: err.message });
-  res.status(statusCode).json({ error: err.message });
-  next();
-};
+const errorHandler =
+	() => (err: any, _req: Request, res: Response, next: NextFunction) => {
+		const statusCode = err.status ?? err.statusCode ?? 500;
+		console.log(
+			statusCode === 500 ? err : { statusCode, message: err.message },
+		);
+		res.status(statusCode).json({ error: err.message });
+		next();
+	};
 
 export default errorHandler;

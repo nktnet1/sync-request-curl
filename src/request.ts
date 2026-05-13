@@ -1,12 +1,18 @@
-import { Curl, Easy, HttpPostField } from 'node-libcurl';
-import { HttpVerb, Options, Response, BufferEncoding, GetJSON } from './types';
+import { Curl, Easy, type HttpPostField } from "node-libcurl";
+import type {
+	BufferEncoding,
+	GetJSON,
+	HttpVerb,
+	Options,
+	Response,
+} from "./types";
 import {
-  checkValidStatusCode,
-  checkValidCurlCode,
-  handleQs,
-  parseReturnedHeaders,
-  parseIncomingHeaders,
-} from './utils';
+	checkValidCurlCode,
+	checkValidStatusCode,
+	handleQs,
+	parseIncomingHeaders,
+	parseReturnedHeaders,
+} from "./utils";
 
 /**
  * Create a libcurl Easy object with default configurations
@@ -16,20 +22,20 @@ import {
  * @returns {Easy} an initialized libcurl Easy object with default options
  */
 const createCurlObjectWithDefaults = (
-  method: HttpVerb,
-  options: Options
+	method: HttpVerb,
+	options: Options,
 ): Easy => {
-  const curl = new Easy();
-  curl.setOpt(Curl.option.CUSTOMREQUEST, method);
-  curl.setOpt(Curl.option.TIMEOUT_MS, options.timeout ?? 0);
-  curl.setOpt(
-    Curl.option.FOLLOWLOCATION,
-    options.followRedirects === undefined || options.followRedirects
-  );
-  curl.setOpt(Curl.option.MAXREDIRS, options.maxRedirects ?? -1);
-  curl.setOpt(Curl.option.SSL_VERIFYPEER, !options.insecure);
-  curl.setOpt(Curl.option.NOBODY, method === 'HEAD');
-  return curl;
+	const curl = new Easy();
+	curl.setOpt(Curl.option.CUSTOMREQUEST, method);
+	curl.setOpt(Curl.option.TIMEOUT_MS, options.timeout ?? 0);
+	curl.setOpt(
+		Curl.option.FOLLOWLOCATION,
+		options.followRedirects === undefined || options.followRedirects,
+	);
+	curl.setOpt(Curl.option.MAXREDIRS, options.maxRedirects ?? -1);
+	curl.setOpt(Curl.option.SSL_VERIFYPEER, !options.insecure);
+	curl.setOpt(Curl.option.NOBODY, method === "HEAD");
+	return curl;
 };
 
 /**
@@ -41,12 +47,12 @@ const createCurlObjectWithDefaults = (
  * @param {Object.<string, any>} qs - query string parameters for the request
  */
 const handleQueryString = (
-  curl: Easy,
-  url: string,
-  qs?: { [key: string]: any }
+	curl: Easy,
+	url: string,
+	qs?: { [key: string]: any },
 ): void => {
-  url = qs && Object.keys(qs).length ? handleQs(url, qs) : url;
-  curl.setOpt(Curl.option.URL, url);
+	url = qs && Object.keys(qs).length ? handleQs(url, qs) : url;
+	curl.setOpt(Curl.option.URL, url);
 };
 
 /**
@@ -57,10 +63,10 @@ const handleQueryString = (
  * @param {string[]} returnedHeaderArray - array for returned header lines
  */
 const handleOutgoingHeaders = (curl: Easy, returnedHeaderArray: string[]) => {
-  curl.setOpt(Curl.option.HEADERFUNCTION, (headerLine) => {
-    returnedHeaderArray.push(headerLine.toString('utf-8').trim());
-    return headerLine.length;
-  });
+	curl.setOpt(Curl.option.HEADERFUNCTION, (headerLine) => {
+		returnedHeaderArray.push(headerLine.toString("utf-8").trim());
+		return headerLine.length;
+	});
 };
 
 /**
@@ -70,10 +76,10 @@ const handleOutgoingHeaders = (curl: Easy, returnedHeaderArray: string[]) => {
  * @param {string[]} httpHeaders - HTTP headers for the request
  */
 const setJSONPayload = (curl: Easy, json: any, httpHeaders: string[]): void => {
-  httpHeaders.push('Content-Type: application/json');
-  const payload = JSON.stringify(json);
-  httpHeaders.push(`Content-Length: ${Buffer.byteLength(payload, 'utf-8')}`);
-  curl.setOpt(Curl.option.POSTFIELDS, payload);
+	httpHeaders.push("Content-Type: application/json");
+	const payload = JSON.stringify(json);
+	httpHeaders.push(`Content-Length: ${Buffer.byteLength(payload, "utf-8")}`);
+	curl.setOpt(Curl.option.POSTFIELDS, payload);
 };
 
 /**
@@ -83,35 +89,35 @@ const setJSONPayload = (curl: Easy, json: any, httpHeaders: string[]): void => {
  * @param {string[]} httpHeaders - HTTP headers for the request
  */
 const setBodyPayload = (
-  curl: Easy,
-  body: string | Buffer,
-  httpHeaders: string[]
+	curl: Easy,
+	body: string | Buffer,
+	httpHeaders: string[],
 ): void => {
-  if (Buffer.isBuffer(body)) {
-    let position = 0;
-    curl.setOpt(Curl.option.POST, true);
-    curl.setOpt(Curl.option.POSTFIELDSIZE, -1);
-    curl.setOpt(
-      Curl.option.READFUNCTION,
-      (buffer: Buffer, size: number, nmemb: number): number => {
-        const amountToRead = size * nmemb;
-        if (position === body.length) {
-          return 0;
-        }
-        const totalWritten = body.copy(
-          buffer,
-          0,
-          position,
-          Math.min(amountToRead, body.length)
-        );
-        position += totalWritten;
-        return totalWritten;
-      }
-    );
-  } else {
-    curl.setOpt(Curl.option.POSTFIELDS, body);
-    httpHeaders.push(`Content-Length: ${Buffer.byteLength(body, 'utf-8')}`);
-  }
+	if (Buffer.isBuffer(body)) {
+		let position = 0;
+		curl.setOpt(Curl.option.POST, true);
+		curl.setOpt(Curl.option.POSTFIELDSIZE, -1);
+		curl.setOpt(
+			Curl.option.READFUNCTION,
+			(buffer: Buffer, size: number, nmemb: number): number => {
+				const amountToRead = size * nmemb;
+				if (position === body.length) {
+					return 0;
+				}
+				const totalWritten = body.copy(
+					buffer,
+					0,
+					position,
+					Math.min(amountToRead, body.length),
+				);
+				position += totalWritten;
+				return totalWritten;
+			},
+		);
+	} else {
+		curl.setOpt(Curl.option.POSTFIELDS, body);
+		httpHeaders.push(`Content-Length: ${Buffer.byteLength(body, "utf-8")}`);
+	}
 };
 
 /**
@@ -120,7 +126,7 @@ const setBodyPayload = (
  * @param {Array<HttpPostField>} formData - list of files/contents to be sent
  */
 const setFormPayload = (curl: Easy, formData: HttpPostField[]) => {
-  curl.setOpt(Curl.option.HTTPPOST, formData);
+	curl.setOpt(Curl.option.HTTPPOST, formData);
 };
 
 /**
@@ -134,26 +140,26 @@ const setFormPayload = (curl: Easy, formData: HttpPostField[]) => {
  * @param {string[]} httpHeaders - HTTP headers for the request
  */
 const handleBodyAndRequestHeaders = (
-  curl: Easy,
-  options: Options,
-  buffer: { body: Buffer },
-  httpHeaders: string[]
+	curl: Easy,
+	options: Options,
+	buffer: { body: Buffer },
+	httpHeaders: string[],
 ): void => {
-  if (options.json) {
-    setJSONPayload(curl, options.json, httpHeaders);
-  } else if (options.body) {
-    setBodyPayload(curl, options.body, httpHeaders);
-  } else if (options.formData) {
-    setFormPayload(curl, options.formData);
-  } else {
-    httpHeaders.push('Content-Length: 0');
-  }
-  curl.setOpt(Curl.option.WRITEFUNCTION, (buff, nmemb, size) => {
-    buffer.body = Buffer.concat([buffer.body, buff.subarray(0, nmemb * size)]);
-    return nmemb * size;
-  });
+	if (options.json) {
+		setJSONPayload(curl, options.json, httpHeaders);
+	} else if (options.body) {
+		setBodyPayload(curl, options.body, httpHeaders);
+	} else if (options.formData) {
+		setFormPayload(curl, options.formData);
+	} else {
+		httpHeaders.push("Content-Length: 0");
+	}
+	curl.setOpt(Curl.option.WRITEFUNCTION, (buff, nmemb, size) => {
+		buffer.body = Buffer.concat([buffer.body, buff.subarray(0, nmemb * size)]);
+		return nmemb * size;
+	});
 
-  curl.setOpt(Curl.option.HTTPHEADER, httpHeaders);
+	curl.setOpt(Curl.option.HTTPHEADER, httpHeaders);
 };
 
 /**
@@ -165,64 +171,65 @@ const handleBodyAndRequestHeaders = (
  * @returns {Response} - HTTP response consisting of status code, headers, and body
  */
 const request = (
-  method: HttpVerb,
-  url: string,
-  options: Options = {}
+	method: HttpVerb,
+	url: string,
+	options: Options = {},
 ): Response => {
-  const curl = createCurlObjectWithDefaults(method, options);
-  handleQueryString(curl, url, options.qs);
+	const curl = createCurlObjectWithDefaults(method, options);
+	handleQueryString(curl, url, options.qs);
 
-  // Body/JSON and Headers (incoming)
-  const bufferWrap = { body: Buffer.alloc(0) };
-  handleBodyAndRequestHeaders(
-    curl,
-    options,
-    bufferWrap,
-    parseIncomingHeaders(options.headers)
-  );
+	// Body/JSON and Headers (incoming)
+	const bufferWrap = { body: Buffer.alloc(0) };
+	handleBodyAndRequestHeaders(
+		curl,
+		options,
+		bufferWrap,
+		parseIncomingHeaders(options.headers),
+	);
 
-  // Headers (outgoing)
-  const returnedHeaderArray: string[] = [];
-  handleOutgoingHeaders(curl, returnedHeaderArray);
+	// Headers (outgoing)
+	const returnedHeaderArray: string[] = [];
+	handleOutgoingHeaders(curl, returnedHeaderArray);
 
-  if (options.setEasyOptions) {
-    options.setEasyOptions(curl, Curl.option);
-  }
+	if (options.setEasyOptions) {
+		options.setEasyOptions(curl, Curl.option);
+	}
 
-  // Execute request
-  const code = curl.perform();
-  checkValidCurlCode(code, { method, url, options });
+	// Execute request
+	const code = curl.perform();
+	checkValidCurlCode(code, { method, url, options });
 
-  // Creating return object
-  const statusCode = curl.getInfo('RESPONSE_CODE').data as number;
-  const headers = parseReturnedHeaders(returnedHeaderArray);
-  const { body } = bufferWrap;
+	// Creating return object
+	const statusCode = curl.getInfo("RESPONSE_CODE").data as number;
+	const headers = parseReturnedHeaders(returnedHeaderArray);
+	const { body } = bufferWrap;
 
-  /**
-   * Get the body of a response with an optional encoding.
-   *
-   * @throws {Error} if the status code is >= 300
-   * @returns {Buffer | string} buffer body by default, string body with encoding
-   */
+	/**
+	 * Get the body of a response with an optional encoding.
+	 *
+	 * @throws {Error} if the status code is >= 300
+	 * @returns {Buffer | string} buffer body by default, string body with encoding
+	 */
 
-  function getBody<Encoding extends BufferEncoding>(encoding: Encoding): string;
-  function getBody(encoding?: undefined): Buffer;
-  function getBody(encoding?: BufferEncoding): string | Buffer {
-    checkValidStatusCode(statusCode, body);
-    return encoding ? body.toString(encoding) : body;
-  }
+	function getBody<Encoding extends BufferEncoding>(encoding: Encoding): string;
+	function getBody(encoding?: undefined): Buffer;
+	function getBody(encoding?: BufferEncoding): string | Buffer {
+		checkValidStatusCode(statusCode, body);
+		return encoding ? body.toString(encoding) : body;
+	}
 
-  /**
-   * Get the JSON-parsed body of a response.
-   *
-   * @throws {Error} if the body is into a valid JSON
-   * @returns {any} parsed JSON body
-   */
-  const getJSON: GetJSON = (encoding?) => {
-    try {
-      return JSON.parse(body.toString(encoding));
-    } catch (err) {
-      throw new Error(`
+	/**
+	 * Get the JSON-parsed body of a response.
+	 *
+	 * @throws {Error} if the body is into a valid JSON
+	 * @returns {any} parsed JSON body
+	 */
+	const getJSON: GetJSON = (encoding?) => {
+		try {
+			return JSON.parse(body.toString(encoding));
+		} catch (err) {
+			throw new Error(
+				`
 The server body response for
   - ${method}
   - ${url}
@@ -234,15 +241,15 @@ Body:
 JSON-Parsing Error Message:
   ${err instanceof Error ? err.message : String(err)}
       `,
-      { cause: err }
-      );
-    }
-  };
+				{ cause: err },
+			);
+		}
+	};
 
-  url = curl.getInfo('EFFECTIVE_URL').data as string;
+	url = curl.getInfo("EFFECTIVE_URL").data as string;
 
-  curl.close();
-  return { statusCode, headers, url, body, getBody, getJSON };
+	curl.close();
+	return { statusCode, headers, url, body, getBody, getJSON };
 };
 
 export default request;

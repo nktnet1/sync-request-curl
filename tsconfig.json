@@ -1,19 +1,16 @@
 {
-  "compilerOptions": {
-    "allowSyntheticDefaultImports": true,
-    "declaration": true,
-    "esModuleInterop": true,
-    "lib": ["es5", "es2015", "esnext", "dom"],
-    "types": ["node"],
-    "moduleResolution": "node",
-    "noImplicitAny": true,
-    "noUnusedLocals": true,
-    "sourceMap": true,
-    "strict": true,
-    "outDir": "dist/esm",
-    "target": "es6"
-  },
-  "include": [
-    "src/**/*.ts",
-  ]
+	"compilerOptions": {
+		"allowSyntheticDefaultImports": true,
+		"declaration": true,
+		"esModuleInterop": true,
+		"lib": ["es5", "es2015", "esnext", "dom"],
+		"types": ["node"],
+		"moduleResolution": "bundler",
+		"noImplicitAny": true,
+		"noUnusedLocals": true,
+		"sourceMap": true,
+		"strict": true,
+		"target": "es6"
+	},
+	"include": ["src/**/*.ts", "tests/**/*.ts"]
 }

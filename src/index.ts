@@ -1,13 +1,12 @@
-import request from './request';
+import request from "./request";
 
+export type { HttpPostField } from "node-libcurl";
 export type {
-  HttpVerb,
-  BufferEncoding,
-  Options,
-  Response,
-  SetEasyOptionCallback,
-} from './types';
-
-export type { HttpPostField } from 'node-libcurl';
+	BufferEncoding,
+	HttpVerb,
+	Options,
+	Response,
+	SetEasyOptionCallback,
+} from "./types";
 
 export default request;
