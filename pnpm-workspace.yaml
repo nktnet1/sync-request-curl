@@ -1,5 +1,8 @@
 allowBuilds:
   esbuild: false
   node-libcurl: true
+minimumReleaseAgeExclude:
+  - node-libcurl@5.1.0
+  - tsx@4.22.4
 overrides:
   ip-address@<=10.1.0: ^10.1.1
