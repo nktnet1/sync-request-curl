@@ -16,6 +16,7 @@
 		"tc": "vitest run --coverage",
 		"lint": "biome lint",
 		"format": "biome format",
+		"check": "biome check",
 		"tsc": "tsc --noEmit",
 		"build": "tsdown",
 		"prepublishOnly": "pnpm run build"
