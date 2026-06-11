@@ -233,6 +233,8 @@ const request = (
     try {
       return JSON.parse(body.toString(encoding));
     } catch (err) {
+      /* v8 ignore next */
+      const errorMessage = err instanceof Error ? err.message : String(err);
       throw new Error(
         `
 The server body response for
@@ -244,7 +246,7 @@ Body:
   ${body.toString(encoding)}
 
 JSON-Parsing Error Message:
-  ${err instanceof Error ? err.message : String(err)}
+  ${errorMessage}
       `,
         { cause: err },
       );

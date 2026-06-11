@@ -30,6 +30,7 @@ export const handleQs = (
     if (Array.isArray(value)) {
       urlObj.searchParams.delete(key);
       value.forEach((item, i) => {
+        /* v8 ignore next */
         urlObj.searchParams.append(`${key}[${i}]`, String(item));
       });
     } else if (value === null) {

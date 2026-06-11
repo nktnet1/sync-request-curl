@@ -32,17 +32,17 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Enable corepack
-        run: corepack enable
+      - name: Enable pnpm via corepack
+        run: corepack enable pnpm
 
       - name: Install dependencies
-        run: pnpm i
+        run: pnpm install
 
-      - name: Run lint
-        run: pnpm lint
+      - name: Run lint and format
+        run: pnpm check
 
       - name: Run tests with coverage
-        run: pnpm tc
+        run: pnpm test --coverage
 
       - name: Upload coverage reports to Codecov
         if: github.ref_name == 'main'

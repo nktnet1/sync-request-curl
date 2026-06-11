@@ -28,7 +28,7 @@ describe("Requests that give Libcurl error", () => {
     checkCurlError(() => request("GET", ""), 3);
   });
 
-  test("Request non-existent server- CURLE_COULDNT_RESOLVE_HOST (6)", () => {
+  test("Request non-existent server - CURLE_COULDNT_RESOLVE_HOST (6)", () => {
     const invalidUrl = "https://google.fake.url.com";
     checkCurlError(() => request("GET", invalidUrl), 6);
   });
