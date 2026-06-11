@@ -3,20 +3,20 @@ import app from ".";
 import { HOST, PORT, SERVER_URL } from "./config";
 
 const server = serve(
-	{
-		fetch: app.fetch,
-		port: PORT,
-		hostname: HOST,
-	},
-	() => {
-		console.log(
-			`Hono Server started and awaiting requests at the URL: '${SERVER_URL}'`,
-		);
-	},
+  {
+    fetch: app.fetch,
+    port: PORT,
+    hostname: HOST,
+  },
+  () => {
+    console.log(
+      `Hono Server started and awaiting requests at the URL: '${SERVER_URL}'`,
+    );
+  },
 );
 
 process.on("SIGINT", () => {
-	server.close(() => {
-		console.log("Shutting down server gracefully.");
-	});
+  server.close(() => {
+    console.log("Shutting down server gracefully.");
+  });
 });
