@@ -33,6 +33,23 @@ describe("Requests that give Libcurl error", () => {
     checkCurlError(() => request("GET", ""), 3);
   });
 
+  test("Curl easy handle is closed when a request fails", () => {
+    let isOpen: boolean | undefined;
+    let handle: { readonly isOpen: boolean } | undefined;
+
+    expect(() =>
+      request("GET", "", {
+        setEasyOptions: (curl) => {
+          handle = curl;
+          isOpen = curl.isOpen;
+        },
+      }),
+    ).toThrow(CurlError);
+
+    expect(isOpen).toBe(true);
+    expect(handle?.isOpen).toBe(false);
+  });
+
   test("Request inputs are hidden by default", () => {
     let error: unknown;
     try {

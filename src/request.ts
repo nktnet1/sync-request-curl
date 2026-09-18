@@ -204,63 +204,66 @@ const performRequest = (
   followRedirects: boolean,
 ): { response: Response; redirectUrl: string | null } => {
   const curl = createCurlObjectWithDefaults(method, options, followRedirects);
-  handleQueryString(curl, url, options.qs);
+  try {
+    handleQueryString(curl, url, options.qs);
 
-  // Body/JSON and Headers (incoming)
-  const bufferWrap = { body: Buffer.alloc(0) };
-  handleBodyAndRequestHeaders(
-    curl,
-    options,
-    bufferWrap,
-    parseIncomingHeaders(options.headers),
-  );
+    // Body/JSON and Headers (incoming)
+    const bufferWrap = { body: Buffer.alloc(0) };
+    handleBodyAndRequestHeaders(
+      curl,
+      options,
+      bufferWrap,
+      parseIncomingHeaders(options.headers),
+    );
 
-  // Headers (outgoing)
-  const returnedHeaderArray: string[] = [];
-  handleOutgoingHeaders(curl, returnedHeaderArray);
+    // Headers (outgoing)
+    const returnedHeaderArray: string[] = [];
+    handleOutgoingHeaders(curl, returnedHeaderArray);
 
-  if (options.setEasyOptions) {
-    options.setEasyOptions(curl, Curl.option);
-  }
+    if (options.setEasyOptions) {
+      options.setEasyOptions(curl, Curl.option);
+    }
 
-  // Execute request
-  const code = curl.perform();
-  checkValidCurlCode(code, { method, url, options });
+    // Execute request
+    const code = curl.perform();
+    checkValidCurlCode(code, { method, url, options });
 
-  // Creating return object
-  const statusCode = curl.getInfo("RESPONSE_CODE").data as number;
-  const headers = parseReturnedHeaders(returnedHeaderArray);
-  const { body } = bufferWrap;
-  const redirectUrl = curl.getInfo("REDIRECT_URL").data as string | null;
+    // Creating return object
+    const statusCode = curl.getInfo("RESPONSE_CODE").data as number;
+    const headers = parseReturnedHeaders(returnedHeaderArray);
+    const { body } = bufferWrap;
+    const redirectUrl = curl.getInfo("REDIRECT_URL").data as string | null;
 
-  /**
-   * Get the body of a response with an optional encoding.
-   *
-   * @throws {Error} if the status code is >= 300
-   * @returns {Buffer | string} buffer body by default, string body with encoding
-   */
+    /**
+     * Get the body of a response with an optional encoding.
+     *
+     * @throws {Error} if the status code is >= 300
+     * @returns {Buffer | string} buffer body by default, string body with encoding
+     */
 
-  function getBody<Encoding extends BufferEncoding>(encoding: Encoding): string;
-  function getBody(encoding?: undefined): Buffer;
-  function getBody(encoding?: BufferEncoding): string | Buffer {
-    checkValidStatusCode(statusCode, body);
-    return encoding ? body.toString(encoding) : body;
-  }
+    function getBody<Encoding extends BufferEncoding>(
+      encoding: Encoding,
+    ): string;
+    function getBody(encoding?: undefined): Buffer;
+    function getBody(encoding?: BufferEncoding): string | Buffer {
+      checkValidStatusCode(statusCode, body);
+      return encoding ? body.toString(encoding) : body;
+    }
 
-  /**
-   * Get the JSON-parsed body of a response.
-   *
-   * @throws {Error} if the body is into a valid JSON
-   * @returns {any} parsed JSON body
-   */
-  const getJSON: GetJSON = (encoding?) => {
-    try {
-      return JSON.parse(body.toString(encoding));
-    } catch (err) {
-      /* v8 ignore next */
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      throw new Error(
-        `
+    /**
+     * Get the JSON-parsed body of a response.
+     *
+     * @throws {Error} if the body is into a valid JSON
+     * @returns {any} parsed JSON body
+     */
+    const getJSON: GetJSON = (encoding?) => {
+      try {
+        return JSON.parse(body.toString(encoding));
+      } catch (err) {
+        /* v8 ignore next */
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        throw new Error(
+          `
 The server body response for
   - ${method}
   - ${url}
@@ -272,18 +275,20 @@ Body:
 JSON-Parsing Error Message:
   ${errorMessage}
       `,
-        { cause: err },
-      );
-    }
-  };
+          { cause: err },
+        );
+      }
+    };
 
-  url = curl.getInfo("EFFECTIVE_URL").data as string;
+    url = curl.getInfo("EFFECTIVE_URL").data as string;
 
-  curl.close();
-  return {
-    response: { statusCode, headers, url, body, getBody, getJSON },
-    redirectUrl,
-  };
+    return {
+      response: { statusCode, headers, url, body, getBody, getJSON },
+      redirectUrl,
+    };
+  } finally {
+    curl.close();
+  }
 };
 
 /**
