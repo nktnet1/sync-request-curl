@@ -55,6 +55,22 @@ app.get("/redirect/destination", (c) => {
   return c.json({ message: "Redirect success!" });
 });
 
+app.all("/redirect/method/302", (c) => {
+  return c.redirect("/redirect/method/destination", 302);
+});
+
+app.all("/redirect/method/303", (c) => {
+  return c.redirect("/redirect/method/destination", 303);
+});
+
+app.all("/redirect/method/307", (c) => {
+  return c.redirect("/redirect/method/destination", 307);
+});
+
+app.all("/redirect/method/destination", (c) => {
+  return c.json({ method: c.req.method });
+});
+
 app.post("/content/length", async (c) => {
   const contentLength = parseInt(c.req.header("content-length") ?? "0", 10);
   const buffer = await c.req.arrayBuffer();

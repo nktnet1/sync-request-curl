@@ -315,6 +315,34 @@ describe("Redirects", () => {
     );
   });
 
+  test("POST changes to GET after a 302 redirect", () => {
+    const res = wrapperRequest("POST", `${SERVER_URL}/redirect/method/302`, {
+      body: "payload",
+    });
+    expect(res).toMatchObject({
+      code: 200,
+      json: { method: "GET" },
+    });
+  });
+
+  test("PUT changes to GET after a 303 redirect", () => {
+    const res = wrapperRequest("PUT", `${SERVER_URL}/redirect/method/303`, {
+      body: "payload",
+    });
+    expect(res).toMatchObject({
+      code: 200,
+      json: { method: "GET" },
+    });
+  });
+
+  test("PUT remains PUT after a 307 redirect", () => {
+    const res = wrapperRequest("PUT", `${SERVER_URL}/redirect/method/307`);
+    expect(res).toMatchObject({
+      code: 200,
+      json: { method: "PUT" },
+    });
+  });
+
   test.skip("External URL redirect - https://picsum.photos/200/300", () => {
     const redirectResponse = wrapperRequest(
       "GET",

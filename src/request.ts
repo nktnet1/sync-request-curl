@@ -15,6 +15,8 @@ import {
   parseReturnedHeaders,
 } from "./utils";
 
+const CURL_FOLLOW_OBEY_CODE = 2;
+
 /**
  * Create a libcurl Easy object with default configurations
  *
@@ -31,7 +33,7 @@ const createCurlObjectWithDefaults = (
   curl.setOpt(Curl.option.TIMEOUT_MS, options.timeout ?? 0);
   curl.setOpt(
     Curl.option.FOLLOWLOCATION,
-    options.followRedirects === undefined || options.followRedirects,
+    options.followRedirects === false ? 0 : CURL_FOLLOW_OBEY_CODE,
   );
   curl.setOpt(Curl.option.MAXREDIRS, options.maxRedirects ?? -1);
   curl.setOpt(Curl.option.SSL_VERIFYPEER, !options.insecure);
