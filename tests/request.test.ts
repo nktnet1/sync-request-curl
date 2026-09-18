@@ -288,7 +288,7 @@ describe("Sending a buffer", () => {
 // ========================================================================= //
 
 describe("Body (instead of JSON)", () => {
-  test("PUT request code 401", () => {
+  test("PUT request code 403", () => {
     const value = { value: "put" };
     const res = wrapperRequest("PUT", `${SERVER_URL}/put`, {
       body: JSON.stringify(value),
@@ -526,7 +526,7 @@ describe("v3.2.0 getJSON method", () => {
   });
 });
 
-describe("v3.3.0 multipart/formdata", () => {
+describe("v3.3.0 multipart/form-data", () => {
   test("Can upload one file", () => {
     const testFileLocation = "./tests/data/test-upload.txt";
     const res = request("POST", `${SERVER_URL}/upload`, {

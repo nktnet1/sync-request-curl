@@ -55,7 +55,7 @@ export interface Options {
   setEasyOptions?: SetEasyOptionCallback;
 }
 
-// Infer type `string` if encoding is specified, otherwise `string | Buffer
+// Infer type `string` if encoding is specified, otherwise `string | Buffer`
 export type GetBody = {
   <Encoding extends BufferEncoding>(encoding: Encoding): string;
   (encoding?: undefined): Buffer;

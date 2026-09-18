@@ -236,7 +236,7 @@ URL as a string
   <tr>
     <td>body</td>
     <td>
-      String body for PATCH, POST and PUT requests. We recommended using <code>json</code> instead for JSON payloads, otherwise the <code>Content-Type</code> will need to be set manually.
+      String or Buffer body for PATCH, POST and PUT requests. We recommend using <code>json</code> instead for JSON payloads, otherwise the <code>Content-Type</code> will need to be set manually.
     </td>
     <td>
 <pre>
@@ -277,7 +277,7 @@ JSON.stringify({
   <tr>
     <td>followRedirects</td>
     <td>
-      Sets whether redirects (status code 302) should be followed automatically.
+      Sets whether HTTP redirects should be followed automatically.
     </td>
     <td><pre>false</pre></td>
     <td><code>true</code></td>
@@ -490,7 +490,7 @@ In most cases, this can be fixed by following these Github issues:
 - https://github.com/JCMais/node-libcurl/issues/296
 - https://github.com/JCMais/node-libcurl/issues/382
 
-and carefully reviewing the [MacOS Build Requirements](https://github.com/JCMais/node-libcurl#building-on-macos) from node-libcurl's documentation. Otherwise, we recommend uninstalling this library and installing [sync-request](https://github.com/JCMais/node-libcurl/issues/382).
+and carefully reviewing the [MacOS Build Requirements](https://github.com/JCMais/node-libcurl#building-on-macos) from node-libcurl's documentation. Otherwise, we recommend uninstalling this library and installing [sync-request](https://github.com/ForbesLindesay/sync-request).
 
 ### 4.3. Linux
 

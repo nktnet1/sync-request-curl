@@ -14,8 +14,8 @@ interface RequestInputs {
  * based on the provided object.
  *
  * Arrays of primitives, e.g. { quizIds: [1,2,3] }, will be of the form:
- *   https://google.com.au/?quizIds%5B0%5D=0&quizIds%5B1%5D=1&quizIds%5B2%5D=2
- *   i.e. https://www.google.com.au/?quizIds[0]=0&quizIds[1]=1&quizIds[2]=2
+ *   https://google.com.au/?quizIds%5B0%5D=1&quizIds%5B1%5D=2&quizIds%5B2%5D=3
+ *   i.e. https://www.google.com.au/?quizIds[0]=1&quizIds[1]=2&quizIds[2]=3
  *
  * @param {string} url - The URL to handle query string parameters for.
  * @param {Object.<string, any>} qs - query string parameters to modify or append.

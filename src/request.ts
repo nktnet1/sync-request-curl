@@ -198,7 +198,7 @@ const setFormPayload = (curl: Easy, formData: HttpPostField[]) => {
 /**
  * Prepares the request body and headers for a cURL request based on provided
  * options. Also sets up a callback function for the cURL Easy object to handle
- * returned body and populates the input buffet.
+ * returned body and populates the input buffer.
  *
  * @param {Easy} curl - The cURL easy handle
  * @param {Options} options - Options for configuring the request
@@ -292,7 +292,7 @@ const performRequest = (
     /**
      * Get the JSON-parsed body of a response.
      *
-     * @throws {Error} if the body is into a valid JSON
+     * @throws {Error} if the body is not valid JSON
      * @returns {any} parsed JSON body
      */
     const getJSON: GetJSON = (encoding?) => {
