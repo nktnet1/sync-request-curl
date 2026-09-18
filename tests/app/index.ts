@@ -45,7 +45,10 @@ app.put("/put", async (c) => {
 });
 
 app.get("/redirect/source", (c) => {
-  const redirectNumber = parseInt(c.req.query("redirectNumber") ?? "0", 10);
+  const redirectNumber = Number.parseInt(
+    c.req.query("redirectNumber") ?? "0",
+    10,
+  );
   return redirectNumber > 0
     ? c.redirect(`/redirect/source?redirectNumber=${redirectNumber - 1}`, 302)
     : c.redirect("/redirect/destination", 302);
@@ -89,7 +92,10 @@ app.get("/redirect/headers/destination", (c) => {
 });
 
 app.post("/content/length", async (c) => {
-  const contentLength = parseInt(c.req.header("content-length") ?? "0", 10);
+  const contentLength = Number.parseInt(
+    c.req.header("content-length") ?? "0",
+    10,
+  );
   const buffer = await c.req.arrayBuffer();
   return c.json({
     headerLength: contentLength,
