@@ -113,7 +113,7 @@ const setBodyPayload = (
           buffer,
           0,
           position,
-          Math.min(amountToRead, body.length),
+          Math.min(position + amountToRead, body.length),
         );
         position += totalWritten;
         return totalWritten;

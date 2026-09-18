@@ -196,6 +196,17 @@ describe("Sending a buffer", () => {
     expect(res).toMatchObject({ code: 200, json: { serverBufferLength: 165 } });
   });
 
+  test("Body buffer larger than the curl read buffer", () => {
+    const largeBody = Buffer.alloc(256 * 1024, 1);
+    const res = wrapperRequest("POST", `${SERVER_URL}/content/length`, {
+      body: largeBody,
+    });
+    expect(res).toMatchObject({
+      code: 200,
+      json: { serverBufferLength: largeBody.length },
+    });
+  });
+
   test("External URL for buffer", () => {
     const res = request("POST", "https://acsk.privatbank.ua/services/tsp/", {
       headers: {
