@@ -58,6 +58,16 @@ app.get("/redirect/destination", (c) => {
   return c.json({ message: "Redirect success!" });
 });
 
+app.get("/redirect/response-headers/source", (c) => {
+  c.header("x-intermediate-response", "intermediate");
+  return c.redirect("/redirect/response-headers/destination", 302);
+});
+
+app.get("/redirect/response-headers/destination", (c) => {
+  c.header("x-final-response", "final");
+  return c.json({ message: "Redirect headers success!" });
+});
+
 app.all("/redirect/method/302", (c) => {
   return c.redirect("/redirect/method/destination", 302);
 });

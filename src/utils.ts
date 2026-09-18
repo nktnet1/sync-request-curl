@@ -60,7 +60,8 @@ export const parseIncomingHeaders = (
 };
 
 /**
- * Parses an array of header lines as IncomingHttpHeaders.
+ * Parses the final HTTP response header block as IncomingHttpHeaders.
+ * Repeated headers are preserved as arrays.
  *
  * @param {string[]} headerLines - An array of header lines to parse.
  * @returns {IncomingHttpHeaders} An object containing parsed headers.
@@ -68,11 +69,32 @@ export const parseIncomingHeaders = (
 export const parseReturnedHeaders = (
   headerLines: string[],
 ): IncomingHttpHeaders => {
-  return headerLines.reduce((acc, header) => {
-    const [name, ...values] = header.split(":");
-    if (name && values.length > 0) {
-      acc[name.trim().toLowerCase()] = values.join(":").trim();
+  const finalStatusLineIndex = headerLines.findLastIndex((header) =>
+    /^HTTP\/\d(?:\.\d+)?\s+\d{3}\b/i.test(header),
+  );
+  const finalHeaderLines =
+    finalStatusLineIndex >= 0
+      ? headerLines.slice(finalStatusLineIndex + 1)
+      : headerLines;
+
+  return finalHeaderLines.reduce((acc, header) => {
+    const separatorIndex = header.indexOf(":");
+    if (separatorIndex <= 0) {
+      return acc;
     }
+
+    const name = header.slice(0, separatorIndex).trim().toLowerCase();
+    const value = header.slice(separatorIndex + 1).trim();
+    const existingValue = acc[name];
+
+    if (existingValue === undefined) {
+      acc[name] = value;
+    } else if (Array.isArray(existingValue)) {
+      existingValue.push(value);
+    } else {
+      acc[name] = [existingValue, value];
+    }
+
     return acc;
   }, {} as IncomingHttpHeaders);
 };

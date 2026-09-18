@@ -302,6 +302,16 @@ describe("Redirects", () => {
     });
   });
 
+  test("Only final response headers are returned after redirects", () => {
+    const res = request(
+      "GET",
+      `${SERVER_URL}/redirect/response-headers/source`,
+    );
+    expect(res.statusCode).toStrictEqual(200);
+    expect(res.headers["x-final-response"]).toStrictEqual("final");
+    expect(res.headers["x-intermediate-response"]).toBeUndefined();
+  });
+
   test("Max redirect 2, causes error", () => {
     const wrap = () =>
       wrapperRequest("GET", `${SERVER_URL}/redirect/source`, {
