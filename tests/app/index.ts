@@ -35,6 +35,10 @@ app.post("/post", async (c) => {
   return c.json({ value });
 });
 
+app.post("/json/echo", async (c) => {
+  return c.json(await c.req.json());
+});
+
 app.put("/put", async (c) => {
   const body = await c.req.json();
   const value = body.value;

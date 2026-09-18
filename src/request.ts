@@ -172,7 +172,7 @@ const handleBodyAndRequestHeaders = (
   buffer: { body: Buffer },
   httpHeaders: string[],
 ): void => {
-  if (options.json) {
+  if (options.json !== undefined) {
     setJSONPayload(curl, options.json, httpHeaders);
   } else if (options.body) {
     setBodyPayload(curl, options.body, httpHeaders);
