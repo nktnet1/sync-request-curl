@@ -98,13 +98,10 @@ describe("GET requests", () => {
 // ========================================================================= //
 
 describe("POST Requests", () => {
-  test.each([false, 0, "", null])(
-    "POST request with falsy JSON %j",
-    (json) => {
-      const res = request("POST", `${SERVER_URL}/json/echo`, { json });
-      expect(res.getJSON()).toStrictEqual(json);
-    },
-  );
+  test.each([false, 0, "", null])("POST request with falsy JSON %j", (json) => {
+    const res = request("POST", `${SERVER_URL}/json/echo`, { json });
+    expect(res.getJSON()).toStrictEqual(json);
+  });
 
   test("JSON takes precedence over body when JSON is falsy", () => {
     const res = request("POST", `${SERVER_URL}/json/echo`, {
@@ -285,16 +282,6 @@ describe("Sending a buffer", () => {
       code: 200,
       json: { serverBufferLength: largeBody.length },
     });
-  });
-
-  test("External URL for buffer", () => {
-    const res = request("POST", "https://acsk.privatbank.ua/services/tsp/", {
-      headers: {
-        "Content-Type": "application/timestamp-query",
-      },
-      body,
-    });
-    expect(res.statusCode).toStrictEqual(200);
   });
 });
 

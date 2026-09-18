@@ -4,13 +4,15 @@ import { CurlError } from "../src/errors";
 import { SERVER_URL } from "./app/config";
 
 const checkCurlError = (requestWrapped: () => void, code: number): void => {
-  expect(requestWrapped).toThrow(CurlError);
+  let error: unknown;
   try {
     requestWrapped();
-  } catch (error) {
-    expect(error).toBeInstanceOf(CurlError);
-    expect((error as CurlError).code).toStrictEqual(code);
+  } catch (caught) {
+    error = caught;
   }
+
+  expect(error).toBeInstanceOf(CurlError);
+  expect((error as CurlError).code).toStrictEqual(code);
 };
 
 describe("CurlError class", () => {
@@ -80,7 +82,7 @@ describe("Requests that give Libcurl error", () => {
   });
 
   test("Request non-existent server - CURLE_COULDNT_RESOLVE_HOST (6)", () => {
-    const invalidUrl = "https://google.fake.url.com";
+    const invalidUrl = "https://sync-request-curl.invalid";
     checkCurlError(() => request("GET", invalidUrl), 6);
   });
 

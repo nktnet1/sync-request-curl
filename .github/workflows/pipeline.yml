@@ -49,6 +49,14 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: pnpm check
 
+      - name: Run typecheck
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm typecheck
+
+      - name: Build package
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm build
+
       - name: Run tests with coverage
         run: pnpm test --coverage
 
