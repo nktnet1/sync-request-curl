@@ -14,10 +14,15 @@ const checkCurlError = (requestWrapped: () => void, code: number): void => {
 };
 
 describe("CurlError class", () => {
-  test("new Curlcode > 99", () => {
-    expect(() => new CurlError(100, "Error 100")).toThrow(Error);
+  test.each([100, 101])("accepts modern Libcurl error code %i", (code) => {
+    expect(new CurlError(code, `Error ${code}`).code).toStrictEqual(code);
   });
-  test("new Curlcode < 1", () => {
+
+  test("new CurlError code > 101", () => {
+    expect(() => new CurlError(102, "Error 102")).toThrow(Error);
+  });
+
+  test("new CurlError code < 1", () => {
     expect(() => new CurlError(0, "Error 0")).toThrow(Error);
     expect(() => new CurlError(-1, "Error 0")).toThrow(Error);
   });
