@@ -130,6 +130,10 @@ app.post("/text", (c) => {
   return c.text("Hello world!");
 });
 
+app.get("/large/response", (c) => {
+  return c.body("x".repeat(512 * 1024));
+});
+
 app.post("/upload", async (c) => {
   const body = await c.req.parseBody();
   const returnedBody = Object.entries(body)

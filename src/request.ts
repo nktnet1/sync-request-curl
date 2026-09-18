@@ -163,13 +163,13 @@ const setFormPayload = (curl: Easy, formData: HttpPostField[]) => {
  *
  * @param {Easy} curl - The cURL easy handle
  * @param {Options} options - Options for configuring the request
- * @param {{ body: Buffer }} buffer - wrapped buffer for the returned body
+ * @param {{ body: Buffer[] }} buffer - wrapped chunks for the returned body
  * @param {string[]} httpHeaders - HTTP headers for the request
  */
 const handleBodyAndRequestHeaders = (
   curl: Easy,
   options: Options,
-  buffer: { body: Buffer },
+  buffer: { body: Buffer[] },
   httpHeaders: string[],
 ): void => {
   if (options.json !== undefined) {
@@ -182,7 +182,7 @@ const handleBodyAndRequestHeaders = (
     httpHeaders.push("Content-Length: 0");
   }
   curl.setOpt(Curl.option.WRITEFUNCTION, (buff, nmemb, size) => {
-    buffer.body = Buffer.concat([buffer.body, buff.subarray(0, nmemb * size)]);
+    buffer.body.push(Buffer.from(buff.subarray(0, nmemb * size)));
     return nmemb * size;
   });
 
@@ -208,7 +208,7 @@ const performRequest = (
     handleQueryString(curl, url, options.qs);
 
     // Body/JSON and Headers (incoming)
-    const bufferWrap = { body: Buffer.alloc(0) };
+    const bufferWrap: { body: Buffer[] } = { body: [] };
     handleBodyAndRequestHeaders(
       curl,
       options,
@@ -231,7 +231,7 @@ const performRequest = (
     // Creating return object
     const statusCode = curl.getInfo("RESPONSE_CODE").data as number;
     const headers = parseReturnedHeaders(returnedHeaderArray);
-    const { body } = bufferWrap;
+    const body = Buffer.concat(bufferWrap.body);
     const redirectUrl = curl.getInfo("REDIRECT_URL").data as string | null;
 
     /**

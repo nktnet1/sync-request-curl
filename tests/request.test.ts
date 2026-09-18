@@ -292,6 +292,16 @@ describe("res.getBody()", () => {
 
 // ========================================================================= //
 
+describe("Response buffering", () => {
+  test("large response assembled across multiple chunks", () => {
+    const res = request("GET", `${SERVER_URL}/large/response`);
+    expect(res.body.length).toStrictEqual(512 * 1024);
+    expect(res.body.equals(Buffer.alloc(512 * 1024, "x"))).toStrictEqual(true);
+  });
+});
+
+// ========================================================================= //
+
 describe("Redirects", () => {
   test("No redirect", () => {
     const res = wrapperRequest("GET", `${SERVER_URL}/redirect/source`, {
