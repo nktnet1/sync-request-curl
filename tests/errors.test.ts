@@ -33,6 +33,35 @@ describe("Requests that give Libcurl error", () => {
     checkCurlError(() => request("GET", ""), 3);
   });
 
+  test("Request inputs are hidden by default", () => {
+    let error: unknown;
+    try {
+      request("GET", "", { headers: { authorization: "secret-token" } });
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeInstanceOf(CurlError);
+    expect((error as Error).message).not.toContain("secret-token");
+    expect((error as Error).message).not.toContain("DEBUG:");
+  });
+
+  test("Request inputs are included when debug is enabled", () => {
+    let error: unknown;
+    try {
+      request("GET", "", {
+        debug: true,
+        headers: { authorization: "secret-token" },
+      });
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeInstanceOf(CurlError);
+    expect((error as Error).message).toContain("secret-token");
+    expect((error as Error).message).toContain("DEBUG:");
+  });
+
   test("Request non-existent server - CURLE_COULDNT_RESOLVE_HOST (6)", () => {
     const invalidUrl = "https://google.fake.url.com";
     checkCurlError(() => request("GET", invalidUrl), 6);

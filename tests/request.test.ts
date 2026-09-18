@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import request, { type HttpVerb, type Options } from "../src";
 import { SERVER_URL } from "./app/config";
 
@@ -64,6 +64,16 @@ describe("GET requests", () => {
     const value: string[] = [];
     const res = wrapperRequest("GET", `${SERVER_URL}/get`, { qs: { value } });
     expect(res).toMatchObject({ code: 200, json: {} });
+  });
+
+  test("GET request with non-empty array", () => {
+    const res = wrapperRequest("GET", `${SERVER_URL}/get`, {
+      qs: { value: [1, 2, 3] },
+    });
+    const finalUrl = new URL(res.rawResponse.url);
+    expect(finalUrl.searchParams.get("value[0]")).toStrictEqual("1");
+    expect(finalUrl.searchParams.get("value[1]")).toStrictEqual("2");
+    expect(finalUrl.searchParams.get("value[2]")).toStrictEqual("3");
   });
 
   test("GET request with undefined value", () => {
@@ -296,9 +306,39 @@ describe("Redirects", () => {
     const wrap = () =>
       wrapperRequest("GET", `${SERVER_URL}/redirect/source`, {
         qs: { redirectNumber: 3 },
+        headers: { "x-test": "value" },
         maxRedirects: 2,
       });
     expect(wrap).toThrow(Error);
+  });
+
+  test("Manual redirects use the remaining overall timeout", () => {
+    const dateNow = vi
+      .spyOn(Date, "now")
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(1001);
+
+    try {
+      expect(() =>
+        request("GET", `${SERVER_URL}/redirect/source`, {
+          headers: { "x-test": "value" },
+          timeout: 1000,
+        }),
+      ).toThrow(Error);
+    } finally {
+      dateNow.mockRestore();
+    }
+  });
+
+  test("Manual redirect handling returns a non-redirect response", () => {
+    const res = wrapperRequest("GET", SERVER_URL, {
+      headers: { "x-test": "value" },
+    });
+    expect(res).toMatchObject({
+      code: 200,
+      json: { message: "Hello, world!" },
+    });
   });
 
   test("Final url returned not redirected", () => {

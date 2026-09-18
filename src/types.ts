@@ -51,6 +51,7 @@ export interface Options {
   maxRedirects?: number;
 
   insecure?: boolean;
+  debug?: boolean;
   setEasyOptions?: SetEasyOptionCallback;
 }
 

@@ -298,6 +298,13 @@ JSON.stringify({
   </tr>
 
   <tr>
+    <td>debug</td>
+    <td>Include request inputs in CurlError messages. This may expose sensitive headers or request bodies, so it is disabled by default.</td>
+    <td><pre>true</pre></td>
+    <td><code>false</code></td>
+  </tr>
+
+  <tr>
     <td>setEasyOptions</td>
     <td>Optional callback to set additional curl options for the <a href='https://curl.se/libcurl/c/easy_setopt_options.html' target="_blank">Easy Interface</a>. This has priority over existing options.</td>
     <td>
@@ -337,6 +344,7 @@ export interface Options {
   maxRedirects?: number;
 
   insecure?: boolean;
+  debug?: boolean;
   setEasyOptions?: SetEasyOptionCallback;
 }
 ```

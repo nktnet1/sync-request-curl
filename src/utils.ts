@@ -89,6 +89,16 @@ export const checkValidCurlCode = (
   requestInputs: RequestInputs,
 ) => {
   if (code !== CurlCode.CURLE_OK) {
+    const debugDetails = requestInputs.options.debug
+      ? `
+
+      DEBUG: {
+        method: "${requestInputs.method}",
+        url: "${requestInputs.url}",
+        options: ${JSON.stringify(requestInputs.options)}
+      }`
+      : "";
+
     throw new CurlError(
       code,
       `
@@ -96,13 +106,7 @@ export const checkValidCurlCode = (
         - ${Easy.strError(code)}
 
       You can also look up the Libcurl Error (code ${code}) here:
-        - https://curl.se/libcurl/c/libcurl-errors.html
-
-      DEBUG: {
-        method: "${requestInputs.method}",
-        url: "${requestInputs.url}",
-        options: ${JSON.stringify(requestInputs.options)}
-      }
+        - https://curl.se/libcurl/c/libcurl-errors.html${debugDetails}
     `,
     );
   }
