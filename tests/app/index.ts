@@ -117,6 +117,15 @@ app.post("/content/length", async (c) => {
   });
 });
 
+app.post("/request/headers", async (c) => {
+  await c.req.arrayBuffer();
+  return c.json({
+    contentType: c.req.header("content-type") ?? null,
+    contentLength: c.req.header("content-length") ?? null,
+    transferEncoding: c.req.header("transfer-encoding") ?? null,
+  });
+});
+
 app.post("/timeout", async (c) => {
   const body = await c.req.json();
   const startTime = Date.now();

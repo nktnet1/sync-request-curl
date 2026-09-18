@@ -206,6 +206,60 @@ describe("Correctly set content-length", () => {
   });
 });
 
+describe("Generated request headers", () => {
+  test("JSON headers replace conflicting caller headers", () => {
+    const json = { message: "hi" };
+    const res = request("POST", `${SERVER_URL}/request/headers`, {
+      json,
+      headers: {
+        "content-type": "text/plain",
+        "Content-Length": "999",
+      },
+    });
+
+    expect(res.getJSON()).toStrictEqual({
+      contentType: "application/json",
+      contentLength: String(Buffer.byteLength(JSON.stringify(json))),
+      transferEncoding: null,
+    });
+  });
+
+  test("body content-length replaces a conflicting caller value", () => {
+    const body = "hello";
+    const res = request("POST", `${SERVER_URL}/request/headers`, {
+      body,
+      headers: { "content-length": "999" },
+    });
+
+    expect(res.getJSON()).toMatchObject({
+      contentLength: String(Buffer.byteLength(body)),
+    });
+  });
+
+  test("empty requests replace a conflicting caller content-length", () => {
+    const res = request("POST", `${SERVER_URL}/request/headers`, {
+      headers: { "Content-Length": "999" },
+    });
+
+    expect(res.getJSON()).toMatchObject({ contentLength: "0" });
+  });
+
+  test("transfer-encoding suppresses generated content-length", () => {
+    const res = request("POST", `${SERVER_URL}/request/headers`, {
+      json: { message: "hi" },
+      headers: {
+        "Transfer-Encoding": "chunked",
+        "Content-Length": "999",
+      },
+    });
+
+    expect(res.getJSON()).toMatchObject({
+      contentLength: null,
+      transferEncoding: "chunked",
+    });
+  });
+});
+
 // ========================================================================= //
 
 // https://github.com/nktnet1/sync-request-curl/issues/116

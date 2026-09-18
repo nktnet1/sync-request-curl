@@ -61,6 +61,45 @@ const removeRequestPayload = (options: Options): Options => ({
   formData: undefined,
 });
 
+const getRequestHeaderName = (header: string): string =>
+  header.split(/[:;]/, 1)[0].trim().toLowerCase();
+
+const removeRequestHeader = (httpHeaders: string[], name: string): void => {
+  const normalizedName = name.toLowerCase();
+  for (let i = httpHeaders.length - 1; i >= 0; i -= 1) {
+    if (getRequestHeaderName(httpHeaders[i]) === normalizedName) {
+      httpHeaders.splice(i, 1);
+    }
+  }
+};
+
+const hasRequestHeader = (httpHeaders: string[], name: string): boolean => {
+  const normalizedName = name.toLowerCase();
+  return httpHeaders.some(
+    (header) => getRequestHeaderName(header) === normalizedName,
+  );
+};
+
+const setRequestHeader = (
+  httpHeaders: string[],
+  name: string,
+  value: string | number,
+): void => {
+  removeRequestHeader(httpHeaders, name);
+  httpHeaders.push(`${name}: ${value}`);
+};
+
+const setContentLengthHeader = (
+  httpHeaders: string[],
+  length: number,
+): void => {
+  if (hasRequestHeader(httpHeaders, "transfer-encoding")) {
+    removeRequestHeader(httpHeaders, "content-length");
+    return;
+  }
+  setRequestHeader(httpHeaders, "Content-Length", length);
+};
+
 /**
  * Handles query string parameters in a URL, modifies the URL if necessary,
  * and sets it as the CURLOPT_URL option in the given cURL Easy object.
@@ -103,9 +142,9 @@ const setJSONPayload = (
   json: CustomJsonType,
   httpHeaders: string[],
 ): void => {
-  httpHeaders.push("Content-Type: application/json");
+  setRequestHeader(httpHeaders, "Content-Type", "application/json");
   const payload = JSON.stringify(json);
-  httpHeaders.push(`Content-Length: ${Buffer.byteLength(payload, "utf-8")}`);
+  setContentLengthHeader(httpHeaders, Buffer.byteLength(payload, "utf-8"));
   curl.setOpt(Curl.option.POSTFIELDS, payload);
 };
 
@@ -143,7 +182,7 @@ const setBodyPayload = (
     );
   } else {
     curl.setOpt(Curl.option.POSTFIELDS, body);
-    httpHeaders.push(`Content-Length: ${Buffer.byteLength(body, "utf-8")}`);
+    setContentLengthHeader(httpHeaders, Buffer.byteLength(body, "utf-8"));
   }
 };
 
@@ -179,7 +218,7 @@ const handleBodyAndRequestHeaders = (
   } else if (options.formData) {
     setFormPayload(curl, options.formData);
   } else {
-    httpHeaders.push("Content-Length: 0");
+    setContentLengthHeader(httpHeaders, 0);
   }
   curl.setOpt(Curl.option.WRITEFUNCTION, (buff, nmemb, size) => {
     buffer.body.push(Buffer.from(buff.subarray(0, nmemb * size)));
