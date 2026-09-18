@@ -318,6 +318,7 @@ describe("Redirects", () => {
   test("POST changes to GET after a 302 redirect", () => {
     const res = wrapperRequest("POST", `${SERVER_URL}/redirect/method/302`, {
       body: "payload",
+      headers: { "x-test": "value" },
     });
     expect(res).toMatchObject({
       code: 200,
@@ -328,6 +329,7 @@ describe("Redirects", () => {
   test("PUT changes to GET after a 303 redirect", () => {
     const res = wrapperRequest("PUT", `${SERVER_URL}/redirect/method/303`, {
       body: "payload",
+      headers: { "x-test": "value" },
     });
     expect(res).toMatchObject({
       code: 200,
@@ -336,10 +338,36 @@ describe("Redirects", () => {
   });
 
   test("PUT remains PUT after a 307 redirect", () => {
-    const res = wrapperRequest("PUT", `${SERVER_URL}/redirect/method/307`);
+    const res = wrapperRequest("PUT", `${SERVER_URL}/redirect/method/307`, {
+      headers: { "x-test": "value" },
+    });
     expect(res).toMatchObject({
       code: 200,
       json: { method: "PUT" },
+    });
+  });
+
+  test("Same-origin redirect keeps custom headers", () => {
+    const res = wrapperRequest(
+      "GET",
+      `${SERVER_URL}/redirect/headers/same-origin`,
+      { headers: { "x-api-key": "secret" } },
+    );
+    expect(res).toMatchObject({
+      code: 200,
+      json: { apiKey: "secret" },
+    });
+  });
+
+  test("Cross-origin redirect drops custom headers", () => {
+    const res = wrapperRequest(
+      "GET",
+      `${SERVER_URL}/redirect/headers/cross-origin`,
+      { headers: { "x-api-key": "secret" } },
+    );
+    expect(res).toMatchObject({
+      code: 200,
+      json: { apiKey: null },
     });
   });
 

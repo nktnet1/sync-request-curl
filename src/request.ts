@@ -1,4 +1,4 @@
-import { Curl, Easy, type HttpPostField } from "node-libcurl";
+import { Curl, CurlCode, Easy, type HttpPostField } from "node-libcurl";
 import type {
   BufferEncoding,
   CustomJsonType,
@@ -16,7 +16,6 @@ import {
 } from "./utils";
 
 const CURL_FOLLOW_OBEY_CODE = 2;
-
 /**
  * Create a libcurl Easy object with default configurations
  *
@@ -27,19 +26,40 @@ const CURL_FOLLOW_OBEY_CODE = 2;
 const createCurlObjectWithDefaults = (
   method: HttpVerb,
   options: Options,
+  followRedirects: boolean,
 ): Easy => {
   const curl = new Easy();
   curl.setOpt(Curl.option.CUSTOMREQUEST, method);
   curl.setOpt(Curl.option.TIMEOUT_MS, options.timeout ?? 0);
   curl.setOpt(
     Curl.option.FOLLOWLOCATION,
-    options.followRedirects === false ? 0 : CURL_FOLLOW_OBEY_CODE,
+    followRedirects ? CURL_FOLLOW_OBEY_CODE : 0,
   );
   curl.setOpt(Curl.option.MAXREDIRS, options.maxRedirects ?? -1);
   curl.setOpt(Curl.option.SSL_VERIFYPEER, !options.insecure);
   curl.setOpt(Curl.option.NOBODY, method === "HEAD");
   return curl;
 };
+
+const hasCustomHeaders = (options: Options): boolean =>
+  Object.values(options.headers ?? {}).some((value) => value !== undefined);
+
+const getRedirectMethod = (method: HttpVerb, statusCode: number): HttpVerb => {
+  if (statusCode === 303 && method !== "HEAD") {
+    return "GET";
+  }
+  if ((statusCode === 301 || statusCode === 302) && method === "POST") {
+    return "GET";
+  }
+  return method;
+};
+
+const removeRequestPayload = (options: Options): Options => ({
+  ...options,
+  json: undefined,
+  body: undefined,
+  formData: undefined,
+});
 
 /**
  * Handles query string parameters in a URL, modifies the URL if necessary,
@@ -177,12 +197,13 @@ const handleBodyAndRequestHeaders = (
  * @param {Options} [options={}] - An object to configure the request
  * @returns {Response} - HTTP response consisting of status code, headers, and body
  */
-const request = (
+const performRequest = (
   method: HttpVerb,
   url: string,
-  options: Options = {},
-): Response => {
-  const curl = createCurlObjectWithDefaults(method, options);
+  options: Options,
+  followRedirects: boolean,
+): { response: Response; redirectUrl: string | null } => {
+  const curl = createCurlObjectWithDefaults(method, options, followRedirects);
   handleQueryString(curl, url, options.qs);
 
   // Body/JSON and Headers (incoming)
@@ -210,6 +231,7 @@ const request = (
   const statusCode = curl.getInfo("RESPONSE_CODE").data as number;
   const headers = parseReturnedHeaders(returnedHeaderArray);
   const { body } = bufferWrap;
+  const redirectUrl = curl.getInfo("REDIRECT_URL").data as string | null;
 
   /**
    * Get the body of a response with an optional encoding.
@@ -258,7 +280,87 @@ JSON-Parsing Error Message:
   url = curl.getInfo("EFFECTIVE_URL").data as string;
 
   curl.close();
-  return { statusCode, headers, url, body, getBody, getJSON };
+  return {
+    response: { statusCode, headers, url, body, getBody, getJSON },
+    redirectUrl,
+  };
+};
+
+/**
+ * Performs an HTTP request using cURL with the specified parameters.
+ *
+ * @param {HttpVerb} method - The HTTP method for the request (e.g., 'GET', 'POST')
+ * @param {string} url - The URL to make the request to
+ * @param {Options} [options={}] - An object to configure the request
+ * @returns {Response} - HTTP response consisting of status code, headers, and body
+ */
+const request = (
+  method: HttpVerb,
+  url: string,
+  options: Options = {},
+): Response => {
+  const shouldFollowRedirects = options.followRedirects !== false;
+
+  // libcurl forwards arbitrary CURLOPT_HTTPHEADER values across origins when
+  // following redirects. If there are no custom headers, its native redirect
+  // handling is safe and avoids duplicating the redirect machinery here.
+  if (!shouldFollowRedirects || !hasCustomHeaders(options)) {
+    return performRequest(method, url, options, shouldFollowRedirects).response;
+  }
+
+  const startedAt = Date.now();
+  const maxRedirects = options.maxRedirects ?? -1;
+  let redirectsFollowed = 0;
+  let currentMethod = method;
+  let currentUrl = url;
+  let currentOptions = options;
+
+  while (true) {
+    if (options.timeout && options.timeout > 0) {
+      const remainingTimeout = options.timeout - (Date.now() - startedAt);
+      if (remainingTimeout <= 0) {
+        checkValidCurlCode(CurlCode.CURLE_OPERATION_TIMEDOUT, {
+          method,
+          url,
+          options,
+        });
+      }
+      currentOptions = { ...currentOptions, timeout: remainingTimeout };
+    }
+
+    const { response, redirectUrl } = performRequest(
+      currentMethod,
+      currentUrl,
+      currentOptions,
+      false,
+    );
+    if (!redirectUrl) {
+      return response;
+    }
+
+    if (maxRedirects >= 0 && redirectsFollowed >= maxRedirects) {
+      checkValidCurlCode(CurlCode.CURLE_TOO_MANY_REDIRECTS, {
+        method,
+        url,
+        options,
+      });
+    }
+    redirectsFollowed += 1;
+
+    const nextUrl = new URL(redirectUrl, response.url).href;
+    const nextMethod = getRedirectMethod(currentMethod, response.statusCode);
+    const sameOrigin = new URL(response.url).origin === new URL(nextUrl).origin;
+
+    currentOptions = {
+      ...(nextMethod === currentMethod
+        ? currentOptions
+        : removeRequestPayload(currentOptions)),
+      qs: undefined,
+      headers: sameOrigin ? currentOptions.headers : undefined,
+    };
+    currentMethod = nextMethod;
+    currentUrl = nextUrl;
+  }
 };
 
 export default request;

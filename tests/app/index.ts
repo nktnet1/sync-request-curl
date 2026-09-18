@@ -71,6 +71,23 @@ app.all("/redirect/method/destination", (c) => {
   return c.json({ method: c.req.method });
 });
 
+app.get("/redirect/headers/same-origin", (c) => {
+  return c.redirect("/redirect/headers/destination", 302);
+});
+
+app.get("/redirect/headers/cross-origin", (c) => {
+  const destination = new URL(c.req.url);
+  destination.hostname =
+    destination.hostname === "localhost" ? "127.0.0.1" : "localhost";
+  destination.pathname = "/redirect/headers/destination";
+  destination.search = "";
+  return c.redirect(destination.href, 302);
+});
+
+app.get("/redirect/headers/destination", (c) => {
+  return c.json({ apiKey: c.req.header("x-api-key") ?? null });
+});
+
 app.post("/content/length", async (c) => {
   const contentLength = parseInt(c.req.header("content-length") ?? "0", 10);
   const buffer = await c.req.arrayBuffer();
