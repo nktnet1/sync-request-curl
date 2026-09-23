@@ -1,5 +1,4 @@
 import type { IncomingHttpHeaders } from "http";
-import { CurlCode, Easy } from "node-libcurl";
 import { CurlError } from "./errors";
 import type { HttpVerb, Options } from "./types";
 
@@ -100,17 +99,19 @@ export const parseReturnedHeaders = (
 };
 
 /**
- * Checks CURL code and throws a `CurlError` if it indicates failure.
+ * Checks a libcurl code and throws a `CurlError` if it indicates failure.
  *
- * @param {CurlCode} code - The CURL error code to check.
- * @param {RequestInputs} requestInputs - input parameters for the CURL request.
- * @throws {CurlError} Throws a `CurlError` if the CURL code indicates failure.
+ * @param {number} code - The libcurl error code to check.
+ * @param {string} errorMessage - The libcurl error string.
+ * @param {RequestInputs} requestInputs - input parameters for the request.
+ * @throws {CurlError} Throws a `CurlError` if the libcurl code indicates failure.
  */
 export const checkValidCurlCode = (
-  code: CurlCode,
+  code: number,
+  errorMessage: string,
   requestInputs: RequestInputs,
-) => {
-  if (code !== CurlCode.CURLE_OK) {
+): void => {
+  if (code !== 0) {
     const debugDetails = requestInputs.options.debug
       ? `
 
@@ -125,7 +126,7 @@ export const checkValidCurlCode = (
       code,
       `
       Curl request failed with code ${code}:
-        - ${Easy.strError(code)}
+        - ${errorMessage}
 
       You can also look up the Libcurl Error (code ${code}) here:
         - https://curl.se/libcurl/c/libcurl-errors.html${debugDetails}

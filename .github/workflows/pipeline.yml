@@ -16,7 +16,58 @@ on:
       - '**/README.md'
 
 jobs:
+  native:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            artifact: ubuntu-latest
+            triplet: x64-linux
+          - runner: macos-15
+            artifact: macos-latest
+            triplet: arm64-osx
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Checkout vcpkg
+        uses: actions/checkout@v7
+        with:
+          repository: microsoft/vcpkg
+          ref: 2026.07.29
+          path: .vcpkg
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+
+      - name: Bootstrap vcpkg
+        run: ./.vcpkg/bootstrap-vcpkg.sh -disableMetrics
+
+      - name: Install static libcurl
+        run: ./.vcpkg/vcpkg install 'curl[http2]:${{ matrix.triplet }}'
+
+      - name: Build native addon
+        env:
+          CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/.vcpkg/scripts/buildsystems/vcpkg.cmake
+          VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
+        run: node scripts/build-native.mjs
+
+      - name: Stage native addon
+        run: node scripts/stage-native.mjs
+
+      - name: Upload native addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.artifact }}
+          path: prebuilds/*.node
+          if-no-files-found: error
+
   test:
+    needs: native
     strategy:
       matrix:
         os:
@@ -44,6 +95,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Download native addon
+        uses: actions/download-artifact@v4
+        with:
+          name: native-${{ matrix.os }}
+          path: prebuilds
 
       - name: Run lint and format
         if: matrix.os == 'ubuntu-latest'

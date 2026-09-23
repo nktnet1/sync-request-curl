@@ -34,7 +34,7 @@
 
 Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but up to 20 times more quickly.
 
-Leverages [node-libcurl](https://github.com/JCMais/node-libcurl) for performance instead of spawning child processes like sync-request.
+Uses a small in-process Node-API binding to libcurl for performance instead of spawning child processes like sync-request. The published package ships prebuilt native addons and does not run install or postinstall scripts.
 
 Designed to run on NodeJS. It will not work in a browser.
 
@@ -64,7 +64,7 @@ Designed to run on NodeJS. It will not work in a browser.
 npm install sync-request-curl
 ```
 
-Please refer to the [compatibility](#4-compatibility) section for known issues and workarounds for Windows, MacOS and Linux.
+No compiler, Python, CMake, node-gyp, or install-script approval is required when installing a published release. Please refer to the [compatibility](#4-compatibility) section for the platforms that have prebuilt binaries.
 
 ## 2. Usage
 
@@ -250,7 +250,7 @@ JSON.stringify({
   <tr>
     <td>formData</td>
     <td>
-      Array of <a href="https://github.com/JCMais/node-libcurl/blob/6bb4f99183af64354067970d9c91d5fedc6b8709/lib/types/HttpPostField.ts#L12-L40">HttpPostField</a> from node-libcurl, used for file uploads with multipart/form-data.
+      Array of <code>HttpPostField</code> values, used for file uploads with multipart/form-data.
     </td>
     <td>
 <pre>
@@ -306,13 +306,13 @@ JSON.stringify({
 
   <tr>
     <td>setEasyOptions</td>
-    <td>Optional callback to set additional curl options for the <a href='https://curl.se/libcurl/c/easy_setopt_options.html' target="_blank">Easy Interface</a>. This has priority over existing options.</td>
+    <td>Optional callback for the supported low-level libcurl options. This has priority over existing request headers/options. Supported options are <code>HTTPHEADER</code>, <code>PROXY</code>, <code>PROXYUSERPWD</code>, <code>USERAGENT</code>, <code>REFERER</code>, <code>CAINFO</code>, <code>INTERFACE</code>, <code>DNS_SERVERS</code>, and <code>TCP_KEEPALIVE</code>.</td>
     <td>
 <pre>
 (curl, opt) => {
   curl.setOpt(
-    opt.URL,
-    'www.ck'
+    opt.PROXY,
+    'http://proxy:8080'
   );
 }
 </pre>
@@ -466,47 +466,30 @@ DEALINGS IN THE SOFTWARE.
 
 ## 4. Compatibility
 
+`sync-request-curl` uses the stable Node-API ABI rather than the Node/V8 ABI. A prebuilt addon is therefore tied to its operating system, CPU architecture, and C runtime, but not to a specific Node.js major version. The same prebuilt binary can be reused by newer Node.js releases that support the targeted Node-API version.
+
+The published package does not download or compile native code during installation. If a matching prebuilt addon is not present, loading the package fails with an explicit unsupported-platform error instead of falling back to `node-gyp`.
+
 ### 4.1. Windows
 
-For installation issues, be sure to review the [Windows Build Requirements](https://github.com/JCMais/node-libcurl#building-on-windows) from node-libcurl's documentation.
+Prebuilt addons are prepared for x64 and arm64 Windows. No Visual Studio, Python, CMake, vcpkg, or node-gyp installation is required by package consumers.
 
-In addition, your requests may unexpectedly fail with a [Libcurl Error](https://curl.se/libcurl/c/libcurl-errors.html) (code 60, CURLE_PEER_FAILED_VERIFICATION) when using NodeJS natively on Windows.
+Requests may still fail with Libcurl Error 60 (`CURLE_PEER_FAILED_VERIFICATION`) when the peer certificate cannot be verified. The `insecure` option disables peer verification and should only be used when that trade-off is intentional.
 
-The reason is covered in the below resources:
+### 4.2. macOS
 
-- https://github.com/JCMais/node-libcurl/issues/301
-- https://stackoverflow.com/a/34883260/22324694
-
-One quick workaround is to set the `insecure` option to `true` when sending your requests. This is the same as setting the Libcurl Easy's equivalent [SSL_VERIFYPEER](https://curl.se/libcurl/c/CURLOPT_SSL_VERIFYPEER.html) to `0`, or using `curl` in the command line with the [`-k` or `--insecure`](https://curl.se/docs/manpage.html#-k) option.
-
-Alternatively, consider using [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/install).
-
-### 4.2. MacOS
-
-The build for MacOS may fail during the installation process.
-
-In most cases, this can be fixed by following these Github issues:
-
-- https://github.com/JCMais/node-libcurl/issues/296
-- https://github.com/JCMais/node-libcurl/issues/382
-
-and carefully reviewing the [MacOS Build Requirements](https://github.com/JCMais/node-libcurl#building-on-macos) from node-libcurl's documentation. Otherwise, we recommend uninstalling this library and installing [sync-request](https://github.com/ForbesLindesay/sync-request).
+Prebuilt addons are prepared for Apple Silicon (`arm64`) and Intel (`x64`) macOS. No Xcode command-line tools or local libcurl installation is required by package consumers.
 
 ### 4.3. Linux
 
-In rare cases, the build for distributions such as Debian or Ubuntu may fail. This is attributed to missing dependencies such as Python or Libcurl. Below are some related issues:
-
-- https://github.com/JCMais/node-libcurl/issues/374
-- https://github.com/JCMais/node-libcurl/issues/376
-
-Be sure to also check the [Linux Build Requirements](https://github.com/JCMais/node-libcurl#building-on-linux) from node-libcurl's documentation.
+Prebuilt addons are prepared for glibc-based x64 and arm64 Linux. The loader also distinguishes musl from glibc so musl prebuilds can be added without changing the JavaScript API. Until a musl prebuild is included in a release, distributions such as Alpine fail explicitly rather than attempting a local build.
 
 ## 5. Caveats
 
-See [sync-request](https://www.npmjs.com/package/sync-request) for the original documentation. Please note that **sync-request-curl** only supports a subset of the original features in sync-request and additional features through leveraging [node-libcurl](https://www.npmjs.com/package/node-libcurl).
+See [sync-request](https://www.npmjs.com/package/sync-request) for the original documentation. Please note that **sync-request-curl** only supports a subset of the original features in sync-request. Low-level libcurl customisation through `setEasyOptions` is intentionally limited to the options documented above so the package does not need to expose another native addon API.
 
 **sync-request-curl** was developed to improve performance with sending synchronous requests in NodeJS. It is also free from the sync-request bug which leaves an orphaned sync-rpc process, resulting in a [leaked handle being detected in Jest](https://github.com/ForbesLindesay/sync-request/issues/129).
 
-**sync-request-curl** was designed to work with UNIX-like systems for UNSW students enrolled in [COMP1531 Software Engineering Fundamentals](https://webcms3.cse.unsw.edu.au/COMP1531/23T2/outline). It has been tested on Alpine, Arch, Debian and Ubuntu Linux and is compatible with Windows/MacOS.
+**sync-request-curl** was designed to work with UNIX-like systems for UNSW students enrolled in [COMP1531 Software Engineering Fundamentals](https://webcms3.cse.unsw.edu.au/COMP1531/23T2/outline). The native distribution currently targets glibc-based Linux, Windows, and macOS on the architectures listed in the compatibility section.
 
 Please note that this library's primary goal is to simplify the learning of JavaScript for novice programmers, hence its synchronous nature. However, we recommend to **always use an [asynchronous alternative](https://blog.appsignal.com/2024/09/11/top-5-http-request-libraries-for-nodejs.html)** where possible.

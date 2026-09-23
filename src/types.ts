@@ -1,5 +1,25 @@
 import type { IncomingHttpHeaders } from "http";
-import type { CurlOption, Easy, HttpPostField } from "node-libcurl";
+
+export interface CurlOption {
+  readonly HTTPHEADER: "HTTPHEADER";
+  readonly PROXY: "PROXY";
+  readonly PROXYUSERPWD: "PROXYUSERPWD";
+  readonly USERAGENT: "USERAGENT";
+  readonly REFERER: "REFERER";
+  readonly CAINFO: "CAINFO";
+  readonly INTERFACE: "INTERFACE";
+  readonly DNS_SERVERS: "DNS_SERVERS";
+  readonly TCP_KEEPALIVE: "TCP_KEEPALIVE";
+}
+
+export type CurlOptionValue = CurlOption[keyof CurlOption];
+export type CurlOptionInput = string | string[] | number | boolean;
+
+export interface Easy {
+  readonly isOpen: boolean;
+  setOpt(option: CurlOptionValue, value: CurlOptionInput): void;
+  close(): void;
+}
 
 // biome-ignore lint/suspicious/noExplicitAny: to match sync-request input type
 export type CustomJsonType = any;
@@ -28,6 +48,18 @@ export type BufferEncoding =
   | "binary"
   | "hex";
 
+export type HttpPostField =
+  | {
+      name: string;
+      contents: string;
+    }
+  | {
+      name: string;
+      file: string;
+      type?: string;
+      filename?: string;
+    };
+
 export type SetEasyOptionCallback = (
   curl: Easy,
   curlOption: CurlOption,
@@ -55,7 +87,7 @@ export interface Options {
   setEasyOptions?: SetEasyOptionCallback;
 }
 
-// Infer type `string` if encoding is specified, otherwise `string | Buffer`
+// Infer type `string` if encoding is specified, otherwise `Buffer`.
 export type GetBody = {
   <Encoding extends BufferEncoding>(encoding: Encoding): string;
   (encoding?: undefined): Buffer;

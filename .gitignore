@@ -6,3 +6,6 @@ coverage/
 
 *.patch
 *.bundle
+
+native/build/
+prebuilds/*.node

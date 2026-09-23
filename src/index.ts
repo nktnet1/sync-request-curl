@@ -1,8 +1,8 @@
 import request from "./request";
 
-export type { HttpPostField } from "node-libcurl";
 export type {
   BufferEncoding,
+  HttpPostField,
   HttpVerb,
   Options,
   Response,

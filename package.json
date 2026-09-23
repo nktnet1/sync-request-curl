@@ -5,21 +5,27 @@
     "type": "git",
     "url": "https://github.com/nktnet1/sync-request-curl"
   },
-  "version": "4.0.3",
+  "version": "5.0.0",
   "files": [
-    "dist"
+    "dist",
+    "prebuilds"
   ],
   "scripts": {
     "start": "tsx tests/app/server",
     "dev": "tsx watch --include ./tests/app ./tests/app/server.ts",
-    "test": "vitest run",
-    "tc": "vitest run --coverage",
+    "test": "node scripts/build-native.mjs --if-needed && vitest run",
+    "tc": "node scripts/build-native.mjs --if-needed && vitest run --coverage",
     "lint": "biome lint",
     "format": "biome format",
     "check": "biome check",
     "typecheck": "tsc --noEmit",
     "build": "tsdown",
-    "prepublishOnly": "pnpm run build"
+    "build:native": "node scripts/build-native.mjs",
+    "stage:native": "node scripts/stage-native.mjs",
+    "verify:prebuilds": "node scripts/verify-prebuilds.mjs",
+    "prepack": "pnpm run build && pnpm run verify:prebuilds",
+    "download:node-import-lib": "node scripts/download-node-import-lib.mjs",
+    "build:native:cmake": "node scripts/build-native.mjs --cmake"
   },
   "keywords": [
     "sync",
@@ -34,12 +40,11 @@
     "https",
     "curl",
     "libcurl",
-    "node-libcurl",
     "comp1531"
   ],
   "author": "Khiet Tam Nguyen",
   "license": "MIT",
-  "description": "Fast way to send synchronous web requests in NodeJS. API is a subset of sync-request. Leverages node-libcurl for high performance. Cannot be used in a browser.",
+  "description": "Fast synchronous HTTP requests for Node.js using an in-process Node-API binding to libcurl. No install scripts or local native compilation required.",
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
     "@hono/node-server": "^2.1.1",
@@ -54,9 +59,6 @@
     "vitest": "^5.0.1"
   },
   "packageManager": "pnpm@12.4.2",
-  "dependencies": {
-    "node-libcurl": "5.1.2"
-  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
