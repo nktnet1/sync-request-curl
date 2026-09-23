@@ -10,17 +10,56 @@ on:
       - 'v*'
 
 jobs:
-  build:
+  build-linux:
     strategy:
       fail-fast: false
       matrix:
         include:
           - runner: ubuntu-24.04
             platform: linux-x64-gnu
-            triplet: x64-linux
+            libc: gnu
+          - runner: ubuntu-24.04
+            platform: linux-x64-musl
+            libc: musl
           - runner: ubuntu-24.04-arm
             platform: linux-arm64-gnu
-            triplet: arm64-linux
+            libc: gnu
+          - runner: ubuntu-24.04-arm
+            platform: linux-arm64-musl
+            libc: musl
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Checkout vcpkg
+        uses: actions/checkout@v7
+        with:
+          repository: microsoft/vcpkg
+          ref: 2026.07.29
+          path: .vcpkg
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+
+      - name: Build Linux prebuild
+        run: node scripts/linux-prebuild.ts --libc=${{ matrix.libc }} --mode=build
+
+      - name: Upload native addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-${{ matrix.platform }}
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          if-no-files-found: error
+
+  build-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
           - runner: macos-15-intel
             platform: darwin-x64
             triplet: x64-osx
@@ -71,26 +110,31 @@ jobs:
 
       - name: Download Node import library
         if: runner.os == 'Windows'
-        run: node scripts/download-node-import-lib.mjs
+        run: node scripts/download-node-import-lib.ts
 
       - name: Build native addon
         env:
           CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/.vcpkg/scripts/buildsystems/vcpkg.cmake
           VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
-        run: node scripts/build-native.mjs --cmake
+        run: node scripts/build-native.ts --cmake
 
       - name: Stage native addon
-        run: node scripts/stage-native.mjs
+        run: node scripts/stage-native.ts --platform=${{ matrix.platform }}
+
+      - name: Verify native addon loads
+        run: node scripts/verify-native-load.ts --file=prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
 
       - name: Upload native addon
         uses: actions/upload-artifact@v4
         with:
           name: prebuild-${{ matrix.platform }}
-          path: prebuilds/*.node
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
           if-no-files-found: error
 
   collect:
-    needs: build
+    needs:
+      - build-linux
+      - build-desktop
     runs-on: ubuntu-24.04
 
     steps:
@@ -104,8 +148,13 @@ jobs:
           path: prebuilds
           merge-multiple: true
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+
       - name: Verify release matrix
-        run: node scripts/verify-prebuilds.mjs
+        run: node scripts/verify-prebuilds.ts
 
       - name: Upload release prebuilds
         uses: actions/upload-artifact@v4

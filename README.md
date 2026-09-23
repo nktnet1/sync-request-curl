@@ -482,7 +482,7 @@ Prebuilt addons are prepared for Apple Silicon (`arm64`) and Intel (`x64`) macOS
 
 ### 4.3. Linux
 
-Prebuilt addons are prepared for glibc-based x64 and arm64 Linux. The loader also distinguishes musl from glibc so musl prebuilds can be added without changing the JavaScript API. Until a musl prebuild is included in a release, distributions such as Alpine fail explicitly rather than attempting a local build.
+Prebuilt addons are prepared for both glibc and musl on x64 and arm64 Linux. This covers the common Debian, Ubuntu, Arch, and Alpine variants without compiling native code during installation. GNU/Linux release binaries are built against a GLIBC 2.31 baseline, while Alpine binaries are built and tested in a musl environment.
 
 ## 5. Caveats
 
@@ -490,6 +490,6 @@ See [sync-request](https://www.npmjs.com/package/sync-request) for the original 
 
 **sync-request-curl** was developed to improve performance with sending synchronous requests in NodeJS. It is also free from the sync-request bug which leaves an orphaned sync-rpc process, resulting in a [leaked handle being detected in Jest](https://github.com/ForbesLindesay/sync-request/issues/129).
 
-**sync-request-curl** was designed to work with UNIX-like systems for UNSW students enrolled in [COMP1531 Software Engineering Fundamentals](https://webcms3.cse.unsw.edu.au/COMP1531/23T2/outline). The native distribution currently targets glibc-based Linux, Windows, and macOS on the architectures listed in the compatibility section.
+**sync-request-curl** was designed to work with UNIX-like systems for UNSW students enrolled in [COMP1531 Software Engineering Fundamentals](https://webcms3.cse.unsw.edu.au/COMP1531/23T2/outline). The native distribution targets glibc- and musl-based Linux, Windows, and macOS on the architectures listed in the compatibility section.
 
 Please note that this library's primary goal is to simplify the learning of JavaScript for novice programmers, hence its synchronous nature. However, we recommend to **always use an [asynchronous alternative](https://blog.appsignal.com/2024/09/11/top-5-http-request-libraries-for-nodejs.html)** where possible.

@@ -1,15 +1,15 @@
 import type { IncomingHttpHeaders } from "http";
 
 export interface CurlOption {
-  readonly HTTPHEADER: "HTTPHEADER";
-  readonly PROXY: "PROXY";
-  readonly PROXYUSERPWD: "PROXYUSERPWD";
-  readonly USERAGENT: "USERAGENT";
-  readonly REFERER: "REFERER";
-  readonly CAINFO: "CAINFO";
-  readonly INTERFACE: "INTERFACE";
-  readonly DNS_SERVERS: "DNS_SERVERS";
-  readonly TCP_KEEPALIVE: "TCP_KEEPALIVE";
+  readonly HTTPHEADER: 1;
+  readonly PROXY: 2;
+  readonly PROXYUSERPWD: 3;
+  readonly USERAGENT: 4;
+  readonly REFERER: 5;
+  readonly CAINFO: 6;
+  readonly INTERFACE: 7;
+  readonly DNS_SERVERS: 8;
+  readonly TCP_KEEPALIVE: 9;
 }
 
 export type CurlOptionValue = CurlOption[keyof CurlOption];

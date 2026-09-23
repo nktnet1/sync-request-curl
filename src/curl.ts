@@ -1,16 +1,21 @@
 import type { NativeCurlOptions } from "./native";
-import type { CurlOption, CurlOptionInput, CurlOptionValue, Easy } from "./types";
+import type {
+  CurlOption,
+  CurlOptionInput,
+  CurlOptionValue,
+  Easy,
+} from "./types";
 
 export const curlOption = {
-  HTTPHEADER: "HTTPHEADER",
-  PROXY: "PROXY",
-  PROXYUSERPWD: "PROXYUSERPWD",
-  USERAGENT: "USERAGENT",
-  REFERER: "REFERER",
-  CAINFO: "CAINFO",
-  INTERFACE: "INTERFACE",
-  DNS_SERVERS: "DNS_SERVERS",
-  TCP_KEEPALIVE: "TCP_KEEPALIVE",
+  HTTPHEADER: 1,
+  PROXY: 2,
+  PROXYUSERPWD: 3,
+  USERAGENT: 4,
+  REFERER: 5,
+  CAINFO: 6,
+  INTERFACE: 7,
+  DNS_SERVERS: 8,
+  TCP_KEEPALIVE: 9,
 } as const satisfies CurlOption;
 
 export interface EasyOptionsSnapshot {
@@ -21,7 +26,7 @@ export interface EasyOptionsSnapshot {
 export class EasyOptions implements Easy {
   #isOpen = true;
   #headers: string[];
-  #curlOptions: NativeCurlOptions = {};
+  readonly #curlOptions: NativeCurlOptions = {};
 
   constructor(headers: string[]) {
     this.#headers = [...headers];
@@ -96,7 +101,10 @@ export class EasyOptions implements Easy {
 
   #stringValue(option: CurlOptionValue, value: CurlOptionInput): string {
     if (typeof value !== "string") {
-      throw new TypeError(`${option} must be a string`);
+      const name = Object.entries(curlOption).find(
+        ([, id]) => id === option,
+      )?.[0];
+      throw new TypeError(`${name ?? option} must be a string`);
     }
     return value;
   }

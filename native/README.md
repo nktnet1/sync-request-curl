@@ -45,7 +45,10 @@ pnpm stage:native
 ```
 
 The GitHub Actions native-prebuild workflow builds static libcurl with vcpkg
-and produces the six release binaries checked by `pnpm verify:prebuilds`.
+and produces eight release binaries checked by `pnpm verify:prebuilds`: macOS
+and Windows x64/arm64, plus glibc and musl Linux x64/arm64. GNU/Linux builds
+are produced in a Node 22 Bullseye container to keep the GLIBC requirement at
+2.31 or older. musl builds are produced and tested in Alpine containers.
 Those `.node` files are shipped in the npm package, so consumers do not need a
 compiler, CMake, vcpkg, node-gyp, or lifecycle-script approval.
 
@@ -53,3 +56,13 @@ Windows local builds currently use this CMake path as well. Windows additionally
 needs a `node.lib` import library while linking. Release CI downloads it for the
 Node version used to build the addon; it is not part of the runtime package and
 does not tie the resulting addon to that Node version.
+
+
+All repository automation under `scripts/` is TypeScript and is executed
+directly by Node.js. No JavaScript, shell, or lifecycle-script wrapper is
+required.
+
+Node.js runs the TypeScript automation files directly. Local development with
+these scripts therefore requires Node.js 22.18 or newer, where type stripping
+is enabled by default. This does not raise the runtime requirement of the
+published library because `scripts/` is not included in the npm package.

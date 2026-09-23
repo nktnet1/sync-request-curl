@@ -71,6 +71,11 @@ bool GetString(
     return false;
   }
 
+  if (length == std::numeric_limits<size_t>::max()) {
+    napi_throw_range_error(env, nullptr, "Native string is too large");
+    return false;
+  }
+
   output->resize(length + 1);
   size_t written = 0;
   if (!CheckNapi(
@@ -180,6 +185,9 @@ bool GetNamedInt64(
 }
 
 size_t WriteCallback(char* ptr, size_t size, size_t nmemb, void* userdata) {
+  if (size != 0 && nmemb > std::numeric_limits<size_t>::max() / size) {
+    return 0;
+  }
   const size_t bytes = size * nmemb;
   auto* state = static_cast<RequestState*>(userdata);
   try {
@@ -208,6 +216,9 @@ std::string TrimHeaderLine(const char* ptr, size_t bytes) {
 }
 
 size_t HeaderCallback(char* ptr, size_t size, size_t nmemb, void* userdata) {
+  if (size != 0 && nmemb > std::numeric_limits<size_t>::max() / size) {
+    return 0;
+  }
   const size_t bytes = size * nmemb;
   auto* state = static_cast<RequestState*>(userdata);
   try {
@@ -631,7 +642,10 @@ napi_value Request(napi_env env, napi_callback_info info) {
   set_option(curl_easy_setopt(curl, CURLOPT_URL, url.c_str()));
   set_option(curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, method.c_str()));
   set_option(curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, static_cast<long>(timeout_ms)));
-  set_option(curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, insecure ? 0L : 1L));
+  // `insecure` is an explicit public compatibility option; verification stays
+  // enabled by default and is disabled only when the caller opts in.
+  set_option(
+      curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, insecure ? 0L : 1L));  // NOSONAR
   set_option(curl_easy_setopt(curl, CURLOPT_NOBODY, no_body ? 1L : 0L));
   set_option(curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback));
   set_option(curl_easy_setopt(curl, CURLOPT_WRITEDATA, &state));

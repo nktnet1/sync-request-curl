@@ -24,6 +24,16 @@ elseif(WIN32)
   endif()
   target_link_libraries(sync_request_curl_native PRIVATE "${NODE_IMPORT_LIB}")
 endif()
+
+if(UNIX AND NOT APPLE)
+  target_link_options(
+    sync_request_curl_native
+    PRIVATE
+    -static-libgcc
+    -static-libstdc++
+  )
+endif()
+
 target_compile_definitions(
   sync_request_curl_native
   PRIVATE

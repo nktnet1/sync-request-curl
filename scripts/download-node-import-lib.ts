@@ -11,10 +11,14 @@ if (process.arch !== "x64" && process.arch !== "arm64") {
 const root = resolve(import.meta.dirname, "..");
 const outputDirectory = join(root, "native", "build");
 const output = join(outputDirectory, "node.lib");
-const url = `https://nodejs.org/download/release/v${process.versions.node}/win-${process.arch}/node.lib`;
+const url =
+  `https://nodejs.org/download/release/v${process.versions.node}/` +
+  `win-${process.arch}/node.lib`;
 const response = await fetch(url);
 if (!response.ok) {
-  throw new Error(`Unable to download node.lib: ${response.status} ${response.statusText}`);
+  throw new Error(
+    `Unable to download node.lib: ${response.status} ${response.statusText}`,
+  );
 }
 
 mkdirSync(outputDirectory, { recursive: true });

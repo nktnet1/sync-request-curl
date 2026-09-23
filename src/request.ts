@@ -1,4 +1,4 @@
-import { CurlCode, EasyOptions, curlOption } from "./curl";
+import { CurlCode, curlOption, EasyOptions } from "./curl";
 import type { NativeCurlOptions } from "./native";
 import native from "./native";
 import type {
