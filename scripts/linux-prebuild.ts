@@ -1,9 +1,9 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import type { LinuxLibc, NativePlatformKey } from "./native-platform.ts";
-import { getLinuxLibc, getPrebuildFilename } from "./native-platform.ts";
-import { run } from "./process.ts";
+import type { LinuxLibc, NativePlatformKey } from "./native-platform";
+import { getLinuxLibc, getPrebuildFilename } from "./native-platform";
+import { run } from "./process";
 
 const root = resolve(import.meta.dirname, "..");
 const { values } = parseArgs({

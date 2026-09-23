@@ -5,7 +5,7 @@ import {
   getCurrentPlatformKey,
   getPrebuildFilename,
   isNativePlatformKey,
-} from "./native-platform.ts";
+} from "./native-platform";
 
 const root = resolve(import.meta.dirname, "..");
 const buildDirectory = join(root, "native", "build");
