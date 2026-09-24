@@ -469,10 +469,9 @@ fn get_string_info(curl: *mut CURL, info: curl_sys::CURLINFO) -> Option<String> 
 pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   ensure_curl_initialized()?;
 
-  let request_body = options.body.map(|body| match body {
-    Either::A(text) => text.into_bytes(),
-    Either::B(buffer) => buffer.to_vec(),
-  });
+  // Keep the original Node Buffer alive for the whole synchronous transfer.
+  // napi::Buffer is zero-copy; converting it to Vec<u8> would duplicate large uploads.
+  let request_body = options.body;
   let has_form_data = options.form_data.is_some();
   let form_data = options.form_data.unwrap_or_default();
   let curl_options = options.curl_options;
@@ -567,6 +566,10 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   }
 
   if let Some(body) = &request_body {
+    let body: &[u8] = match body {
+      Either::A(text) => text.as_bytes(),
+      Either::B(buffer) => buffer.as_ref(),
+    };
     let body_pointer = if body.is_empty() {
       c"".as_ptr()
     } else {
@@ -675,9 +678,10 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   let effective_url = get_string_info(curl, curl_sys::CURLINFO_EFFECTIVE_URL);
   let redirect_url = get_string_info(curl, curl_sys::CURLINFO_REDIRECT_URL);
 
-  // Keep MIME and its backing strings alive until all libcurl operations above
-  // are finished. Explicitly touching it also makes the lifetime requirement
-  // obvious to future refactors.
+  // Keep POSTFIELDS, MIME, and string backing storage alive until all libcurl
+  // operations above are finished. Explicitly touching them also makes the
+  // lifetime requirement obvious to future refactors.
+  let _request_body = request_body;
   let _mime = mime;
   let _keepalive = keepalive;
 
