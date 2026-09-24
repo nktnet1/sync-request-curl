@@ -10,3 +10,4 @@ coverage/
 native/build/
 native/target/
 prebuilds/*.node
+.release/

@@ -39,9 +39,9 @@ runtime dependencies on build-host libraries.
 
 See [the prebuilds README](../prebuilds/README.md) for the release matrix and CI details.
 
-Package consumers never compile this directory. The published package contains
-only the generated `.node` files under `prebuilds/`, so installation does not
-require Rust, a C/C++ compiler, CMake, vcpkg, node-gyp, or lifecycle-script
+Package consumers never compile this directory. Release CI publishes each generated
+`.node` file in a platform-specific optional npm package, so installation does
+not require Rust, a C/C++ compiler, CMake, vcpkg, node-gyp, or lifecycle-script
 approval.
 
 All repository automation under `scripts/` is TypeScript and runs directly in

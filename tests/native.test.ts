@@ -7,8 +7,12 @@ import {
   loadBinding,
   loadFirstExisting,
   type NativeBinding,
+  resolveOptionalNativePackage,
 } from "#/native";
-import { isNativePlatformKey } from "#/native/platform-key";
+import {
+  getNativePackageName,
+  isNativePlatformKey,
+} from "#/native/platform-key";
 
 const fakeBinding = (): NativeBinding => ({
   request: vi.fn(() => {
@@ -51,6 +55,12 @@ describe("native platform detection", () => {
   test("validates native platform keys", () => {
     expect(isNativePlatformKey("linux-x64-gnu")).toBe(true);
     expect(isNativePlatformKey("linux-x64-unknown")).toBe(false);
+  });
+
+  test("maps platform keys to optional native package names", () => {
+    expect(getNativePackageName("linux-x64-gnu")).toBe(
+      "@nktnet/sync-request-curl-linux-x64-gnu",
+    );
   });
 });
 
@@ -103,6 +113,32 @@ describe("native binding loading", () => {
   test("returns undefined when no candidate exists", () => {
     expect(
       loadFirstExisting(["/missing.node"], () => false, vi.fn()),
+    ).toBeUndefined();
+  });
+
+  test("resolves an installed optional native package", () => {
+    const resolveNative = vi.fn(() => "/node_modules/native/addon.node");
+
+    expect(
+      resolveOptionalNativePackage(
+        "@nktnet/sync-request-curl-linux-x64-gnu",
+        resolveNative,
+      ),
+    ).toBe("/node_modules/native/addon.node");
+  });
+
+  test("returns undefined when the optional native package is missing", () => {
+    const error = Object.assign(new Error("missing"), {
+      code: "MODULE_NOT_FOUND",
+    });
+
+    expect(
+      resolveOptionalNativePackage(
+        "@nktnet/sync-request-curl-linux-x64-gnu",
+        () => {
+          throw error;
+        },
+      ),
     ).toBeUndefined();
   });
 
@@ -168,16 +204,44 @@ describe("native binding loading", () => {
     expect(requireNative).toHaveBeenCalledWith(expected);
   });
 
+  test("loads the matching optional native package when local outputs are missing", () => {
+    const binding = fakeBinding();
+    const requireNative = vi.fn(() => binding);
+    const resolved = join("", "node_modules", "native", "addon.node");
+    const resolveNative = vi.fn(() => resolved);
+
+    expect(
+      loadBinding({
+        platformKey: "linux-x64-gnu",
+        packageRoot: join("", "package"),
+        exists: () => false,
+        requireNative,
+        resolveNative,
+      }),
+    ).toBe(binding);
+    expect(resolveNative).toHaveBeenCalledWith(
+      "@nktnet/sync-request-curl-linux-x64-gnu",
+    );
+    expect(requireNative).toHaveBeenCalledWith(resolved);
+  });
+
   test("throws a useful error when no matching binary exists", () => {
+    const missing = Object.assign(new Error("missing"), {
+      code: "MODULE_NOT_FOUND",
+    });
+
     expect(() =>
       loadBinding({
         platformKey: "linux-arm64-musl",
         packageRoot: join("", "package"),
         exists: () => false,
         requireNative: vi.fn(),
+        resolveNative: () => {
+          throw missing;
+        },
       }),
     ).toThrow(
-      "Unable to load the sync-request-curl native binary for linux-arm64-musl",
+      "The optional package @nktnet/sync-request-curl-linux-arm64-musl is missing",
     );
   });
 });

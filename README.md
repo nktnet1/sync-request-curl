@@ -34,7 +34,7 @@
 
 Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but up to 20 times more quickly.
 
-Uses a small in-process Node-API binding to libcurl for performance instead of spawning child processes like sync-request. The published package ships prebuilt native addons and does not run install or postinstall scripts.
+Uses a small in-process Node-API binding to libcurl for performance instead of spawning child processes like sync-request. The published package selects a platform-specific optional native package and does not run install or postinstall scripts.
 
 Designed to run on NodeJS. It will not work in a browser.
 
@@ -64,7 +64,7 @@ Designed to run on NodeJS. It will not work in a browser.
 npm install sync-request-curl
 ```
 
-No compiler, Python, CMake, node-gyp, or install-script approval is required when installing a published release. Please refer to the [compatibility](#4-compatibility) section for the platforms that have prebuilt binaries.
+No compiler, Python, CMake, node-gyp, or install-script approval is required when installing a published release. The package manager installs the matching platform-specific native package rather than every release binary. Please refer to the [compatibility](#4-compatibility) section for the platforms that have prebuilt binaries.
 
 ## 2. Usage
 
@@ -468,7 +468,7 @@ DEALINGS IN THE SOFTWARE.
 
 `sync-request-curl` uses the stable Node-API ABI rather than the Node/V8 ABI. A prebuilt addon is therefore tied to its operating system, CPU architecture, and C runtime, but not to a specific Node.js major version. The same prebuilt binary can be reused by newer Node.js releases that support the targeted Node-API version.
 
-The published package does not download or compile native code during installation. If a matching prebuilt addon is not present, loading the package fails with an explicit unsupported-platform error instead of falling back to `node-gyp`.
+The published package does not download or compile native code during installation. Each release declares platform-specific optional packages, so the package manager installs only the native binary compatible with the current operating system, CPU architecture, and Linux C runtime. If optional dependencies are disabled or a matching package is unavailable, loading fails with an explicit error instead of falling back to `node-gyp`.
 
 ### 4.1. Windows
 

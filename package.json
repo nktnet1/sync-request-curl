@@ -14,8 +14,7 @@
   },
   "version": "5.0.0",
   "files": [
-    "dist",
-    "prebuilds"
+    "dist"
   ],
   "scripts": {
     "start": "tsx tests/app/server",
@@ -30,10 +29,12 @@
     "build:native": "node scripts/build-native.ts",
     "stage:native": "node scripts/stage-native.ts",
     "verify:prebuilds": "node scripts/verify-prebuilds.ts",
-    "prepack": "pnpm build && pnpm verify:prebuilds",
+    "prepack": "pnpm build",
+    "prepublishOnly": "node scripts/prevent-direct-publish.ts",
     "build:linux:gnu": "node scripts/linux-prebuild.ts --libc=gnu --mode=build",
     "build:linux:musl": "node scripts/linux-prebuild.ts --libc=musl --mode=build",
-    "test:linux:musl": "node scripts/linux-prebuild.ts --libc=musl --mode=test"
+    "test:linux:musl": "node scripts/linux-prebuild.ts --libc=musl --mode=test",
+    "prepare:release-packages": "node scripts/prepare-release-packages.ts"
   },
   "keywords": [
     "sync",

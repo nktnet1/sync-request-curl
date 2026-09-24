@@ -12,6 +12,9 @@ export const supportedPlatformKeys = [
 export type NativePlatformKey = (typeof supportedPlatformKeys)[number];
 export type LinuxLibc = "gnu" | "musl";
 
+export const getNativePackageName = (platform: NativePlatformKey): string =>
+  `@nktnet/sync-request-curl-${platform}`;
+
 export function isNativePlatformKey(value: string): value is NativePlatformKey {
   return (supportedPlatformKeys as readonly string[]).includes(value);
 }

@@ -4,7 +4,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FormDataEntry } from "#/form-data";
 import {
+  getNativePackageName,
   type LinuxLibc,
+  type NativePlatformKey,
   resolveNativePlatformKey,
 } from "#/native/platform-key";
 
@@ -33,6 +35,7 @@ export interface NativeBinding {
 }
 
 type NativeRequire = (path: string) => NativeBinding;
+type NativeResolve = (request: string) => string;
 type FileExists = (path: string) => boolean;
 
 interface ProcessReport {
@@ -41,13 +44,16 @@ interface ProcessReport {
 
 export interface NativeLoadOptions {
   explicitPath?: string;
-  platformKey?: string;
+  platformKey?: NativePlatformKey;
   packageRoot?: string;
   exists?: FileExists;
   requireNative?: NativeRequire;
+  resolveNative?: NativeResolve;
 }
 
-const nativeRequire = createRequire(import.meta.url) as NativeRequire;
+const moduleRequire = createRequire(import.meta.url);
+const nativeRequire = moduleRequire as NativeRequire;
+const nativeResolve = moduleRequire.resolve.bind(moduleRequire);
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
 
 export const findPackageRoot = (
@@ -80,7 +86,7 @@ export const getPlatformKey = (
   platform: NodeJS.Platform = process.platform,
   arch: string = process.arch,
   linuxLibc: LinuxLibc = getLinuxLibc(),
-): string => {
+): NativePlatformKey => {
   const platformKey = resolveNativePlatformKey(platform, arch, linuxLibc);
   if (platformKey) {
     return platformKey;
@@ -104,6 +110,24 @@ export const loadFirstExisting = (
   return undefined;
 };
 
+export const resolveOptionalNativePackage = (
+  packageName: string,
+  resolveNative: NativeResolve = nativeResolve,
+): string | undefined => {
+  try {
+    return resolveNative(packageName);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "MODULE_NOT_FOUND"
+    ) {
+      return undefined;
+    }
+    throw error;
+  }
+};
+
 export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
   const requireNative = options.requireNative ?? nativeRequire;
   const explicitPath =
@@ -117,7 +141,7 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
     options.packageRoot ?? findPackageRoot(moduleDirectory);
   const localBuildDirectory = join(currentPackageRoot, "native", "build");
   const prebuildDirectory = join(currentPackageRoot, "prebuilds");
-  const binding = loadFirstExisting(
+  const localBinding = loadFirstExisting(
     [
       join(localBuildDirectory, "sync_request_curl_native.node"),
       join(prebuildDirectory, `sync_request_curl_native.${platformKey}.node`),
@@ -126,13 +150,22 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
     requireNative,
   );
 
-  if (binding) {
-    return binding;
+  if (localBinding) {
+    return localBinding;
+  }
+
+  const nativePackageName = getNativePackageName(platformKey);
+  const nativePackagePath = resolveOptionalNativePackage(
+    nativePackageName,
+    options.resolveNative,
+  );
+  if (nativePackagePath) {
+    return requireNative(nativePackagePath);
   }
 
   throw new Error(
     `Unable to load the sync-request-curl native binary for ${platformKey}. ` +
-      "The published package should include this prebuilt Node-API addon; no install-time build fallback is used.",
+      `The optional package ${nativePackageName} is missing. Reinstall sync-request-curl with optional dependencies enabled.`,
   );
 };
 
