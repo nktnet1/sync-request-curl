@@ -231,21 +231,9 @@ fn set_string_option(
   option: CURLoption,
   value: Option<&str>,
   keepalive: &mut Vec<CString>,
+  allow_empty: bool,
 ) -> CURLcode {
-  let Some(value) = value.filter(|value| !value.is_empty()) else {
-    return CURLE_OK;
-  };
-
-  set_string_option_value(curl, option, value, keepalive)
-}
-
-fn set_string_option_allow_empty(
-  curl: *mut CURL,
-  option: CURLoption,
-  value: Option<&str>,
-  keepalive: &mut Vec<CString>,
-) -> CURLcode {
-  let Some(value) = value else {
+  let Some(value) = value.filter(|value| allow_empty || !value.is_empty()) else {
     return CURLE_OK;
   };
 
@@ -273,6 +261,7 @@ fn configure_default_ca(
         curl_sys::CURLOPT_CAINFO,
         Some(path.as_ref()),
         keepalive,
+        false,
       ),
     );
   }
@@ -285,6 +274,7 @@ fn configure_default_ca(
         curl_sys::CURLOPT_CAPATH,
         Some(path.as_ref()),
         keepalive,
+        false,
       ),
     );
   }
@@ -300,34 +290,48 @@ fn configure_default_ca(
   CURLE_OK
 }
 
-fn checked_callback_size(size: usize, count: usize) -> Option<usize> {
-  size.checked_mul(count)
-}
-
-extern "C" fn write_callback(
+fn handle_request_callback<F>(
   data: *mut c_char,
   size: usize,
   count: usize,
   userdata: *mut c_void,
-) -> usize {
-  let Some(bytes) = checked_callback_size(size, count) else {
+  handle_chunk: F,
+) -> usize
+where
+  F: FnOnce(&mut RequestState, &[u8]),
+{
+  let Some(bytes) = size.checked_mul(count) else {
     return 0;
   };
-  if bytes == 0 {
-    return 0;
-  }
-  if data.is_null() || userdata.is_null() {
+  if bytes == 0 || data.is_null() || userdata.is_null() {
     return 0;
   }
 
   catch_unwind(AssertUnwindSafe(|| unsafe {
     let state = &mut *userdata.cast::<RequestState>();
     let chunk = std::slice::from_raw_parts(data.cast::<u8>(), bytes);
-    state.body.extend_from_slice(chunk);
+    handle_chunk(state, chunk);
     bytes
   }))
   .unwrap_or(0)
 }
+
+macro_rules! request_callback {
+  ($name:ident, $handle_chunk:expr) => {
+    extern "C" fn $name(
+      data: *mut c_char,
+      size: usize,
+      count: usize,
+      userdata: *mut c_void,
+    ) -> usize {
+      handle_request_callback(data, size, count, userdata, $handle_chunk)
+    }
+  };
+}
+
+request_callback!(write_callback, |state: &mut RequestState, chunk: &[u8]| {
+  state.body.extend_from_slice(chunk);
+});
 
 fn trim_header_line(bytes: &[u8]) -> &[u8] {
   let is_space = |byte: u8| matches!(byte, b' ' | b'\t' | b'\r' | b'\n');
@@ -342,32 +346,11 @@ fn trim_header_line(bytes: &[u8]) -> &[u8] {
   &bytes[begin..end]
 }
 
-extern "C" fn header_callback(
-  data: *mut c_char,
-  size: usize,
-  count: usize,
-  userdata: *mut c_void,
-) -> usize {
-  let Some(bytes) = checked_callback_size(size, count) else {
-    return 0;
-  };
-  if bytes == 0 {
-    return 0;
-  }
-  if data.is_null() || userdata.is_null() {
-    return 0;
-  }
-
-  catch_unwind(AssertUnwindSafe(|| unsafe {
-    let state = &mut *userdata.cast::<RequestState>();
-    let chunk = std::slice::from_raw_parts(data.cast::<u8>(), bytes);
-    state
-      .headers
-      .push(String::from_utf8_lossy(trim_header_line(chunk)).into_owned());
-    bytes
-  }))
-  .unwrap_or(0)
-}
+request_callback!(header_callback, |state: &mut RequestState, chunk: &[u8]| {
+  state
+    .headers
+    .push(String::from_utf8_lossy(trim_header_line(chunk)).into_owned());
+});
 
 fn build_mime(
   curl: *mut CURL,
@@ -498,6 +481,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
       curl_sys::CURLOPT_URL,
       Some(&options.url),
       &mut keepalive,
+      false,
     ),
   );
   keep_first_error(
@@ -507,6 +491,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
       curl_sys::CURLOPT_CUSTOMREQUEST,
       Some(&options.method),
       &mut keepalive,
+      false,
     ),
   );
   keep_first_error(&mut code, unsafe {
@@ -620,11 +605,12 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     if let Some(curl_options) = &curl_options {
       keep_first_error(
         &mut code,
-        set_string_option_allow_empty(
+        set_string_option(
           curl,
           curl_sys::CURLOPT_PROXY,
           curl_options.proxy.as_deref(),
           &mut keepalive,
+          true,
         ),
       );
       keep_first_error(
@@ -634,6 +620,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
           curl_sys::CURLOPT_PROXYUSERPWD,
           curl_options.proxy_user_pwd.as_deref(),
           &mut keepalive,
+          false,
         ),
       );
       keep_first_error(
@@ -643,6 +630,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
           curl_sys::CURLOPT_USERAGENT,
           curl_options.user_agent.as_deref(),
           &mut keepalive,
+          false,
         ),
       );
       keep_first_error(
@@ -652,6 +640,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
           curl_sys::CURLOPT_REFERER,
           curl_options.referer.as_deref(),
           &mut keepalive,
+          false,
         ),
       );
       keep_first_error(
@@ -661,6 +650,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
           curl_sys::CURLOPT_CAINFO,
           curl_options.ca_info.as_deref(),
           &mut keepalive,
+          false,
         ),
       );
       keep_first_error(
@@ -670,6 +660,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
           curl_sys::CURLOPT_INTERFACE,
           curl_options.interface.as_deref(),
           &mut keepalive,
+          false,
         ),
       );
       if curl_options.tcp_keep_alive.unwrap_or(false) {

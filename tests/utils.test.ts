@@ -57,6 +57,26 @@ describe("normalizeUrlHostname", () => {
     );
   });
 
+  test("converts hostnames with query or fragment delimiters", () => {
+    expect(normalizeUrlHostname("https://münchen.example?q=über")).toBe(
+      "https://xn--mnchen-3ya.example?q=über",
+    );
+    expect(normalizeUrlHostname("https://münchen.example#über")).toBe(
+      "https://xn--mnchen-3ya.example#über",
+    );
+  });
+
+  test("supports valid non-HTTP scheme characters", () => {
+    expect(normalizeUrlHostname("git+ssh://例え.テスト/path")).toBe(
+      "git+ssh://xn--r8jz45g.xn--zckzah/path",
+    );
+  });
+
+  test("leaves URLs with an invalid scheme unchanged", () => {
+    const url = "1https://münchen.example/path";
+    expect(normalizeUrlHostname(url)).toBe(url);
+  });
+
   test("does not rewrite unicode outside the hostname", () => {
     const url = "https://example.com/über?q=你好#résumé";
     expect(normalizeUrlHostname(url)).toBe(url);
