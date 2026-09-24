@@ -7,6 +7,7 @@ import {
   loadFirstExisting,
   type NativeBinding,
 } from "#/native";
+import { isNativePlatformKey } from "#/native-platform-key";
 
 const fakeBinding = (): NativeBinding => ({
   request: vi.fn(() => {
@@ -44,6 +45,11 @@ describe("native platform detection", () => {
     expect(() => getPlatformKey("linux", "ia32", "gnu")).toThrow(
       "sync-request-curl does not provide a native binary for linux-ia32",
     );
+  });
+
+  test("validates native platform keys", () => {
+    expect(isNativePlatformKey("linux-x64-gnu")).toBe(true);
+    expect(isNativePlatformKey("linux-x64-unknown")).toBe(false);
   });
 });
 

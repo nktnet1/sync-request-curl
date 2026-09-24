@@ -118,12 +118,18 @@ bool GetNamedString(
   return GetString(env, value, output, message.c_str());
 }
 
-bool GetNamedBool(
+template <typename T, typename Getter>
+bool GetNamedScalar(
     napi_env env,
     napi_value object,
     const char* name,
-    bool* output,
-    bool default_value) {
+    T* output,
+    T default_value,
+    napi_valuetype expected_type,
+    Getter getter,
+    const char* inspect_message,
+    const char* type_message,
+    const char* read_message) {
   napi_value value;
   bool found = false;
   if (!GetNamedValue(env, object, name, &value, &found)) {
@@ -135,19 +141,32 @@ bool GetNamedBool(
   }
 
   napi_valuetype type;
-  if (!CheckNapi(
-          env,
-          napi_typeof(env, value, &type),
-          "Failed to inspect boolean native request option")) {
+  if (!CheckNapi(env, napi_typeof(env, value, &type), inspect_message)) {
     return false;
   }
-  if (type != napi_boolean) {
-    napi_throw_type_error(env, nullptr, "Native request option must be boolean");
+  if (type != expected_type) {
+    napi_throw_type_error(env, nullptr, type_message);
     return false;
   }
-  return CheckNapi(
+  return CheckNapi(env, getter(env, value, output), read_message);
+}
+
+bool GetNamedBool(
+    napi_env env,
+    napi_value object,
+    const char* name,
+    bool* output,
+    bool default_value) {
+  return GetNamedScalar(
       env,
-      napi_get_value_bool(env, value, output),
+      object,
+      name,
+      output,
+      default_value,
+      napi_boolean,
+      napi_get_value_bool,
+      "Failed to inspect boolean native request option",
+      "Native request option must be boolean",
       "Failed to read boolean native request option");
 }
 
@@ -157,46 +176,49 @@ bool GetNamedInt64(
     const char* name,
     int64_t* output,
     int64_t default_value) {
-  napi_value value;
-  bool found = false;
-  if (!GetNamedValue(env, object, name, &value, &found)) {
-    return false;
-  }
-  if (!found) {
-    *output = default_value;
-    return true;
-  }
-
-  napi_valuetype type;
-  if (!CheckNapi(
-          env,
-          napi_typeof(env, value, &type),
-          "Failed to inspect numeric native request option")) {
-    return false;
-  }
-  if (type != napi_number) {
-    napi_throw_type_error(env, nullptr, "Native request option must be a number");
-    return false;
-  }
-  return CheckNapi(
+  return GetNamedScalar(
       env,
-      napi_get_value_int64(env, value, output),
+      object,
+      name,
+      output,
+      default_value,
+      napi_number,
+      napi_get_value_int64,
+      "Failed to inspect numeric native request option",
+      "Native request option must be a number",
       "Failed to read numeric native request option");
 }
 
-size_t WriteCallback(char* ptr, size_t size, size_t nmemb, void* userdata) {
+template <typename Store>
+size_t HandleCurlData(
+    char* ptr,
+    size_t size,
+    size_t nmemb,
+    void* userdata,
+    Store store) {
   if (size != 0 && nmemb > std::numeric_limits<size_t>::max() / size) {
     return 0;
   }
   const size_t bytes = size * nmemb;
-  auto* state = static_cast<RequestState*>(userdata);
+  auto& state = *static_cast<RequestState*>(userdata);
   try {
-    const auto* begin = reinterpret_cast<unsigned char*>(ptr);
-    state->body.insert(state->body.end(), begin, begin + bytes);
+    store(state, ptr, bytes);
     return bytes;
   } catch (...) {
     return 0;
   }
+}
+
+size_t WriteCallback(char* ptr, size_t size, size_t nmemb, void* userdata) {
+  return HandleCurlData(
+      ptr,
+      size,
+      nmemb,
+      userdata,
+      [](RequestState& state, char* data, size_t bytes) {
+        const auto* begin = reinterpret_cast<unsigned char*>(data);
+        state.body.insert(state.body.end(), begin, begin + bytes);
+      });
 }
 
 std::string TrimHeaderLine(const char* ptr, size_t bytes) {
@@ -216,17 +238,14 @@ std::string TrimHeaderLine(const char* ptr, size_t bytes) {
 }
 
 size_t HeaderCallback(char* ptr, size_t size, size_t nmemb, void* userdata) {
-  if (size != 0 && nmemb > std::numeric_limits<size_t>::max() / size) {
-    return 0;
-  }
-  const size_t bytes = size * nmemb;
-  auto* state = static_cast<RequestState*>(userdata);
-  try {
-    state->headers.push_back(TrimHeaderLine(ptr, bytes));
-    return bytes;
-  } catch (...) {
-    return 0;
-  }
+  return HandleCurlData(
+      ptr,
+      size,
+      nmemb,
+      userdata,
+      [](RequestState& state, char* data, size_t bytes) {
+        state.headers.push_back(TrimHeaderLine(data, bytes));
+      });
 }
 
 bool ReadStringArray(

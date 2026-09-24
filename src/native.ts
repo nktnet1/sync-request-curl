@@ -2,6 +2,10 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  type LinuxLibc,
+  resolveNativePlatformKey,
+} from "#/native-platform-key";
 import type { HttpPostField } from "#/types";
 
 export interface NativeCurlOptions {
@@ -41,7 +45,6 @@ export interface NativeBinding {
   request(options: NativeRequestOptions): NativeResponse;
 }
 
-type LinuxLibc = "gnu" | "musl";
 type NativeRequire = (path: string) => NativeBinding;
 type FileExists = (path: string) => boolean;
 
@@ -69,17 +72,8 @@ export const getPlatformKey = (
   arch: string = process.arch,
   linuxLibc: LinuxLibc = getLinuxLibc(),
 ): string => {
-  if (platform === "darwin" && (arch === "x64" || arch === "arm64")) {
-    return `darwin-${arch}`;
-  }
-
-  if (platform === "linux" && (arch === "x64" || arch === "arm64")) {
-    return `linux-${arch}-${linuxLibc}`;
-  }
-
-  if (platform === "win32" && (arch === "x64" || arch === "arm64")) {
-    return `win32-${arch}-msvc`;
-  }
+  const platformKey = resolveNativePlatformKey(platform, arch, linuxLibc);
+  if (platformKey) return platformKey;
 
   throw new Error(
     `sync-request-curl does not provide a native binary for ${platform}-${arch}`,
