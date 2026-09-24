@@ -3,12 +3,13 @@ import type { IncomingHttpHeaders } from "node:http";
 const getHeaderName = (header: string): string => {
   const colonIndex = header.indexOf(":");
   const semicolonIndex = header.indexOf(";");
-  const delimiterIndex =
-    colonIndex < 0
-      ? semicolonIndex
-      : semicolonIndex < 0
-        ? colonIndex
-        : Math.min(colonIndex, semicolonIndex);
+  let delimiterIndex = colonIndex;
+  if (
+    delimiterIndex < 0 ||
+    (semicolonIndex >= 0 && semicolonIndex < delimiterIndex)
+  ) {
+    delimiterIndex = semicolonIndex;
+  }
   const endIndex = delimiterIndex < 0 ? header.length : delimiterIndex;
   return header.slice(0, endIndex).trim().toLowerCase();
 };

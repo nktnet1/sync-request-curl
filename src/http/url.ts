@@ -114,10 +114,14 @@ const isPlainObject = (value: object): value is Record<string, unknown> => {
 };
 
 const deleteQueryValue = (searchParams: URLSearchParams, key: string): void => {
-  for (const existingKey of [...searchParams.keys()]) {
+  const keysToDelete = new Set<string>();
+  for (const existingKey of searchParams.keys()) {
     if (existingKey === key || existingKey.startsWith(`${key}[`)) {
-      searchParams.delete(existingKey);
+      keysToDelete.add(existingKey);
     }
+  }
+  for (const existingKey of keysToDelete) {
+    searchParams.delete(existingKey);
   }
 };
 
