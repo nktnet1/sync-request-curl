@@ -51,6 +51,12 @@ describe("normalizeUrlHostname", () => {
     );
   });
 
+  test("converts an internationalized hostname without a path", () => {
+    expect(normalizeUrlHostname("https://münchen.example")).toBe(
+      "https://xn--mnchen-3ya.example",
+    );
+  });
+
   test("does not rewrite unicode outside the hostname", () => {
     const url = "https://example.com/über?q=你好#résumé";
     expect(normalizeUrlHostname(url)).toBe(url);

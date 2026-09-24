@@ -10,7 +10,8 @@ interface RequestInputs {
 }
 
 const NON_ASCII = /[^\p{ASCII}]/u;
-const ABSOLUTE_URL = /^([A-Za-z][A-Za-z\d+.-]*:\/\/)([^/?#]*)([\s\S]*)$/;
+const ABSOLUTE_URL =
+  /^([A-Za-z][A-Za-z\d+.-]*:\/\/)([^/?#]*)([/?#][\s\S]*)?$/;
 
 /**
  * Converts only an internationalized hostname to ASCII/Punycode while leaving
@@ -27,7 +28,7 @@ export const normalizeUrlHostname = (url: string): string => {
     return url;
   }
 
-  const [, scheme, authority, remainder] = match;
+  const [, scheme, authority, remainder = ""] = match;
   const userInfoEnd = authority.lastIndexOf("@");
   const userInfo = userInfoEnd >= 0 ? authority.slice(0, userInfoEnd + 1) : "";
   const hostAndPort = authority.slice(userInfoEnd + 1);
