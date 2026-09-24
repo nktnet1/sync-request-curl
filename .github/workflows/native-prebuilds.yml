@@ -145,6 +145,9 @@ jobs:
     needs: collect
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -162,9 +165,9 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 22.x
-          cache: "pnpm"
+          node-version: 24.x
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -172,7 +175,5 @@ jobs:
       - name: Verify tag matches package version
         run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
 
-      - name: Publish package
-        run: pnpm publish --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish package with trusted publishing
+        run: npm publish
