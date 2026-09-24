@@ -63,7 +63,9 @@ export const throwForTransportError = (
   message: string,
   inputs: RequestInputs,
 ): void => {
-  if (code === 0) return;
+  if (code === 0) {
+    return;
+  }
 
   throw new RequestError(
     transportErrorCode(code),

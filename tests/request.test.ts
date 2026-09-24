@@ -13,10 +13,12 @@ const wrapperRequest = (method: HttpVerb, url: string, option?: Options) => {
   try {
     json = JSON.parse(rawResponse.body.toString());
   } catch (error: unknown) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : `Non-Error thrown while parsing JSON (${typeof error})`;
     json = {
-      error: `Failed to parse JSON: ${
-        error instanceof Error ? error.message : error
-      }`,
+      error: `Failed to parse JSON: ${message}`,
     };
   }
   return {
@@ -443,6 +445,18 @@ describe("Redirects", () => {
       json: { message: "Hello, world!" },
     });
   });
+
+  test.each([Number.NaN, -1])(
+    "treats maxRedirects=%s as unbounded",
+    (maxRedirects) => {
+      const res = wrapperRequest("GET", SERVER_URL, { maxRedirects });
+
+      expect(res).toMatchObject({
+        code: 200,
+        json: { message: "Hello, world!" },
+      });
+    },
+  );
 
   test("Final url returned not redirected", () => {
     const res = wrapperRequest("GET", `${SERVER_URL}/redirect/source`, {

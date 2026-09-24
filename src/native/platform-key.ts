@@ -21,7 +21,9 @@ export function resolveNativePlatformKey(
   arch: string,
   linuxLibc: LinuxLibc,
 ): NativePlatformKey | undefined {
-  if (arch !== "x64" && arch !== "arm64") return undefined;
+  if (arch !== "x64" && arch !== "arm64") {
+    return undefined;
+  }
 
   switch (platform) {
     case "darwin":

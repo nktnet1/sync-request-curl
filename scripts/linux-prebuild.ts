@@ -58,7 +58,9 @@ if (mode !== "build" && mode !== "test") {
 
 type Architecture = "x64" | "arm64";
 const getArchitecture = (): Architecture => {
-  if (process.arch === "x64" || process.arch === "arm64") return process.arch;
+  if (process.arch === "x64" || process.arch === "arm64") {
+    return process.arch;
+  }
   throw new Error(`Unsupported Linux architecture: ${process.arch}`);
 };
 
@@ -185,7 +187,9 @@ const buildInsideContainer = (targetLibc: LinuxLibc): void => {
     `--file=${prebuild}`,
     `--libc=${targetLibc}`,
   ];
-  if (targetLibc === "gnu") verifyArgs.push("--glibc-max=2.31");
+  if (targetLibc === "gnu") {
+    verifyArgs.push("--glibc-max=2.31");
+  }
   run(process.execPath, verifyArgs, { cwd: root });
   run(
     process.execPath,
@@ -210,6 +214,10 @@ const testInsideContainer = (targetLibc: LinuxLibc): void => {
   run("pnpm", ["test"], { cwd: root });
 };
 
-if (!values.inside) runInContainer();
-else if (mode === "build") buildInsideContainer(libc);
-else testInsideContainer(libc);
+if (!values.inside) {
+  runInContainer();
+} else if (mode === "build") {
+  buildInsideContainer(libc);
+} else {
+  testInsideContainer(libc);
+}

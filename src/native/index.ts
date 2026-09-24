@@ -56,17 +56,20 @@ export const findPackageRoot = (
 ): string => {
   let currentDirectory = startDirectory;
 
-  while (true) {
-    if (exists(join(currentDirectory, "package.json"))) return currentDirectory;
-
-    const parentDirectory = dirname(currentDirectory);
-    if (parentDirectory === currentDirectory) {
-      throw new Error(
-        `Unable to locate the sync-request-curl package root from ${startDirectory}`,
-      );
+  while (currentDirectory !== dirname(currentDirectory)) {
+    if (exists(join(currentDirectory, "package.json"))) {
+      return currentDirectory;
     }
-    currentDirectory = parentDirectory;
+    currentDirectory = dirname(currentDirectory);
   }
+
+  if (exists(join(currentDirectory, "package.json"))) {
+    return currentDirectory;
+  }
+
+  throw new Error(
+    `Unable to locate the sync-request-curl package root from ${startDirectory}`,
+  );
 };
 
 export const getLinuxLibc = (
@@ -79,7 +82,9 @@ export const getPlatformKey = (
   linuxLibc: LinuxLibc = getLinuxLibc(),
 ): string => {
   const platformKey = resolveNativePlatformKey(platform, arch, linuxLibc);
-  if (platformKey) return platformKey;
+  if (platformKey) {
+    return platformKey;
+  }
 
   throw new Error(
     `sync-request-curl does not provide a native binary for ${platform}-${arch}`,
@@ -92,7 +97,9 @@ export const loadFirstExisting = (
   requireNative: NativeRequire = nativeRequire,
 ): NativeBinding | undefined => {
   for (const candidate of candidates) {
-    if (exists(candidate)) return requireNative(candidate);
+    if (exists(candidate)) {
+      return requireNative(candidate);
+    }
   }
   return undefined;
 };
@@ -101,7 +108,9 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
   const requireNative = options.requireNative ?? nativeRequire;
   const explicitPath =
     options.explicitPath ?? process.env.SYNC_REQUEST_CURL_NATIVE_PATH;
-  if (explicitPath) return requireNative(explicitPath);
+  if (explicitPath) {
+    return requireNative(explicitPath);
+  }
 
   const platformKey = options.platformKey ?? getPlatformKey();
   const currentPackageRoot =
@@ -117,7 +126,9 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
     requireNative,
   );
 
-  if (binding) return binding;
+  if (binding) {
+    return binding;
+  }
 
   throw new Error(
     `Unable to load the sync-request-curl native binary for ${platformKey}. ` +

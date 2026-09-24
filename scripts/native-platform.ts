@@ -20,7 +20,9 @@ export const getLinuxLibc = (): LinuxLibc => {
 export const getCurrentPlatformKey = (): NativePlatformKey => {
   const { platform, arch } = process;
   const platformKey = resolveNativePlatformKey(platform, arch, getLinuxLibc());
-  if (platformKey) return platformKey;
+  if (platformKey) {
+    return platformKey;
+  }
 
   throw new Error(`Unsupported native platform: ${platform}-${arch}`);
 };

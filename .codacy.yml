@@ -1,22 +1,21 @@
 ---
 engines:
-  # Codacy's repository ESLint patterns misclassify trusted Node-only build
-  # filesystem paths/browser compatibility and TypeScript declaration
-  # parameter names as security/unused-code issues. Keep these files covered
-  # by Biome, TypeScript, tests, and the remaining Codacy engines.
+  # This package targets Node.js only (see package.json engines/browserslist
+  # and tsconfig's Node-only type environment). Codacy's repository ESLint
+  # profiles can apply browser-oriented rules to native/build integration code,
+  # so leave those files to Biome, TypeScript, tests, and Codacy's other analyzers.
   eslint-8:
     exclude_paths:
       - "scripts/**"
-      - "src/native.ts"
-      - "src/request.ts"
+      - "src/native/**"
       - "src/types.ts"
   eslint-9:
     exclude_paths:
       - "scripts/**"
-      - "src/native.ts"
-      - "src/request.ts"
+      - "src/native/**"
       - "src/types.ts"
 exclude_paths:
-  # Documentation is validated manually; Codacy markdown rules conflict with the nested README layout.
+  # Documentation is maintained separately from source analysis.
+  - "ROADMAP.md"
   - "native/README.md"
   - "prebuilds/README.md"

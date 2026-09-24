@@ -1,8 +1,10 @@
-import { domainToASCII } from "node:url";
+import { domainToASCII, URL, type URLSearchParams } from "node:url";
 
 const hasNonAscii = (value: string): boolean => {
   for (let i = 0; i < value.length; i += 1) {
-    if ((value.codePointAt(i) ?? -1) > 0x7f) return true;
+    if (value.charCodeAt(i) > 0x7f) {
+      return true;
+    }
   }
   return false;
 };
@@ -19,8 +21,10 @@ const isSchemeCharacter = (code: number): boolean =>
 
 const isDecimal = (value: string): boolean => {
   for (let i = 0; i < value.length; i += 1) {
-    const code = value.codePointAt(i) ?? -1;
-    if (code < 48 || code > 57) return false;
+    const code = value.charCodeAt(i);
+    if (code < 48 || code > 57) {
+      return false;
+    }
   }
   return true;
 };
@@ -33,18 +37,20 @@ interface AbsoluteUrlParts {
 
 const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
   const schemeEnd = url.indexOf("://");
-  if (schemeEnd <= 0 || !isAsciiLetter(url.codePointAt(0) ?? -1)) {
+  if (schemeEnd <= 0 || !isAsciiLetter(url.charCodeAt(0))) {
     return undefined;
   }
 
   for (let i = 1; i < schemeEnd; i += 1) {
-    if (!isSchemeCharacter(url.codePointAt(i) ?? -1)) return undefined;
+    if (!isSchemeCharacter(url.charCodeAt(i))) {
+      return undefined;
+    }
   }
 
   const authorityStart = schemeEnd + 3;
   let authorityEnd = url.length;
   for (let i = authorityStart; i < url.length; i += 1) {
-    const code = url.codePointAt(i) ?? -1;
+    const code = url.charCodeAt(i);
     if (code === 47 || code === 63 || code === 35) {
       authorityEnd = i;
       break;
@@ -63,30 +69,120 @@ const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
  * the rest of the URL byte-for-byte unchanged.
  */
 export const normalizeUrlHostname = (url: string): string => {
-  if (!hasNonAscii(url)) return url;
+  if (!hasNonAscii(url)) {
+    return url;
+  }
 
   const parts = splitAbsoluteUrl(url);
-  if (!parts) return url;
+  if (!parts) {
+    return url;
+  }
 
   const { prefix, authority, remainder } = parts;
   const userInfoEnd = authority.lastIndexOf("@");
   const userInfo = userInfoEnd >= 0 ? authority.slice(0, userInfoEnd + 1) : "";
   const hostAndPort = authority.slice(userInfoEnd + 1);
 
-  if (hostAndPort.startsWith("[")) return url;
+  if (hostAndPort.startsWith("[")) {
+    return url;
+  }
 
   const portSeparator = hostAndPort.lastIndexOf(":");
   const hasPort =
     portSeparator >= 0 && isDecimal(hostAndPort.slice(portSeparator + 1));
   const hostname = hasPort ? hostAndPort.slice(0, portSeparator) : hostAndPort;
 
-  if (!hasNonAscii(hostname)) return url;
+  if (!hasNonAscii(hostname)) {
+    return url;
+  }
 
   const asciiHostname = domainToASCII(hostname);
-  if (!asciiHostname) return url;
+  if (!asciiHostname) {
+    return url;
+  }
 
   const port = hasPort ? hostAndPort.slice(portSeparator) : "";
   return `${prefix}${userInfo}${asciiHostname}${port}${remainder}`;
+};
+
+const isPlainObject = (value: object): value is Record<string, unknown> => {
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
+
+const deleteQueryValue = (searchParams: URLSearchParams, key: string): void => {
+  for (const existingKey of [...searchParams.keys()]) {
+    if (existingKey === key || existingKey.startsWith(`${key}[`)) {
+      searchParams.delete(existingKey);
+    }
+  }
+};
+
+const appendQueryValue = (
+  searchParams: URLSearchParams,
+  key: string,
+  value: unknown,
+  ancestors: Set<object>,
+): void => {
+  if (value === undefined) {
+    return;
+  }
+
+  if (value === null) {
+    searchParams.append(key, "");
+    return;
+  }
+
+  switch (typeof value) {
+    case "string":
+    case "number":
+    case "boolean":
+    case "bigint":
+      searchParams.append(key, String(value));
+      return;
+    case "object":
+      break;
+    default:
+      throw new TypeError(
+        `Unsupported query-string value for "${key}": ${typeof value}`,
+      );
+  }
+
+  if (value instanceof Date) {
+    searchParams.append(key, value.toISOString());
+    return;
+  }
+
+  if (ancestors.has(value)) {
+    throw new TypeError(
+      `Cannot serialize circular query-string value at "${key}"`,
+    );
+  }
+
+  ancestors.add(value);
+  try {
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => {
+        appendQueryValue(searchParams, `${key}[${index}]`, item, ancestors);
+      });
+      return;
+    }
+
+    if (!isPlainObject(value)) {
+      throw new TypeError(`Unsupported query-string object for "${key}"`);
+    }
+
+    for (const [nestedKey, nestedValue] of Object.entries(value)) {
+      appendQueryValue(
+        searchParams,
+        `${key}[${nestedKey}]`,
+        nestedValue,
+        ancestors,
+      );
+    }
+  } finally {
+    ancestors.delete(value);
+  }
 };
 
 export const appendQueryString = (
@@ -96,16 +192,11 @@ export const appendQueryString = (
   const parsed = new URL(url);
 
   for (const [key, value] of Object.entries(query)) {
-    if (Array.isArray(value)) {
-      parsed.searchParams.delete(key);
-      value.forEach((item, index) => {
-        parsed.searchParams.append(`${key}[${index}]`, String(item));
-      });
-    } else if (value === null) {
-      parsed.searchParams.set(key, "");
-    } else if (value !== undefined) {
-      parsed.searchParams.set(key, String(value));
+    if (value === undefined) {
+      continue;
     }
+    deleteQueryValue(parsed.searchParams, key);
+    appendQueryValue(parsed.searchParams, key, value, new Set());
   }
 
   parsed.search = parsed.searchParams.toString();

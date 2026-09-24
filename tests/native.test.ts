@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, parse, resolve } from "node:path";
 import { describe, expect, test, vi } from "vitest";
 import {
   findPackageRoot,
@@ -65,6 +65,23 @@ describe("native binding loading", () => {
         (candidate) => candidate === packageJson,
       ),
     ).toBe(root);
+  });
+
+  test("finds a package rooted at the filesystem root", () => {
+    const root = parse(resolve(".")).root;
+    const packageJson = join(root, "package.json");
+
+    expect(
+      findPackageRoot(root, (candidate) => candidate === packageJson),
+    ).toBe(root);
+  });
+
+  test("throws when no package root can be found", () => {
+    const root = parse(resolve(".")).root;
+
+    expect(() => findPackageRoot(join(root, "missing"), () => false)).toThrow(
+      "Unable to locate the sync-request-curl package root",
+    );
   });
 
   test("loads the first existing candidate", () => {

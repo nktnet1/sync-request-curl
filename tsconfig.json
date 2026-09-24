@@ -4,7 +4,7 @@
     "allowSyntheticDefaultImports": true,
     "declaration": true,
     "esModuleInterop": true,
-    "lib": ["es5", "es2015", "esnext", "dom"],
+    "lib": ["es2023"],
     "types": ["node"],
     "module": "esnext",
     "moduleResolution": "bundler",

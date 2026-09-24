@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 import request from "../src";
-import { RequestError, ResponseError } from "../src/errors";
+import {
+  RequestError,
+  ResponseError,
+  throwForTransportError,
+} from "../src/errors";
 import { SERVER_URL } from "./app/config";
 
 const expectRequestError = (
@@ -67,6 +71,21 @@ describe("request transport errors", () => {
           timeout: 200,
         }),
       "ETIMEDOUT",
+    );
+  });
+
+  test.each([
+    [47, "ERR_TOO_MANY_REDIRECTS"],
+    [99, "ERR_REQUEST_FAILED"],
+  ] as const)("maps transport code %i to %s", (transportCode, expectedCode) => {
+    expectRequestError(
+      () =>
+        throwForTransportError(transportCode, "transport failure", {
+          method: "GET",
+          url: "https://example.com",
+          options: {},
+        }),
+      expectedCode,
     );
   });
 });

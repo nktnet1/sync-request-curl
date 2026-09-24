@@ -24,10 +24,15 @@ mkdirSync(buildDir, { recursive: true });
 const listNativeSources = (directory: string): string[] => {
   const files: string[] = [];
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    if (entry.name === "build" || entry.name === "target") continue;
+    if (entry.name === "build" || entry.name === "target") {
+      continue;
+    }
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...listNativeSources(path));
-    else files.push(path);
+    if (entry.isDirectory()) {
+      files.push(...listNativeSources(path));
+    } else {
+      files.push(path);
+    }
   }
   return files;
 };
@@ -45,10 +50,14 @@ const matchingPrebuild = (): string =>
   join(root, "prebuilds", getPrebuildFilename(getCurrentPlatformKey()));
 
 const shouldSkipIfNeededBuild = (): boolean => {
-  if (!ifNeeded) return false;
+  if (!ifNeeded) {
+    return false;
+  }
 
   if (existsSync(localOutput)) {
-    if (localBuildIsStale()) return false;
+    if (localBuildIsStale()) {
+      return false;
+    }
     console.log(`Native addon is up to date: ${localOutput}`);
     return true;
   }
@@ -63,9 +72,15 @@ const shouldSkipIfNeededBuild = (): boolean => {
 };
 
 const cargoLibrary = (): string => {
-  if (process.platform === "win32") return "sync_request_curl_native.dll";
-  if (process.platform === "darwin") return "libsync_request_curl_native.dylib";
-  if (process.platform === "linux") return "libsync_request_curl_native.so";
+  if (process.platform === "win32") {
+    return "sync_request_curl_native.dll";
+  }
+  if (process.platform === "darwin") {
+    return "libsync_request_curl_native.dylib";
+  }
+  if (process.platform === "linux") {
+    return "libsync_request_curl_native.so";
+  }
   throw new Error(`Unsupported native build platform: ${process.platform}`);
 };
 
@@ -91,7 +106,9 @@ const buildNative = (): void => {
     OPENSSL_STATIC: "1",
     PKG_CONFIG_ALL_STATIC: "1",
   };
-  if (rustFlags) env.RUSTFLAGS = rustFlags;
+  if (rustFlags) {
+    env.RUSTFLAGS = rustFlags;
+  }
 
   run(
     "cargo",

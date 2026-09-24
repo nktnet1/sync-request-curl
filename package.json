@@ -72,6 +72,9 @@
   "engines": {
     "node": ">=22"
   },
+  "browserslist": [
+    "node >= 22"
+  ],
   "exports": {
     ".": {
       "import": "./dist/index.mjs",

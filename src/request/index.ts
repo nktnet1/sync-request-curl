@@ -1,3 +1,4 @@
+import { URL } from "node:url";
 import { RequestError } from "#/errors";
 import { performRequest } from "#/request/perform";
 import {
@@ -9,6 +10,17 @@ import type { HttpVerb, Options, Response, UppercaseHttpVerb } from "#/types";
 
 const normalizeMethod = (method: HttpVerb): UppercaseHttpVerb =>
   method.toUpperCase() as UppercaseHttpVerb;
+
+const getRedirectLimit = (maxRedirects: number | undefined): number => {
+  if (
+    maxRedirects === undefined ||
+    !Number.isFinite(maxRedirects) ||
+    maxRedirects < 0
+  ) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return Math.ceil(maxRedirects);
+};
 
 const request = (
   method: HttpVerb,
@@ -23,13 +35,12 @@ const request = (
   }
 
   const startedAt = Date.now();
-  const maxRedirects = options.maxRedirects ?? -1;
-  let redirectsFollowed = 0;
+  const redirectLimit = getRedirectLimit(options.maxRedirects);
   let currentMethod = originalMethod;
   let currentUrl = originalUrl;
   let currentOptions = options;
 
-  while (true) {
+  for (let redirectsFollowed = 0; ; redirectsFollowed += 1) {
     if (options.timeout && options.timeout > 0) {
       currentOptions = {
         ...currentOptions,
@@ -42,15 +53,16 @@ const request = (
       currentUrl,
       currentOptions,
     );
-    if (!redirectUrl) return response;
+    if (!redirectUrl) {
+      return response;
+    }
 
-    if (maxRedirects >= 0 && redirectsFollowed >= maxRedirects) {
+    if (redirectsFollowed >= redirectLimit) {
       throw new RequestError(
         "ERR_TOO_MANY_REDIRECTS",
         "Request failed: Number of redirects hit maximum amount",
       );
     }
-    redirectsFollowed += 1;
 
     const nextUrl = new URL(redirectUrl, response.url).href;
     const nextMethod = getRedirectMethod(currentMethod, response.statusCode);

@@ -86,6 +86,8 @@ using this repository's own paths and metadata.
       the published README workflow.
 - [ ] Add JSDoc for public request options, response APIs, multipart APIs, and
       errors, including defaults and compatibility notes.
+- [ ] Document nested `qs` bracket serialization and unsupported query-value
+      behaviour with the rest of the generated request-option documentation.
 - [ ] Group generated API docs by request, response, multipart, and errors.
 - [ ] Add CI verification that generated documentation is committed and not
       stale.

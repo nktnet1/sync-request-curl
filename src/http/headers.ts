@@ -1,15 +1,24 @@
 import type { IncomingHttpHeaders } from "node:http";
 
-const getHeaderName = (header: string): string =>
-  header.split(/[:;]/, 1)[0].trim().toLowerCase();
+const getHeaderName = (header: string): string => {
+  const colonIndex = header.indexOf(":");
+  const semicolonIndex = header.indexOf(";");
+  const delimiterIndex =
+    colonIndex < 0
+      ? semicolonIndex
+      : semicolonIndex < 0
+        ? colonIndex
+        : Math.min(colonIndex, semicolonIndex);
+  const endIndex = delimiterIndex < 0 ? header.length : delimiterIndex;
+  return header.slice(0, endIndex).trim().toLowerCase();
+};
 
 export const removeRequestHeader = (headers: string[], name: string): void => {
   const normalizedName = name.toLowerCase();
-  for (let i = headers.length - 1; i >= 0; i -= 1) {
-    if (getHeaderName(headers[i]) === normalizedName) {
-      headers.splice(i, 1);
-    }
-  }
+  const retainedHeaders = headers.filter(
+    (header) => getHeaderName(header) !== normalizedName,
+  );
+  headers.splice(0, headers.length, ...retainedHeaders);
 };
 
 export const hasRequestHeader = (headers: string[], name: string): boolean => {
@@ -44,11 +53,15 @@ export const setContentLengthHeader = (
 export const serializeRequestHeaders = (
   headers?: IncomingHttpHeaders,
 ): string[] => {
-  if (!headers) return [];
+  if (!headers) {
+    return [];
+  }
 
   const serialized: string[] = [];
   for (const [name, value] of Object.entries(headers)) {
-    if (value === undefined) continue;
+    if (value === undefined) {
+      continue;
+    }
 
     const values = Array.isArray(value) ? value : [value];
     for (const item of values) {
@@ -58,34 +71,81 @@ export const serializeRequestHeaders = (
   return serialized;
 };
 
+const isAsciiDigit = (character: string): boolean =>
+  character >= "0" && character <= "9";
+
+const isHttpStatusLine = (header: string): boolean => {
+  if (header.slice(0, 5).toUpperCase() !== "HTTP/") {
+    return false;
+  }
+
+  const versionEnd = header.indexOf(" ", 5);
+  if (versionEnd < 6) {
+    return false;
+  }
+
+  let hasVersionDigit = false;
+  for (let i = 5; i < versionEnd; i += 1) {
+    const character = header.charAt(i);
+    if (isAsciiDigit(character)) {
+      hasVersionDigit = true;
+    } else if (character !== ".") {
+      return false;
+    }
+  }
+  if (!hasVersionDigit) {
+    return false;
+  }
+
+  let statusStart = versionEnd + 1;
+  while (
+    header.charAt(statusStart) === " " ||
+    header.charAt(statusStart) === "\t"
+  ) {
+    statusStart += 1;
+  }
+
+  if (
+    !isAsciiDigit(header.charAt(statusStart)) ||
+    !isAsciiDigit(header.charAt(statusStart + 1)) ||
+    !isAsciiDigit(header.charAt(statusStart + 2))
+  ) {
+    return false;
+  }
+
+  const boundary = header.charAt(statusStart + 3);
+  return boundary === "" || boundary === " " || boundary === "\t";
+};
+
 /** Parses the final response header block and preserves repeated headers. */
 export const parseResponseHeaders = (
   headerLines: string[],
 ): IncomingHttpHeaders => {
-  const finalStatusLineIndex = headerLines.findLastIndex((header) =>
-    /^HTTP\/\d(?:\.\d+)?\s+\d{3}\b/i.test(header),
-  );
+  const finalStatusLineIndex = headerLines.findLastIndex(isHttpStatusLine);
   const finalHeaderLines =
     finalStatusLineIndex >= 0
       ? headerLines.slice(finalStatusLineIndex + 1)
       : headerLines;
+  const parsedHeaders = new Map<string, string | string[]>();
 
-  return finalHeaderLines.reduce((headers, header) => {
+  for (const header of finalHeaderLines) {
     const separatorIndex = header.indexOf(":");
-    if (separatorIndex <= 0) return headers;
+    if (separatorIndex <= 0) {
+      continue;
+    }
 
     const name = header.slice(0, separatorIndex).trim().toLowerCase();
     const value = header.slice(separatorIndex + 1).trim();
-    const existingValue = headers[name];
+    const existingValue = parsedHeaders.get(name);
 
     if (existingValue === undefined) {
-      headers[name] = value;
+      parsedHeaders.set(name, value);
     } else if (Array.isArray(existingValue)) {
       existingValue.push(value);
     } else {
-      headers[name] = [existingValue, value];
+      parsedHeaders.set(name, [existingValue, value]);
     }
+  }
 
-    return headers;
-  }, {} as IncomingHttpHeaders);
+  return Object.fromEntries(parsedHeaders) as IncomingHttpHeaders;
 };

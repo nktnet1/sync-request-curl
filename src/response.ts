@@ -24,20 +24,21 @@ export const createResponse = ({
   headers,
   body,
 }: CreateResponseOptions): Response => {
-  function getBody<Encoding extends BufferEncoding>(encoding: Encoding): string;
-  function getBody(encoding?: undefined): Buffer;
-  function getBody(encoding?: BufferEncoding): string | Buffer {
+  const getBody = ((encoding?: BufferEncoding): string | Buffer => {
     if (statusCode >= 300) {
       throw new ResponseError(statusCode, headers, body);
     }
     return encoding ? body.toString(encoding) : body;
-  }
+  }) as Response["getBody"];
 
   const getJSON: GetJSON = (encoding?) => {
     try {
       return JSON.parse(body.toString(encoding));
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : `Non-Error thrown while parsing JSON (${typeof error})`;
       throw new Error(
         `The response body for ${method} ${requestUrl} could not be parsed as JSON.\n\n` +
           `Body:\n${body.toString(encoding)}\n\nJSON parse error:\n${message}`,

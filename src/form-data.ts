@@ -6,6 +6,16 @@ export interface FormDataEntry {
 
 const entries = new WeakMap<FormData, FormDataEntry[]>();
 
+const getEntries = (form: FormData): FormDataEntry[] => {
+  const formEntries = entries.get(form);
+  if (!formEntries) {
+    throw new TypeError(
+      "Expected a FormData instance created by sync-request-curl",
+    );
+  }
+  return formEntries;
+};
+
 /**
  * A synchronous multipart/form-data builder compatible with sync-request.
  */
@@ -15,16 +25,9 @@ export class FormData {
   }
 
   append(key: string, value: string | Buffer, fileName?: string): void {
-    entries.get(this)?.push({ key, value, fileName });
+    getEntries(this).push({ key, value, fileName });
   }
 }
 
-export const getFormDataEntries = (form: FormData): FormDataEntry[] => {
-  const formEntries = entries.get(form);
-  if (!formEntries) {
-    throw new TypeError(
-      "Expected a FormData instance created by sync-request-curl",
-    );
-  }
-  return formEntries.map((entry) => ({ ...entry }));
-};
+export const getFormDataEntries = (form: FormData): FormDataEntry[] =>
+  getEntries(form).map((entry) => ({ ...entry }));

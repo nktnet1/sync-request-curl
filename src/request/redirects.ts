@@ -5,7 +5,9 @@ export const getRedirectMethod = (
   method: UppercaseHttpVerb,
   statusCode: number,
 ): UppercaseHttpVerb => {
-  if (statusCode === 303 && method !== "HEAD") return "GET";
+  if (statusCode === 303 && method !== "HEAD") {
+    return "GET";
+  }
   if ((statusCode === 301 || statusCode === 302) && method === "POST") {
     return "GET";
   }
