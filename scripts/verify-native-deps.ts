@@ -1,4 +1,3 @@
-/* eslint-disable security/detect-non-literal-fs-filename -- Build tooling only accesses trusted repository, CI, or explicit CLI paths. */
 import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { run } from "#scripts/process";

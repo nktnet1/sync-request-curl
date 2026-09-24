@@ -38,14 +38,11 @@ export interface NativeResponse {
 }
 
 export interface NativeBinding {
-  // eslint-disable-next-line no-unused-vars -- Type-only parameter documents the native request signature.
   request(options: NativeRequestOptions): NativeResponse;
 }
 
 type LinuxLibc = "gnu" | "musl";
-// eslint-disable-next-line no-unused-vars -- Type-only parameter documents the loader signature.
 type NativeRequire = (path: string) => NativeBinding;
-// eslint-disable-next-line no-unused-vars -- Type-only parameter documents the predicate signature.
 type FileExists = (path: string) => boolean;
 
 interface ProcessReport {

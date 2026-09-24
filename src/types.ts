@@ -17,7 +17,6 @@ export type CurlOptionInput = string | string[] | number | boolean;
 
 export interface Easy {
   readonly isOpen: boolean;
-  // eslint-disable-next-line no-unused-vars -- Interface parameter names document the compatibility API.
   setOpt(option: CurlOptionValue, value: CurlOptionInput): void;
   close(): void;
 }

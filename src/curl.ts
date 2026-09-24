@@ -23,6 +23,16 @@ export interface EasyOptionsSnapshot {
   curlOptions: NativeCurlOptions;
 }
 
+function stringValue(option: CurlOptionValue, value: CurlOptionInput): string {
+  if (typeof value !== "string") {
+    const name = Object.entries(curlOption).find(
+      ([, id]) => id === option,
+    )?.[0];
+    throw new TypeError(`${name ?? option} must be a string`);
+  }
+  return value;
+}
+
 export class EasyOptions implements Easy {
   #isOpen = true;
   #headers: string[];
@@ -52,25 +62,25 @@ export class EasyOptions implements Easy {
         this.#headers = [...value];
         return;
       case curlOption.PROXY:
-        this.#curlOptions.proxy = this.#stringValue(option, value);
+        this.#curlOptions.proxy = stringValue(option, value);
         return;
       case curlOption.PROXYUSERPWD:
-        this.#curlOptions.proxyUserPwd = this.#stringValue(option, value);
+        this.#curlOptions.proxyUserPwd = stringValue(option, value);
         return;
       case curlOption.USERAGENT:
-        this.#curlOptions.userAgent = this.#stringValue(option, value);
+        this.#curlOptions.userAgent = stringValue(option, value);
         return;
       case curlOption.REFERER:
-        this.#curlOptions.referer = this.#stringValue(option, value);
+        this.#curlOptions.referer = stringValue(option, value);
         return;
       case curlOption.CAINFO:
-        this.#curlOptions.caInfo = this.#stringValue(option, value);
+        this.#curlOptions.caInfo = stringValue(option, value);
         return;
       case curlOption.INTERFACE:
-        this.#curlOptions.interface = this.#stringValue(option, value);
+        this.#curlOptions.interface = stringValue(option, value);
         return;
       case curlOption.DNS_SERVERS:
-        this.#curlOptions.dnsServers = this.#stringValue(option, value);
+        this.#curlOptions.dnsServers = stringValue(option, value);
         return;
       case curlOption.TCP_KEEPALIVE:
         if (typeof value !== "boolean" && typeof value !== "number") {
@@ -97,16 +107,6 @@ export class EasyOptions implements Easy {
 
   close(): void {
     this.#isOpen = false;
-  }
-
-  #stringValue(option: CurlOptionValue, value: CurlOptionInput): string {
-    if (typeof value !== "string") {
-      const name = Object.entries(curlOption).find(
-        ([, id]) => id === option,
-      )?.[0];
-      throw new TypeError(`${name ?? option} must be a string`);
-    }
-    return value;
   }
 }
 
