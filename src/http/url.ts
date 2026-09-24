@@ -2,27 +2,30 @@ import { domainToASCII, URL, type URLSearchParams } from "node:url";
 
 const hasNonAscii = (value: string): boolean => {
   for (let i = 0; i < value.length; i += 1) {
-    if (value.charCodeAt(i) > 0x7f) {
+    const code = value.codePointAt(i);
+    if (code !== undefined && code > 0x7f) {
       return true;
     }
   }
   return false;
 };
 
-const isAsciiLetter = (code: number): boolean =>
-  (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+const isAsciiLetter = (code: number | undefined): boolean =>
+  code !== undefined &&
+  ((code >= 65 && code <= 90) || (code >= 97 && code <= 122));
 
-const isSchemeCharacter = (code: number): boolean =>
-  isAsciiLetter(code) ||
-  (code >= 48 && code <= 57) ||
-  code === 43 ||
-  code === 45 ||
-  code === 46;
+const isSchemeCharacter = (code: number | undefined): boolean =>
+  code !== undefined &&
+  (isAsciiLetter(code) ||
+    (code >= 48 && code <= 57) ||
+    code === 43 ||
+    code === 45 ||
+    code === 46);
 
 const isDecimal = (value: string): boolean => {
   for (let i = 0; i < value.length; i += 1) {
-    const code = value.charCodeAt(i);
-    if (code < 48 || code > 57) {
+    const code = value.codePointAt(i);
+    if (code === undefined || code < 48 || code > 57) {
       return false;
     }
   }
@@ -37,12 +40,12 @@ interface AbsoluteUrlParts {
 
 const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
   const schemeEnd = url.indexOf("://");
-  if (schemeEnd <= 0 || !isAsciiLetter(url.charCodeAt(0))) {
+  if (schemeEnd <= 0 || !isAsciiLetter(url.codePointAt(0))) {
     return undefined;
   }
 
   for (let i = 1; i < schemeEnd; i += 1) {
-    if (!isSchemeCharacter(url.charCodeAt(i))) {
+    if (!isSchemeCharacter(url.codePointAt(i))) {
       return undefined;
     }
   }
@@ -50,7 +53,7 @@ const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
   const authorityStart = schemeEnd + 3;
   let authorityEnd = url.length;
   for (let i = authorityStart; i < url.length; i += 1) {
-    const code = url.charCodeAt(i);
+    const code = url.codePointAt(i);
     if (code === 47 || code === 63 || code === 35) {
       authorityEnd = i;
       break;
