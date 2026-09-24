@@ -33,15 +33,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      # 2026.07.29 uses CMake 4.3-only STRING_ENCODE while the pinned
-      # Bullseye/Alpine Linux build containers intentionally use older CMake.
-      - name: Checkout vcpkg
-        uses: actions/checkout@v7
-        with:
-          repository: microsoft/vcpkg
-          ref: 2026.06.24
-          path: .vcpkg
-
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
@@ -64,61 +55,28 @@ jobs:
         include:
           - runner: macos-15-intel
             platform: darwin-x64
-            triplet: x64-osx
           - runner: macos-15
             platform: darwin-arm64
-            triplet: arm64-osx
           - runner: windows-2025
             platform: win32-x64-msvc
-            triplet: x64-windows-static-md
           - runner: windows-11-arm
             platform: win32-arm64-msvc
-            triplet: arm64-windows-static-md
     runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Checkout vcpkg
-        uses: actions/checkout@v7
-        with:
-          repository: microsoft/vcpkg
-          ref: 2026.07.29
-          path: .vcpkg
-
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
           node-version: 22.x
 
-      - name: Bootstrap vcpkg
-        if: runner.os != 'Windows'
-        run: ./.vcpkg/bootstrap-vcpkg.sh -disableMetrics
-
-      - name: Bootstrap vcpkg on Windows
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: .\.vcpkg\bootstrap-vcpkg.bat -disableMetrics
-
-      - name: Install static libcurl
-        if: runner.os != 'Windows'
-        run: ./.vcpkg/vcpkg install 'curl[http2]:${{ matrix.triplet }}'
-
-      - name: Install static libcurl on Windows
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: .\.vcpkg\vcpkg.exe install 'curl[http2]:${{ matrix.triplet }}'
-
-      - name: Download Node import library
-        if: runner.os == 'Windows'
-        run: node scripts/download-node-import-lib.ts
+      - name: Set up Rust
+        run: rustup toolchain install 1.88.0 --profile minimal --no-self-update
 
       - name: Build native addon
-        env:
-          CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/.vcpkg/scripts/buildsystems/vcpkg.cmake
-          VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
-        run: node scripts/build-native.ts --cmake
+        run: node scripts/build-native.ts
 
       - name: Stage native addon
         run: node scripts/stage-native.ts --platform=${{ matrix.platform }}

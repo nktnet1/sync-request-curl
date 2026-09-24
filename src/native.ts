@@ -113,7 +113,6 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
   const binding = loadFirstExisting(
     [
       join(localBuildDirectory, "sync_request_curl_native.node"),
-      join(localBuildDirectory, "Release", "sync_request_curl_native.node"),
       join(prebuildDirectory, `sync_request_curl_native.${platformKey}.node`),
     ],
     options.exists,

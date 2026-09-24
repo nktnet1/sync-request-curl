@@ -1,73 +1,50 @@
 # Native addon
 
-`addon.cc` is a deliberately small synchronous Node-API wrapper around
-libcurl. It targets Node-API v8 and does not include V8 or Node internal APIs,
-so the compiled addon is ABI-stable across Node.js releases that support that
-Node-API version.
+The native addon is a synchronous Rust Node-API wrapper around libcurl. It uses
+`napi-rs` with Node-API v8, so release binaries are tied to the operating system,
+CPU architecture, and C runtime rather than to a specific Node.js major.
 
-The Node-API C headers are vendored in `node-api/` for build-time use only.
-Consumers never compile this directory.
+The Rust layer intentionally keeps libcurl underneath the public API. That
+preserves curl error codes and the existing proxy, TLS, interface, DNS,
+keepalive, raw-body, and multipart behaviour instead of changing HTTP stacks as
+part of the language migration.
 
 ## Building locally
 
-Local development does not require CMake on macOS or Linux:
+Local native builds require Rust 1.88 or newer, Node.js, and the platform C
+toolchain used by the vendored libcurl/OpenSSL build (Xcode Command Line Tools,
+MSVC Build Tools, or a Linux build-essential equivalent):
 
 ```sh
 pnpm build:native
 pnpm test
 ```
 
-`pnpm test` automatically builds the local addon when it is missing or older
-than the native sources.
+`rust-toolchain.toml` pins the repository toolchain. `pnpm test` builds the
+local addon only when no matching prebuild is available or the local native
+output is stale.
 
-On macOS the local build uses the Xcode Command Line Tools (`xcrun clang++`)
-and the libcurl shipped in the macOS SDK. If the command line tools are not
-installed, run `xcode-select --install`.
+The build uses Cargo and produces:
 
-On Linux the local build needs a C++17 compiler plus libcurl development files.
-It discovers libcurl through `pkg-config` first and `curl-config` second. For
-example, Debian/Ubuntu development packages can be installed with:
-
-```sh
-sudo apt install g++ libcurl4-openssl-dev pkg-config
+```text
+native/build/sync_request_curl_native.node
 ```
 
-Local builds are for development/testing only and may dynamically link the
-host libcurl. Package consumers never use this path.
+`curl-sys` builds libcurl from its bundled source with HTTP/2 enabled. Unix TLS
+uses vendored OpenSSL; Windows uses Schannel. zlib and the Linux GCC runtime are
+forced static in the prebuild path so release binaries do not acquire accidental
+runtime dependencies on build-host libraries.
 
 ## Release prebuilds
 
-Release binaries continue to use the reproducible CMake + vcpkg path:
+See [PREBUILDS.md](./PREBUILDS.md) for the release matrix and CI details.
 
-```sh
-pnpm build:native:cmake
-pnpm stage:native
-```
+Package consumers never compile this directory. The published package contains
+only the generated `.node` files under `prebuilds/`, so installation does not
+require Rust, a C/C++ compiler, CMake, vcpkg, node-gyp, or lifecycle-script
+approval.
 
-The GitHub Actions native-prebuild workflow builds static libcurl with vcpkg.
-Linux currently pins vcpkg 2026.06.24 because the 2026.07.29 scripts require
-CMake 4.3 for SPDX JSON encoding, while the intentionally old Linux build
-containers use older CMake versions to preserve broad libc compatibility.
-Desktop builds can use the newer vcpkg release.
-
-The workflow builds static libcurl
-and produces eight release binaries checked by `pnpm verify:prebuilds`: macOS
-and Windows x64/arm64, plus glibc and musl Linux x64/arm64. GNU/Linux builds
-are produced in a Node 22 Bullseye container to keep the GLIBC requirement at
-2.31 or older. musl builds are produced and tested in Alpine containers.
-Those `.node` files are shipped in the npm package, so consumers do not need a
-compiler, CMake, vcpkg, node-gyp, or lifecycle-script approval.
-
-Windows local builds currently use this CMake path as well. Windows additionally
-needs a `node.lib` import library while linking. Release CI downloads it for the
-Node version used to build the addon; it is not part of the runtime package and
-does not tie the resulting addon to that Node version.
-
-All repository automation under `scripts/` is TypeScript and is executed
-directly by Node.js. No JavaScript, shell, or lifecycle-script wrapper is
-required.
-
-Node.js runs the TypeScript automation files directly. Local development with
-these scripts therefore requires Node.js 22.18 or newer, where type stripping
-is enabled by default. This does not raise the runtime requirement of the
-published library because `scripts/` is not included in the npm package.
+All repository automation under `scripts/` is TypeScript and runs directly in
+Node.js. Local development with those scripts requires a Node.js release where
+type stripping is enabled by default; `scripts/` is not included in the npm
+package and does not change the published library runtime requirement.

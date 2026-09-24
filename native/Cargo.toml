@@ -1,0 +1,29 @@
+[package]
+name = "sync-request-curl-native"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88.0"
+publish = false
+
+[lib]
+name = "sync_request_curl_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+curl-sys = { version = "=0.4.90", default-features = false, features = ["http2", "ssl", "static-curl", "static-ssl"] }
+napi = { version = "=3.13.0", default-features = false, features = ["dyn-symbols", "napi8"] }
+napi-derive = "=3.6.3"
+# Keep the macro crate on the backend release it was published against.
+# napi-derive-backend 6.1.4 moved to convert_case 0.12 while napi-derive 3.6.3 still uses 0.11.
+napi-derive-backend = "=6.1.2"
+
+[target.'cfg(unix)'.dependencies]
+openssl-probe = "=0.2.1"
+
+[build-dependencies]
+napi-build = "=2.5.0"
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+strip = "symbols"

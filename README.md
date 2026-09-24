@@ -472,7 +472,7 @@ The published package does not download or compile native code during installati
 
 ### 4.1. Windows
 
-Prebuilt addons are prepared for x64 and arm64 Windows. No Visual Studio, Python, CMake, vcpkg, or node-gyp installation is required by package consumers.
+Prebuilt addons are prepared for x64 and arm64 Windows. No Visual Studio, Python, Rust, CMake, vcpkg, or node-gyp installation is required by package consumers.
 
 Requests may still fail with Libcurl Error 60 (`CURLE_PEER_FAILED_VERIFICATION`) when the peer certificate cannot be verified. The `insecure` option disables peer verification and should only be used when that trade-off is intentional.
 

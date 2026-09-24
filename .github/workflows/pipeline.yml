@@ -25,31 +25,20 @@ jobs:
             platform: linux-x64-gnu
             kind: linux
             libc: gnu
-            vcpkg-ref: 2026.06.24
           - runner: ubuntu-24.04
             artifact: alpine-latest
             platform: linux-x64-musl
             kind: linux
             libc: musl
-            vcpkg-ref: 2026.06.24
           - runner: macos-15
             artifact: macos-latest
             platform: darwin-arm64
             kind: desktop
-            triplet: arm64-osx
-            vcpkg-ref: 2026.07.29
     runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
-      - name: Checkout vcpkg
-        uses: actions/checkout@v7
-        with:
-          repository: microsoft/vcpkg
-          ref: ${{ matrix.vcpkg-ref }}
-          path: .vcpkg
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -60,20 +49,13 @@ jobs:
         if: matrix.kind == 'linux'
         run: node scripts/linux-prebuild.ts --libc=${{ matrix.libc }} --mode=build
 
-      - name: Bootstrap vcpkg
+      - name: Set up Rust
         if: matrix.kind == 'desktop'
-        run: ./.vcpkg/bootstrap-vcpkg.sh -disableMetrics
-
-      - name: Install static libcurl
-        if: matrix.kind == 'desktop'
-        run: ./.vcpkg/vcpkg install 'curl[http2]:${{ matrix.triplet }}'
+        run: rustup toolchain install 1.88.0 --profile minimal --no-self-update
 
       - name: Build native addon
         if: matrix.kind == 'desktop'
-        env:
-          CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/.vcpkg/scripts/buildsystems/vcpkg.cmake
-          VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
-        run: node scripts/build-native.ts --cmake
+        run: node scripts/build-native.ts
 
       - name: Stage native addon
         if: matrix.kind == 'desktop'
