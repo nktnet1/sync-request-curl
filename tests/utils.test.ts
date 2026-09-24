@@ -72,18 +72,11 @@ describe("normalizeUrlHostname", () => {
     );
   });
 
-  test("leaves URLs with an invalid scheme unchanged", () => {
-    const url = "1https://münchen.example/path";
-    expect(normalizeUrlHostname(url)).toBe(url);
-  });
-
-  test("does not rewrite unicode outside the hostname", () => {
-    const url = "https://example.com/über?q=你好#résumé";
-    expect(normalizeUrlHostname(url)).toBe(url);
-  });
-
-  test("leaves malformed URLs for libcurl to reject", () => {
-    const url = "not a url münchen.example";
+  test.each([
+    ["an invalid scheme", "1https://münchen.example/path"],
+    ["unicode outside the hostname", "https://example.com/über?q=你好#résumé"],
+    ["a malformed URL", "not a url münchen.example"],
+  ])("leaves %s unchanged", (_case, url) => {
     expect(normalizeUrlHostname(url)).toBe(url);
   });
 });

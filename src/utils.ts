@@ -11,7 +11,7 @@ interface RequestInputs {
 
 const hasNonAscii = (value: string): boolean => {
   for (let i = 0; i < value.length; i += 1) {
-    if (value.charCodeAt(i) > 0x7f) {
+    if ((value.codePointAt(i) ?? -1) > 0x7f) {
       return true;
     }
   }
@@ -30,7 +30,7 @@ const isSchemeCharacter = (code: number): boolean =>
 
 const isDecimal = (value: string): boolean => {
   for (let i = 0; i < value.length; i += 1) {
-    const code = value.charCodeAt(i);
+    const code = value.codePointAt(i) ?? -1;
     if (code < 48 || code > 57) {
       return false;
     }
@@ -46,12 +46,12 @@ interface AbsoluteUrlParts {
 
 const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
   const schemeEnd = url.indexOf("://");
-  if (schemeEnd <= 0 || !isAsciiLetter(url.charCodeAt(0))) {
+  if (schemeEnd <= 0 || !isAsciiLetter(url.codePointAt(0) ?? -1)) {
     return undefined;
   }
 
   for (let i = 1; i < schemeEnd; i += 1) {
-    if (!isSchemeCharacter(url.charCodeAt(i))) {
+    if (!isSchemeCharacter(url.codePointAt(i) ?? -1)) {
       return undefined;
     }
   }
@@ -59,7 +59,7 @@ const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
   const authorityStart = schemeEnd + 3;
   let authorityEnd = url.length;
   for (let i = authorityStart; i < url.length; i += 1) {
-    const code = url.charCodeAt(i);
+    const code = url.codePointAt(i) ?? -1;
     if (code === 47 || code === 63 || code === 35) {
       authorityEnd = i;
       break;
