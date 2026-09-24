@@ -1,3 +1,7 @@
 ---
+engines:
+  cppcheck:
+    language: c++
 exclude_paths:
+  # Vendored stable Node-API headers are third-party declarations, not project code.
   - "native/node-api/**"

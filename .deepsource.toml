@@ -7,4 +7,9 @@ name = "javascript"
   environment = [
     "nodejs"
   ]
-  skip_doc_coverage = ["class-expression", "method-definition", "function-declaration"]
+  skip_doc_coverage = [
+    "arrow-function-expression",
+    "class-expression",
+    "function-declaration",
+    "method-definition"
+  ]

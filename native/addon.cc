@@ -644,8 +644,9 @@ napi_value Request(napi_env env, napi_callback_info info) {
   set_option(curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, static_cast<long>(timeout_ms)));
   // `insecure` is an explicit public compatibility option; verification stays
   // enabled by default and is disabled only when the caller opts in.
+  // Flawfinder: ignore -- this is the documented, explicit equivalent of curl -k.
   set_option(
-      curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, insecure ? 0L : 1L));  // NOSONAR
+      curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, insecure ? 0L : 1L));  // NOSONAR nosemgrep
   set_option(curl_easy_setopt(curl, CURLOPT_NOBODY, no_body ? 1L : 0L));
   set_option(curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback));
   set_option(curl_easy_setopt(curl, CURLOPT_WRITEDATA, &state));
