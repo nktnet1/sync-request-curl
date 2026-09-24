@@ -31,7 +31,8 @@ const forbiddenPrefixes = [
   "libbrotli",
   "libcrypto",
   "libcurl",
-  "libgcc_s",
+  // rustc may dynamically use libgcc_s for GNU/Linux unwinding. It is a
+  // platform runtime, not one of the native dependencies bundled here.
   "libidn",
   "libnghttp2",
   "libpsl",

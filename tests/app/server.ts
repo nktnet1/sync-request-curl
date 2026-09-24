@@ -12,11 +12,15 @@ const server = serve(
     console.log(
       `Hono Server started and awaiting requests at the URL: '${SERVER_URL}'`,
     );
+    process.send?.("sync-request-curl:test-server-ready");
   },
 );
 
-process.on("SIGINT", () => {
+const shutdown = (): void => {
   server.close(() => {
     console.log("Shutting down server gracefully.");
   });
-});
+};
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
