@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { describe, expect, test, vi } from "vitest";
-import request, { type HttpVerb, type Options } from "../src";
+import request, { FormData, type HttpVerb, type Options } from "../src";
 import { SERVER_URL } from "./app/config";
 
 // ========================================================================= //
@@ -31,6 +31,21 @@ const wrapperRequest = (method: HttpVerb, url: string, option?: Options) => {
 describe("GET requests", () => {
   test("GET request with no options", () => {
     const res = wrapperRequest("GET", SERVER_URL);
+    expect(res).toMatchObject({
+      code: 200,
+      json: { message: "Hello, world!" },
+    });
+  });
+
+  test("accepts URL objects", () => {
+    const res = wrapperRequest("GET", new URL(SERVER_URL).href);
+    const direct = request("GET", new URL(SERVER_URL));
+    expect(res.code).toBe(200);
+    expect(direct.getJSON()).toStrictEqual({ message: "Hello, world!" });
+  });
+
+  test("normalizes lowercase methods", () => {
+    const res = wrapperRequest("get", SERVER_URL);
     expect(res).toMatchObject({
       code: 200,
       json: { message: "Hello, world!" },
@@ -545,30 +560,24 @@ describe("v3.2.0 getJSON method", () => {
   });
 });
 
-describe("v3.3.0 multipart/form-data", () => {
-  test("Can upload one file", () => {
+describe("multipart/form-data", () => {
+  test("uploads buffer and text fields with FormData", () => {
     const testFileLocation = "./tests/data/test-upload.txt";
-    const res = request("POST", `${SERVER_URL}/upload`, {
-      formData: [
-        {
-          file: testFileLocation,
-          name: "1-test-file-upload",
-          type: "text/plain",
-        },
-        {
-          name: "2-test-contents",
-          contents: "Example Content!",
-        },
-      ],
-    });
+    const file = fs.readFileSync(testFileLocation);
+    const form = new FormData();
+    form.append("1-test-file-upload", file, path.basename(testFileLocation));
+    form.append("2-test-contents", "Example Content!");
+
+    const res = request("POST", `${SERVER_URL}/upload`, { form });
+
     expect(res.statusCode).toStrictEqual(200);
     expect(res.getJSON()).toStrictEqual([
       {
         name: "1-test-file-upload",
         file: {
           name: path.basename(testFileLocation),
-          size: fs.readFileSync(testFileLocation).length,
-          type: "text/plain",
+          size: file.length,
+          type: expect.any(String),
           lastModified: expect.any(Number),
         },
       },

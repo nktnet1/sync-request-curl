@@ -1,7 +1,10 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["./src/index.ts", "./src/errors.ts"],
+  entry: {
+    index: "./src/index.ts",
+    errors: "./src/errors.ts",
+  },
   format: ["commonjs", "esm"],
   platform: "node",
   outDir: "./dist",

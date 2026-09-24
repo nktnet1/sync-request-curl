@@ -9,12 +9,12 @@ use curl_sys::{
   CURLOPTTYPE_OBJECTPOINT,
 };
 use napi::bindgen_prelude::{Buffer, Either};
-use napi::{Error, Result, Status};
+use napi::{Error, Result};
 use napi_derive::napi;
 
 // curl-sys intentionally exposes the older form API but not libcurl's MIME API.
 // The MIME symbols are part of libcurl's public ABI; keep this small bridge here
-// so multipart requests retain the same implementation as the former C++ addon.
+// for multipart requests without exposing transport-specific APIs to JavaScript.
 #[repr(C)]
 struct CurlMime {
   _private: [u8; 0],
@@ -35,17 +35,10 @@ unsafe extern "C" {
     data: *const c_char,
     data_size: usize,
   ) -> CURLcode;
-  fn curl_mime_filedata(part: *mut CurlMimePart, filename: *const c_char) -> CURLcode;
-  fn curl_mime_type(part: *mut CurlMimePart, mime_type: *const c_char) -> CURLcode;
   fn curl_mime_filename(part: *mut CurlMimePart, filename: *const c_char) -> CURLcode;
 }
 
 const CURLOPT_MIMEPOST: CURLoption = CURLOPTTYPE_OBJECTPOINT + 269;
-// curl-sys 0.4.90 bundles libcurl 8.21.0. CURLFOLLOW_OBEYCODE (2), added
-// in libcurl 8.13.0, preserves our redirect method semantics when
-// CURLOPT_CUSTOMREQUEST is set.
-const CURL_FOLLOW_OBEY_CODE: c_long = 2;
-
 static CURL_INIT: OnceLock<CURLcode> = OnceLock::new();
 #[cfg(unix)]
 static CA_PROBE: OnceLock<openssl_probe::ProbeResult> = OnceLock::new();
@@ -118,28 +111,11 @@ impl Drop for Mime {
 }
 
 #[napi(object, object_to_js = false)]
-pub struct NativeCurlOptions {
-  pub proxy: Option<String>,
-  #[napi(js_name = "proxyUserPwd")]
-  pub proxy_user_pwd: Option<String>,
-  #[napi(js_name = "userAgent")]
-  pub user_agent: Option<String>,
-  pub referer: Option<String>,
-  #[napi(js_name = "caInfo")]
-  pub ca_info: Option<String>,
-  pub interface: Option<String>,
-  #[napi(js_name = "tcpKeepAlive")]
-  pub tcp_keep_alive: Option<bool>,
-}
-
-#[napi(object, object_to_js = false)]
-pub struct NativePostField {
-  pub name: String,
-  pub contents: Option<String>,
-  pub file: Option<String>,
-  #[napi(js_name = "type")]
-  pub content_type: Option<String>,
-  pub filename: Option<String>,
+pub struct NativeFormDataEntry {
+  pub key: String,
+  pub value: Either<String, Buffer>,
+  #[napi(js_name = "fileName")]
+  pub file_name: Option<String>,
 }
 
 #[napi(object, object_to_js = false)]
@@ -148,25 +124,18 @@ pub struct NativeRequestOptions {
   pub url: String,
   pub headers: Option<Vec<String>>,
   pub body: Option<Either<String, Buffer>>,
-  #[napi(js_name = "formData")]
-  pub form_data: Option<Vec<NativePostField>>,
+  pub form: Option<Vec<NativeFormDataEntry>>,
   pub timeout: Option<i64>,
-  pub insecure: Option<bool>,
   #[napi(js_name = "noBody")]
   pub no_body: Option<bool>,
-  #[napi(js_name = "followRedirects")]
-  pub follow_redirects: Option<bool>,
-  #[napi(js_name = "maxRedirects")]
-  pub max_redirects: Option<i64>,
-  #[napi(js_name = "curlOptions")]
-  pub curl_options: Option<NativeCurlOptions>,
 }
 
 #[napi(object, object_from_js = false, use_nullable = true)]
 pub struct NativeResponse {
-  pub code: i64,
-  #[napi(js_name = "errorMessage")]
-  pub error_message: String,
+  #[napi(js_name = "transportCode")]
+  pub transport_code: i64,
+  #[napi(js_name = "transportMessage")]
+  pub transport_message: String,
   #[napi(js_name = "statusCode")]
   pub status_code: i64,
   #[napi(js_name = "effectiveUrl")]
@@ -188,7 +157,7 @@ fn curl_string(value: &str) -> CString {
 fn curl_error_message(code: CURLcode) -> String {
   let message = unsafe { curl_sys::curl_easy_strerror(code) };
   if message.is_null() {
-    return format!("libcurl error {code}");
+    return format!("transport error {code}");
   }
   unsafe { CStr::from_ptr(message) }
     .to_string_lossy()
@@ -243,13 +212,8 @@ fn set_string_option(
 #[cfg(unix)]
 fn configure_default_ca(
   curl: *mut CURL,
-  custom_ca_info: Option<&str>,
   keepalive: &mut Vec<CString>,
 ) -> CURLcode {
-  if custom_ca_info.is_some_and(|value| !value.is_empty()) {
-    return CURLE_OK;
-  }
-
   let probe = CA_PROBE.get_or_init(openssl_probe::probe);
   let mut code = CURLE_OK;
   if let Some(cert_file) = &probe.cert_file {
@@ -284,7 +248,6 @@ fn configure_default_ca(
 #[cfg(not(unix))]
 fn configure_default_ca(
   _curl: *mut CURL,
-  _custom_ca_info: Option<&str>,
   _keepalive: &mut Vec<CString>,
 ) -> CURLcode {
   CURLE_OK
@@ -354,92 +317,61 @@ request_callback!(header_callback, |state: &mut RequestState, chunk: &[u8]| {
 
 fn build_mime(
   curl: *mut CURL,
-  fields: &[NativePostField],
+  fields: &[NativeFormDataEntry],
   keepalive: &mut Vec<CString>,
-) -> Result<std::result::Result<Mime, CURLcode>> {
-  for field in fields {
-    if field.file.is_none() && field.contents.is_none() {
-      return Err(Error::new(
-        Status::InvalidArg,
-        "Missing native request option: contents".to_string(),
-      ));
-    }
-  }
-
-  let mime = match Mime::new(curl) {
-    Ok(mime) => mime,
-    Err(code) => return Ok(Err(code)),
-  };
+) -> std::result::Result<Mime, CURLcode> {
+  let mime = Mime::new(curl)?;
 
   for field in fields {
     let part = unsafe { curl_mime_addpart(mime.0) };
     if part.is_null() {
-      return Ok(Err(CURLE_OUT_OF_MEMORY));
+      return Err(CURLE_OUT_OF_MEMORY);
     }
 
-    keepalive.push(curl_string(&field.name));
+    keepalive.push(curl_string(&field.key));
     let name = keepalive.last().expect("just pushed MIME name").as_ptr();
     let mut code = unsafe { curl_mime_name(part, name) };
     if code != CURLE_OK {
-      return Ok(Err(code));
+      return Err(code);
     }
 
-    if let Some(file) = &field.file {
-      keepalive.push(curl_string(file));
-      let file = keepalive.last().expect("just pushed MIME file").as_ptr();
-      code = unsafe { curl_mime_filedata(part, file) };
-      if code != CURLE_OK {
-        return Ok(Err(code));
-      }
-
-      if let Some(content_type) = field.content_type.as_deref().filter(|value| !value.is_empty()) {
-        keepalive.push(curl_string(content_type));
-        let content_type = keepalive
-          .last()
-          .expect("just pushed MIME content type")
-          .as_ptr();
-        code = unsafe { curl_mime_type(part, content_type) };
-        if code != CURLE_OK {
-          return Ok(Err(code));
-        }
-      }
-
-      if let Some(filename) = field.filename.as_deref().filter(|value| !value.is_empty()) {
-        keepalive.push(curl_string(filename));
-        let filename = keepalive
-          .last()
-          .expect("just pushed MIME filename")
-          .as_ptr();
-        code = unsafe { curl_mime_filename(part, filename) };
-        if code != CURLE_OK {
-          return Ok(Err(code));
-        }
-      }
-      continue;
-    }
-
-    let contents = field
-      .contents
-      .as_deref()
-      .expect("validated non-file MIME field has contents");
-    code = unsafe {
-      curl_mime_data(
-        part,
-        contents.as_bytes().as_ptr().cast::<c_char>(),
-        contents.len(),
-      )
+    let data: &[u8] = match &field.value {
+      Either::A(text) => text.as_bytes(),
+      Either::B(buffer) => buffer.as_ref(),
     };
+    let data_pointer = if data.is_empty() {
+      c"".as_ptr()
+    } else {
+      data.as_ptr().cast::<c_char>()
+    };
+    code = unsafe { curl_mime_data(part, data_pointer, data.len()) };
     if code != CURLE_OK {
-      return Ok(Err(code));
+      return Err(code);
+    }
+
+    if let Some(file_name) = field
+      .file_name
+      .as_deref()
+      .filter(|value| !value.is_empty())
+    {
+      keepalive.push(curl_string(file_name));
+      let file_name = keepalive
+        .last()
+        .expect("just pushed MIME filename")
+        .as_ptr();
+      code = unsafe { curl_mime_filename(part, file_name) };
+      if code != CURLE_OK {
+        return Err(code);
+      }
     }
   }
 
   let code = unsafe { curl_sys::curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime.0) };
   if code != CURLE_OK {
-    return Ok(Err(code));
+    return Err(code);
   }
 
-  Ok(Ok(mime))
+  Ok(mime)
 }
 
 fn get_string_info(curl: *mut CURL, info: curl_sys::CURLINFO) -> Option<String> {
@@ -461,9 +393,8 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   // Keep the original Node Buffer alive for the whole synchronous transfer.
   // napi::Buffer is zero-copy; converting it to Vec<u8> would duplicate large uploads.
   let request_body = options.body;
-  let has_form_data = options.form_data.is_some();
-  let form_data = options.form_data.unwrap_or_default();
-  let curl_options = options.curl_options;
+  let has_form = options.form.is_some();
+  let form = options.form.unwrap_or_default();
 
   let easy = EasyHandle::new()?;
   let curl = easy.0;
@@ -504,33 +435,10 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(
       curl,
-      curl_sys::CURLOPT_SSL_VERIFYPEER,
-      if options.insecure.unwrap_or(false) { 0 as c_long } else { 1 as c_long },
-    )
-  });
-  keep_first_error(&mut code, unsafe {
-    curl_sys::curl_easy_setopt(
-      curl,
       curl_sys::CURLOPT_NOBODY,
       if options.no_body.unwrap_or(false) { 1 as c_long } else { 0 as c_long },
     )
   });
-  if options.follow_redirects.unwrap_or(false) {
-    keep_first_error(&mut code, unsafe {
-      curl_sys::curl_easy_setopt(
-        curl,
-        curl_sys::CURLOPT_FOLLOWLOCATION,
-        CURL_FOLLOW_OBEY_CODE,
-      )
-    });
-    keep_first_error(&mut code, unsafe {
-      curl_sys::curl_easy_setopt(
-        curl,
-        curl_sys::CURLOPT_MAXREDIRS,
-        options.max_redirects.unwrap_or(-1) as c_long,
-      )
-    });
-  }
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(
       curl,
@@ -551,13 +459,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_HEADERDATA, state_pointer)
   });
-  let custom_ca_info = curl_options
-    .as_ref()
-    .and_then(|options| options.ca_info.as_deref());
-  keep_first_error(
-    &mut code,
-    configure_default_ca(curl, custom_ca_info, &mut keepalive),
-  );
+  keep_first_error(&mut code, configure_default_ca(curl, &mut keepalive));
 
   for header in options.headers.unwrap_or_default() {
     let next = headers.append(&header);
@@ -594,80 +496,10 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     });
   }
 
-  if code == CURLE_OK && has_form_data {
-    match build_mime(curl, &form_data, &mut keepalive)? {
+  if code == CURLE_OK && has_form {
+    match build_mime(curl, &form, &mut keepalive) {
       Ok(next_mime) => mime = Some(next_mime),
       Err(next_code) => code = next_code,
-    }
-  }
-
-  if code == CURLE_OK {
-    if let Some(curl_options) = &curl_options {
-      keep_first_error(
-        &mut code,
-        set_string_option(
-          curl,
-          curl_sys::CURLOPT_PROXY,
-          curl_options.proxy.as_deref(),
-          &mut keepalive,
-          true,
-        ),
-      );
-      keep_first_error(
-        &mut code,
-        set_string_option(
-          curl,
-          curl_sys::CURLOPT_PROXYUSERPWD,
-          curl_options.proxy_user_pwd.as_deref(),
-          &mut keepalive,
-          false,
-        ),
-      );
-      keep_first_error(
-        &mut code,
-        set_string_option(
-          curl,
-          curl_sys::CURLOPT_USERAGENT,
-          curl_options.user_agent.as_deref(),
-          &mut keepalive,
-          false,
-        ),
-      );
-      keep_first_error(
-        &mut code,
-        set_string_option(
-          curl,
-          curl_sys::CURLOPT_REFERER,
-          curl_options.referer.as_deref(),
-          &mut keepalive,
-          false,
-        ),
-      );
-      keep_first_error(
-        &mut code,
-        set_string_option(
-          curl,
-          curl_sys::CURLOPT_CAINFO,
-          curl_options.ca_info.as_deref(),
-          &mut keepalive,
-          false,
-        ),
-      );
-      keep_first_error(
-        &mut code,
-        set_string_option(
-          curl,
-          curl_sys::CURLOPT_INTERFACE,
-          curl_options.interface.as_deref(),
-          &mut keepalive,
-          false,
-        ),
-      );
-      if curl_options.tcp_keep_alive.unwrap_or(false) {
-        keep_first_error(&mut code, unsafe {
-          curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_TCP_KEEPALIVE, 1 as c_long)
-        });
-      }
     }
   }
 
@@ -690,8 +522,8 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   let _keepalive = keepalive;
 
   Ok(NativeResponse {
-    code: i64::from(code),
-    error_message: curl_error_message(code),
+    transport_code: i64::from(code),
+    transport_message: curl_error_message(code),
     status_code: status_code as i64,
     effective_url,
     redirect_url,

@@ -13,6 +13,11 @@
     "sourceMap": true,
     "strict": true,
     "target": "es2022",
-    "erasableSyntaxOnly": true
+    "erasableSyntaxOnly": true,
+    "paths": {
+      "#/*": ["./src/*"],
+      "#/native": ["./src/native/index.ts"],
+      "#/request": ["./src/request/index.ts"]
+    }
   }
 }

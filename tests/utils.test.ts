@@ -1,9 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { normalizeUrlHostname, parseReturnedHeaders } from "../src/utils";
+import { parseResponseHeaders } from "#/http/headers";
+import { normalizeUrlHostname } from "#/http/url";
 
-describe("parseReturnedHeaders", () => {
+describe("parseResponseHeaders", () => {
   test("preserves repeated response headers", () => {
-    const headers = parseReturnedHeaders([
+    const headers = parseResponseHeaders([
       "HTTP/1.1 200 OK",
       "Set-Cookie: session=abc; Path=/",
       "Set-Cookie: preferences=dark; Path=/",
@@ -22,18 +23,16 @@ describe("parseReturnedHeaders", () => {
   });
 
   test("parses header lines without a status line", () => {
-    const headers = parseReturnedHeaders(["X-Test: value"]);
-
+    const headers = parseResponseHeaders(["X-Test: value"]);
     expect(headers["x-test"]).toStrictEqual("value");
   });
 
   test("keeps header values containing colons", () => {
-    const headers = parseReturnedHeaders([
+    const headers = parseResponseHeaders([
       "HTTP/1.1 200 OK",
       "Location: https://example.com:8443/path",
       "",
     ]);
-
     expect(headers.location).toStrictEqual("https://example.com:8443/path");
   });
 });

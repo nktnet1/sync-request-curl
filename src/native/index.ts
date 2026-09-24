@@ -2,39 +2,25 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { FormDataEntry } from "#/form-data";
 import {
   type LinuxLibc,
   resolveNativePlatformKey,
-} from "#/native-platform-key";
-import type { HttpPostField } from "#/types";
-
-export interface NativeCurlOptions {
-  proxy?: string;
-  proxyUserPwd?: string;
-  userAgent?: string;
-  referer?: string;
-  caInfo?: string;
-  interface?: string;
-  tcpKeepAlive?: boolean;
-}
+} from "#/native/platform-key";
 
 export interface NativeRequestOptions {
   method: string;
   url: string;
   headers: string[];
   body?: string | Buffer;
-  formData?: HttpPostField[];
+  form?: FormDataEntry[];
   timeout: number;
-  insecure: boolean;
   noBody: boolean;
-  followRedirects: boolean;
-  maxRedirects: number;
-  curlOptions?: NativeCurlOptions;
 }
 
 export interface NativeResponse {
-  code: number;
-  errorMessage: string;
+  transportCode: number;
+  transportMessage: string;
   statusCode: number;
   effectiveUrl: string | null;
   redirectUrl: string | null;
@@ -56,13 +42,32 @@ interface ProcessReport {
 export interface NativeLoadOptions {
   explicitPath?: string;
   platformKey?: string;
-  moduleDirectory?: string;
+  packageRoot?: string;
   exists?: FileExists;
   requireNative?: NativeRequire;
 }
 
 const nativeRequire = createRequire(import.meta.url) as NativeRequire;
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
+
+export const findPackageRoot = (
+  startDirectory: string,
+  exists: FileExists = existsSync,
+): string => {
+  let currentDirectory = startDirectory;
+
+  while (true) {
+    if (exists(join(currentDirectory, "package.json"))) return currentDirectory;
+
+    const parentDirectory = dirname(currentDirectory);
+    if (parentDirectory === currentDirectory) {
+      throw new Error(
+        `Unable to locate the sync-request-curl package root from ${startDirectory}`,
+      );
+    }
+    currentDirectory = parentDirectory;
+  }
+};
 
 export const getLinuxLibc = (
   report = process.report?.getReport() as ProcessReport | undefined,
@@ -87,9 +92,7 @@ export const loadFirstExisting = (
   requireNative: NativeRequire = nativeRequire,
 ): NativeBinding | undefined => {
   for (const candidate of candidates) {
-    if (exists(candidate)) {
-      return requireNative(candidate);
-    }
+    if (exists(candidate)) return requireNative(candidate);
   }
   return undefined;
 };
@@ -98,19 +101,13 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
   const requireNative = options.requireNative ?? nativeRequire;
   const explicitPath =
     options.explicitPath ?? process.env.SYNC_REQUEST_CURL_NATIVE_PATH;
-  if (explicitPath) {
-    return requireNative(explicitPath);
-  }
+  if (explicitPath) return requireNative(explicitPath);
 
   const platformKey = options.platformKey ?? getPlatformKey();
-  const currentModuleDirectory = options.moduleDirectory ?? moduleDirectory;
-  const localBuildDirectory = join(
-    currentModuleDirectory,
-    "..",
-    "native",
-    "build",
-  );
-  const prebuildDirectory = join(currentModuleDirectory, "..", "prebuilds");
+  const currentPackageRoot =
+    options.packageRoot ?? findPackageRoot(moduleDirectory);
+  const localBuildDirectory = join(currentPackageRoot, "native", "build");
+  const prebuildDirectory = join(currentPackageRoot, "prebuilds");
   const binding = loadFirstExisting(
     [
       join(localBuildDirectory, "sync_request_curl_native.node"),
@@ -120,9 +117,7 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
     requireNative,
   );
 
-  if (binding) {
-    return binding;
-  }
+  if (binding) return binding;
 
   throw new Error(
     `Unable to load the sync-request-curl native binary for ${platformKey}. ` +

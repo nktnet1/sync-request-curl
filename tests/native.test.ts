@@ -1,13 +1,14 @@
 import { join } from "node:path";
 import { describe, expect, test, vi } from "vitest";
 import {
+  findPackageRoot,
   getLinuxLibc,
   getPlatformKey,
   loadBinding,
   loadFirstExisting,
   type NativeBinding,
 } from "#/native";
-import { isNativePlatformKey } from "#/native-platform-key";
+import { isNativePlatformKey } from "#/native/platform-key";
 
 const fakeBinding = (): NativeBinding => ({
   request: vi.fn(() => {
@@ -54,6 +55,18 @@ describe("native platform detection", () => {
 });
 
 describe("native binding loading", () => {
+  test("finds the package root from a nested source directory", () => {
+    const root = join("", "package");
+    const packageJson = join(root, "package.json");
+
+    expect(
+      findPackageRoot(
+        join(root, "src", "native"),
+        (candidate) => candidate === packageJson,
+      ),
+    ).toBe(root);
+  });
+
   test("loads the first existing candidate", () => {
     const binding = fakeBinding();
     const requireNative = vi.fn(() => binding);
@@ -89,13 +102,18 @@ describe("native binding loading", () => {
     expect(requireNative).toHaveBeenCalledWith("/custom/native.node");
   });
 
-  test("loads the matching prebuild when local outputs are missing", () => {
+  test("prefers the package-local build output over a matching prebuild", () => {
     const binding = fakeBinding();
     const requireNative = vi.fn(() => binding);
-    const root = join("", "package", "src");
-    const expected = join(
-      "",
-      "package",
+    const root = join("", "package");
+    const localBuild = join(
+      root,
+      "native",
+      "build",
+      "sync_request_curl_native.node",
+    );
+    const prebuild = join(
+      root,
       "prebuilds",
       "sync_request_curl_native.linux-x64-musl.node",
     );
@@ -103,7 +121,29 @@ describe("native binding loading", () => {
     expect(
       loadBinding({
         platformKey: "linux-x64-musl",
-        moduleDirectory: root,
+        packageRoot: root,
+        exists: (candidate) =>
+          candidate === localBuild || candidate === prebuild,
+        requireNative,
+      }),
+    ).toBe(binding);
+    expect(requireNative).toHaveBeenCalledWith(localBuild);
+  });
+
+  test("loads the matching prebuild when local outputs are missing", () => {
+    const binding = fakeBinding();
+    const requireNative = vi.fn(() => binding);
+    const root = join("", "package");
+    const expected = join(
+      root,
+      "prebuilds",
+      "sync_request_curl_native.linux-x64-musl.node",
+    );
+
+    expect(
+      loadBinding({
+        platformKey: "linux-x64-musl",
+        packageRoot: root,
         exists: (candidate) => candidate === expected,
         requireNative,
       }),
@@ -115,7 +155,7 @@ describe("native binding loading", () => {
     expect(() =>
       loadBinding({
         platformKey: "linux-arm64-musl",
-        moduleDirectory: join("", "package", "src"),
+        packageRoot: join("", "package"),
         exists: () => false,
         requireNative: vi.fn(),
       }),

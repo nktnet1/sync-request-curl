@@ -1,29 +1,10 @@
-import type { IncomingHttpHeaders } from "http";
+import type { IncomingHttpHeaders } from "node:http";
+import type { FormData } from "#/form-data";
 
-export interface CurlOption {
-  readonly HTTPHEADER: 1;
-  readonly PROXY: 2;
-  readonly PROXYUSERPWD: 3;
-  readonly USERAGENT: 4;
-  readonly REFERER: 5;
-  readonly CAINFO: 6;
-  readonly INTERFACE: 7;
-  readonly TCP_KEEPALIVE: 9;
-}
-
-export type CurlOptionValue = CurlOption[keyof CurlOption];
-export type CurlOptionInput = string | string[] | number | boolean;
-
-export interface Easy {
-  readonly isOpen: boolean;
-  setOpt(option: CurlOptionValue, value: CurlOptionInput): void;
-  close(): void;
-}
-
-// biome-ignore lint/suspicious/noExplicitAny: to match sync-request input type
+// biome-ignore lint/suspicious/noExplicitAny: matches sync-request's JSON input/output type
 export type CustomJsonType = any;
 
-export type HttpVerb =
+export type UppercaseHttpVerb =
   | "GET"
   | "HEAD"
   | "POST"
@@ -33,6 +14,8 @@ export type HttpVerb =
   | "OPTIONS"
   | "TRACE"
   | "PATCH";
+
+export type HttpVerb = UppercaseHttpVerb | Lowercase<UppercaseHttpVerb>;
 
 export type BufferEncoding =
   | "ascii"
@@ -47,46 +30,23 @@ export type BufferEncoding =
   | "binary"
   | "hex";
 
-export type HttpPostField =
-  | {
-      name: string;
-      contents: string;
-    }
-  | {
-      name: string;
-      file: string;
-      type?: string;
-      filename?: string;
-    };
-
-export type SetEasyOptionCallback = (
-  curl: Easy,
-  curlOption: CurlOption,
-) => void;
-
 export interface Options {
   headers?: IncomingHttpHeaders;
-  qs?: { [key: string]: CustomJsonType };
+  qs?: Record<string, CustomJsonType>;
 
-  // You should only specify one of these.
-  // They are processed in the order listed below.
-  //
-  // When no json, body or formdata is provided, Content-Length = 0
-  // will be set in the headers.
+  // Request payloads are mutually exclusive and resolved in this order.
   json?: CustomJsonType;
   body?: string | Buffer;
-  formData?: HttpPostField[];
+  form?: FormData;
 
   timeout?: number;
   followRedirects?: boolean;
   maxRedirects?: number;
 
-  insecure?: boolean;
+  /** Include request inputs in transport error messages. */
   debug?: boolean;
-  setEasyOptions?: SetEasyOptionCallback;
 }
 
-// Infer type `string` if encoding is specified, otherwise `Buffer`.
 export type GetBody = {
   <Encoding extends BufferEncoding>(encoding: Encoding): string;
   (encoding?: undefined): Buffer;
@@ -98,7 +58,7 @@ export interface Response {
   statusCode: number;
   headers: IncomingHttpHeaders;
   url: string;
-  body: string | Buffer;
+  body: Buffer;
   getBody: GetBody;
   getJSON: GetJSON;
 }

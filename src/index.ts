@@ -1,12 +1,16 @@
+import { FormData } from "#/form-data";
 import request from "#/request";
 
+export type { FormDataEntry } from "#/form-data";
+export { FormData } from "#/form-data";
 export type {
   BufferEncoding,
-  HttpPostField,
   HttpVerb,
   Options,
   Response,
-  SetEasyOptionCallback,
+  UppercaseHttpVerb,
 } from "#/types";
 
-export default request;
+const requestWithFormData = Object.assign(request, { FormData });
+
+export default requestWithFormData;
