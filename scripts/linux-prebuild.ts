@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- Build tooling only accesses trusted repository, CI, or explicit CLI paths. */
 import { existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -9,15 +10,15 @@ import { run } from "#scripts/process";
 const root = resolve(import.meta.dirname, "..");
 // Bullseye LTS ended on 2026-08-31. Pin the last complete archive so
 // security mirror cleanup cannot make an otherwise reproducible build fail.
-const BULLSEYE_SNAPSHOT = "20260901T000000Z";
+const bullseyeSnapshot = "20260901T000000Z";
 
 const getBullseyeAptArgs = (): string[] => {
   const sourceList = join(tmpdir(), "sync-request-curl-bullseye.list");
   writeFileSync(
     sourceList,
     [
-      `deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/${BULLSEYE_SNAPSHOT}/ bullseye main`,
-      `deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/${BULLSEYE_SNAPSHOT}/ bullseye-security main`,
+      `deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/${bullseyeSnapshot}/ bullseye main`,
+      `deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/${bullseyeSnapshot}/ bullseye-security main`,
       "",
     ].join("\n"),
   );

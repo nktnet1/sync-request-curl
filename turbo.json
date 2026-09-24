@@ -1,0 +1,11 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "CMAKE_PREFIX_PATH",
+    "CMAKE_TOOLCHAIN_FILE",
+    "CXX",
+    "NODE_IMPORT_LIB",
+    "SYNC_REQUEST_CURL_NATIVE_PATH",
+    "VCPKG_TARGET_TRIPLET"
+  ]
+}

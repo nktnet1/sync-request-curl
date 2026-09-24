@@ -157,6 +157,7 @@ const performRequest = (
   const headers = parseReturnedHeaders(result.headers);
   const body = result.body;
 
+  // eslint-disable-next-line no-unused-vars -- Overload parameter is used only for its generic return mapping.
   function getBody<Encoding extends BufferEncoding>(encoding: Encoding): string;
   function getBody(encoding?: undefined): Buffer;
   function getBody(encoding?: BufferEncoding): string | Buffer {

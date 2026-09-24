@@ -63,7 +63,6 @@ needs a `node.lib` import library while linking. Release CI downloads it for the
 Node version used to build the addon; it is not part of the runtime package and
 does not tie the resulting addon to that Node version.
 
-
 All repository automation under `scripts/` is TypeScript and is executed
 directly by Node.js. No JavaScript, shell, or lifecycle-script wrapper is
 required.

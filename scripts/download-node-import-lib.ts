@@ -1,3 +1,5 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- Build tooling only accesses trusted repository, CI, or explicit CLI paths. */
+/* eslint-disable compat/compat -- This is a Node-only build script; browser compatibility does not apply. */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
