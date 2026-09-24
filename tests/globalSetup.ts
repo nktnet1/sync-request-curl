@@ -10,6 +10,8 @@ const SERVER_READY_MESSAGE = "sync-request-curl:test-server-ready";
 const SERVER_START_TIMEOUT_MS = 5_000;
 const SERVER_STOP_TIMEOUT_MS = 5_000;
 
+let testServer: ChildProcess | undefined;
+
 const isServerReady = async (): Promise<boolean> => {
   try {
     const response = await fetch(serverUrl);
@@ -35,17 +37,19 @@ const waitForServer = async (server: ChildProcess): Promise<void> => {
         `Test server exited before becoming ready (code=${code}, signal=${signal})`,
       );
     }),
-    delay(SERVER_START_TIMEOUT_MS).then(() => {
+    delay(SERVER_START_TIMEOUT_MS, undefined, { ref: false }).then(() => {
       throw new Error(`Timed out waiting for test server at ${serverUrl}`);
     }),
   ]);
 };
 
-const waitForExit = async (server: ChildProcess): Promise<boolean> => {
-  if (server.exitCode !== null || server.signalCode !== null) return true;
+const waitForExit = (server: ChildProcess): Promise<boolean> => {
+  if (server.exitCode !== null || server.signalCode !== null) {
+    return Promise.resolve(true);
+  }
   return Promise.race([
     once(server, "exit").then(() => true),
-    delay(SERVER_STOP_TIMEOUT_MS).then(() => false),
+    delay(SERVER_STOP_TIMEOUT_MS, undefined, { ref: false }).then(() => false),
   ]);
 };
 
@@ -59,9 +63,9 @@ const stopServer = async (server: ChildProcess): Promise<void> => {
 };
 
 /**
- * Starts and stops the local Hono server used by the HTTP integration tests.
+ * Starts the local Hono server used by the HTTP integration tests.
  */
-export default async function setup() {
+export async function setup(): Promise<void> {
   if (await isServerReady()) return;
 
   const server = spawn(
@@ -80,7 +84,16 @@ export default async function setup() {
     throw error;
   }
 
-  return async () => {
-    await stopServer(server);
-  };
+  testServer = server;
+}
+
+/**
+ * Stops the local Hono server started by {@link setup}.
+ */
+export async function teardown(): Promise<void> {
+  if (!testServer) return;
+
+  const server = testServer;
+  testServer = undefined;
+  await stopServer(server);
 }
