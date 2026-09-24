@@ -10,8 +10,7 @@ interface RequestInputs {
 }
 
 const nonAscii = /\P{ASCII}/u;
-const absoluteUrl =
-  /^([A-Za-z][A-Za-z\d+.-]*:\/\/)([^/?#]*)([/?#][\s\S]*)?$/;
+const absoluteUrl = /^([A-Za-z][A-Za-z\d+.-]*:\/\/)([^/?#]*)([/?#][\s\S]*)?$/;
 
 /**
  * Converts only an internationalized hostname to ASCII/Punycode while leaving
