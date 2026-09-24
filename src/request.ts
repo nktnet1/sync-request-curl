@@ -13,6 +13,7 @@ import {
   checkValidCurlCode,
   checkValidStatusCode,
   handleQs,
+  normalizeUrlHostname,
   parseIncomingHeaders,
   parseReturnedHeaders,
 } from "#/utils";
@@ -131,10 +132,11 @@ const performRequest = (
   options: Options,
   followRedirects = false,
 ): { response: Response; redirectUrl: string | null } => {
-  const requestUrl =
+  const requestUrl = normalizeUrlHostname(
     options.qs && Object.keys(options.qs).length
       ? handleQs(url, options.qs)
-      : url;
+      : url,
+  );
 
   const httpHeaders = parseIncomingHeaders(options.headers);
   const payload = preparePayload(options, httpHeaders);

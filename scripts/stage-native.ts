@@ -8,12 +8,7 @@ import {
 } from "#scripts/native-platform";
 
 const root = resolve(import.meta.dirname, "..");
-const source = join(
-  root,
-  "native",
-  "build",
-  "sync_request_curl_native.node",
-);
+const source = join(root, "native", "build", "sync_request_curl_native.node");
 const outputDirectory = join(root, "prebuilds");
 const { values } = parseArgs({
   options: {

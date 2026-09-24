@@ -15,7 +15,6 @@ export interface NativeCurlOptions {
   referer?: string;
   caInfo?: string;
   interface?: string;
-  dnsServers?: string;
   tcpKeepAlive?: boolean;
 }
 

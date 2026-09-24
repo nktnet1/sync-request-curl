@@ -1,3 +1,4 @@
+import { domainToASCII } from "node:url";
 import type { IncomingHttpHeaders } from "http";
 import { CurlError } from "#/errors";
 import type { HttpVerb, Options } from "#/types";
@@ -7,6 +8,53 @@ interface RequestInputs {
   url: string;
   options: Options;
 }
+
+const NON_ASCII = /[^\p{ASCII}]/u;
+const ABSOLUTE_URL = /^([A-Za-z][A-Za-z\d+.-]*:\/\/)([^/?#]*)([\s\S]*)$/;
+
+/**
+ * Converts only an internationalized hostname to ASCII/Punycode while leaving
+ * the rest of the URL byte-for-byte unchanged. The vendored curl-sys build
+ * does not enable libcurl's optional IDN backend.
+ */
+export const normalizeUrlHostname = (url: string): string => {
+  if (!NON_ASCII.test(url)) {
+    return url;
+  }
+
+  const match = ABSOLUTE_URL.exec(url);
+  if (!match) {
+    return url;
+  }
+
+  const [, scheme, authority, remainder] = match;
+  const userInfoEnd = authority.lastIndexOf("@");
+  const userInfo = userInfoEnd >= 0 ? authority.slice(0, userInfoEnd + 1) : "";
+  const hostAndPort = authority.slice(userInfoEnd + 1);
+
+  // IPv6 literals are already ASCII and use colons as part of the address.
+  if (hostAndPort.startsWith("[")) {
+    return url;
+  }
+
+  const portSeparator = hostAndPort.lastIndexOf(":");
+  const hasPort =
+    portSeparator >= 0 && /^\d*$/.test(hostAndPort.slice(portSeparator + 1));
+  const hostname = hasPort ? hostAndPort.slice(0, portSeparator) : hostAndPort;
+
+  if (!NON_ASCII.test(hostname)) {
+    return url;
+  }
+
+  const asciiHostname = domainToASCII(hostname);
+  if (!asciiHostname) {
+    // Preserve existing libcurl error behaviour for malformed hostnames.
+    return url;
+  }
+
+  const port = hasPort ? hostAndPort.slice(portSeparator) : "";
+  return `${scheme}${userInfo}${asciiHostname}${port}${remainder}`;
+};
 
 /**
  * Handles query string parameters in a URL by modifying or appending them

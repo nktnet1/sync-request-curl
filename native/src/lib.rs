@@ -128,8 +128,6 @@ pub struct NativeCurlOptions {
   #[napi(js_name = "caInfo")]
   pub ca_info: Option<String>,
   pub interface: Option<String>,
-  #[napi(js_name = "dnsServers")]
-  pub dns_servers: Option<String>,
   #[napi(js_name = "tcpKeepAlive")]
   pub tcp_keep_alive: Option<bool>,
 }
@@ -671,15 +669,6 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
           curl,
           curl_sys::CURLOPT_INTERFACE,
           curl_options.interface.as_deref(),
-          &mut keepalive,
-        ),
-      );
-      keep_first_error(
-        &mut code,
-        set_string_option(
-          curl,
-          curl_sys::CURLOPT_DNS_SERVERS,
-          curl_options.dns_servers.as_deref(),
           &mut keepalive,
         ),
       );

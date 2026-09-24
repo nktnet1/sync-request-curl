@@ -8,7 +8,6 @@ export interface CurlOption {
   readonly REFERER: 5;
   readonly CAINFO: 6;
   readonly INTERFACE: 7;
-  readonly DNS_SERVERS: 8;
   readonly TCP_KEEPALIVE: 9;
 }
 

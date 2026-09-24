@@ -14,7 +14,6 @@ export const curlOption = {
   REFERER: 5,
   CAINFO: 6,
   INTERFACE: 7,
-  DNS_SERVERS: 8,
   TCP_KEEPALIVE: 9,
 } as const satisfies CurlOption;
 
@@ -78,9 +77,6 @@ export class EasyOptions implements Easy {
         return;
       case curlOption.INTERFACE:
         this.#curlOptions.interface = stringValue(option, value);
-        return;
-      case curlOption.DNS_SERVERS:
-        this.#curlOptions.dnsServers = stringValue(option, value);
         return;
       case curlOption.TCP_KEEPALIVE:
         if (typeof value !== "boolean" && typeof value !== "number") {

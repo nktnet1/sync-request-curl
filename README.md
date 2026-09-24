@@ -306,7 +306,7 @@ JSON.stringify({
 
   <tr>
     <td>setEasyOptions</td>
-    <td>Optional callback for the supported low-level libcurl options. This has priority over existing request headers/options. Supported options are <code>HTTPHEADER</code>, <code>PROXY</code>, <code>PROXYUSERPWD</code>, <code>USERAGENT</code>, <code>REFERER</code>, <code>CAINFO</code>, <code>INTERFACE</code>, <code>DNS_SERVERS</code>, and <code>TCP_KEEPALIVE</code>.</td>
+    <td>Optional callback for the supported low-level libcurl options. This has priority over existing request headers/options. Supported options are <code>HTTPHEADER</code>, <code>PROXY</code>, <code>PROXYUSERPWD</code>, <code>USERAGENT</code>, <code>REFERER</code>, <code>CAINFO</code>, <code>INTERFACE</code>, and <code>TCP_KEEPALIVE</code>.</td>
     <td>
 <pre>
 (curl, opt) => {

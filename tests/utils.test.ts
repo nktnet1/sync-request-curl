@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { parseReturnedHeaders } from "../src/utils";
+import { normalizeUrlHostname, parseReturnedHeaders } from "../src/utils";
 
 describe("parseReturnedHeaders", () => {
   test("preserves repeated response headers", () => {
@@ -35,5 +35,29 @@ describe("parseReturnedHeaders", () => {
     ]);
 
     expect(headers.location).toStrictEqual("https://example.com:8443/path");
+  });
+});
+
+describe("normalizeUrlHostname", () => {
+  test("converts an internationalized hostname to ASCII", () => {
+    expect(
+      normalizeUrlHostname("https://münchen.example:8443/über?q=你好#résumé"),
+    ).toBe("https://xn--mnchen-3ya.example:8443/über?q=你好#résumé");
+  });
+
+  test("preserves user info while converting the hostname", () => {
+    expect(normalizeUrlHostname("https://user:pass@例え.テスト/path")).toBe(
+      "https://user:pass@xn--r8jz45g.xn--zckzah/path",
+    );
+  });
+
+  test("does not rewrite unicode outside the hostname", () => {
+    const url = "https://example.com/über?q=你好#résumé";
+    expect(normalizeUrlHostname(url)).toBe(url);
+  });
+
+  test("leaves malformed URLs for libcurl to reject", () => {
+    const url = "not a url münchen.example";
+    expect(normalizeUrlHostname(url)).toBe(url);
   });
 });
