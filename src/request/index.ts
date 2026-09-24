@@ -66,12 +66,10 @@ const request = (
 
     const nextUrl = new URL(redirectUrl, response.url).href;
     const nextMethod = getRedirectMethod(currentMethod, response.statusCode);
-    const sameOrigin = new URL(response.url).origin === new URL(nextUrl).origin;
 
     currentOptions = getRedirectOptions(
       currentOptions,
       nextMethod !== currentMethod,
-      sameOrigin,
     );
     currentMethod = nextMethod;
     currentUrl = nextUrl;

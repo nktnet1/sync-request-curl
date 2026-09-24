@@ -42,6 +42,7 @@ export interface Options {
   timeout?: number;
   followRedirects?: boolean;
   maxRedirects?: number;
+  allowRedirectHeaders?: string[];
 
   /** Include request inputs in transport error messages. */
   debug?: boolean;

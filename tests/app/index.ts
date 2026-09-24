@@ -102,7 +102,10 @@ app.get("/redirect/headers/cross-origin", (c) => {
 });
 
 app.get("/redirect/headers/destination", (c) => {
-  return c.json({ apiKey: c.req.header("x-api-key") ?? null });
+  return c.json({
+    apiKey: c.req.header("x-api-key") ?? null,
+    traceId: c.req.header("x-trace-id") ?? null,
+  });
 });
 
 app.post("/content/length", async (c) => {

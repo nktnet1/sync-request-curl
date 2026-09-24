@@ -25,7 +25,7 @@ transport details stay behind the TypeScript request layer.
 
 ## `sync-request` compatibility
 
-- [ ] Add `allowRedirectHeaders` with case-insensitive redirect-header
+- [x] Add `allowRedirectHeaders` with case-insensitive redirect-header
       allow-list semantics.
 - [ ] Add `gzip`, enabled by default, with transparent response decompression
       and an explicit opt-out.
@@ -59,7 +59,7 @@ Replace useful capabilities that were previously reachable through
 
 - [ ] Port the applicable upstream `sync-request` Node.js tests into a focused
       compatibility suite.
-- [ ] Cover redirect-header allow-list behaviour for same-origin and
+- [x] Cover redirect-header allow-list behaviour for same-origin and
       cross-origin redirects.
 - [ ] Cover compressed responses and `gzip: false`.
 - [ ] Cover retry count, delay, HTTP error retries, and transport error retries.

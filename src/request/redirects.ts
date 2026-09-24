@@ -1,3 +1,4 @@
+import type { IncomingHttpHeaders } from "node:http";
 import { RequestError } from "#/errors";
 import type { Options, UppercaseHttpVerb } from "#/types";
 
@@ -21,14 +22,32 @@ const withoutPayload = (options: Options): Options => ({
   form: undefined,
 });
 
+const getRedirectHeaders = (
+  headers: IncomingHttpHeaders | undefined,
+  allowRedirectHeaders: string[] | undefined,
+): IncomingHttpHeaders | undefined => {
+  if (!headers || !allowRedirectHeaders || allowRedirectHeaders.length === 0) {
+    return undefined;
+  }
+
+  const allowedNames = new Set(
+    allowRedirectHeaders.map((name) => name.toLowerCase()),
+  );
+  const entries = Object.entries(headers).filter(([name]) =>
+    allowedNames.has(name.toLowerCase()),
+  );
+  return entries.length > 0
+    ? (Object.fromEntries(entries) as IncomingHttpHeaders)
+    : undefined;
+};
+
 export const getRedirectOptions = (
   options: Options,
   methodChanged: boolean,
-  sameOrigin: boolean,
 ): Options => ({
   ...(methodChanged ? withoutPayload(options) : options),
   qs: undefined,
-  headers: sameOrigin ? options.headers : undefined,
+  headers: getRedirectHeaders(options.headers, options.allowRedirectHeaders),
 });
 
 export const getRemainingTimeout = (

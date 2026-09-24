@@ -512,27 +512,54 @@ describe("Redirects", () => {
     });
   });
 
-  test("Same-origin redirect keeps custom headers", () => {
+  test.each(["same-origin", "cross-origin"])(
+    "%s redirect drops custom headers by default",
+    (redirectType) => {
+      const res = wrapperRequest(
+        "GET",
+        `${SERVER_URL}/redirect/headers/${redirectType}`,
+        { headers: { "x-api-key": "secret" } },
+      );
+      expect(res).toMatchObject({
+        code: 200,
+        json: { apiKey: null, traceId: null },
+      });
+    },
+  );
+
+  test.each(["same-origin", "cross-origin"])(
+    "%s redirect forwards only allow-listed headers case-insensitively",
+    (redirectType) => {
+      const res = wrapperRequest(
+        "GET",
+        `${SERVER_URL}/redirect/headers/${redirectType}`,
+        {
+          headers: {
+            "X-API-Key": "secret",
+            "x-trace-id": "trace",
+          },
+          allowRedirectHeaders: ["x-api-KEY"],
+        },
+      );
+      expect(res).toMatchObject({
+        code: 200,
+        json: { apiKey: "secret", traceId: null },
+      });
+    },
+  );
+
+  test("redirect drops headers when allow-list has no matching names", () => {
     const res = wrapperRequest(
       "GET",
       `${SERVER_URL}/redirect/headers/same-origin`,
-      { headers: { "x-api-key": "secret" } },
+      {
+        headers: { "x-trace-id": "trace" },
+        allowRedirectHeaders: ["x-api-key"],
+      },
     );
     expect(res).toMatchObject({
       code: 200,
-      json: { apiKey: "secret" },
-    });
-  });
-
-  test("Cross-origin redirect drops custom headers", () => {
-    const res = wrapperRequest(
-      "GET",
-      `${SERVER_URL}/redirect/headers/cross-origin`,
-      { headers: { "x-api-key": "secret" } },
-    );
-    expect(res).toMatchObject({
-      code: 200,
-      json: { apiKey: null },
+      json: { apiKey: null, traceId: null },
     });
   });
 
