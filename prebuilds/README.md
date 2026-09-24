@@ -1,9 +1,9 @@
 # Native prebuilds
 
 Release CI builds one Node-API addon for each supported platform and places the
-finished artifacts in the repository-level `prebuilds/` directory. That
-directory is generated binary output only; documentation for the native build
-lives here with the native source.
+finished artifacts alongside this file in the repository-level `prebuilds/`
+directory. The `.node` files are generated release artifacts; this README
+documents their supported matrix, naming, and verification.
 
 The release matrix contains:
 

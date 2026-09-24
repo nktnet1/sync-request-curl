@@ -19,4 +19,4 @@ engines:
 exclude_paths:
   # Documentation is validated manually; Codacy markdown rules conflict with the nested README layout.
   - "native/README.md"
-  - "native/PREBUILDS.md"
+  - "prebuilds/README.md"
