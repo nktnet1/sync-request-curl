@@ -206,6 +206,20 @@ fn keep_first_error(code: &mut CURLcode, next: CURLcode) {
   }
 }
 
+fn set_string_option_value(
+  curl: *mut CURL,
+  option: CURLoption,
+  value: &str,
+  keepalive: &mut Vec<CString>,
+) -> CURLcode {
+  keepalive.push(curl_string(value));
+  let pointer = keepalive
+    .last()
+    .expect("just pushed curl string")
+    .as_ptr();
+  unsafe { curl_sys::curl_easy_setopt(curl, option, pointer) }
+}
+
 fn set_string_option(
   curl: *mut CURL,
   option: CURLoption,
@@ -216,14 +230,21 @@ fn set_string_option(
     return CURLE_OK;
   };
 
-  keepalive.push(curl_string(value));
-  let pointer = keepalive
-    .last()
-    .expect("just pushed curl string")
-    .as_ptr();
-  unsafe { curl_sys::curl_easy_setopt(curl, option, pointer) }
+  set_string_option_value(curl, option, value, keepalive)
 }
 
+fn set_string_option_allow_empty(
+  curl: *mut CURL,
+  option: CURLoption,
+  value: Option<&str>,
+  keepalive: &mut Vec<CString>,
+) -> CURLcode {
+  let Some(value) = value else {
+    return CURLE_OK;
+  };
+
+  set_string_option_value(curl, option, value, keepalive)
+}
 
 #[cfg(unix)]
 fn configure_default_ca(
@@ -574,7 +595,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     if let Some(curl_options) = &curl_options {
       keep_first_error(
         &mut code,
-        set_string_option(
+        set_string_option_allow_empty(
           curl,
           curl_sys::CURLOPT_PROXY,
           curl_options.proxy.as_deref(),
