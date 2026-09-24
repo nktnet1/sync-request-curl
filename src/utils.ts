@@ -9,8 +9,8 @@ interface RequestInputs {
   options: Options;
 }
 
-const NON_ASCII = /[^\p{ASCII}]/u;
-const ABSOLUTE_URL =
+const nonAscii = /\P{ASCII}/u;
+const absoluteUrl =
   /^([A-Za-z][A-Za-z\d+.-]*:\/\/)([^/?#]*)([/?#][\s\S]*)?$/;
 
 /**
@@ -19,11 +19,11 @@ const ABSOLUTE_URL =
  * does not enable libcurl's optional IDN backend.
  */
 export const normalizeUrlHostname = (url: string): string => {
-  if (!NON_ASCII.test(url)) {
+  if (!nonAscii.test(url)) {
     return url;
   }
 
-  const match = ABSOLUTE_URL.exec(url);
+  const match = absoluteUrl.exec(url);
   if (!match) {
     return url;
   }
@@ -43,7 +43,7 @@ export const normalizeUrlHostname = (url: string): string => {
     portSeparator >= 0 && /^\d*$/.test(hostAndPort.slice(portSeparator + 1));
   const hostname = hasPort ? hostAndPort.slice(0, portSeparator) : hostAndPort;
 
-  if (!NON_ASCII.test(hostname)) {
+  if (!nonAscii.test(hostname)) {
     return url;
   }
 
