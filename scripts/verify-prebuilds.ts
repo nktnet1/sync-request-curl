@@ -1,6 +1,9 @@
 import { existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { getPrebuildFilename, supportedPlatformKeys } from "./native-platform";
+import {
+  getPrebuildFilename,
+  supportedPlatformKeys,
+} from "#scripts/native-platform";
 
 const root = resolve(import.meta.dirname, "..");
 const prebuilds = join(root, "prebuilds");

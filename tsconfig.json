@@ -1,4 +1,5 @@
 {
+  "include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"],
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
     "declaration": true,
@@ -13,6 +14,5 @@
     "strict": true,
     "target": "es2022",
     "erasableSyntaxOnly": true
-  },
-  "include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"]
+  }
 }

@@ -1,6 +1,6 @@
-import { CurlCode, curlOption, EasyOptions } from "./curl";
-import type { NativeCurlOptions } from "./native";
-import native from "./native";
+import { CurlCode, curlOption, EasyOptions } from "#/curl";
+import type { NativeCurlOptions } from "#/native";
+import native from "#/native";
 import type {
   BufferEncoding,
   GetJSON,
@@ -8,14 +8,14 @@ import type {
   HttpVerb,
   Options,
   Response,
-} from "./types";
+} from "#/types";
 import {
   checkValidCurlCode,
   checkValidStatusCode,
   handleQs,
   parseIncomingHeaders,
   parseReturnedHeaders,
-} from "./utils";
+} from "#/utils";
 
 const getRedirectMethod = (method: HttpVerb, statusCode: number): HttpVerb => {
   if (statusCode === 303 && method !== "HEAD") {

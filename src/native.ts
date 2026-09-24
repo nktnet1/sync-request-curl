@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { HttpPostField } from "./types";
+import type { HttpPostField } from "#/types";
 
 export interface NativeCurlOptions {
   proxy?: string;

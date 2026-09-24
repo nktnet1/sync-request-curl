@@ -1,4 +1,4 @@
-import request from "./request";
+import request from "#/request";
 
 export type {
   BufferEncoding,
@@ -7,6 +7,6 @@ export type {
   Options,
   Response,
   SetEasyOptionCallback,
-} from "./types";
+} from "#/types";
 
 export default request;

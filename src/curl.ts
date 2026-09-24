@@ -1,10 +1,10 @@
-import type { NativeCurlOptions } from "./native";
+import type { NativeCurlOptions } from "#/native";
 import type {
   CurlOption,
   CurlOptionInput,
   CurlOptionValue,
   Easy,
-} from "./types";
+} from "#/types";
 
 export const curlOption = {
   HTTPHEADER: 1,

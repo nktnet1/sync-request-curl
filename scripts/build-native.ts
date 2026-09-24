@@ -1,7 +1,10 @@
 import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { getCurrentPlatformKey, getPrebuildFilename } from "./native-platform";
-import { canRun, run, splitFlags } from "./process";
+import {
+  getCurrentPlatformKey,
+  getPrebuildFilename,
+} from "#scripts/native-platform";
+import { canRun, run, splitFlags } from "#scripts/process";
 
 const root = resolve(import.meta.dirname, "..");
 const nativeDir = join(root, "native");

@@ -1,6 +1,10 @@
 {
   "name": "sync-request-curl",
   "type": "module",
+  "imports": {
+    "#/*": "./src/*.ts",
+    "#scripts/*": "./scripts/*.ts"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/nktnet1/sync-request-curl"

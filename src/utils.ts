@@ -1,6 +1,6 @@
 import type { IncomingHttpHeaders } from "http";
-import { CurlError } from "./errors";
-import type { HttpVerb, Options } from "./types";
+import { CurlError } from "#/errors";
+import type { HttpVerb, Options } from "#/types";
 
 interface RequestInputs {
   method: HttpVerb;
