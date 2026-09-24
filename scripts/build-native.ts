@@ -77,8 +77,12 @@ const buildNative = (): void => {
     );
   }
 
+  const platform = getCurrentPlatformKey();
   const rustFlags = [
     process.env.RUSTFLAGS,
+    platform.endsWith("-musl")
+      ? "-C target-feature=-crt-static"
+      : undefined,
     process.platform === "linux" ? "-C link-arg=-static-libgcc" : undefined,
   ]
     .filter((value): value is string => Boolean(value))
