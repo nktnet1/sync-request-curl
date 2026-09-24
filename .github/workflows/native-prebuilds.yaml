@@ -141,39 +141,15 @@ jobs:
           path: prebuilds/*.node
           if-no-files-found: error
 
-  publish:
-    needs: collect
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      id-token: write
+      - name: Write release metadata
+        run: |
+          mkdir -p release-metadata
+          printf '%s\n' "$GITHUB_REF_NAME" > release-metadata/tag
+          printf '%s\n' "$GITHUB_SHA" > release-metadata/sha
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Download release prebuilds
-        uses: actions/download-artifact@v4
+      - name: Upload release metadata
+        uses: actions/upload-artifact@v4
         with:
-          name: native-prebuilds
-          path: prebuilds
-
-      - name: Enable pnpm via corepack
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24.x
-          registry-url: https://registry.npmjs.org
-          package-manager-cache: false
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Verify tag matches package version
-        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
-
-      - name: Publish package with trusted publishing
-        run: npm publish
+          name: release-metadata
+          path: release-metadata
+          if-no-files-found: error
