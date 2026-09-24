@@ -1,4 +1,5 @@
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import type { LinuxLibc, NativePlatformKey } from "#scripts/native-platform";
@@ -6,6 +7,34 @@ import { getLinuxLibc, getPrebuildFilename } from "#scripts/native-platform";
 import { run } from "#scripts/process";
 
 const root = resolve(import.meta.dirname, "..");
+// Bullseye LTS ended on 2026-08-31. Pin the last complete archive so
+// security mirror cleanup cannot make an otherwise reproducible build fail.
+const BULLSEYE_SNAPSHOT = "20260901T000000Z";
+
+const getBullseyeAptArgs = (): string[] => {
+  const sourceList = join(tmpdir(), "sync-request-curl-bullseye.list");
+  writeFileSync(
+    sourceList,
+    [
+      `deb [check-valid-until=no] https://snapshot.debian.org/archive/debian/${BULLSEYE_SNAPSHOT}/ bullseye main`,
+      `deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/${BULLSEYE_SNAPSHOT}/ bullseye-security main`,
+      "",
+    ].join("\n"),
+  );
+
+  return [
+    "-o",
+    `Dir::Etc::sourcelist=${sourceList}`,
+    "-o",
+    "Dir::Etc::sourceparts=-",
+    "-o",
+    "APT::Get::List-Cleanup=0",
+    "-o",
+    "Acquire::Check-Valid-Until=false",
+    "-o",
+    "Acquire::Retries=5",
+  ];
+};
 const { values } = parseArgs({
   options: {
     libc: { type: "string" },
@@ -94,8 +123,10 @@ const installBuildDependencies = (targetLibc: LinuxLibc): void => {
     return;
   }
 
-  run("apt-get", ["update"]);
+  const aptArgs = getBullseyeAptArgs();
+  run("apt-get", [...aptArgs, "update"]);
   run("apt-get", [
+    ...aptArgs,
     "install",
     "-y",
     "--no-install-recommends",
