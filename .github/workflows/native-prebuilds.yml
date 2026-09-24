@@ -38,7 +38,15 @@ jobs:
         with:
           node-version: 22.x
 
+      - name: Restore cached native addon
+        id: native-cache
+        uses: actions/cache@v4
+        with:
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          key: native-prebuild-v1-${{ matrix.platform }}-${{ hashFiles('native/**', 'rust-toolchain.toml', 'scripts/*.ts') }}
+
       - name: Build Linux prebuild
+        if: steps.native-cache.outputs.cache-hit != 'true'
         run: node scripts/linux-prebuild.ts --libc=${{ matrix.libc }} --mode=build
 
       - name: Upload native addon
@@ -72,13 +80,23 @@ jobs:
         with:
           node-version: 22.x
 
+      - name: Restore cached native addon
+        id: native-cache
+        uses: actions/cache@v4
+        with:
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          key: native-prebuild-v1-${{ matrix.platform }}-${{ hashFiles('native/**', 'rust-toolchain.toml', 'scripts/*.ts') }}
+
       - name: Set up Rust
+        if: steps.native-cache.outputs.cache-hit != 'true'
         run: rustup toolchain install 1.88.0 --profile minimal --no-self-update
 
       - name: Build native addon
+        if: steps.native-cache.outputs.cache-hit != 'true'
         run: node scripts/build-native.ts
 
       - name: Stage native addon
+        if: steps.native-cache.outputs.cache-hit != 'true'
         run: node scripts/stage-native.ts --platform=${{ matrix.platform }}
 
       - name: Verify native addon loads
