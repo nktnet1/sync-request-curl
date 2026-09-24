@@ -1,13 +1,14 @@
 import {
-  isNativePlatformKey,
   type LinuxLibc,
   type NativePlatformKey,
   resolveNativePlatformKey,
-  supportedPlatformKeys,
 } from "#native-platform-key";
 
-export type { LinuxLibc, NativePlatformKey };
-export { isNativePlatformKey, supportedPlatformKeys };
+export type { LinuxLibc, NativePlatformKey } from "#native-platform-key";
+export {
+  isNativePlatformKey,
+  supportedPlatformKeys,
+} from "#native-platform-key";
 
 export const getLinuxLibc = (): LinuxLibc => {
   const report = process.report?.getReport() as

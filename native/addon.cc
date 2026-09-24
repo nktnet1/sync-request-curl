@@ -200,8 +200,8 @@ size_t HandleCurlData(
     return 0;
   }
   const size_t bytes = size * nmemb;
-  auto& state = *static_cast<RequestState*>(userdata);
   try {
+    auto& state = *static_cast<RequestState*>(userdata);
     store(state, ptr, bytes);
     return bytes;
   } catch (...) {
