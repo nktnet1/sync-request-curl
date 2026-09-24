@@ -22,7 +22,7 @@ export const getLinuxLibc = (): LinuxLibc => {
 export const isNativePlatformKey = (
   value: string,
 ): value is NativePlatformKey =>
-  supportedPlatformKeys.some((candidate) => candidate === value);
+  (supportedPlatformKeys as readonly string[]).includes(value);
 
 export const getCurrentPlatformKey = (): NativePlatformKey => {
   const { platform, arch } = process;

@@ -65,9 +65,9 @@ describe("native binding loading", () => {
   });
 
   test("returns undefined when no candidate exists", () => {
-    expect(loadFirstExisting(["/missing.node"], () => false, vi.fn())).toBe(
-      undefined,
-    );
+    expect(
+      loadFirstExisting(["/missing.node"], () => false, vi.fn()),
+    ).toBeUndefined();
   });
 
   test("honours an explicit native path", () => {

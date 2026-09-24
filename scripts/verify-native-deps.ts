@@ -53,7 +53,7 @@ if (unexpected.length > 0) {
 const parseVersion = (value: string): [number, number] => {
   const [major, minor] = value.split(".").map(Number);
   if (!Number.isInteger(major) || !Number.isInteger(minor)) {
-    throw new Error(`Invalid glibc version: ${value}`);
+    throw new TypeError(`Invalid glibc version: ${value}`);
   }
   return [major, minor];
 };

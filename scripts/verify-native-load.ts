@@ -16,7 +16,7 @@ if (!existsSync(file)) throw new Error(`Native addon does not exist: ${file}`);
 const nativeRequire = createRequire(import.meta.url);
 const binding = nativeRequire(file) as { request?: unknown };
 if (typeof binding.request !== "function") {
-  throw new Error(`Native addon does not export request(): ${file}`);
+  throw new TypeError(`Native addon does not export request(): ${file}`);
 }
 
 console.log(`Loaded native addon: ${file}`);
