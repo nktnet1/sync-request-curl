@@ -16,7 +16,82 @@ on:
       - '**/README.md'
 
 jobs:
+  native:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            artifact: ubuntu-latest
+            platform: linux-x64-gnu
+            kind: linux
+            libc: gnu
+            vcpkg-ref: 2026.06.24
+          - runner: ubuntu-24.04
+            artifact: alpine-latest
+            platform: linux-x64-musl
+            kind: linux
+            libc: musl
+            vcpkg-ref: 2026.06.24
+          - runner: macos-15
+            artifact: macos-latest
+            platform: darwin-arm64
+            kind: desktop
+            triplet: arm64-osx
+            vcpkg-ref: 2026.07.29
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Checkout vcpkg
+        uses: actions/checkout@v7
+        with:
+          repository: microsoft/vcpkg
+          ref: ${{ matrix.vcpkg-ref }}
+          path: .vcpkg
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+
+      - name: Build Linux prebuild
+        if: matrix.kind == 'linux'
+        run: node scripts/linux-prebuild.ts --libc=${{ matrix.libc }} --mode=build
+
+      - name: Bootstrap vcpkg
+        if: matrix.kind == 'desktop'
+        run: ./.vcpkg/bootstrap-vcpkg.sh -disableMetrics
+
+      - name: Install static libcurl
+        if: matrix.kind == 'desktop'
+        run: ./.vcpkg/vcpkg install 'curl[http2]:${{ matrix.triplet }}'
+
+      - name: Build native addon
+        if: matrix.kind == 'desktop'
+        env:
+          CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/.vcpkg/scripts/buildsystems/vcpkg.cmake
+          VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
+        run: node scripts/build-native.ts --cmake
+
+      - name: Stage native addon
+        if: matrix.kind == 'desktop'
+        run: node scripts/stage-native.ts --platform=${{ matrix.platform }}
+
+      - name: Verify native addon loads
+        if: matrix.kind == 'desktop'
+        run: node scripts/verify-native-load.ts --file=prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+
+      - name: Upload native addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.artifact }}
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          if-no-files-found: error
+
   test:
+    needs: native
     strategy:
       matrix:
         os:
@@ -45,6 +120,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Download native addon
+        uses: actions/download-artifact@v4
+        with:
+          name: native-${{ matrix.os }}
+          path: prebuilds
+
       - name: Run lint and format
         if: matrix.os == 'ubuntu-latest'
         run: pnpm check
@@ -65,3 +146,31 @@ jobs:
         uses: codecov/codecov-action@v7
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  test-musl:
+    needs: native
+    strategy:
+      matrix:
+        node-version:
+          - '22'
+          - '24'
+          - '26'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+
+      - name: Download Alpine native addon
+        uses: actions/download-artifact@v4
+        with:
+          name: native-alpine-latest
+          path: prebuilds
+
+      - name: Test on Alpine
+        run: node scripts/linux-prebuild.ts --libc=musl --mode=test --node=${{ matrix.node-version }}

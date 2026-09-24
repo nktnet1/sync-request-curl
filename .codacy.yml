@@ -1,0 +1,25 @@
+---
+engines:
+  cppcheck:
+    language: c++
+  # Codacy's repository ESLint patterns misclassify trusted Node-only build
+  # filesystem paths/browser compatibility and TypeScript declaration
+  # parameter names as security/unused-code issues. Keep these files covered
+  # by Biome, TypeScript, tests, and the remaining Codacy engines.
+  eslint-8:
+    exclude_paths:
+      - "scripts/**"
+      - "src/native.ts"
+      - "src/request.ts"
+      - "src/types.ts"
+  eslint-9:
+    exclude_paths:
+      - "scripts/**"
+      - "src/native.ts"
+      - "src/request.ts"
+      - "src/types.ts"
+exclude_paths:
+  # Vendored stable Node-API headers are third-party declarations, not project code.
+  - "native/node-api/**"
+  # Documentation is validated manually; Codacy markdown rules conflict with the nested README layout.
+  - "native/README.md"

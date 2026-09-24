@@ -169,10 +169,6 @@ overrides:
 importers:
 
   .:
-    dependencies:
-      node-libcurl:
-        specifier: 5.1.2
-        version: 5.1.2(supports-color@7.2.0)
     devDependencies:
       '@biomejs/biome':
         specifier: 2.5.14
@@ -1408,10 +1404,6 @@ packages:
     engines: {node: ^20.17.0 || >=22.9.0}
     hasBin: true
 
-  node-libcurl@5.1.2:
-    resolution: {integrity: sha512-lpPIQu7JqYhrlDbd3esuHyQ9lusvSReQfkpLRw7S80NdJ8hFBRlqHgwQ8RHUIf2JLaAmdUazj26sw0KR+5YsbQ==}
-    engines: {node: '>=22.14'}
-
   node-netstat@1.9.0:
     resolution: {integrity: sha512-c8DItoXsciyQuYRMZiVtKOwlgX5fGh64utC2U7RGTKRaUGP43i+UgNRo5QuTZuTagW66uRUckfYTOxR7va4UGw==}
 
@@ -2611,19 +2603,6 @@ snapshots:
       tinyglobby: 0.2.17
       undici: 6.28.0
       which: 6.0.1
-
-  node-libcurl@5.1.2(supports-color@7.2.0):
-    dependencies:
-      '@mapbox/node-pre-gyp': 2.0.3(supports-color@7.2.0)
-      env-paths: 2.2.0
-      node-addon-api: 8.5.0
-      node-gyp: 12.3.0
-      npmlog: 7.0.1
-      rimraf: 5.0.5
-      tslib: 2.6.2
-    transitivePeerDependencies:
-      - encoding
-      - supports-color
 
   node-netstat@1.9.0:
     dependencies:

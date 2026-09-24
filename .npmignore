@@ -1,0 +1,4 @@
+native/
+scripts/
+tests/
+*.patch

@@ -5,7 +5,7 @@ export default defineConfig({
     globalSetup: ["./tests/globalSetup.ts"],
     coverage: {
       include: ["src/**/*.ts"],
-      exclude: ["src/types.ts"],
+      exclude: ["src/index.ts", "src/types.ts"],
     },
   },
 });

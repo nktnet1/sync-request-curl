@@ -1,16 +1,18 @@
 {
+  "include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"],
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
     "declaration": true,
     "esModuleInterop": true,
     "lib": ["es5", "es2015", "esnext", "dom"],
     "types": ["node"],
+    "module": "esnext",
     "moduleResolution": "bundler",
     "noImplicitAny": true,
     "noUnusedLocals": true,
     "sourceMap": true,
     "strict": true,
-    "target": "es6"
-  },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+    "target": "es2022",
+    "erasableSyntaxOnly": true
+  }
 }

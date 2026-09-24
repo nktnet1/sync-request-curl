@@ -1,0 +1,166 @@
+name: Native prebuilds
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux-x64-gnu
+            libc: gnu
+          - runner: ubuntu-24.04
+            platform: linux-x64-musl
+            libc: musl
+          - runner: ubuntu-24.04-arm
+            platform: linux-arm64-gnu
+            libc: gnu
+          - runner: ubuntu-24.04-arm
+            platform: linux-arm64-musl
+            libc: musl
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # 2026.07.29 uses CMake 4.3-only STRING_ENCODE while the pinned
+      # Bullseye/Alpine Linux build containers intentionally use older CMake.
+      - name: Checkout vcpkg
+        uses: actions/checkout@v7
+        with:
+          repository: microsoft/vcpkg
+          ref: 2026.06.24
+          path: .vcpkg
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+
+      - name: Build Linux prebuild
+        run: node scripts/linux-prebuild.ts --libc=${{ matrix.libc }} --mode=build
+
+      - name: Upload native addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-${{ matrix.platform }}
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          if-no-files-found: error
+
+  build-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            platform: darwin-x64
+            triplet: x64-osx
+          - runner: macos-15
+            platform: darwin-arm64
+            triplet: arm64-osx
+          - runner: windows-2025
+            platform: win32-x64-msvc
+            triplet: x64-windows-static-md
+          - runner: windows-11-arm
+            platform: win32-arm64-msvc
+            triplet: arm64-windows-static-md
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Checkout vcpkg
+        uses: actions/checkout@v7
+        with:
+          repository: microsoft/vcpkg
+          ref: 2026.07.29
+          path: .vcpkg
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+
+      - name: Bootstrap vcpkg
+        if: runner.os != 'Windows'
+        run: ./.vcpkg/bootstrap-vcpkg.sh -disableMetrics
+
+      - name: Bootstrap vcpkg on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\.vcpkg\bootstrap-vcpkg.bat -disableMetrics
+
+      - name: Install static libcurl
+        if: runner.os != 'Windows'
+        run: ./.vcpkg/vcpkg install 'curl[http2]:${{ matrix.triplet }}'
+
+      - name: Install static libcurl on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\.vcpkg\vcpkg.exe install 'curl[http2]:${{ matrix.triplet }}'
+
+      - name: Download Node import library
+        if: runner.os == 'Windows'
+        run: node scripts/download-node-import-lib.ts
+
+      - name: Build native addon
+        env:
+          CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/.vcpkg/scripts/buildsystems/vcpkg.cmake
+          VCPKG_TARGET_TRIPLET: ${{ matrix.triplet }}
+        run: node scripts/build-native.ts --cmake
+
+      - name: Stage native addon
+        run: node scripts/stage-native.ts --platform=${{ matrix.platform }}
+
+      - name: Verify native addon loads
+        run: node scripts/verify-native-load.ts --file=prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+
+      - name: Upload native addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-${{ matrix.platform }}
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          if-no-files-found: error
+
+  collect:
+    needs:
+      - build-linux
+      - build-desktop
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Download native addons
+        uses: actions/download-artifact@v4
+        with:
+          pattern: prebuild-*
+          path: prebuilds
+          merge-multiple: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+
+      - name: Verify release matrix
+        run: node scripts/verify-prebuilds.ts
+
+      - name: Upload release prebuilds
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-prebuilds
+          path: prebuilds/*.node
+          if-no-files-found: error

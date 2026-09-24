@@ -1,7 +1,6 @@
 allowBuilds:
   esbuild: false
   lefthook: true
-  node-libcurl: true
 overrides:
   esbuild@>=0.17.0 <0.28.1: ^0.28.2
   ip-address@<=10.1.0: ^10.1.1
