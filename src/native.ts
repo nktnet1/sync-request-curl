@@ -15,7 +15,6 @@ export interface NativeCurlOptions {
   referer?: string;
   caInfo?: string;
   interface?: string;
-  dnsServers?: string;
   tcpKeepAlive?: boolean;
 }
 
@@ -28,6 +27,8 @@ export interface NativeRequestOptions {
   timeout: number;
   insecure: boolean;
   noBody: boolean;
+  followRedirects: boolean;
+  maxRedirects: number;
   curlOptions?: NativeCurlOptions;
 }
 
@@ -113,7 +114,6 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
   const binding = loadFirstExisting(
     [
       join(localBuildDirectory, "sync_request_curl_native.node"),
-      join(localBuildDirectory, "Release", "sync_request_curl_native.node"),
       join(prebuildDirectory, `sync_request_curl_native.${platformKey}.node`),
     ],
     options.exists,

@@ -371,6 +371,15 @@ describe("Redirects", () => {
     });
   });
 
+  test("Native redirects enforce maxRedirects", () => {
+    expect(() =>
+      request("GET", `${SERVER_URL}/redirect/source`, {
+        qs: { redirectNumber: 2 },
+        maxRedirects: 1,
+      }),
+    ).toThrow(Error);
+  });
+
   test("Only final response headers are returned after redirects", () => {
     const res = request(
       "GET",
@@ -450,6 +459,14 @@ describe("Redirects", () => {
       body: "payload",
       headers: { "x-test": "value" },
     });
+    expect(res).toMatchObject({
+      code: 200,
+      json: { method: "GET" },
+    });
+  });
+
+  test("Native redirects change PUT to GET after a 303 redirect", () => {
+    const res = wrapperRequest("PUT", `${SERVER_URL}/redirect/method/303`);
     expect(res).toMatchObject({
       code: 200,
       json: { method: "GET" },

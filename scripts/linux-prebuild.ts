@@ -1,5 +1,5 @@
 import { existsSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import type { LinuxLibc, NativePlatformKey } from "#scripts/native-platform";
@@ -7,6 +7,7 @@ import { getLinuxLibc, getPrebuildFilename } from "#scripts/native-platform";
 import { run } from "#scripts/process";
 
 const root = resolve(import.meta.dirname, "..");
+const rustToolchain = "1.88.0";
 // Bullseye LTS ended on 2026-08-31. Pin the last complete archive so
 // security mirror cleanup cannot make an otherwise reproducible build fail.
 const bullseyeSnapshot = "20260901T000000Z";
@@ -35,6 +36,7 @@ const getBullseyeAptArgs = (): string[] => {
     "Acquire::Retries=5",
   ];
 };
+
 const { values } = parseArgs({
   options: {
     libc: { type: "string" },
@@ -72,6 +74,10 @@ const runInContainer = (): void => {
     "--rm",
     "--volume",
     `${root}:/workspace`,
+    "--mount",
+    "type=volume,destination=/workspace/native/build",
+    "--mount",
+    "type=volume,destination=/workspace/native/target",
     "--workdir",
     "/workspace",
   ];
@@ -80,8 +86,6 @@ const runInContainer = (): void => {
     dockerArgs.push(
       "--mount",
       "type=volume,destination=/workspace/node_modules",
-      "--mount",
-      "type=volume,destination=/workspace/native/build",
     );
   }
 
@@ -102,23 +106,14 @@ const installBuildDependencies = (targetLibc: LinuxLibc): void => {
     run("apk", [
       "add",
       "--no-cache",
-      "autoconf",
-      "automake",
       "bash",
       "binutils",
       "build-base",
       "ca-certificates",
-      "cmake",
       "curl",
-      "git",
-      "libtool",
       "linux-headers",
-      "ninja",
       "perl",
       "pkgconf",
-      "tar",
-      "unzip",
-      "zip",
     ]);
     return;
   }
@@ -130,22 +125,41 @@ const installBuildDependencies = (targetLibc: LinuxLibc): void => {
     "install",
     "-y",
     "--no-install-recommends",
-    "autoconf",
-    "automake",
     "binutils",
     "build-essential",
     "ca-certificates",
-    "cmake",
     "curl",
-    "git",
-    "libtool",
-    "ninja-build",
     "perl",
     "pkg-config",
-    "tar",
-    "unzip",
-    "zip",
   ]);
+};
+
+const installRust = (): NodeJS.ProcessEnv => {
+  const installer = join(tmpdir(), "rustup-init.sh");
+  run("curl", [
+    "--fail",
+    "--location",
+    "--silent",
+    "--show-error",
+    "https://sh.rustup.rs",
+    "--output",
+    installer,
+  ]);
+  run("sh", [
+    installer,
+    "-y",
+    "--profile",
+    "minimal",
+    "--default-toolchain",
+    rustToolchain,
+    "--no-modify-path",
+  ]);
+
+  const cargoHome = join(homedir(), ".cargo");
+  return {
+    ...process.env,
+    PATH: `${join(cargoHome, "bin")}:${process.env.PATH ?? ""}`,
+  };
 };
 
 const buildInsideContainer = (targetLibc: LinuxLibc): void => {
@@ -153,43 +167,11 @@ const buildInsideContainer = (targetLibc: LinuxLibc): void => {
     throw new Error(`Expected a ${targetLibc} Linux build container`);
   }
 
-  const vcpkgRoot = join(root, ".vcpkg");
-  const bootstrap = join(vcpkgRoot, "bootstrap-vcpkg.sh");
-  if (!existsSync(bootstrap)) {
-    throw new Error(
-      ".vcpkg is missing; checkout microsoft/vcpkg before building",
-    );
-  }
-
   installBuildDependencies(targetLibc);
-  const bootstrapArgs = ["-disableMetrics"];
-  if (targetLibc === "musl") bootstrapArgs.push("-musl");
-  const buildEnv = {
-    ...process.env,
-    VCPKG_FORCE_SYSTEM_BINARIES: targetLibc === "musl" ? "1" : undefined,
-  };
-  run(bootstrap, bootstrapArgs, { cwd: root, env: buildEnv });
-
-  const architecture = getArchitecture();
-  const triplet = `${architecture}-linux`;
-  run(join(vcpkgRoot, "vcpkg"), ["install", `curl[http2]:${triplet}`], {
+  const buildEnv = installRust();
+  run(process.execPath, ["scripts/build-native.ts"], {
     cwd: root,
     env: buildEnv,
-  });
-
-  const cmakeEnv = {
-    ...buildEnv,
-    CMAKE_TOOLCHAIN_FILE: join(
-      vcpkgRoot,
-      "scripts",
-      "buildsystems",
-      "vcpkg.cmake",
-    ),
-    VCPKG_TARGET_TRIPLET: triplet,
-  };
-  run(process.execPath, ["scripts/build-native.ts", "--cmake"], {
-    cwd: root,
-    env: cmakeEnv,
   });
 
   const platform = getPlatform(targetLibc);

@@ -45,14 +45,3 @@ export const canRun = (
   });
   return !result.error && result.status === 0;
 };
-
-const unquote = (value: string): string => {
-  const first = value.at(0);
-  if ((first === '"' || first === "'") && value.at(-1) === first) {
-    return value.slice(1, -1);
-  }
-  return value;
-};
-
-export const splitFlags = (value: string): string[] =>
-  (value.match(/"[^"]*"|'[^']*'|\S+/g) ?? []).map(unquote);

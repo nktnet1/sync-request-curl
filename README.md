@@ -306,7 +306,7 @@ JSON.stringify({
 
   <tr>
     <td>setEasyOptions</td>
-    <td>Optional callback for the supported low-level libcurl options. This has priority over existing request headers/options. Supported options are <code>HTTPHEADER</code>, <code>PROXY</code>, <code>PROXYUSERPWD</code>, <code>USERAGENT</code>, <code>REFERER</code>, <code>CAINFO</code>, <code>INTERFACE</code>, <code>DNS_SERVERS</code>, and <code>TCP_KEEPALIVE</code>.</td>
+    <td>Optional callback for the supported low-level libcurl options. This has priority over existing request headers/options. Supported options are <code>HTTPHEADER</code>, <code>PROXY</code>, <code>PROXYUSERPWD</code>, <code>USERAGENT</code>, <code>REFERER</code>, <code>CAINFO</code>, <code>INTERFACE</code>, and <code>TCP_KEEPALIVE</code>.</td>
     <td>
 <pre>
 (curl, opt) => {
@@ -472,7 +472,7 @@ The published package does not download or compile native code during installati
 
 ### 4.1. Windows
 
-Prebuilt addons are prepared for x64 and arm64 Windows. No Visual Studio, Python, CMake, vcpkg, or node-gyp installation is required by package consumers.
+Prebuilt addons are prepared for x64 and arm64 Windows. No Visual Studio, Python, Rust, CMake, vcpkg, or node-gyp installation is required by package consumers.
 
 Requests may still fail with Libcurl Error 60 (`CURLE_PEER_FAILED_VERIFICATION`) when the peer certificate cannot be verified. The `insecure` option disables peer verification and should only be used when that trade-off is intentional.
 

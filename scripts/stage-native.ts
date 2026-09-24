@@ -8,7 +8,7 @@ import {
 } from "#scripts/native-platform";
 
 const root = resolve(import.meta.dirname, "..");
-const buildDirectory = join(root, "native", "build");
+const source = join(root, "native", "build", "sync_request_curl_native.node");
 const outputDirectory = join(root, "prebuilds");
 const { values } = parseArgs({
   options: {
@@ -25,12 +25,7 @@ if (requestedPlatform) {
   platform = requestedPlatform;
 }
 
-const sourceCandidates = [
-  join(buildDirectory, "sync_request_curl_native.node"),
-  join(buildDirectory, "Release", "sync_request_curl_native.node"),
-];
-const source = sourceCandidates.find(existsSync);
-if (!source) {
+if (!existsSync(source)) {
   throw new Error(
     "Native addon has not been built. Run pnpm build:native first.",
   );

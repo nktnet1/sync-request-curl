@@ -29,8 +29,6 @@
     "stage:native": "node scripts/stage-native.ts",
     "verify:prebuilds": "node scripts/verify-prebuilds.ts",
     "prepack": "pnpm run build && pnpm run verify:prebuilds",
-    "download:node-import-lib": "node scripts/download-node-import-lib.ts",
-    "build:native:cmake": "node scripts/build-native.ts --cmake",
     "build:linux:gnu": "node scripts/linux-prebuild.ts --libc=gnu --mode=build",
     "build:linux:musl": "node scripts/linux-prebuild.ts --libc=musl --mode=build",
     "test:linux:musl": "node scripts/linux-prebuild.ts --libc=musl --mode=test"
@@ -60,7 +58,6 @@
     "@vitest/coverage-v8": "5.0.1",
     "hono": "^4.13.8",
     "lefthook": "2.1.14",
-    "sync-dev-server": "^1.1.3",
     "tsdown": "^0.23.0",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",

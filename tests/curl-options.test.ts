@@ -12,7 +12,6 @@ describe("EasyOptions", () => {
     easy.setOpt(curlOption.REFERER, "https://example.com/");
     easy.setOpt(curlOption.CAINFO, "/tmp/ca.pem");
     easy.setOpt(curlOption.INTERFACE, "127.0.0.1");
-    easy.setOpt(curlOption.DNS_SERVERS, "1.1.1.1");
     easy.setOpt(curlOption.TCP_KEEPALIVE, 1);
 
     expect(easy.snapshot()).toStrictEqual({
@@ -24,7 +23,6 @@ describe("EasyOptions", () => {
         referer: "https://example.com/",
         caInfo: "/tmp/ca.pem",
         interface: "127.0.0.1",
-        dnsServers: "1.1.1.1",
         tcpKeepAlive: true,
       },
     });
@@ -49,7 +47,6 @@ describe("EasyOptions", () => {
     [curlOption.REFERER, ["invalid"]],
     [curlOption.CAINFO, 1],
     [curlOption.INTERFACE, false],
-    [curlOption.DNS_SERVERS, 1],
   ];
 
   test.each(invalidStringOptions)(

@@ -8,4 +8,5 @@ coverage/
 *.bundle
 
 native/build/
+native/target/
 prebuilds/*.node
