@@ -3,6 +3,7 @@
   "type": "module",
   "imports": {
     "#/*": "./src/*.ts",
+    "#native-platform-key": "./src/native-platform-key.ts",
     "#scripts/*": "./scripts/*.ts"
   },
   "repository": {

@@ -4,7 +4,7 @@ import {
   type NativePlatformKey,
   resolveNativePlatformKey,
   supportedPlatformKeys,
-} from "#/native-platform-key";
+} from "#native-platform-key";
 
 export type { LinuxLibc, NativePlatformKey };
 export { isNativePlatformKey, supportedPlatformKeys };
