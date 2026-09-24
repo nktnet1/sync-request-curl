@@ -25,16 +25,19 @@ jobs:
             platform: linux-x64-gnu
             kind: linux
             libc: gnu
+            vcpkg-ref: 2026.06.24
           - runner: ubuntu-24.04
             artifact: alpine-latest
             platform: linux-x64-musl
             kind: linux
             libc: musl
+            vcpkg-ref: 2026.06.24
           - runner: macos-15
             artifact: macos-latest
             platform: darwin-arm64
             kind: desktop
             triplet: arm64-osx
+            vcpkg-ref: 2026.07.29
     runs-on: ${{ matrix.runner }}
 
     steps:
@@ -45,7 +48,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: microsoft/vcpkg
-          ref: 2026.07.29
+          ref: ${{ matrix.vcpkg-ref }}
           path: .vcpkg
 
       - name: Set up Node.js

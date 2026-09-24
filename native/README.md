@@ -44,7 +44,13 @@ pnpm build:native:cmake
 pnpm stage:native
 ```
 
-The GitHub Actions native-prebuild workflow builds static libcurl with vcpkg
+The GitHub Actions native-prebuild workflow builds static libcurl with vcpkg.
+Linux currently pins vcpkg 2026.06.24 because the 2026.07.29 scripts require
+CMake 4.3 for SPDX JSON encoding, while the intentionally old Linux build
+containers use older CMake versions to preserve broad libc compatibility.
+Desktop builds can use the newer vcpkg release.
+
+The workflow builds static libcurl
 and produces eight release binaries checked by `pnpm verify:prebuilds`: macOS
 and Windows x64/arm64, plus glibc and musl Linux x64/arm64. GNU/Linux builds
 are produced in a Node 22 Bullseye container to keep the GLIBC requirement at

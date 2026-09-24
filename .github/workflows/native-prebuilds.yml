@@ -33,11 +33,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      # 2026.07.29 uses CMake 4.3-only STRING_ENCODE while the pinned
+      # Bullseye/Alpine Linux build containers intentionally use older CMake.
       - name: Checkout vcpkg
         uses: actions/checkout@v7
         with:
           repository: microsoft/vcpkg
-          ref: 2026.07.29
+          ref: 2026.06.24
           path: .vcpkg
 
       - name: Set up Node.js

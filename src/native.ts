@@ -37,30 +37,44 @@ export interface NativeResponse {
   body: Buffer;
 }
 
-interface NativeBinding {
+export interface NativeBinding {
   request(options: NativeRequestOptions): NativeResponse;
 }
 
-const nativeRequire = createRequire(import.meta.url);
+type LinuxLibc = "gnu" | "musl";
+type NativeRequire = (path: string) => NativeBinding;
+type FileExists = (path: string) => boolean;
+
+interface ProcessReport {
+  header?: { glibcVersionRuntime?: string };
+}
+
+export interface NativeLoadOptions {
+  explicitPath?: string;
+  platformKey?: string;
+  moduleDirectory?: string;
+  exists?: FileExists;
+  requireNative?: NativeRequire;
+}
+
+const nativeRequire = createRequire(import.meta.url) as NativeRequire;
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
 
-const getLinuxLibc = (): "gnu" | "musl" => {
-  const report = process.report?.getReport() as
-    | { header?: { glibcVersionRuntime?: string } }
-    | undefined;
-  return report?.header?.glibcVersionRuntime ? "gnu" : "musl";
-};
+export const getLinuxLibc = (
+  report = process.report?.getReport() as ProcessReport | undefined,
+): LinuxLibc => (report?.header?.glibcVersionRuntime ? "gnu" : "musl");
 
-const getPlatformKey = (): string => {
-  const platform = process.platform;
-  const arch = process.arch;
-
+export const getPlatformKey = (
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch,
+  linuxLibc: LinuxLibc = getLinuxLibc(),
+): string => {
   if (platform === "darwin" && (arch === "x64" || arch === "arm64")) {
     return `darwin-${arch}`;
   }
 
   if (platform === "linux" && (arch === "x64" || arch === "arm64")) {
-    return `linux-${arch}-${getLinuxLibc()}`;
+    return `linux-${arch}-${linuxLibc}`;
   }
 
   if (platform === "win32" && (arch === "x64" || arch === "arm64")) {
@@ -72,29 +86,45 @@ const getPlatformKey = (): string => {
   );
 };
 
-const loadFirstExisting = (candidates: string[]): NativeBinding | undefined => {
+export const loadFirstExisting = (
+  candidates: string[],
+  exists: FileExists = existsSync,
+  requireNative: NativeRequire = nativeRequire,
+): NativeBinding | undefined => {
   for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      return nativeRequire(candidate) as NativeBinding;
+    if (exists(candidate)) {
+      return requireNative(candidate);
     }
   }
   return undefined;
 };
 
-const loadBinding = (): NativeBinding => {
-  const explicitPath = process.env.SYNC_REQUEST_CURL_NATIVE_PATH;
+export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
+  const requireNative = options.requireNative ?? nativeRequire;
+  const explicitPath =
+    options.explicitPath ?? process.env.SYNC_REQUEST_CURL_NATIVE_PATH;
   if (explicitPath) {
-    return nativeRequire(explicitPath) as NativeBinding;
+    return requireNative(explicitPath);
   }
 
-  const platformKey = getPlatformKey();
-  const localBuildDirectory = join(moduleDirectory, "..", "native", "build");
-  const prebuildDirectory = join(moduleDirectory, "..", "prebuilds");
-  const binding = loadFirstExisting([
-    join(localBuildDirectory, "sync_request_curl_native.node"),
-    join(localBuildDirectory, "Release", "sync_request_curl_native.node"),
-    join(prebuildDirectory, `sync_request_curl_native.${platformKey}.node`),
-  ]);
+  const platformKey = options.platformKey ?? getPlatformKey();
+  const currentModuleDirectory = options.moduleDirectory ?? moduleDirectory;
+  const localBuildDirectory = join(
+    currentModuleDirectory,
+    "..",
+    "native",
+    "build",
+  );
+  const prebuildDirectory = join(currentModuleDirectory, "..", "prebuilds");
+  const binding = loadFirstExisting(
+    [
+      join(localBuildDirectory, "sync_request_curl_native.node"),
+      join(localBuildDirectory, "Release", "sync_request_curl_native.node"),
+      join(prebuildDirectory, `sync_request_curl_native.${platformKey}.node`),
+    ],
+    options.exists,
+    requireNative,
+  );
 
   if (binding) {
     return binding;
