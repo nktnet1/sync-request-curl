@@ -142,6 +142,21 @@ describe("native binding loading", () => {
     ).toBeUndefined();
   });
 
+  test("rethrows errors unrelated to a missing optional native package", () => {
+    const error = Object.assign(new Error("resolver failed"), {
+      code: "EACCES",
+    });
+
+    expect(() =>
+      resolveOptionalNativePackage(
+        "@nktnet/sync-request-curl-linux-x64-gnu",
+        () => {
+          throw error;
+        },
+      ),
+    ).toThrow(error);
+  });
+
   test("honours an explicit native path", () => {
     const binding = fakeBinding();
     const requireNative = vi.fn(() => binding);

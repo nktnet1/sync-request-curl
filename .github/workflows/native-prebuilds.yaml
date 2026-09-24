@@ -153,3 +153,54 @@ jobs:
           name: release-metadata
           path: release-metadata
           if-no-files-found: error
+
+  package:
+    needs: collect
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Enable pnpm via corepack
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download release prebuilds
+        uses: actions/download-artifact@v4
+        with:
+          name: native-prebuilds
+          path: prebuilds
+
+      - name: Verify release matrix
+        run: node scripts/verify-prebuilds.ts
+
+      - name: Build JavaScript package
+        run: pnpm build
+
+      - name: Prepare release packages
+        run: pnpm prepare:release-packages
+
+      - name: Pack release packages
+        run: |
+          mkdir -p release-tarballs
+          for package_dir in .release/native/*; do
+            npm pack "$package_dir" --pack-destination release-tarballs --ignore-scripts
+          done
+          npm pack .release/main --pack-destination release-tarballs --ignore-scripts
+          test "$(find release-tarballs -maxdepth 1 -name '*.tgz' -type f | wc -l)" -eq 9
+
+      - name: Upload release packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-packages
+          path: release-tarballs/*.tgz
+          if-no-files-found: error
