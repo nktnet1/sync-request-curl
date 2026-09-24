@@ -41,6 +41,10 @@ unsafe extern "C" {
 }
 
 const CURLOPT_MIMEPOST: CURLoption = CURLOPTTYPE_OBJECTPOINT + 269;
+// curl-sys 0.4.90 bundles libcurl 8.21.0. CURLFOLLOW_OBEYCODE (2), added
+// in libcurl 8.13.0, preserves our redirect method semantics when
+// CURLOPT_CUSTOMREQUEST is set.
+const CURL_FOLLOW_OBEY_CODE: c_long = 2;
 
 static CURL_INIT: OnceLock<CURLcode> = OnceLock::new();
 #[cfg(unix)]
@@ -152,6 +156,10 @@ pub struct NativeRequestOptions {
   pub insecure: Option<bool>,
   #[napi(js_name = "noBody")]
   pub no_body: Option<bool>,
+  #[napi(js_name = "followRedirects")]
+  pub follow_redirects: Option<bool>,
+  #[napi(js_name = "maxRedirects")]
+  pub max_redirects: Option<i64>,
   #[napi(js_name = "curlOptions")]
   pub curl_options: Option<NativeCurlOptions>,
 }
@@ -524,6 +532,22 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
       if options.no_body.unwrap_or(false) { 1 as c_long } else { 0 as c_long },
     )
   });
+  if options.follow_redirects.unwrap_or(false) {
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(
+        curl,
+        curl_sys::CURLOPT_FOLLOWLOCATION,
+        CURL_FOLLOW_OBEY_CODE,
+      )
+    });
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(
+        curl,
+        curl_sys::CURLOPT_MAXREDIRS,
+        options.max_redirects.unwrap_or(-1) as c_long,
+      )
+    });
+  }
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(
       curl,

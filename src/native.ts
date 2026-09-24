@@ -28,6 +28,8 @@ export interface NativeRequestOptions {
   timeout: number;
   insecure: boolean;
   noBody: boolean;
+  followRedirects: boolean;
+  maxRedirects: number;
   curlOptions?: NativeCurlOptions;
 }
 

@@ -17,6 +17,9 @@ import {
   parseReturnedHeaders,
 } from "#/utils";
 
+const hasCustomHeaders = (options: Options): boolean =>
+  Object.values(options.headers ?? {}).some((value) => value !== undefined);
+
 const getRedirectMethod = (method: HttpVerb, statusCode: number): HttpVerb => {
   if (statusCode === 303 && method !== "HEAD") {
     return "GET";
@@ -126,6 +129,7 @@ const performRequest = (
   method: HttpVerb,
   url: string,
   options: Options,
+  followRedirects = false,
 ): { response: Response; redirectUrl: string | null } => {
   const requestUrl =
     options.qs && Object.keys(options.qs).length
@@ -144,6 +148,8 @@ const performRequest = (
     timeout: options.timeout ?? 0,
     insecure: options.insecure ?? false,
     noBody: method === "HEAD",
+    followRedirects,
+    maxRedirects: options.maxRedirects ?? -1,
     curlOptions: easyOptions.curlOptions,
   });
 
@@ -207,8 +213,19 @@ const request = (
   options: Options = {},
 ): Response => {
   const shouldFollowRedirects = options.followRedirects !== false;
-  if (!shouldFollowRedirects) {
-    return performRequest(method, url, options).response;
+
+  // libcurl can preserve its connection/DNS/TLS state across redirects when it
+  // follows them on the same easy handle. Keep the manual path for requests
+  // with user-controlled headers, because libcurl forwards arbitrary
+  // CURLOPT_HTTPHEADER values across origins. setEasyOptions can also replace
+  // HTTPHEADER, so conservatively keep those requests on the manual path too.
+  const canUseNativeRedirects =
+    shouldFollowRedirects &&
+    !hasCustomHeaders(options) &&
+    options.setEasyOptions === undefined;
+
+  if (!shouldFollowRedirects || canUseNativeRedirects) {
+    return performRequest(method, url, options, canUseNativeRedirects).response;
   }
 
   const startedAt = Date.now();
