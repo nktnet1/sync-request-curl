@@ -10,8 +10,16 @@ const poolFinalizer = new FinalizationRegistry<number>(releaseAgentPool);
 
 const maximumNativePoolSize = 2_147_483_647;
 
+/**
+ * then-request forwards Agent instances directly to Node, whose runtime Agent
+ * stores the effective keep-alive flag on the instance. Current Node typings do
+ * not expose that field, so read it reflectively at this compatibility boundary.
+ */
+const hasKeepAlive = (agent: Agent): boolean =>
+  Reflect.get(agent, "keepAlive") === true;
+
 const getMaximumConnections = (agent: Agent): number | undefined => {
-  if (!agent.keepAlive || !(agent.maxFreeSockets > 0)) {
+  if (!hasKeepAlive(agent) || !(agent.maxFreeSockets > 0)) {
     return undefined;
   }
 
@@ -26,9 +34,7 @@ const getMaximumConnections = (agent: Agent): number | undefined => {
   return Math.min(Math.floor(agent.maxTotalSockets), maximumNativePoolSize);
 };
 
-export const getAgentPoolId = (
-  agent: Agent | false | undefined,
-): number | undefined => {
+export const getAgentPoolId = (agent?: Agent | false): number | undefined => {
   if (!agent) {
     return undefined;
   }
