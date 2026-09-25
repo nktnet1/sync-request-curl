@@ -119,12 +119,15 @@ const isHttpStatusLine = (header: string): boolean => {
 };
 
 const findFinalStatusLineIndex = (headerLines: string[]): number => {
-  for (let index = headerLines.length - 1; index >= 0; index -= 1) {
-    if (isHttpStatusLine(headerLines[index])) {
-      return index;
+  let finalStatusLineIndex = -1;
+
+  for (const [index, headerLine] of headerLines.entries()) {
+    if (isHttpStatusLine(headerLine)) {
+      finalStatusLineIndex = index;
     }
   }
-  return -1;
+
+  return finalStatusLineIndex;
 };
 
 /** Parses the final response header block and preserves repeated headers. */
