@@ -78,6 +78,15 @@ describe("appendQueryString", () => {
     },
   );
 
+  test("accepts null-prototype top-level query objects", () => {
+    const query: Record<string, unknown> = Object.create(null);
+    query.value = "kept";
+
+    expect(appendQueryString("https://example.com/path", query)).toBe(
+      "https://example.com/path?value=kept",
+    );
+  });
+
   test("serializes nested objects and arrays with bracket notation", () => {
     const url = appendQueryString("https://example.com/path?existing=1", {
       filter: {
@@ -129,8 +138,123 @@ describe("appendQueryString", () => {
 
     expect(parsed.searchParams.get("empty")).toBe("");
     expect(parsed.searchParams.has("omitted")).toBe(false);
-    expect(parsed.searchParams.get("preserved")).toBe("existing");
+    expect(parsed.searchParams.has("preserved")).toBe(false);
     expect(parsed.searchParams.get("when")).toBe("2026-09-24T12:34:56.000Z");
+  });
+
+  test("matches qs parse/merge/stringify and RFC3986 encoding", () => {
+    const url = appendQueryString(
+      "https://example.com/path?tag=one&tag=two&existing=a+b#section",
+      {
+        nested: {
+          value: "hello world",
+          punctuation: "!*'()",
+        },
+      },
+    );
+
+    expect(url).toBe(
+      "https://example.com/path?tag%5B0%5D=one&tag%5B1%5D=two&existing=a%20b&nested%5Bvalue%5D=hello%20world&nested%5Bpunctuation%5D=%21%2A%27%28%29#section",
+    );
+  });
+
+  test("compacts parsed sparse arrays and keeps indexes above the qs array limit as object keys", () => {
+    const url = appendQueryString(
+      "https://example.com/path?a%5B1%5D=b&a%5B15%5D=c&large%5B100%5D=x&mixed%5B0%5D=first&mixed%5Bname%5D=second",
+      { other: "value" },
+    );
+
+    expect(url).toBe(
+      "https://example.com/path?a%5B0%5D=b&a%5B1%5D=c&large%5B100%5D=x&mixed%5B0%5D=first&mixed%5Bname%5D=second&other=value",
+    );
+  });
+
+  test("parses bracket arrays and preserves fragments without an existing query", () => {
+    expect(
+      appendQueryString(
+        "https://example.com/path?items%5B%5D=one&items%5B%5D=two",
+        { added: "three" },
+      ),
+    ).toBe(
+      "https://example.com/path?items%5B0%5D=one&items%5B1%5D=two&added=three",
+    );
+
+    expect(
+      appendQueryString("https://example.com/path#fragment", { value: "x" }),
+    ).toBe("https://example.com/path?value=x#fragment");
+  });
+
+  test("uses qs-compatible depth, parameter, and malformed-escape handling", () => {
+    const parameters = Array.from(
+      { length: 1001 },
+      (_, index) => `p${index}=v${index}`,
+    ).join("&");
+    const url = appendQueryString(
+      `https://example.com/path?deep%5Ba%5D%5Bb%5D%5Bc%5D%5Bd%5D%5Be%5D%5Bf%5D=value&bad=%E0%A4%A&${parameters}`,
+      {},
+    );
+
+    expect(url).toContain(
+      "deep%5Ba%5D%5Bb%5D%5Bc%5D%5Bd%5D%5Be%5D%5B%5Bf%5D%5D=value",
+    );
+    expect(url).toContain("bad=%25E0%25A4%25A");
+    expect(url).toContain("p997=v997");
+    expect(url).not.toContain("p998=v998");
+    expect(url).not.toContain("p1000=v1000");
+  });
+
+  test("matches qs conflict merging for mixed scalar, array, and object notation", () => {
+    const url = appendQueryString(
+      "https://example.com/path?array%5B0%5D=first&array=second&scalar=old&scalar%5Bnested%5D=new&object%5Bkey%5D=value&object=extra&empty%5Bkey%5D=value&empty=",
+      {},
+    );
+
+    expect(url).toBe(
+      "https://example.com/path?array%5B0%5D=first&array%5B1%5D=second&scalar%5B0%5D=old&scalar%5B1%5D%5Bnested%5D=new&object%5B0%5D%5Bkey%5D=value&object%5B1%5D=extra&empty%5Bkey%5D=value",
+    );
+  });
+
+  test("supports bracket-leading keys, bare values, and malformed bracket tails", () => {
+    const url = appendQueryString(
+      "https://example.com/path?%5Broot%5D=value&flag&broken%5B=tail",
+      {},
+    );
+
+    expect(url).toBe(
+      "https://example.com/path?root=value&flag=&broken%5B%5B%5D=tail",
+    );
+  });
+
+  test("covers empty, protected, and partially malformed parsed query keys", () => {
+    const url = appendQueryString(
+      "https://example.com/path?=ignored&broken%5Binner%5D%5B=tail&safe%5Bconstructor%5D=bad&safe%5Bvalue%5D=kept",
+      {},
+    );
+
+    expect(url).toBe(
+      "https://example.com/path?broken%5Binner%5D%5B%5B%5D=tail&safe%5Bvalue%5D=kept",
+    );
+  });
+
+  test("covers scalar and same-index array merge conflicts", () => {
+    const url = appendQueryString(
+      "https://example.com/path?%5Balias%5D=first&alias=second&items%5B0%5D=first&items%5B%5D=second&objects%5B0%5D%5Bleft%5D=one&objects%5B0%5D%5Bright%5D=two",
+      {},
+    );
+
+    expect(url).toBe(
+      "https://example.com/path?alias%5B0%5D=first&alias%5B1%5D=second&items%5B0%5D=first&items%5B1%5D=second&objects%5B0%5D%5Bleft%5D=one&objects%5B0%5D%5Bright%5D=two",
+    );
+  });
+
+  test("does not revive prototype keys from an existing query string", () => {
+    const url = appendQueryString(
+      "https://example.com/path?constructor=bad&__proto__%5Bpolluted%5D=yes&safe=value",
+      { added: "ok" },
+    );
+
+    expect(url).toBe("https://example.com/path?safe=value&added=ok");
+    expect(({} as { polluted?: string }).polluted).toBeUndefined();
   });
 
   test("skips nested undefined values and supports bigint values", () => {
@@ -140,6 +264,7 @@ describe("appendQueryString", () => {
     const url = appendQueryString("https://example.com/path", {
       filter: { omitted: undefined, included: "yes" },
       count: 42n,
+      buffer: Buffer.from("buffer value"),
       nullPrototype,
     });
     const parsed = new URL(url);
@@ -147,28 +272,7 @@ describe("appendQueryString", () => {
     expect(parsed.searchParams.has("filter[omitted]")).toBe(false);
     expect(parsed.searchParams.get("filter[included]")).toBe("yes");
     expect(parsed.searchParams.get("count")).toBe("42");
+    expect(parsed.searchParams.get("buffer")).toBe("buffer value");
     expect(parsed.searchParams.get("nullPrototype[value]")).toBe("kept");
-  });
-
-  test("rejects unsupported and circular query values", () => {
-    expect(() =>
-      appendQueryString("https://example.com/path", {
-        callback: () => undefined,
-      }),
-    ).toThrow('Unsupported query-string value for "callback": function');
-
-    expect(() =>
-      appendQueryString("https://example.com/path", {
-        map: new Map([["key", "value"]]),
-      }),
-    ).toThrow('Unsupported query-string object for "map"');
-
-    const circular: Record<string, unknown> = {};
-    circular.self = circular;
-    expect(() =>
-      appendQueryString("https://example.com/path", { circular }),
-    ).toThrow(
-      'Cannot serialize circular query-string value at "circular[self]"',
-    );
   });
 });

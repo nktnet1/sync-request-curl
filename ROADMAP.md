@@ -50,7 +50,7 @@ layer.
 - [x] Expose `FormData` as a named export from the root ESM entry and restore
       upstream-style root named public types while preserving direct callable
       CommonJS `require("sync-request-curl")`.
-- [ ] Match `then-request` query parsing/merging/stringifying semantics for
+- [x] Match `then-request` query parsing/merging/stringifying semantics for
       `qs`, including nested values and RFC3986 byte encoding.
 
 ## Additional transport-neutral features
@@ -92,12 +92,11 @@ socket timeouts, GET retry behaviour, file caching, agent-scoped connection
 reuse, and the response shape are all represented. `getJSON()` remains an
 intentional additive helper.
 
-The remaining observable compatibility work is narrower but important:
-
-- `qs` currently uses the WHATWG URL/query implementation rather than the
-  `qs` parse/merge/stringify behaviour inherited from `then-request`; nested
-  merge and byte-encoding details therefore still need compatibility tests
-  and alignment.
+The focused compatibility suite now covers the observable Node.js request
+surface together with `then-request`-style `qs` parse/merge/stringify
+semantics, including nested values, indexed arrays, existing-query reparsing,
+and RFC3986 byte encoding. Remaining roadmap work is additive transport and
+release hardening rather than a known request-surface parity gap.
 
 Features exposed by `then-request`/`http-basic` but explicitly excluded by
 `sync-request` are not v5 parity gaps: memory/custom caches and function-valued
@@ -202,6 +201,24 @@ should be treated as the current baseline in future sessions:
 - `v1.0.16-knip-native-deps-entry.patch` adds an explicit Knip entry for
   `scripts/verify-native-deps.ts`, which is executed dynamically by the Linux
   prebuild workflow and therefore is not discoverable as a static module edge.
+- `v1.0.17-then-request-qs-compatibility.patch` replaces WHATWG query
+  serialization with the `then-request`/`qs` compatibility model: existing
+  query strings are parsed with nested/indexed-array defaults, caller `qs`
+  values replace top-level keys, and the merged result is serialized with
+  indexed brackets and RFC3986 encoding.
+- `v1.0.18-qs-parser-coverage.patch` covers the remaining query parser and
+  merge conflict branches from the initial compatibility implementation.
+- `v1.0.19-use-qs-package.patch` replaces that local compatibility parser and
+  serializer with the maintained `qs` package itself, keeping behaviour tied
+  directly to the same dependency family used by `then-request` and removing
+  the custom parsing/encoding maintenance surface.
+- `v1.0.20-qs-test-expectations.patch` updates the legacy parser edge-case
+  expectations to the actual `qs` parse/stringify output now that `qs` is the
+  implementation, keeping tests aligned with upstream behaviour rather than the
+  removed local compatibility parser.
+- `v1.0.21-url-null-prototype-coverage.patch` covers the remaining
+  `appendQueryString` plain-object validation branch with a null-prototype
+  top-level query object, without changing runtime behaviour.
 
 
 Do not replace these behaviours with a response-body-only cache or move retry

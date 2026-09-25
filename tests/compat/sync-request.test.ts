@@ -23,16 +23,34 @@ describe("sync-request Node.js compatibility", () => {
     expect(response.getBody("utf8")).toContain('"method":"GET"');
   });
 
-  test("appends qs values to an existing query string", () => {
-    const response = request("GET", `${SERVER_URL}/compat/echo?existing=keep`, {
-      qs: { value: "hello world", count: 2 },
-    });
+  test("matches then-request qs parsing, merging, and encoding", () => {
+    const response = request(
+      "GET",
+      `${SERVER_URL}/compat/echo?existing=a+b&tag=one&tag=two`,
+      {
+        qs: {
+          nested: { value: "hello world" },
+          count: 2,
+        },
+      },
+    );
     const body = response.getJSON<EchoResponse>();
-    const searchParams = new URLSearchParams(body.search);
 
-    expect(searchParams.get("existing")).toBe("keep");
-    expect(searchParams.get("value")).toBe("hello world");
-    expect(searchParams.get("count")).toBe("2");
+    expect(body.search).toBe(
+      "?existing=a%20b&tag%5B0%5D=one&tag%5B1%5D=two&nested%5Bvalue%5D=hello%20world&count=2",
+    );
+  });
+
+  test("reparses an existing query when qs is an empty object", () => {
+    const response = request(
+      "GET",
+      `${SERVER_URL}/compat/echo?value=hello+world&tag=one&tag=two`,
+      { qs: {} },
+    );
+
+    expect(response.getJSON<EchoResponse>().search).toBe(
+      "?value=hello%20world&tag%5B0%5D=one&tag%5B1%5D=two",
+    );
   });
 
   test("passes caller headers and string bodies unchanged", () => {

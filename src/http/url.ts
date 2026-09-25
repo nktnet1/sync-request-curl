@@ -1,4 +1,5 @@
-import { domainToASCII, URL, type URLSearchParams } from "node:url";
+import { domainToASCII } from "node:url";
+import qs from "qs";
 import * as v from "valibot";
 
 const hasNonAscii = (value: string): boolean => {
@@ -121,100 +122,28 @@ const plainObjectSchema = v.custom<v.InferOutput<typeof recordSchema>>(
   "Expected a plain object",
 );
 
-const deleteQueryValue = (searchParams: URLSearchParams, key: string): void => {
-  const keysToDelete = new Set<string>();
-  for (const existingKey of searchParams.keys()) {
-    if (existingKey === key || existingKey.startsWith(`${key}[`)) {
-      keysToDelete.add(existingKey);
-    }
-  }
-  for (const existingKey of keysToDelete) {
-    searchParams.delete(existingKey);
-  }
-};
-
-const appendQueryValue = (
-  searchParams: URLSearchParams,
-  key: string,
-  value: unknown,
-  ancestors: Set<object>,
-): void => {
-  if (value === undefined) {
-    return;
-  }
-
-  if (value === null) {
-    searchParams.append(key, "");
-    return;
-  }
-
-  switch (typeof value) {
-    case "string":
-    case "number":
-    case "boolean":
-    case "bigint":
-      searchParams.append(key, String(value));
-      return;
-    case "object":
-      break;
-    default:
-      throw new TypeError(
-        `Unsupported query-string value for "${key}": ${typeof value}`,
-      );
-  }
-
-  if (value instanceof Date) {
-    searchParams.append(key, value.toISOString());
-    return;
-  }
-
-  if (ancestors.has(value)) {
-    throw new TypeError(
-      `Cannot serialize circular query-string value at "${key}"`,
-    );
-  }
-
-  ancestors.add(value);
-  try {
-    if (Array.isArray(value)) {
-      value.forEach((item, index) => {
-        appendQueryValue(searchParams, `${key}[${index}]`, item, ancestors);
-      });
-      return;
-    }
-
-    if (!v.is(plainObjectSchema, value)) {
-      throw new TypeError(`Unsupported query-string object for "${key}"`);
-    }
-
-    for (const [nestedKey, nestedValue] of Object.entries(value)) {
-      appendQueryValue(
-        searchParams,
-        `${key}[${nestedKey}]`,
-        nestedValue,
-        ancestors,
-      );
-    }
-  } finally {
-    ancestors.delete(value);
-  }
-};
-
+// `then-request` delegates `options.qs` to `qs` with its default parser and
+// serializer options. Use the same library directly so parsing, merging,
+// encoding, depth limits, and array handling stay aligned upstream.
 export const appendQueryString = (
   url: string,
   query: Record<string, unknown>,
 ): string => {
-  const parsed = new URL(url);
   const parsedQuery = v.parse(plainObjectSchema, query);
-
-  for (const [key, value] of Object.entries(parsedQuery)) {
-    if (value === undefined) {
-      continue;
-    }
-    deleteQueryValue(parsed.searchParams, key);
-    appendQueryValue(parsed.searchParams, key, value, new Set());
-  }
-
-  parsed.search = parsed.searchParams.toString();
-  return parsed.href;
+  const fragmentIndex = url.indexOf("#");
+  const fragment = fragmentIndex === -1 ? "" : url.slice(fragmentIndex);
+  const withoutFragment =
+    fragmentIndex === -1 ? url : url.slice(0, fragmentIndex);
+  const queryIndex = withoutFragment.indexOf("?");
+  const base =
+    queryIndex === -1 ? withoutFragment : withoutFragment.slice(0, queryIndex);
+  const existingQuery =
+    queryIndex === -1 ? "" : withoutFragment.slice(queryIndex + 1);
+  const merged: Record<string, unknown> = Object.assign(
+    Object.create(null),
+    qs.parse(existingQuery),
+    parsedQuery,
+  );
+  const serialized = qs.stringify(merged);
+  return `${base}${serialized ? `?${serialized}` : ""}${fragment}`;
 };

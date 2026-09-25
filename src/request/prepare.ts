@@ -49,10 +49,7 @@ const preparePayload = (
 };
 
 const prepareUrl = (url: string, options: Options): string => {
-  const withQuery =
-    options.qs && Object.keys(options.qs).length > 0
-      ? appendQueryString(url, options.qs)
-      : url;
+  const withQuery = options.qs ? appendQueryString(url, options.qs) : url;
   return normalizeUrlHostname(withQuery);
 };
 

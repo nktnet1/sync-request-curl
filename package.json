@@ -54,12 +54,14 @@
   "license": "MIT",
   "description": "Fast synchronous HTTP requests for Node.js using an in-process Node-API binding to libcurl.",
   "dependencies": {
+    "qs": "^6.16.0",
     "valibot": "^1.5.0"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
     "@hono/node-server": "^2.1.1",
     "@types/node": "^26.6.2",
+    "@types/qs": "^6.15.1",
     "@vitest/coverage-v8": "5.0.1",
     "hono": "^4.13.9",
     "lefthook": "2.1.14",
