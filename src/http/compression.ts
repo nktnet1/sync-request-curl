@@ -24,11 +24,7 @@ const isSupportedContentEncoding = (encoding: string): boolean =>
 const decodeBody = (body: Buffer, encodings: string[]): Buffer => {
   let decoded = body;
 
-  for (let index = encodings.length - 1; index >= 0; index -= 1) {
-    const encoding = encodings[index];
-    if (!encoding) {
-      continue;
-    }
+  for (const encoding of [...encodings].reverse()) {
     decoded =
       encoding === "deflate" ? inflateSync(decoded) : gunzipSync(decoded);
   }

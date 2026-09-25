@@ -12,6 +12,7 @@ describe("native platform detection", () => {
     );
     expect(getLinuxLibc({ header: {} })).toBe("musl");
     expect(getLinuxLibc({})).toBe("musl");
+    expect(getLinuxLibc(null)).toBe("musl");
   });
 
   test.each([

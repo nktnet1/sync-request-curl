@@ -9,8 +9,8 @@ import {
 } from "#/request/redirects";
 import {
   canRetryRequest,
-  DEFAULT_MAX_RETRIES,
-  DEFAULT_RETRY_DELAY,
+  defaultMaxRetries,
+  defaultRetryDelay,
   isRetryableRequestError,
   shouldRetryResponse,
   waitForRetry,
@@ -97,8 +97,8 @@ const request = (
     return performRequestAttempt(originalMethod, originalUrl, originalOptions);
   }
 
-  const retryDelay = originalOptions.retryDelay ?? DEFAULT_RETRY_DELAY;
-  const maxRetries = originalOptions.maxRetries ?? DEFAULT_MAX_RETRIES;
+  const retryDelay = originalOptions.retryDelay ?? defaultRetryDelay;
+  const maxRetries = originalOptions.maxRetries ?? defaultMaxRetries;
 
   for (let retries = 0; ; retries += 1) {
     try {

@@ -1,8 +1,8 @@
 import { CurlError } from "#/errors";
 import type { Response, UppercaseHttpVerb } from "#/types";
 
-export const DEFAULT_RETRY_DELAY = 200;
-export const DEFAULT_MAX_RETRIES = 5;
+export const defaultRetryDelay = 200;
+export const defaultMaxRetries = 5;
 
 const retryWaitArray = new Int32Array(new SharedArrayBuffer(4));
 
