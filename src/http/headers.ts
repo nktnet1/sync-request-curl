@@ -157,7 +157,56 @@ const findFinalStatusLineIndex = (headerLines: string[]): number => {
   return finalStatusLineIndex;
 };
 
-/** Parses the final response header block and preserves repeated headers. */
+const singletonResponseHeaders = new Set([
+  "age",
+  "authorization",
+  "content-length",
+  "content-type",
+  "etag",
+  "expires",
+  "from",
+  "host",
+  "if-modified-since",
+  "if-unmodified-since",
+  "last-modified",
+  "location",
+  "max-forwards",
+  "proxy-authorization",
+  "referer",
+  "retry-after",
+  "server",
+  "user-agent",
+]);
+
+const appendResponseHeader = (
+  parsedHeaders: Map<string, string | string[]>,
+  name: string,
+  value: string,
+): void => {
+  if (name === "set-cookie") {
+    const existingValue = parsedHeaders.get(name);
+    if (existingValue === undefined) {
+      parsedHeaders.set(name, [value]);
+    } else {
+      (existingValue as string[]).push(value);
+    }
+    return;
+  }
+
+  const existingValue = parsedHeaders.get(name);
+  if (existingValue === undefined) {
+    parsedHeaders.set(name, value);
+    return;
+  }
+
+  if (name === "cookie") {
+    parsedHeaders.set(name, `${existingValue as string}; ${value}`);
+  } else if (!singletonResponseHeaders.has(name)) {
+    parsedHeaders.set(name, `${existingValue as string}, ${value}`);
+  }
+};
+
+/** Parses the final response header block using Node IncomingMessage folding. */
 export const parseResponseHeaders = (
   headerLines: string[],
 ): Response["headers"] => {
@@ -176,15 +225,7 @@ export const parseResponseHeaders = (
 
     const name = header.slice(0, separatorIndex).trim().toLowerCase();
     const value = header.slice(separatorIndex + 1).trim();
-    const existingValue = parsedHeaders.get(name);
-
-    if (existingValue === undefined) {
-      parsedHeaders.set(name, value);
-    } else if (Array.isArray(existingValue)) {
-      existingValue.push(value);
-    } else {
-      parsedHeaders.set(name, [existingValue, value]);
-    }
+    appendResponseHeader(parsedHeaders, name, value);
   }
 
   return v.parse(incomingHttpHeadersSchema, Object.fromEntries(parsedHeaders));

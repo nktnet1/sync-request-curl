@@ -139,9 +139,10 @@ not all necessarily desirable behaviours to copy.
       transparent gzip/deflate decompression so the headers describe the body
       actually returned to callers. Preserve the header when decompression is
       disabled or the encoding is unsupported.
-- [ ] Match Node's duplicate response-header folding where useful: preserve
-      `set-cookie` as an array, join `cookie` with `; `, join ordinary repeated
-      headers with `, `, and apply Node's singleton-header duplicate rules.
+- [x] Match Node's duplicate response-header folding: expose `set-cookie` as
+      an array even when only one value is present, join repeated `cookie`
+      values with `; `, join ordinary repeated headers with `, `, and keep the
+      first value for Node's singleton-header set.
 
 Intentional differences: do not reproduce `then-request`'s early rejection of a
 `body` on GET, DELETE, or HEAD. `sync-request-curl` passes explicit request
@@ -298,6 +299,13 @@ should be treated as the current baseline in future sessions:
   exposed response headers after successful transparent gzip/deflate
   decompression, matching the attached `http-basic` behaviour while retaining
   the header when decompression is disabled, unsupported, or not performed.
+- `v1.0.32-node-response-header-folding.patch` matches the
+  `IncomingMessage.headers` shape inherited by `http-basic`/`then-request`:
+  `set-cookie` is always an array, repeated `cookie` values use `; `, ordinary
+  repeated fields use `, `, and Node's singleton response headers keep their
+  first value. This normalises the raw header lines supplied by libcurl; it does
+  not emulate Node's HTTP parser rejecting malformed framing before a response
+  object is created.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

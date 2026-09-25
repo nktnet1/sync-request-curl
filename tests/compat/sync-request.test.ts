@@ -24,11 +24,7 @@ describe("sync-request Node.js compatibility", () => {
   });
 
   test("treats null options like omitted options at runtime", () => {
-    const response = request(
-      "GET",
-      `${SERVER_URL}/compat/echo`,
-      null as never,
-    );
+    const response = request("GET", `${SERVER_URL}/compat/echo`, null as never);
 
     expect(response.statusCode).toBe(200);
     expect(response.getJSON<EchoResponse>().method).toBe("GET");

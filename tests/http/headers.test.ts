@@ -7,14 +7,19 @@ import {
 } from "#/http/headers";
 
 describe("parseResponseHeaders", () => {
-  test("preserves repeated response headers", () => {
+  test("folds repeated response headers like Node", () => {
     const headers = parseResponseHeaders([
       "HTTP/1.1 200 OK",
       "Set-Cookie: session=abc; Path=/",
       "Set-Cookie: preferences=dark; Path=/",
       "Set-Cookie: locale=en; Path=/",
+      "Cookie: theme=dark",
+      "Cookie: session=abc",
       "X-Test: first",
       "X-Test: second",
+      "X-Test: third",
+      "Content-Type: text/plain",
+      "Content-Type: application/json",
       "",
     ]);
 
@@ -23,7 +28,43 @@ describe("parseResponseHeaders", () => {
       "preferences=dark; Path=/",
       "locale=en; Path=/",
     ]);
-    expect(headers["x-test"]).toStrictEqual(["first", "second"]);
+    expect(headers.cookie).toBe("theme=dark; session=abc");
+    expect(headers["x-test"]).toBe("first, second, third");
+    expect(headers["content-type"]).toBe("text/plain");
+  });
+
+  test("represents a single set-cookie header as an array", () => {
+    const headers = parseResponseHeaders([
+      "HTTP/1.1 200 OK",
+      "Set-Cookie: session=abc; Path=/",
+    ]);
+
+    expect(headers["set-cookie"]).toStrictEqual(["session=abc; Path=/"]);
+  });
+
+  test.for([
+    "age",
+    "authorization",
+    "content-length",
+    "content-type",
+    "etag",
+    "expires",
+    "from",
+    "host",
+    "if-modified-since",
+    "if-unmodified-since",
+    "last-modified",
+    "location",
+    "max-forwards",
+    "proxy-authorization",
+    "referer",
+    "retry-after",
+    "server",
+    "user-agent",
+  ])("keeps the first repeated Node singleton header: %s", (name) => {
+    const headers = parseResponseHeaders([`${name}: first`, `${name}: second`]);
+
+    expect(headers[name]).toBe("first");
   });
 
   test("parses header lines without a status line", () => {
