@@ -1,6 +1,7 @@
 import * as v from "valibot";
 import { type FormDataEntry, getFormDataEntries } from "#/form-data";
 import {
+  hasRequestHeader,
   serializeRequestHeaders,
   setContentLengthHeader,
   setRequestHeader,
@@ -61,6 +62,10 @@ export const prepareRequest = (
   options: Options,
 ): PreparedRequest => {
   const headers = serializeRequestHeaders(options.headers);
+
+  if (options.gzip !== false && !hasRequestHeader(headers, "accept-encoding")) {
+    setRequestHeader(headers, "Accept-Encoding", "gzip, deflate");
+  }
 
   return {
     url: prepareUrl(url, options),

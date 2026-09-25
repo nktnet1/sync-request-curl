@@ -29,9 +29,11 @@ describe("runtime validation", () => {
         headers: { "x-test": ["one", "two"] },
         timeout: 100,
         followRedirects: true,
+        gzip: false,
       }).success,
     ).toBe(true);
     expect(v.safeParse(optionsSchema, { timeout: "fast" }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { gzip: "yes" }).success).toBe(false);
     expect(
       v.safeParse(optionsSchema, { maxRedirects: Number.NaN }).success,
     ).toBe(false);

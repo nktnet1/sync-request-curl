@@ -1,4 +1,5 @@
 import { throwForTransportError } from "#/errors";
+import { decompressResponseBody } from "#/http/compression";
 import { parseResponseHeaders } from "#/http/headers";
 import native from "#/native/index";
 import { prepareRequest } from "#/request/prepare";
@@ -33,14 +34,21 @@ export const performRequest = (
     options,
   });
 
+  const responseHeaders = parseResponseHeaders(result.headers);
+  const responseBody = decompressResponseBody(
+    result.body,
+    responseHeaders,
+    options.gzip !== false,
+  );
+
   return {
     response: createResponse({
       method,
       requestUrl: url,
       responseUrl: result.effectiveUrl ?? requestUrl,
       statusCode: result.statusCode,
-      headers: parseResponseHeaders(result.headers),
-      body: result.body,
+      headers: responseHeaders,
+      body: responseBody,
     }),
     redirectUrl: result.redirectUrl,
   };

@@ -60,6 +60,7 @@ export interface Options {
   followRedirects?: boolean;
   maxRedirects?: number;
   allowRedirectHeaders?: string[];
+  gzip?: boolean;
 
   /** Include request inputs in transport error messages. */
   debug?: boolean;

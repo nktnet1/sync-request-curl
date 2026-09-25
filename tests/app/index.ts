@@ -1,10 +1,16 @@
 import { setTimeout as delay } from "node:timers/promises";
+import { deflateSync, gzipSync } from "node:zlib";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import * as v from "valibot";
 
 const app = new Hono();
+const toArrayBuffer = (buffer: Buffer): ArrayBuffer => {
+  const arrayBuffer = new ArrayBuffer(buffer.length);
+  new Uint8Array(arrayBuffer).set(buffer);
+  return arrayBuffer;
+};
 const valueBodySchema = v.object({ value: v.optional(v.unknown()) });
 const decimalIntegerSchema = v.pipe(
   v.string(),
@@ -163,6 +169,35 @@ app.post("/text", (c) => {
 
 app.get("/large/response", (c) => {
   return c.body("x".repeat(512 * 1024));
+});
+
+app.get("/compressed/:encoding", (c) => {
+  const encoding = c.req.param("encoding");
+  const payload = JSON.stringify({
+    acceptEncoding: c.req.header("accept-encoding") ?? null,
+    message: "Compressed response",
+  });
+  const body = Buffer.from(payload);
+
+  if (encoding === "gzip") {
+    return new Response(toArrayBuffer(gzipSync(body)), {
+      headers: {
+        "content-encoding": "gzip",
+        "content-type": "application/json",
+      },
+    });
+  }
+
+  if (encoding === "deflate") {
+    return new Response(toArrayBuffer(deflateSync(body)), {
+      headers: {
+        "content-encoding": "deflate",
+        "content-type": "application/json",
+      },
+    });
+  }
+
+  return c.json({ error: "Unsupported compression encoding" }, 400);
 });
 
 app.post("/upload", async (c) => {

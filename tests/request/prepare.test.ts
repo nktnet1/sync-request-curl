@@ -37,4 +37,24 @@ describe("request preparation", () => {
       "https://example.com/path",
     );
   });
+
+  test("adds compression negotiation by default", () => {
+    expect(prepareRequest("https://example.com", {}).headers).toContain(
+      "Accept-Encoding: gzip, deflate",
+    );
+  });
+
+  test("does not add compression negotiation when gzip is false", () => {
+    expect(
+      prepareRequest("https://example.com", { gzip: false }).headers,
+    ).not.toContain("Accept-Encoding: gzip, deflate");
+  });
+
+  test("preserves a caller supplied accept-encoding header", () => {
+    expect(
+      prepareRequest("https://example.com", {
+        headers: { "accept-encoding": "identity" },
+      }).headers,
+    ).toContain("accept-encoding: identity");
+  });
 });

@@ -29,7 +29,7 @@ layer.
 
 - [x] Add `allowRedirectHeaders` with case-insensitive redirect-header
       allow-list semantics.
-- [ ] Add `gzip`, enabled by default, with transparent response decompression
+- [x] Add `gzip`, enabled by default, with transparent response decompression
       and an explicit opt-out.
 - [ ] Add `retry`, `retryDelay`, and `maxRetries` with `sync-request`
       compatible defaults and retry conditions.
@@ -63,7 +63,7 @@ Replace useful capabilities that were previously reachable through
       compatibility suite.
 - [x] Cover redirect-header allow-list behaviour for same-origin and
       cross-origin redirects.
-- [ ] Cover compressed responses and `gzip: false`.
+- [x] Cover compressed responses and `gzip: false`.
 - [ ] Cover retry count, delay, HTTP error retries, and transport error retries.
 - [ ] Cover `socketTimeout` with streaming responses that both remain active
       and become inactive.
