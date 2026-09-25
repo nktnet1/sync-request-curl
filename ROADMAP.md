@@ -104,3 +104,37 @@ using this repository's own paths and metadata.
       installation from a packed tarball.
 - [ ] Run the full Vitest, typecheck, lint, formatting, native, and prebuild
       verification suites before the v5 release.
+
+## Implemented compatibility notes (2026-09-25)
+
+The following work has already landed in the incremental v5 patch series and
+should be treated as the current baseline in future sessions:
+
+- `v1.0.0-file-cache-compatibility.patch` added the `sync-request`-compatible
+  `cache: "file"` surface with HTTP-aware disk caching, explicit freshness,
+  ETag/Last-Modified revalidation, `Vary` handling, cached redirects, and
+  invalidation after successful unsafe methods.
+- `v1.0.1-cache-retry-regressions.patch` made caller `Cache-Control: no-cache`
+  perform a real origin fetch/replacement and isolated cache timestamps from
+  non-cached retry timeout accounting.
+- `v1.0.2-cache-coverage-lint.patch` fixed the assignment-in-expression lint
+  finding and added focused cache policy/filesystem failure coverage.
+- `v1.0.3-cache-branch-coverage-sonar.patch` covered the remaining cache
+  branches and cleaned up Sonar findings in native platform selection and
+  agent option validation without changing runtime semantics.
+- The follow-up quality pass removes duplicated `Vary` request-header matching,
+  avoids analyzer-sensitive dynamic object/array access in cache comparisons,
+  uses deterministic `localeCompare` sorting, prefers `Number.NaN`, and
+  documents the safety invariant around SHA-512-derived cache file paths.
+- `v1.0.5-cache-coverage.patch` makes the normalized request-header value
+  helper coverage-stable and explicitly covers duplicate `Cache-Control`
+  request headers so the file-cache implementation reaches full line/statement
+  coverage without changing runtime behaviour.
+- `v1.0.6-cache-vary-length-coverage.patch` explicitly covers the `Vary`
+  request-header vector length-mismatch path, ensuring cache entries do not
+  match when a repeated varied request header changes the number of values.
+
+
+Do not replace these behaviours with a response-body-only cache or move retry
+and redirect orchestration into the native transport; those choices are
+intentional compatibility boundaries for v5.

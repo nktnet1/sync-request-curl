@@ -2,18 +2,41 @@ import * as v from "valibot";
 import type { Options, Response } from "#/types";
 import { incomingHttpHeadersSchema } from "#/validation";
 
-const getHeaderName = (header: string): string => {
+const getRequestHeaderDelimiterIndex = (header: string): number => {
   const colonIndex = header.indexOf(":");
   const semicolonIndex = header.indexOf(";");
-  let delimiterIndex = colonIndex;
-  if (
-    delimiterIndex < 0 ||
-    (semicolonIndex >= 0 && semicolonIndex < delimiterIndex)
-  ) {
-    delimiterIndex = semicolonIndex;
+  if (colonIndex < 0 || (semicolonIndex >= 0 && semicolonIndex < colonIndex)) {
+    return semicolonIndex;
   }
+  return colonIndex;
+};
+
+const getHeaderName = (header: string): string => {
+  const delimiterIndex = getRequestHeaderDelimiterIndex(header);
   const endIndex = delimiterIndex < 0 ? header.length : delimiterIndex;
   return header.slice(0, endIndex).trim().toLowerCase();
+};
+
+export interface ParsedRequestHeaderLine {
+  name: string;
+  value: string;
+}
+
+export const parseRequestHeaderLine = (
+  header: string,
+): ParsedRequestHeaderLine | undefined => {
+  const delimiterIndex = getRequestHeaderDelimiterIndex(header);
+  if (delimiterIndex <= 0) {
+    return undefined;
+  }
+
+  return {
+    name: header.slice(0, delimiterIndex).trim().toLowerCase(),
+    value:
+      header.charAt(delimiterIndex) === ";"
+        ? ""
+        : header.slice(delimiterIndex + 1).trim(),
+  };
 };
 
 export const removeRequestHeader = (headers: string[], name: string): void => {

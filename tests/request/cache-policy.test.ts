@@ -76,15 +76,19 @@ describe("file cache policy", () => {
         "X-Feature;",
         "X-Feature: enabled",
         "X-Early-Semicolon; ignored: yes",
+        "Cache-Control: max-age=3600",
+        "Cache-Control: no-store",
       ],
       "file",
       0,
     );
 
     expect(lookup.requestHeaders).toStrictEqual({
+      "cache-control": ["max-age=3600", "no-store"],
       "x-early-semicolon": [""],
       "x-feature": ["", "enabled"],
     });
+    expect(lookup.allowStore).toBe(false);
   });
 
   test("supports array-valued response headers", () => {
@@ -104,6 +108,15 @@ describe("file cache policy", () => {
       prepareFileCacheLookup("GET", url, ["X-A: a", "X-B: b"], "file", 1)
         .useCachedResponse,
     ).toBe(true);
+    expect(
+      prepareFileCacheLookup(
+        "GET",
+        url,
+        ["X-A: a", "X-A: extra", "X-B: b"],
+        "file",
+        1,
+      ).useCachedResponse,
+    ).toBe(false);
   });
 
   test("parses quoted Cache-Control directive values", () => {

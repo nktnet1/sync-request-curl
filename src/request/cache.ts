@@ -3,7 +3,11 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as v from "valibot";
-import { hasRequestHeader, setRequestHeader } from "#/http/headers";
+import {
+  hasRequestHeader,
+  parseRequestHeaderLine,
+  setRequestHeader,
+} from "#/http/headers";
 import type { Response } from "#/types";
 import { incomingHttpHeadersSchema } from "#/validation";
 
@@ -67,7 +71,10 @@ const getHeaderValues = (
   headers: Response["headers"],
   name: string,
 ): string[] => {
-  const value = headers[name.toLowerCase()];
+  const normalizedName = name.toLowerCase();
+  const value = Object.entries(headers).find(
+    ([headerName]) => headerName === normalizedName,
+  )?.[1];
   if (value === undefined) {
     return [];
   }
@@ -85,36 +92,24 @@ const getHeaderValue = (
 const normalizeRequestHeaders = (
   headers: string[],
 ): NormalizedRequestHeaders => {
-  const normalized: NormalizedRequestHeaders = {};
+  const normalized = new Map<string, string[]>();
 
   for (const header of headers) {
-    const colonIndex = header.indexOf(":");
-    const semicolonIndex = header.indexOf(";");
-    let delimiterIndex = colonIndex;
-    if (
-      delimiterIndex < 0 ||
-      (semicolonIndex >= 0 && semicolonIndex < delimiterIndex)
-    ) {
-      delimiterIndex = semicolonIndex;
-    }
-    if (delimiterIndex <= 0) {
+    const parsed = parseRequestHeaderLine(header);
+    if (parsed === undefined) {
       continue;
     }
 
-    const name = header.slice(0, delimiterIndex).trim().toLowerCase();
-    const value =
-      delimiterIndex === semicolonIndex
-        ? ""
-        : header.slice(delimiterIndex + 1).trim();
-    const values = normalized[name];
+    const { name, value } = parsed;
+    const values = normalized.get(name);
     if (values === undefined) {
-      normalized[name] = [value];
+      normalized.set(name, [value]);
     } else {
       values.push(value);
     }
   }
 
-  return normalized;
+  return Object.fromEntries(normalized);
 };
 
 const parseCacheControl = (value: string | undefined): Map<string, string> => {
@@ -152,10 +147,44 @@ const parseDeltaSeconds = (value: string | undefined): number | undefined => {
   return Number.isSafeInteger(parsed) ? parsed : undefined;
 };
 
+const getRequestHeaderValues = (
+  requestHeaders: NormalizedRequestHeaders,
+  name: string,
+): string[] | undefined => {
+  const normalizedName = name.toLowerCase();
+  return Object.entries(requestHeaders).find(
+    ([headerName]) => headerName === normalizedName,
+  )?.[1];
+};
+
 const getRequestHeaderValue = (
   requestHeaders: NormalizedRequestHeaders,
   name: string,
-): string | undefined => requestHeaders[name.toLowerCase()]?.join(", ");
+): string | undefined => {
+  const values = getRequestHeaderValues(requestHeaders, name);
+  return values === undefined ? undefined : values.join(", ");
+};
+
+const stringArraysEqual = (left: string[], right: string[]): boolean => {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  const rightValues = right.values();
+  return left.every((value) => value === rightValues.next().value);
+};
+
+const varyRequestHeadersMatch = (
+  varyNames: string[],
+  left: NormalizedRequestHeaders,
+  right: NormalizedRequestHeaders,
+): boolean =>
+  varyNames.every((name) =>
+    stringArraysEqual(
+      getRequestHeaderValues(left, name) ?? [],
+      getRequestHeaderValues(right, name) ?? [],
+    ),
+  );
 
 const getRequestCacheControl = (
   requestHeaders: NormalizedRequestHeaders,
@@ -185,7 +214,7 @@ const getVaryNamesFromHeaders = (headers: Response["headers"]): string[] =>
         .map((name) => name.trim().toLowerCase())
         .filter(Boolean),
     ),
-  ].sort();
+  ].sort((left, right) => left.localeCompare(right));
 
 const getVaryNames = (entry: CacheEntry): string[] =>
   getVaryNamesFromHeaders(entry.headers);
@@ -199,14 +228,11 @@ const requestMatchesEntry = (
     return false;
   }
 
-  return varyNames.every((name) => {
-    const current = requestHeaders[name] ?? [];
-    const cached = entry.requestHeaders[name] ?? [];
-    return (
-      current.length === cached.length &&
-      current.every((value, index) => value === cached[index])
-    );
-  });
+  return varyRequestHeadersMatch(
+    varyNames,
+    requestHeaders,
+    entry.requestHeaders,
+  );
 };
 
 const getFreshnessLifetime = (entry: CacheEntry): number => {
@@ -228,7 +254,8 @@ const getFreshnessLifetime = (entry: CacheEntry): number => {
   }
 
   const dateHeader = getHeaderValue(entry.headers, "date");
-  const responseDate = dateHeader === undefined ? NaN : Date.parse(dateHeader);
+  const responseDate =
+    dateHeader === undefined ? Number.NaN : Date.parse(dateHeader);
   const freshnessBase = Number.isFinite(responseDate)
     ? responseDate
     : entry.responseTimestamp;
@@ -237,7 +264,8 @@ const getFreshnessLifetime = (entry: CacheEntry): number => {
 
 const getCurrentAge = (entry: CacheEntry, now: number): number => {
   const dateHeader = getHeaderValue(entry.headers, "date");
-  const responseDate = dateHeader === undefined ? NaN : Date.parse(dateHeader);
+  const responseDate =
+    dateHeader === undefined ? Number.NaN : Date.parse(dateHeader);
   const apparentAge = Number.isFinite(responseDate)
     ? Math.max(0, entry.responseTimestamp - responseDate)
     : 0;
@@ -290,6 +318,8 @@ const hasValidator = (entry: CacheEntry): boolean =>
 const readCacheEntries = (url: string): CacheEntry[] => {
   let serialized: string;
   try {
+    // The URL is SHA-512 hashed by getCachePath, so it cannot control the path.
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
     serialized = readFileSync(getCachePath(url), "utf8");
   } catch (error) {
     if (isNotFoundError(error)) {
@@ -317,7 +347,11 @@ const readCacheEntries = (url: string): CacheEntry[] => {
 const writeCacheEntries = (url: string, entries: CacheEntry[]): void => {
   const bucket: CacheBucket = { version: 1, entries };
   try {
+    // fileCacheDirectory is derived only from the OS temp directory and uid.
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
     mkdirSync(fileCacheDirectory, { recursive: true, mode: 0o700 });
+    // The URL is SHA-512 hashed by getCachePath, so it cannot control the path.
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
     writeFileSync(getCachePath(url), JSON.stringify(bucket), {
       encoding: "utf8",
       mode: 0o600,
@@ -457,17 +491,14 @@ export const storeFileCacheResponse = (
     if (existingVaryNames.length !== varyNames.length) {
       return true;
     }
-    if (existingVaryNames.some((name, index) => name !== varyNames[index])) {
+    if (!stringArraysEqual(existingVaryNames, varyNames)) {
       return true;
     }
-    return !varyNames.every((name) => {
-      const current = requestHeaders[name] ?? [];
-      const cached = existing.requestHeaders[name] ?? [];
-      return (
-        current.length === cached.length &&
-        current.every((value, index) => value === cached[index])
-      );
-    });
+    return !varyRequestHeadersMatch(
+      varyNames,
+      requestHeaders,
+      existing.requestHeaders,
+    );
   });
 
   writeCacheEntries(url, [entry, ...retainedEntries]);

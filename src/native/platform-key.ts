@@ -25,10 +25,8 @@ export function isNativePlatformKey(value: string): value is NativePlatformKey {
   return isNativePlatformKeyCore(value);
 }
 
-export function resolveNativePlatformKey(
+export const resolveNativePlatformKey: (
   platform: NodeJS.Platform,
   arch: string,
   linuxLibc: LinuxLibc,
-): NativePlatformKey | undefined {
-  return resolveNativePlatformKeyCore(platform, arch, linuxLibc);
-}
+) => NativePlatformKey | undefined = resolveNativePlatformKeyCore;

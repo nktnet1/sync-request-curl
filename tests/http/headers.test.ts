@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   hasRequestHeader,
+  parseRequestHeaderLine,
   parseResponseHeaders,
   serializeRequestHeaders,
 } from "#/http/headers";
@@ -61,6 +62,18 @@ describe("parseResponseHeaders", () => {
         "x-omitted": undefined,
       }),
     ).toStrictEqual(["x-list: first", "x-list: second", "x-empty;"]);
+  });
+
+  test("parses request header line formats through the shared parser", () => {
+    expect(parseRequestHeaderLine("X-Test: value; parameter")).toStrictEqual({
+      name: "x-test",
+      value: "value; parameter",
+    });
+    expect(parseRequestHeaderLine("X-Empty;")).toStrictEqual({
+      name: "x-empty",
+      value: "",
+    });
+    expect(parseRequestHeaderLine("malformed")).toBeUndefined();
   });
 
   test("recognizes header names across supported line formats", () => {
