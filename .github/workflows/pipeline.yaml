@@ -184,7 +184,7 @@ jobs:
       fail-fast: true
       matrix:
         node-version:
-          - 16.0.0
+          - 16.17.0
           - 18.0.0
           - 20.0.0
           - 22.0.0

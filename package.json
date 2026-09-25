@@ -73,10 +73,10 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=16.17.0"
   },
   "browserslist": [
-    "node >= 16.0.0"
+    "node >= 16.17.0"
   ],
   "exports": {
     ".": {

@@ -136,7 +136,7 @@ should be treated as the current baseline in future sessions:
 - `v1.0.7-blob-multipart.patch` accepts Node `Blob`/`File` multipart values,
   materialises their bytes synchronously through public worker-thread APIs,
   preserves filename and MIME metadata without relying on private Blob internals,
-  and smoke-tests Blob append on the Node 16 runtime floor.
+  and smoke-tests Blob append on the Node 16.17 runtime floor.
 
 
 Do not replace these behaviours with a response-body-only cache or move retry

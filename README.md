@@ -454,7 +454,7 @@ DEALINGS IN THE SOFTWARE.
 
 ## 4. Compatibility
 
-`sync-request-curl` supports Node.js 16.0.0 and newer at runtime. The native addon targets Node-API v8, so a prebuilt addon is tied to its operating system, CPU architecture, and C runtime, but not to a specific Node.js major version. The same prebuilt binary can be reused by Node.js releases that support Node-API v8.
+`sync-request-curl` supports Node.js 16.17.0 and newer at runtime. The native addon targets Node-API v8, so a prebuilt addon is tied to its operating system, CPU architecture, and C runtime, but not to a specific Node.js major version. The same prebuilt binary can be reused by Node.js releases that support Node-API v8.
 
 Repository build and release automation runs on newer Node.js versions independently of the published runtime requirement. Package consumers do not execute those TypeScript build scripts or compile the native addon.
 
