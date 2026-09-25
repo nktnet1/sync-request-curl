@@ -122,8 +122,12 @@ These are observable differences found while comparing the local sources for
 `sync-request`, `then-request`, and, only where necessary, `http-basic`. They are
 not all necessarily desirable behaviours to copy.
 
-- [ ] Accept `null` request options at runtime and normalise them to `{}`, as
-      `then-request` does. The current Valibot boundary rejects `null`.
+- [x] Accept `null` request options at runtime and normalise them to `{}`,
+      matching `sync-request`'s `options || ...` runtime behaviour. Keep the
+      public TypeScript signature as `options?: Options`, matching upstream;
+      `null` is legacy runtime compatibility rather than a declared input type.
+      Direct `optionsSchema` validation remains strict and continues to reject
+      `null`.
 - [x] Match upstream payload precedence and caller-header preservation where it
       maps cleanly to the buffered API. Payload selection is `form` before
       `json` before `body`; generated JSON `Content-Type` and payload
@@ -284,6 +288,11 @@ should be treated as the current baseline in future sessions:
   payload headers, avoids generating `Content-Length: 0` for empty
   GET/DELETE/HEAD requests, and records the intentional request-body and framing
   differences retained by the libcurl transport.
+- `v1.0.30-null-options-runtime-compat.patch` restores upstream runtime
+  compatibility for callers that pass `null` as the request options value by
+  normalising it to an empty object at the public request boundary. The
+  TypeScript declaration remains `options?: Options`, and direct schema
+  validation remains strict.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

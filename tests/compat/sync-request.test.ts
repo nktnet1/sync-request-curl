@@ -23,6 +23,17 @@ describe("sync-request Node.js compatibility", () => {
     expect(response.getBody("utf8")).toContain('"method":"GET"');
   });
 
+  test("treats null options like omitted options at runtime", () => {
+    const response = request(
+      "GET",
+      `${SERVER_URL}/compat/echo`,
+      null as never,
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.getJSON<EchoResponse>().method).toBe("GET");
+  });
+
   test("matches then-request qs parsing, merging, and encoding", () => {
     const response = request(
       "GET",

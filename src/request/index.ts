@@ -83,7 +83,7 @@ const request = (
 ): Response => {
   const originalMethod = normalizeMethod(method);
   const originalUrl = v.parse(requestUrlSchema, url);
-  const originalOptions = v.parse(optionsSchema, options);
+  const originalOptions = v.parse(optionsSchema, options ?? {});
 
   return performRequestAttempt(originalMethod, originalUrl, originalOptions);
 };

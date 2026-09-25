@@ -119,6 +119,7 @@ describe("runtime validation", () => {
         maxRetries: 5,
       }).success,
     ).toBe(true);
+    expect(v.safeParse(optionsSchema, null).success).toBe(false);
     expect(v.safeParse(optionsSchema, { timeout: "fast" }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { socketTimeout: -1 }).success).toBe(
       false,
