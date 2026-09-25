@@ -23,28 +23,10 @@ export type PreparedFormDataEntry = v.InferOutput<
 
 const entries = new WeakMap<FormData, PreparedFormDataEntry[]>();
 
-/**
- * Blob exposes only asynchronous readers. A worker can await the public Blob
- * API while the calling thread blocks on shared state, keeping append synchronous.
- */
-const blobReaderSource = `
-  const { workerData } = require("node:worker_threads");
-  const state = new Int32Array(workerData.state);
-
-  const main = async () => {
-    try {
-      const arrayBuffer = await workerData.blob.arrayBuffer();
-      new Uint8Array(workerData.data).set(new Uint8Array(arrayBuffer));
-      Atomics.store(state, 0, 1);
-    } catch {
-      Atomics.store(state, 0, -1);
-    } finally {
-      Atomics.notify(state, 0);
-    }
-  };
-
-  main();
-`;
+const blobReaderWorkerUrl = new URL(
+  "./internal/blob-reader-worker.cjs",
+  import.meta.url,
+);
 
 const blobToBufferSync = (blob: Blob): Buffer => {
   if (blob.size === 0) {
@@ -54,8 +36,7 @@ const blobToBufferSync = (blob: Blob): Buffer => {
   const data = new SharedArrayBuffer(blob.size);
   const stateBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
   const state = new Int32Array(stateBuffer);
-  const worker = new Worker(blobReaderSource, {
-    eval: true,
+  const worker = new Worker(blobReaderWorkerUrl, {
     workerData: { blob, data, state: stateBuffer },
   });
   worker.unref();

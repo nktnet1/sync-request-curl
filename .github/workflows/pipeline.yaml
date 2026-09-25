@@ -166,6 +166,9 @@ jobs:
       - name: Build published JavaScript
         run: pnpm build
 
+      - name: Verify Blob worker is shipped
+        run: test -f dist/internal/blob-reader-worker.cjs
+
       - name: Upload runtime compatibility fixture
         uses: actions/upload-artifact@v4
         with:
@@ -242,12 +245,15 @@ jobs:
           NODE
 
           node --input-type=module <<'NODE'
+          import { Blob } from "node:buffer";
           const imported = await import("./dist/index.mjs");
           const types = await import("./dist/types.mjs");
           const errors = await import("./dist/errors.mjs");
           const request = imported.default;
           if (typeof request !== "function") throw new Error("ESM default export is not callable");
           if (typeof types.FormData !== "function") throw new Error("ESM types entry does not expose FormData");
+          const form = new types.FormData();
+          form.append("blob", new Blob(["runtime compatibility"]), "runtime.txt");
           if (new errors.CurlError(60, "TLS failure").code !== 60) throw new Error("ESM errors entry does not preserve CurlError code");
           const response = request("GET", "http://127.0.0.1:18765/");
           if (response.statusCode !== 200) throw new Error(`Unexpected ESM status: ${response.statusCode}`);
