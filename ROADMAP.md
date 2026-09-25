@@ -16,7 +16,8 @@ layer.
       `CurlOption`, `formData`, and `HttpPostField`) while retaining `CurlError`
       with its numeric libcurl error code.
 - [x] Keep `Response#getJSON()` as an additive API.
-- [x] Support `string | URL` request URLs and case-insensitive HTTP methods.
+- [x] Support `string | URL` request URLs and arbitrary case-insensitive
+      string HTTP methods, including extension/WebDAV verbs.
 - [x] Replace multipart `formData` input with `sync-request`-style `FormData`
       and `form`.
 - [x] Keep redirects and overall request timeout orchestration in TypeScript.
@@ -42,20 +43,29 @@ layer.
 - [x] Add `Blob` multipart values where they can be supported synchronously
       without depending on private runtime internals.
 - [x] Verify CommonJS compatibility for `request.FormData` in the built
-      package, in addition to the named ESM export.
+      package, with matching `FormData` coverage through the existing ESM
+      `./types` entry.
+- [x] Match upstream `getBody()` status-error messages, including decoding the
+      response body with the requested encoding.
+- [ ] Expose `FormData` as a named export from the root ESM entry and restore
+      upstream-style root named public types while preserving direct callable
+      CommonJS `require("sync-request-curl")`.
+- [ ] Match `then-request` query parsing/merging/stringifying semantics for
+      `qs`, including nested values and RFC3986 byte encoding.
 
 ## Additional transport-neutral features
 
 Replace useful capabilities that were previously reachable through
 `setEasyOptions` with explicit high-level options where appropriate:
 
+- [ ] Redact credentials and other sensitive values from debug error details
+      before adding credential-bearing transport options.
 - [ ] Proxy URL and proxy authentication.
 - [ ] TLS verification and custom CA configuration.
 - [ ] Local interface/address binding.
 - [ ] TCP keepalive configuration.
 - [x] Use `CurlError` with the raw numeric libcurl code for native transport
       failures; keep `RequestError` for errors created by the TypeScript layer.
-- [ ] Redact credentials and other sensitive values from debug error details.
 
 ## Tests
 
@@ -69,8 +79,41 @@ Replace useful capabilities that were previously reachable through
       and become inactive.
 - [x] Cover agent-scoped connection reuse and one-shot agent behaviour.
 - [x] Cover file-cache freshness, validators, and cache bypass/revalidation.
-- [ ] Add built-package smoke tests for ESM and CommonJS exports.
+- [x] Add built-package smoke tests for the current ESM and CommonJS exports.
+- [ ] Extend built-package smoke tests to the upstream-style root ESM named
+      `FormData` export once that packaging change lands.
 - [ ] Keep native loading/prebuild coverage for every supported platform key.
+
+## Parity assessment (2026-09-25)
+
+The Node.js `sync-request` surface is now substantially covered: request URLs,
+headers, body/JSON/multipart payloads, redirects, gzip handling, overall and
+socket timeouts, GET retry behaviour, file caching, agent-scoped connection
+reuse, and the response shape are all represented. `getJSON()` remains an
+intentional additive helper.
+
+The remaining observable compatibility work is narrower but important:
+
+- Root ESM does not yet support the upstream `then-request`-style
+  `import request, { FormData } from ...` shape, and the root entry does not
+  yet expose the upstream-style named public types. The current CommonJS entry
+  must remain directly callable, so the runtime export needs a packaging
+  solution rather than simply adding another root export while `cjsDefault`
+  is in use.
+- `qs` currently uses the WHATWG URL/query implementation rather than the
+  `qs` parse/merge/stringify behaviour inherited from `then-request`; nested
+  merge and byte-encoding details therefore still need compatibility tests
+  and alignment.
+- The focused local tests cover implemented features, but the applicable
+  upstream Node.js test cases still need to be ported to catch smaller
+  behavioural differences.
+
+Features exposed by `then-request`/`http-basic` but explicitly excluded by
+`sync-request` are not v5 parity gaps: memory/custom caches and function-valued
+retry policies are examples. Async/streaming-only lower-level features such as
+`ReadableStream` request bodies, `duplex`, and cache implementation hooks are
+also outside the synchronous Node.js compatibility target unless a separate
+high-level use case is added later.
 
 ## TypeDoc
 
@@ -141,6 +184,10 @@ should be treated as the current baseline in future sessions:
   entry is directly callable through `require()` and exposes the same
   `request.FormData` constructor as the named `FormData` export, with matching
   ESM coverage in the runtime compatibility matrix.
+- `v1.0.9-sync-request-parity-closure.patch` accepts arbitrary
+  case-insensitive string HTTP methods (including extension verbs), restores
+  the upstream `getBody()` status-error body/encoding text, and records the
+  remaining `sync-request`/`then-request`/`http-basic` parity boundaries.
 
 
 Do not replace these behaviours with a response-body-only cache or move retry

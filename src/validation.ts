@@ -56,39 +56,27 @@ export const optionsSchema = v.custom<
   v.InferOutput<typeof optionsObjectSchema>
 >((input) => v.is(optionsObjectSchema, input), "Invalid request options");
 
-export const uppercaseHttpVerbSchema = v.picklist([
-  "GET",
-  "HEAD",
-  "POST",
-  "PUT",
-  "DELETE",
-  "CONNECT",
-  "OPTIONS",
-  "TRACE",
-  "PATCH",
-]);
+const httpMethodTokenSchema = v.pipe(
+  v.string(),
+  v.regex(
+    /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/,
+    "Expected a valid HTTP method token",
+  ),
+);
 
-const lowercaseHttpVerbSchema = v.picklist([
-  "get",
-  "head",
-  "post",
-  "put",
-  "delete",
-  "connect",
-  "options",
-  "trace",
-  "patch",
-]);
+export const uppercaseHttpVerbSchema = v.pipe(
+  httpMethodTokenSchema,
+  v.check(
+    (method) => method === method.toUpperCase(),
+    "Expected an uppercase HTTP method",
+  ),
+);
 
-export const httpVerbInputSchema = v.union([
-  uppercaseHttpVerbSchema,
-  lowercaseHttpVerbSchema,
-]);
+export const httpVerbInputSchema = httpMethodTokenSchema;
 
 export const httpVerbSchema = v.pipe(
-  v.string(),
+  httpMethodTokenSchema,
   v.transform((method) => method.toUpperCase()),
-  uppercaseHttpVerbSchema,
 );
 
 export const bufferEncodingSchema = v.picklist([

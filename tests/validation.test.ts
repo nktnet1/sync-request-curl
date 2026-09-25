@@ -78,9 +78,12 @@ describe("schema-derived types", () => {
 });
 
 describe("runtime validation", () => {
-  test("normalizes supported HTTP methods and rejects unsupported methods", () => {
+  test("normalizes standard and extension HTTP methods", () => {
     expect(v.parse(httpVerbSchema, "post")).toBe("POST");
-    expect(v.safeParse(httpVerbSchema, "BREW").success).toBe(false);
+    expect(v.parse(httpVerbSchema, "propfind")).toBe("PROPFIND");
+    expect(v.safeParse(httpVerbSchema, "bad method").success).toBe(false);
+    expect(v.safeParse(httpVerbSchema, "").success).toBe(false);
+    expect(v.safeParse(httpVerbSchema, 123).success).toBe(false);
   });
 
   test("accepts string and URL request targets", () => {

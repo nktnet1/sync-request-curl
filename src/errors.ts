@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import type { HttpVerb, Options, Response } from "#/types";
+import type { BufferEncoding, HttpVerb, Options, Response } from "#/types";
 
 const requestErrorCodeSchema = v.picklist([
   "ERR_INVALID_URL",
@@ -64,8 +64,15 @@ export class ResponseError extends Error {
   readonly headers: Response["headers"];
   readonly body: Buffer;
 
-  constructor(statusCode: number, headers: Response["headers"], body: Buffer) {
-    super(`Server responded with status code ${statusCode}`);
+  constructor(
+    statusCode: number,
+    headers: Response["headers"],
+    body: Buffer,
+    encoding?: BufferEncoding,
+  ) {
+    super(
+      `Server responded with status code ${statusCode}:\n${body.toString(encoding)}`,
+    );
     this.name = "ResponseError";
     this.statusCode = statusCode;
     this.headers = headers;

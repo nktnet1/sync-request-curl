@@ -25,7 +25,7 @@ export const createResponse = ({
 }: CreateResponseOptions): Response => {
   const getBody = ((encoding?: BufferEncoding): string | Buffer => {
     if (statusCode >= 300) {
-      throw new ResponseError(statusCode, headers, body);
+      throw new ResponseError(statusCode, headers, body, encoding);
     }
     return encoding ? body.toString(encoding) : body;
   }) as GetBody;
