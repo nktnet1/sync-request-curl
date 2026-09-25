@@ -39,11 +39,16 @@ export const createResponse = ({
         error instanceof Error
           ? error.message
           : `Non-Error thrown while parsing JSON (${typeof error})`;
-      throw new Error(
+      const parseError = new Error(
         `The response body for ${method} ${requestUrl} could not be parsed as JSON.\n\n` +
           `Body:\n${body.toString(encoding)}\n\nJSON parse error:\n${message}`,
-        { cause: error },
       );
+      Object.defineProperty(parseError, "cause", {
+        value: error,
+        configurable: true,
+        writable: true,
+      });
+      throw parseError;
     }
   };
 

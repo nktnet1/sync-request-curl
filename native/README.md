@@ -45,6 +45,6 @@ not require Rust, a C/C++ compiler, CMake, vcpkg, node-gyp, or lifecycle-script
 approval.
 
 All repository automation under `scripts/` is TypeScript and runs directly in
-Node.js. Local development with those scripts requires a Node.js release where
-type stripping is enabled by default; `scripts/` is not included in the npm
-package and does not change the published library runtime requirement.
+Node.js. Local development and release automation use Node.js 24.14+ or 26+;
+`scripts/` is not included in the npm package and does not change the published
+library runtime requirement of Node.js 16.0.0 or newer.

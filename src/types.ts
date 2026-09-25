@@ -1,5 +1,8 @@
 import type { IncomingHttpHeaders } from "node:http";
-import type { FormData } from "#/form-data";
+import { FormData } from "#/form-data";
+
+export type { FormDataEntry } from "#/form-data";
+export { FormData };
 
 // biome-ignore lint/suspicious/noExplicitAny: matches sync-request's JSON input/output type
 export type CustomJsonType = any;

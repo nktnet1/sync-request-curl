@@ -41,14 +41,14 @@ const { values } = parseArgs({
   options: {
     libc: { type: "string" },
     mode: { type: "string", default: "build" },
-    node: { type: "string", default: "22" },
+    node: { type: "string", default: "24" },
     inside: { type: "boolean", default: false },
   },
 });
 
 const libc = values.libc;
 const mode = values.mode ?? "build";
-const nodeVersion = values.node ?? "22";
+const nodeVersion = values.node ?? "24";
 if (libc !== "gnu" && libc !== "musl") {
   throw new Error("--libc must be either gnu or musl");
 }

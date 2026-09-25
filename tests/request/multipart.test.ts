@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
-import request, { FormData } from "#/index";
+import request from "#/index";
+import { FormData } from "#/types";
 import { SERVER_URL } from "../app/config";
 
 describe("multipart/form-data", () => {

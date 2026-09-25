@@ -43,7 +43,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 22.x
+          node-version: 24.x
 
       - name: Restore cached native addon
         id: native-cache
@@ -87,7 +87,6 @@ jobs:
           - ubuntu-latest
           - macos-latest
         node-version:
-          - 22.x
           - 24.x
           - 26.x
       fail-fast: true
@@ -136,12 +135,104 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+  build-runtime-compat:
+    needs: native
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Enable pnpm via corepack
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Set up build Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download GNU native addon
+        uses: actions/download-artifact@v4
+        with:
+          name: native-ubuntu-latest
+          path: prebuilds
+
+      - name: Build published JavaScript
+        run: pnpm build
+
+      - name: Upload runtime compatibility fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-compat-linux-x64-gnu
+          path: |
+            dist
+            prebuilds/sync_request_curl_native.linux-x64-gnu.node
+          if-no-files-found: error
+
+  runtime-compat:
+    needs: build-runtime-compat
+    strategy:
+      fail-fast: true
+      matrix:
+        node-version:
+          - 16.0.0
+          - 18.0.0
+          - 20.0.0
+          - 22.0.0
+          - 24.0.0
+          - 26.0.0
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Download runtime compatibility fixture
+        uses: actions/download-artifact@v4
+        with:
+          name: runtime-compat-linux-x64-gnu
+          path: .
+
+      - name: Smoke test CommonJS and ESM
+        env:
+          SYNC_REQUEST_CURL_NATIVE_PATH: ${{ github.workspace }}/prebuilds/sync_request_curl_native.linux-x64-gnu.node
+        run: |
+          python3 -m http.server 18765 --bind 127.0.0.1 >/tmp/sync-request-curl-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          sleep 1
+
+          node <<'NODE'
+          const imported = require("./dist/index.cjs");
+          const types = require("./dist/types.cjs");
+          const request = typeof imported === "function" ? imported : imported.default;
+          if (typeof request !== "function") throw new Error("CommonJS default export is not callable");
+          if (typeof types.FormData !== "function") throw new Error("CommonJS types entry does not expose FormData");
+          const response = request("GET", "http://127.0.0.1:18765/");
+          if (response.statusCode !== 200) throw new Error(`Unexpected CommonJS status: ${response.statusCode}`);
+          NODE
+
+          node --input-type=module <<'NODE'
+          const imported = await import("./dist/index.mjs");
+          const types = await import("./dist/types.mjs");
+          const request = imported.default;
+          if (typeof request !== "function") throw new Error("ESM default export is not callable");
+          if (typeof types.FormData !== "function") throw new Error("ESM types entry does not expose FormData");
+          const response = request("GET", "http://127.0.0.1:18765/");
+          if (response.statusCode !== 200) throw new Error(`Unexpected ESM status: ${response.statusCode}`);
+          NODE
+
   test-musl:
     needs: native
     strategy:
       matrix:
         node-version:
-          - '22'
           - '24'
           - '26'
     runs-on: ubuntu-24.04
@@ -153,7 +244,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 22.x
+          node-version: 24.x
 
       - name: Download Alpine native addon
         uses: actions/download-artifact@v4

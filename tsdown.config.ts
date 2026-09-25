@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     index: "./src/index.ts",
     errors: "./src/errors.ts",
+    types: "./src/types.ts",
   },
   format: ["commonjs", "esm"],
   platform: "node",

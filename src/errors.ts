@@ -11,8 +11,19 @@ export type RequestErrorCode =
 export class RequestError extends Error {
   readonly code: RequestErrorCode;
 
-  constructor(code: RequestErrorCode, message: string, options?: ErrorOptions) {
-    super(message, options);
+  constructor(
+    code: RequestErrorCode,
+    message: string,
+    options?: { cause?: unknown },
+  ) {
+    super(message);
+    if (options && "cause" in options) {
+      Object.defineProperty(this, "cause", {
+        value: options.cause,
+        configurable: true,
+        writable: true,
+      });
+    }
     this.name = "RequestError";
     this.code = code;
   }

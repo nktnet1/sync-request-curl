@@ -118,11 +118,20 @@ const isHttpStatusLine = (header: string): boolean => {
   return boundary === "" || boundary === " " || boundary === "\t";
 };
 
+const findFinalStatusLineIndex = (headerLines: string[]): number => {
+  for (let index = headerLines.length - 1; index >= 0; index -= 1) {
+    if (isHttpStatusLine(headerLines[index])) {
+      return index;
+    }
+  }
+  return -1;
+};
+
 /** Parses the final response header block and preserves repeated headers. */
 export const parseResponseHeaders = (
   headerLines: string[],
 ): IncomingHttpHeaders => {
-  const finalStatusLineIndex = headerLines.findLastIndex(isHttpStatusLine);
+  const finalStatusLineIndex = findFinalStatusLineIndex(headerLines);
   const finalHeaderLines =
     finalStatusLineIndex >= 0
       ? headerLines.slice(finalStatusLineIndex + 1)

@@ -68,10 +68,10 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.cts",
   "engines": {
-    "node": ">=22"
+    "node": ">=16.0.0"
   },
   "browserslist": [
-    "node >= 22"
+    "node >= 16.0.0"
   ],
   "exports": {
     ".": {
@@ -81,6 +81,10 @@
     "./errors": {
       "import": "./dist/errors.mjs",
       "require": "./dist/errors.cjs"
+    },
+    "./types": {
+      "import": "./dist/types.mjs",
+      "require": "./dist/types.cjs"
     },
     "./package.json": "./package.json"
   }

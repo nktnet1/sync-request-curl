@@ -77,6 +77,14 @@ Try with [Replit](https://replit.com/@nktnet1/sync-request-curl-example#index.js
 request(method, url, options);
 ```
 
+The request function is the package default export. Public types and `FormData` are named exports from the `/types` entry:
+
+```typescript
+import request from 'sync-request-curl';
+import { FormData } from 'sync-request-curl/types';
+import type { Options, Response } from 'sync-request-curl/types';
+```
+
 <details closed>
 <summary>Examples (click to view)</summary>
 
@@ -466,7 +474,9 @@ DEALINGS IN THE SOFTWARE.
 
 ## 4. Compatibility
 
-`sync-request-curl` uses the stable Node-API ABI rather than the Node/V8 ABI. A prebuilt addon is therefore tied to its operating system, CPU architecture, and C runtime, but not to a specific Node.js major version. The same prebuilt binary can be reused by newer Node.js releases that support the targeted Node-API version.
+`sync-request-curl` supports Node.js 16.0.0 and newer at runtime. The native addon targets Node-API v8, so a prebuilt addon is tied to its operating system, CPU architecture, and C runtime, but not to a specific Node.js major version. The same prebuilt binary can be reused by Node.js releases that support Node-API v8.
+
+Repository build and release automation runs on newer Node.js versions independently of the published runtime requirement. Package consumers do not execute those TypeScript build scripts or compile the native addon.
 
 The published package does not download or compile native code during installation. Each release declares platform-specific optional packages, so the package manager installs only the native binary compatible with the current operating system, CPU architecture, and Linux C runtime. If optional dependencies are disabled or a matching package is unavailable, loading fails with an explicit error instead of falling back to `node-gyp`.
 
