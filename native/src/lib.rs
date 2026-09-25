@@ -10,7 +10,8 @@ use std::time::{Duration, Instant};
 use curl_sys::{
   curl_off_t, curl_slist, CURLcode, CURLoption, CURLMcode, CURL, CURLM,
   CURLE_FAILED_INIT, CURLE_OK, CURLE_OPERATION_TIMEDOUT, CURLE_OUT_OF_MEMORY,
-  CURLM_CALL_MULTI_PERFORM, CURLM_OK, CURLM_OUT_OF_MEMORY, CURLOPTTYPE_OBJECTPOINT,
+  CURLE_WRITE_ERROR, CURLM_CALL_MULTI_PERFORM, CURLM_OK, CURLM_OUT_OF_MEMORY,
+  CURLOPTTYPE_OBJECTPOINT,
 };
 use napi::bindgen_prelude::{Buffer, Either};
 use napi::{Error, Result};
@@ -55,6 +56,9 @@ struct RequestState {
   body: Vec<u8>,
   headers: Vec<String>,
   last_activity: Instant,
+  stop_after_final_headers: bool,
+  current_status_code: Option<u16>,
+  stopped_after_final_headers: bool,
 }
 
 impl Default for RequestState {
@@ -63,6 +67,9 @@ impl Default for RequestState {
       body: Vec::new(),
       headers: Vec::new(),
       last_activity: Instant::now(),
+      stop_after_final_headers: false,
+      current_status_code: None,
+      stopped_after_final_headers: false,
     }
   }
 }
@@ -418,11 +425,65 @@ fn trim_header_line(bytes: &[u8]) -> &[u8] {
   &bytes[begin..end]
 }
 
-request_callback!(header_callback, |state: &mut RequestState, chunk: &[u8]| {
-  state
-    .headers
-    .push(String::from_utf8_lossy(trim_header_line(chunk)).into_owned());
-});
+fn parse_http_status_code(line: &[u8]) -> Option<u16> {
+  let line = trim_header_line(line);
+  if line.len() < 8 || !line[..5].eq_ignore_ascii_case(b"HTTP/") {
+    return None;
+  }
+
+  let status_start = line.iter().position(|byte| *byte == b' ')? + 1;
+  let status = line.get(status_start..status_start + 3)?;
+  if !status.iter().all(u8::is_ascii_digit) {
+    return None;
+  }
+
+  Some(
+    u16::from(status[0] - b'0') * 100
+      + u16::from(status[1] - b'0') * 10
+      + u16::from(status[2] - b'0'),
+  )
+}
+
+extern "C" fn header_callback(
+  data: *mut c_char,
+  size: usize,
+  count: usize,
+  userdata: *mut c_void,
+) -> usize {
+  let Some(bytes) = size.checked_mul(count) else {
+    return 0;
+  };
+  if bytes == 0 {
+    return 0;
+  }
+
+  catch_unwind(AssertUnwindSafe(|| unsafe {
+    let state = &mut *userdata.cast::<RequestState>();
+    let chunk = std::slice::from_raw_parts(data.cast::<u8>(), bytes);
+    let line = trim_header_line(chunk);
+    state.mark_activity();
+    state
+      .headers
+      .push(String::from_utf8_lossy(line).into_owned());
+
+    if let Some(status_code) = parse_http_status_code(line) {
+      state.current_status_code = Some(status_code);
+    }
+
+    if state.stop_after_final_headers
+      && line.is_empty()
+      && state
+        .current_status_code
+        .is_some_and(|status_code| !(100..200).contains(&status_code))
+    {
+      state.stopped_after_final_headers = true;
+      return 0;
+    }
+
+    bytes
+  }))
+  .unwrap_or(0)
+}
 
 fn build_mime(
   curl: *mut CURL,
@@ -713,11 +774,14 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   // napi::Buffer is zero-copy; converting it to Vec<u8> would duplicate large uploads.
   let request_body = options.body;
   let has_form = options.form.is_some();
+  let has_request_payload = request_body.is_some() || has_form;
   let form = options.form.unwrap_or_default();
+  let no_body = options.no_body.unwrap_or(false);
 
   let easy = EasyHandle::new()?;
   let curl = easy.0;
   let mut state = Box::new(RequestState::default());
+  state.stop_after_final_headers = no_body && has_request_payload;
   let state_pointer = (&mut *state as *mut RequestState).cast::<c_void>();
   let mut headers = HeaderList::default();
   let mut mime: Option<Mime> = None;
@@ -755,7 +819,11 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     curl_sys::curl_easy_setopt(
       curl,
       curl_sys::CURLOPT_NOBODY,
-      if options.no_body.unwrap_or(false) { 1 as c_long } else { 0 as c_long },
+      if no_body && !has_request_payload {
+        1 as c_long
+      } else {
+        0 as c_long
+      },
     )
   });
   keep_first_error(&mut code, unsafe {
@@ -829,6 +897,9 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
       options.socket_timeout.unwrap_or_default(),
       options.connection_pool_id,
     );
+    if code == CURLE_WRITE_ERROR && state.stopped_after_final_headers {
+      code = CURLE_OK;
+    }
   }
 
   let mut status_code: c_long = 0;

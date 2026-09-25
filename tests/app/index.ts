@@ -394,6 +394,23 @@ app.all("/compat/echo", async (c) => {
   });
 });
 
+app.all("/compat/head-payload", async (c) => {
+  const chunks: Buffer[] = [];
+  for await (const chunk of c.env.incoming) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  const body = Buffer.concat(chunks);
+
+  return new Response(null, {
+    headers: {
+      "content-length": "1024",
+      "x-request-body-hex": body.toString("hex"),
+      "x-request-body-length": String(body.length),
+      "x-request-content-type": c.req.header("content-type") ?? "",
+    },
+  });
+});
+
 app.post("/upload", async (c) => {
   const body = await c.req.parseBody();
   const returnedBody = Object.entries(body)

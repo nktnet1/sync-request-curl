@@ -158,6 +158,14 @@ delay, treating `maxRetries: 0` as the default retry count, or lower-level
 stream/callback APIs that do not map cleanly to a synchronous buffered
 interface.
 
+For HEAD specifically, request content is allowed as an intentional extension
+even though RFC 9110 gives it no generally defined semantics. The native
+transport must still preserve HEAD response semantics: payload bytes are sent,
+but the transfer completes after the final response headers and exposes an
+empty response body. This avoids libcurl's `CURLOPT_NOBODY` suppressing request
+content or its body-capable request mode waiting for response bytes that a HEAD
+server does not send.
+
 ## TypeDoc
 
 Keep `README.md` at the pre-v5 develop version until the public API and
@@ -306,6 +314,10 @@ should be treated as the current baseline in future sessions:
   first value. This normalises the raw header lines supplied by libcurl; it does
   not emulate Node's HTTP parser rejecting malformed framing before a response
   object is created.
+- `v1.0.33-head-request-payloads.patch` makes the intentional HEAD request-body
+  extension work end-to-end: explicit body, JSON, and multipart payloads are
+  transmitted while the native transport still completes after the final HEAD
+  response headers and returns an empty response body.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are
