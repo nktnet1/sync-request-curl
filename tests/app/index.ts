@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
@@ -131,10 +132,15 @@ app.post("/request/headers", async (c) => {
 
 app.post("/timeout", async (c) => {
   const body = await c.req.json();
-  const startTime = Date.now();
-  while (Date.now() - startTime < body.timeout) {
-    /* zzzZZ */
+
+  try {
+    await delay(body.timeout, undefined, { signal: c.req.raw.signal });
+  } catch (error) {
+    if (!(error instanceof Error && error.name === "AbortError")) {
+      throw error;
+    }
   }
+
   return c.json({});
 });
 
