@@ -7,10 +7,10 @@ import {
   type CacheableResponse,
   getCachedRedirectUrl,
   getCachedResponse,
-  invalidateFileCache,
-  prepareFileCacheLookup,
-  refreshFileCacheEntry,
-  storeFileCacheResponse,
+  invalidateCache,
+  prepareCacheLookup,
+  refreshCacheEntry,
+  storeCacheResponse,
 } from "#/request/cache";
 import { prepareRequest } from "#/request/prepare";
 import { createResponse } from "#/response";
@@ -43,8 +43,8 @@ export const performRequest = (
   options: Options,
 ): RequestResult => {
   const { url: requestUrl, headers, body, form } = prepareRequest(url, options);
-  const requestTimestamp = options.cache === "file" ? Date.now() : 0;
-  const cacheLookup = prepareFileCacheLookup(
+  const requestTimestamp = options.cache ? Date.now() : 0;
+  const cacheLookup = prepareCacheLookup(
     method,
     requestUrl,
     headers,
@@ -81,18 +81,15 @@ export const performRequest = (
     responseHeaders,
     options.gzip !== false,
   );
-  const responseTimestamp = options.cache === "file" ? Date.now() : 0;
+  const responseTimestamp = options.cache ? Date.now() : 0;
 
-  if (
-    options.cache === "file" &&
-    method === "GET" &&
-    result.statusCode === 304
-  ) {
-    const refreshedResponse = refreshFileCacheEntry(
+  if (options.cache && method === "GET" && result.statusCode === 304) {
+    const refreshedResponse = refreshCacheEntry(
       requestUrl,
       cacheLookup,
       responseHeaders,
       responseTimestamp,
+      options.cache,
     );
     if (refreshedResponse) {
       return createRequestResult(method, url, refreshedResponse);
@@ -107,25 +104,26 @@ export const performRequest = (
   };
 
   if (
-    options.cache === "file" &&
+    options.cache &&
     method === "GET" &&
     cacheLookup.allowStore &&
     result.statusCode !== 304
   ) {
-    storeFileCacheResponse(
+    storeCacheResponse(
       requestUrl,
       cacheLookup.requestHeaders,
       requestTimestamp,
       responseTimestamp,
       cacheableResponse,
+      options.cache,
     );
   } else if (
-    options.cache === "file" &&
+    options.cache &&
     !["GET", "HEAD", "OPTIONS", "TRACE"].includes(method) &&
     result.statusCode >= 200 &&
     result.statusCode < 400
   ) {
-    invalidateFileCache(requestUrl);
+    invalidateCache(requestUrl, options.cache);
   }
 
   return {

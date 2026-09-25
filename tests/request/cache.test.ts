@@ -8,14 +8,19 @@ const cacheUrl = (path: string): string => {
   return `${SERVER_URL}${path}?key=${process.pid}-${Date.now()}-${nextCacheKey}`;
 };
 
-const cachedJson = (url: string, headers?: Record<string, string>): unknown =>
-  request("GET", url, { cache: "file", headers }).getJSON();
+type CacheMode = "file" | "memory";
 
-const cachedPair = (path: string) => {
+const cachedJson = (
+  url: string,
+  headers?: Record<string, string>,
+  cache: CacheMode = "file",
+): unknown => request("GET", url, { cache, headers }).getJSON();
+
+const cachedPair = (path: string, cache: CacheMode = "file") => {
   const url = cacheUrl(path);
   return [
-    request("GET", url, { cache: "file" }),
-    request("GET", url, { cache: "file" }),
+    request("GET", url, { cache }),
+    request("GET", url, { cache }),
   ] as const;
 };
 
@@ -138,5 +143,43 @@ describe("file cache", () => {
       version: 1,
     });
     expect(cachedJson(url)).toStrictEqual({ hits: 2, version: 1 });
+  });
+});
+
+describe("memory cache", () => {
+  test("reuses a fresh GET response without contacting the origin", () => {
+    const [first, second] = cachedPair("/cache/fresh", "memory");
+
+    expect(first.getJSON()).toStrictEqual({ hits: 1 });
+    expect(second.getJSON()).toStrictEqual({ hits: 1 });
+  });
+
+  test("revalidates stale responses using the same HTTP cache policy", () => {
+    const [first, second] = cachedPair("/cache/revalidate/etag", "memory");
+
+    expect(first.getJSON()).toStrictEqual({ hits: 1 });
+    expect(second.statusCode).toBe(200);
+    expect(second.getJSON()).toStrictEqual({ hits: 1 });
+    expect(second.headers["x-origin-hits"]).toBe("2");
+  });
+
+  test("invalidates a cached GET after a successful unsafe request", () => {
+    const url = cacheUrl("/cache/mutable");
+
+    expect(cachedJson(url, undefined, "memory")).toStrictEqual({
+      hits: 1,
+      version: 0,
+    });
+    expect(cachedJson(url, undefined, "memory")).toStrictEqual({
+      hits: 1,
+      version: 0,
+    });
+    expect(request("POST", url, { cache: "memory" }).getJSON()).toStrictEqual({
+      version: 1,
+    });
+    expect(cachedJson(url, undefined, "memory")).toStrictEqual({
+      hits: 2,
+      version: 1,
+    });
   });
 });

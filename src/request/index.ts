@@ -1,6 +1,6 @@
 import { URL } from "node:url";
 import * as v from "valibot";
-import { RequestError } from "#/errors";
+import { type CurlError, RequestError } from "#/errors";
 import { performRequest } from "#/request/perform";
 import {
   getRedirectMethod,
@@ -10,9 +10,9 @@ import {
 import {
   canRetryRequest,
   defaultMaxRetries,
-  defaultRetryDelay,
+  getRetryDelay,
   isRetryableRequestError,
-  shouldRetryResponse,
+  shouldRetryRequest,
   waitForRetry,
 } from "#/request/retry";
 import type { HttpVerb, Options, Response, UppercaseHttpVerb } from "#/types";
@@ -97,26 +97,48 @@ const request = (
     return performRequestAttempt(originalMethod, originalUrl, originalOptions);
   }
 
-  const retryDelay = originalOptions.retryDelay ?? defaultRetryDelay;
+  const retry = originalOptions.retry;
   const maxRetries = originalOptions.maxRetries ?? defaultMaxRetries;
 
   for (let retries = 0; ; retries += 1) {
+    const attemptNumber = retries + 1;
+    let retryError: CurlError | null = null;
+    let retryResponse: Response | undefined;
+
     try {
       const response = performRequestAttempt(
         originalMethod,
         originalUrl,
         originalOptions,
       );
-      if (!shouldRetryResponse(response) || retries >= maxRetries) {
+      if (
+        !shouldRetryRequest(retry, null, response, attemptNumber) ||
+        retries >= maxRetries
+      ) {
         return response;
       }
+      retryResponse = response;
     } catch (error) {
-      if (!isRetryableRequestError(error) || retries >= maxRetries) {
+      if (!isRetryableRequestError(error)) {
         throw error;
       }
+      if (
+        !shouldRetryRequest(retry, error, undefined, attemptNumber) ||
+        retries >= maxRetries
+      ) {
+        throw error;
+      }
+      retryError = error;
     }
 
-    waitForRetry(retryDelay);
+    waitForRetry(
+      getRetryDelay(
+        originalOptions.retryDelay,
+        retryError,
+        retryResponse,
+        attemptNumber,
+      ),
+    );
   }
 };
 

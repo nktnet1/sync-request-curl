@@ -6,7 +6,7 @@ import {
   setRequestHeader,
 } from "#/http/headers";
 import { fileCacheDirectory, getCachePath } from "#/request/cache-path";
-import type { Response } from "#/types";
+import type { Options, Response } from "#/types";
 import { incomingHttpHeadersSchema } from "#/validation";
 
 const cacheEntrySchema = v.object({
@@ -27,8 +27,9 @@ const cacheBucketSchema = v.object({
 type CacheEntry = v.InferOutput<typeof cacheEntrySchema>;
 type CacheBucket = v.InferOutput<typeof cacheBucketSchema>;
 type NormalizedRequestHeaders = CacheEntry["requestHeaders"];
+type CacheMode = NonNullable<Options["cache"]>;
 
-export interface FileCacheLookup {
+export interface CacheLookup {
   entry?: CacheEntry;
   requestHeaders: NormalizedRequestHeaders;
   requestTimestamp: number;
@@ -301,7 +302,7 @@ const hasValidator = (entry: CacheEntry): boolean =>
   getHeaderValue(entry.headers, "etag") !== undefined ||
   getHeaderValue(entry.headers, "last-modified") !== undefined;
 
-const readCacheEntries = (url: string): CacheEntry[] => {
+const readFileCacheEntries = (url: string): CacheEntry[] => {
   let serialized: string;
   try {
     // The URL is SHA-512 hashed by getCachePath, so it cannot control the path.
@@ -329,7 +330,7 @@ const readCacheEntries = (url: string): CacheEntry[] => {
   return [];
 };
 
-const writeCacheEntries = (url: string, entries: CacheEntry[]): void => {
+const writeFileCacheEntries = (url: string, entries: CacheEntry[]): void => {
   const bucket: CacheBucket = { version: 1, entries };
   try {
     // fileCacheDirectory is derived only from the OS temp directory and uid.
@@ -346,7 +347,31 @@ const writeCacheEntries = (url: string, entries: CacheEntry[]): void => {
   }
 };
 
-export const invalidateFileCache = (url: string): void => {
+const memoryCacheEntries = new Map<string, CacheEntry[]>();
+
+const readCacheEntries = (url: string, cache: CacheMode): CacheEntry[] =>
+  cache === "memory"
+    ? (memoryCacheEntries.get(url) ?? [])
+    : readFileCacheEntries(url);
+
+const writeCacheEntries = (
+  url: string,
+  entries: CacheEntry[],
+  cache: CacheMode,
+): void => {
+  if (cache === "memory") {
+    memoryCacheEntries.set(url, entries);
+    return;
+  }
+  writeFileCacheEntries(url, entries);
+};
+
+export const invalidateCache = (url: string, cache: CacheMode): void => {
+  if (cache === "memory") {
+    memoryCacheEntries.delete(url);
+    return;
+  }
+
   try {
     rmSync(getCachePath(url), { force: true });
   } catch (error) {
@@ -356,17 +381,20 @@ export const invalidateFileCache = (url: string): void => {
   }
 };
 
-export const prepareFileCacheLookup = (
+export const invalidateFileCache = (url: string): void =>
+  invalidateCache(url, "file");
+
+export const prepareCacheLookup = (
   method: string,
   url: string,
   headers: string[],
-  cache: "file" | undefined,
+  cache: CacheMode | undefined,
   now = Date.now(),
-): FileCacheLookup => {
+): CacheLookup => {
   const requestHeaders = normalizeRequestHeaders(headers);
   const requestCacheControl = getRequestCacheControl(requestHeaders);
   const allowStore = !requestCacheControl.has("no-store");
-  const base: FileCacheLookup = {
+  const base: CacheLookup = {
     requestHeaders,
     requestTimestamp: now,
     useCachedResponse: false,
@@ -375,11 +403,11 @@ export const prepareFileCacheLookup = (
     allowStore,
   };
 
-  if (cache !== "file" || method !== "GET" || !allowStore) {
+  if (cache === undefined || method !== "GET" || !allowStore) {
     return base;
   }
 
-  const entry = readCacheEntries(url).find((candidate) =>
+  const entry = readCacheEntries(url, cache).find((candidate) =>
     requestMatchesEntry(candidate, requestHeaders),
   );
   if (!entry) {
@@ -424,6 +452,8 @@ export const prepareFileCacheLookup = (
   };
 };
 
+export const prepareFileCacheLookup = prepareCacheLookup;
+
 const canStoreResponse = (response: CacheableResponse): boolean => {
   const cacheControl = parseCacheControl(
     getHeaderValue(response.headers, "cache-control"),
@@ -447,12 +477,13 @@ const canStoreResponse = (response: CacheableResponse): boolean => {
   return response.statusCode !== 206 && hasExplicitFreshness;
 };
 
-export const storeFileCacheResponse = (
+export const storeCacheResponse = (
   url: string,
   requestHeaders: NormalizedRequestHeaders,
   requestTimestamp: number,
   responseTimestamp: number,
   response: CacheableResponse,
+  cache: CacheMode,
 ): void => {
   if (!canStoreResponse(response)) {
     return;
@@ -468,7 +499,7 @@ export const storeFileCacheResponse = (
     responseTimestamp,
   };
   const varyNames = getVaryNames(entry);
-  const existingEntries = readCacheEntries(url);
+  const existingEntries = readCacheEntries(url, cache);
   const retainedEntries = existingEntries.filter((existing) => {
     const existingVaryNames = getVaryNames(existing);
     if (existingVaryNames.length !== varyNames.length) {
@@ -484,19 +515,36 @@ export const storeFileCacheResponse = (
     );
   });
 
-  writeCacheEntries(url, [entry, ...retainedEntries]);
+  writeCacheEntries(url, [entry, ...retainedEntries], cache);
 };
+
+export const storeFileCacheResponse = (
+  url: string,
+  requestHeaders: NormalizedRequestHeaders,
+  requestTimestamp: number,
+  responseTimestamp: number,
+  response: CacheableResponse,
+): void =>
+  storeCacheResponse(
+    url,
+    requestHeaders,
+    requestTimestamp,
+    responseTimestamp,
+    response,
+    "file",
+  );
 
 const mergeRevalidationHeaders = (
   cached: Response["headers"],
   revalidated: Response["headers"],
 ): Response["headers"] => ({ ...cached, ...revalidated });
 
-export const refreshFileCacheEntry = (
+export const refreshCacheEntry = (
   url: string,
-  lookup: FileCacheLookup,
+  lookup: CacheLookup,
   responseHeaders: Response["headers"],
   responseTimestamp: number,
+  cache: CacheMode,
 ): CacheableResponse | undefined => {
   const entry = lookup.entry;
   if (!entry || !lookup.isRevalidation) {
@@ -509,18 +557,27 @@ export const refreshFileCacheEntry = (
     body: Buffer.from(entry.body, "base64"),
     responseUrl: entry.responseUrl,
   };
-  storeFileCacheResponse(
+  storeCacheResponse(
     url,
     lookup.requestHeaders,
     lookup.requestTimestamp,
     responseTimestamp,
     response,
+    cache,
   );
   return response;
 };
 
+export const refreshFileCacheEntry = (
+  url: string,
+  lookup: CacheLookup,
+  responseHeaders: Response["headers"],
+  responseTimestamp: number,
+): CacheableResponse | undefined =>
+  refreshCacheEntry(url, lookup, responseHeaders, responseTimestamp, "file");
+
 export const getCachedResponse = (
-  entry: NonNullable<FileCacheLookup["entry"]>,
+  entry: NonNullable<CacheLookup["entry"]>,
 ): CacheableResponse => ({
   statusCode: entry.statusCode,
   headers: entry.headers,

@@ -26,6 +26,37 @@ export const incomingHttpHeadersSchema = v.custom<
   "Invalid HTTP headers",
 );
 
+export interface RetryResponse {
+  statusCode: number;
+  headers: v.InferOutput<typeof incomingHttpHeadersSchema>;
+  url: string;
+  body: Buffer;
+  getBody(encoding: BufferEncoding): string;
+  getBody(): Buffer;
+}
+
+export type RetryFunction = (
+  error: Error | null,
+  response: RetryResponse | undefined,
+  attemptNumber: number,
+) => boolean;
+
+export type RetryDelayFunction = (
+  error: Error | null,
+  response: RetryResponse | undefined,
+  attemptNumber: number,
+) => number;
+
+const retryFunctionSchema = v.custom<RetryFunction>(
+  (input) => typeof input === "function",
+  "Invalid retry function",
+);
+
+const retryDelayFunctionSchema = v.custom<RetryDelayFunction>(
+  (input) => typeof input === "function",
+  "Invalid retry delay function",
+);
+
 // JSON serializability is validated by jsonBodySchema immediately before use.
 // This schema carries the public input type without eagerly invoking toJSON().
 export const jsonLikeSchema = v.custom<JsonLikeValue>(() => true);
@@ -42,10 +73,15 @@ const optionsObjectSchema = v.object({
   maxRedirects: v.optional(v.number()),
   allowRedirectHeaders: v.optional(v.array(v.string())),
   gzip: v.optional(v.boolean()),
-  cache: v.optional(v.literal("file")),
+  cache: v.optional(v.picklist(["file", "memory"])),
   agent: v.optional(v.union([v.literal(false), v.instance(Agent)])),
-  retry: v.optional(v.boolean()),
-  retryDelay: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),
+  retry: v.optional(v.union([v.boolean(), retryFunctionSchema])),
+  retryDelay: v.optional(
+    v.union([
+      v.pipe(v.number(), v.finite(), v.minValue(0)),
+      retryDelayFunctionSchema,
+    ]),
+  ),
   maxRetries: v.optional(
     v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0)),
   ),

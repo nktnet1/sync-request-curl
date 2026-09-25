@@ -12,6 +12,7 @@ vi.mock("#/native/index", () => ({
 
 import request from "#/request/index";
 import { performRequest } from "#/request/perform";
+import type { RetryResponse } from "#/types";
 
 const nativeResponse = (
   overrides: Partial<{
@@ -198,6 +199,138 @@ describe("request retries", () => {
     expect(wait.mock.calls[0]?.[3]).toBe(17);
   });
 
+  test("supports a function-valued retry policy with one-based attempts", () => {
+    nativeRequest
+      .mockReturnValueOnce(nativeResponse({ statusCode: 503 }))
+      .mockReturnValueOnce(nativeResponse());
+    const retry = vi.fn(
+      (
+        error: Error | null,
+        response: RetryResponse | undefined,
+        attemptNumber: number,
+      ) => {
+        expect(error).toBeNull();
+        return response?.statusCode === 503 && attemptNumber === 1;
+      },
+    );
+
+    const response = request("GET", "https://example.com/retry", {
+      retry,
+      retryDelay: 0,
+      maxRetries: 3,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(retry).toHaveBeenCalledTimes(2);
+    expect(retry.mock.calls.map((call) => call[2])).toEqual([1, 2]);
+  });
+
+  test("lets a function-valued retry policy reject the default HTTP retry", () => {
+    nativeRequest.mockReturnValue(nativeResponse({ statusCode: 503 }));
+    const retry = vi.fn(() => false);
+
+    const response = request("GET", "https://example.com/retry", {
+      retry,
+      maxRetries: 5,
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(retry).toHaveBeenCalledOnce();
+    expect(nativeRequest).toHaveBeenCalledOnce();
+  });
+
+  test("propagates errors thrown by a function-valued retry policy", () => {
+    nativeRequest.mockReturnValue(nativeResponse({ statusCode: 503 }));
+
+    expect(() =>
+      request("GET", "https://example.com/retry", {
+        retry: () => {
+          throw new Error("retry policy failed");
+        },
+        maxRetries: 1,
+      }),
+    ).toThrow("retry policy failed");
+    expect(nativeRequest).toHaveBeenCalledOnce();
+  });
+
+  test("passes transport errors to a function-valued retry policy", () => {
+    nativeRequest
+      .mockReturnValueOnce(
+        nativeResponse({
+          transportCode: 7,
+          transportMessage: "Could not connect",
+          statusCode: 0,
+          body: Buffer.alloc(0),
+        }),
+      )
+      .mockReturnValueOnce(nativeResponse());
+    const retry = vi.fn(
+      (
+        error: Error | null,
+        _response: RetryResponse | undefined,
+        attemptNumber: number,
+      ) => error !== null && attemptNumber === 1,
+    );
+
+    const response = request("GET", "https://example.com/retry", {
+      retry,
+      retryDelay: 0,
+      maxRetries: 1,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(retry).toHaveBeenCalledTimes(2);
+    expect(retry.mock.calls[0]?.[0]).toMatchObject({ code: 7 });
+    expect(retry.mock.calls[0]?.[1]).toBeUndefined();
+    expect(retry.mock.calls[0]?.[2]).toBe(1);
+    expect(retry.mock.calls[1]?.[0]).toBeNull();
+    expect(retry.mock.calls[1]?.[1]?.statusCode).toBe(200);
+    expect(retry.mock.calls[1]?.[2]).toBe(2);
+  });
+
+  test("supports a function-valued retry delay with retry context", () => {
+    nativeRequest
+      .mockReturnValueOnce(nativeResponse({ statusCode: 503 }))
+      .mockReturnValueOnce(nativeResponse());
+    const wait = vi.spyOn(Atomics, "wait").mockReturnValue("timed-out");
+    const retryDelay = vi.fn(
+      (
+        error: Error | null,
+        response: RetryResponse | undefined,
+        attemptNumber: number,
+      ) => {
+        expect(error).toBeNull();
+        expect(response?.statusCode).toBe(503);
+        expect(attemptNumber).toBe(1);
+        return 23;
+      },
+    );
+
+    const response = request("GET", "https://example.com/retry", {
+      retry: true,
+      retryDelay,
+      maxRetries: 1,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(retryDelay).toHaveBeenCalledOnce();
+    expect(wait).toHaveBeenCalledOnce();
+    expect(wait.mock.calls[0]?.[3]).toBe(23);
+  });
+
+  test("rejects invalid values returned by a retry delay function", () => {
+    nativeRequest.mockReturnValue(nativeResponse({ statusCode: 503 }));
+
+    expect(() =>
+      request("GET", "https://example.com/retry", {
+        retry: true,
+        retryDelay: () => Number.NaN,
+        maxRetries: 1,
+      }),
+    ).toThrow("retryDelay must resolve to a finite non-negative number");
+    expect(nativeRequest).toHaveBeenCalledOnce();
+  });
+
   test("does not retry non-GET requests", () => {
     nativeRequest.mockReturnValue(nativeResponse({ statusCode: 503 }));
 
@@ -208,6 +341,21 @@ describe("request retries", () => {
     });
 
     expect(response.statusCode).toBe(503);
+    expect(nativeRequest).toHaveBeenCalledOnce();
+  });
+
+  test("does not invoke a function-valued retry policy for non-GET requests", () => {
+    nativeRequest.mockReturnValue(nativeResponse({ statusCode: 503 }));
+    const retry = vi.fn(() => true);
+
+    const response = request("POST", "https://example.com/retry", {
+      retry,
+      retryDelay: 0,
+      maxRetries: 5,
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(retry).not.toHaveBeenCalled();
     expect(nativeRequest).toHaveBeenCalledOnce();
   });
 });

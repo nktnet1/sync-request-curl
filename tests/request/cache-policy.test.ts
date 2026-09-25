@@ -9,6 +9,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import {
   getCachedRedirectUrl,
   prepareFileCacheLookup,
+  refreshFileCacheEntry,
   storeFileCacheResponse,
 } from "#/request/cache";
 import { fileCacheDirectory, getCachePath } from "#/request/cache-path";
@@ -256,6 +257,37 @@ describe("file cache policy", () => {
 
     expect(lookup.entry).toBeDefined();
     expect(lookup.useCachedResponse).toBe(false);
+  });
+
+  test("refreshes a stale entry through the file-cache compatibility wrapper", () => {
+    const url = cacheUrl();
+    storeFileCacheResponse(
+      url,
+      {},
+      0,
+      0,
+      response(url, {
+        "cache-control": "max-age=0",
+        etag: '"v1"',
+      }),
+    );
+
+    const lookup = prepareFileCacheLookup("GET", url, [], "file", 1);
+    const refreshed = refreshFileCacheEntry(
+      url,
+      lookup,
+      { "cache-control": "max-age=60" },
+      2,
+    );
+
+    expect(lookup.isRevalidation).toBe(true);
+    expect(refreshed?.headers).toStrictEqual({
+      "cache-control": "max-age=60",
+      etag: '"v1"',
+    });
+    expect(
+      prepareFileCacheLookup("GET", url, [], "file", 3).useCachedResponse,
+    ).toBe(true);
   });
 
   test("uses Expires freshness when Cache-Control max-age is absent", () => {

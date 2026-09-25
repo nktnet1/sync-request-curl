@@ -128,11 +128,18 @@ describe("runtime validation", () => {
     ).toBe(false);
     expect(v.safeParse(optionsSchema, { gzip: "yes" }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { cache: "file" }).success).toBe(true);
-    expect(v.safeParse(optionsSchema, { cache: "memory" }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { cache: "memory" }).success).toBe(true);
+    expect(v.safeParse(optionsSchema, { cache: "custom" }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { agent: false }).success).toBe(true);
     expect(v.safeParse(optionsSchema, { agent: true }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { agent: {} }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { retry: () => true }).success).toBe(
+      true,
+    );
     expect(v.safeParse(optionsSchema, { retry: "yes" }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { retryDelay: () => 10 }).success).toBe(
+      true,
+    );
     expect(v.safeParse(optionsSchema, { retryDelay: -1 }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { retryDelay: Number.NaN }).success).toBe(
       false,

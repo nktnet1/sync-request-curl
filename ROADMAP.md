@@ -93,15 +93,20 @@ intentional additive helper.
 The focused compatibility suite now covers the observable Node.js request
 surface together with `then-request`-style `qs` parse/merge/stringify
 semantics, including nested values, indexed arrays, existing-query reparsing,
-and RFC3986 byte encoding. Remaining roadmap work is additive transport and
-release hardening rather than a known request-surface parity gap.
+and RFC3986 byte encoding.
 
-Features exposed by `then-request`/`http-basic` but explicitly excluded by
-`sync-request` are not v5 parity gaps: memory/custom caches and function-valued
-retry policies are examples. Async/streaming-only lower-level features such as
-`ReadableStream` request bodies, `duplex`, and cache implementation hooks are
-also outside the synchronous Node.js compatibility target unless a separate
-high-level use case is added later.
+For useful `then-request` features that remain naturally synchronous in this
+in-process implementation, v5 also supports `cache: "memory"` and
+function-valued `retry`/`retryDelay` policies. These are intentionally additive
+to the narrower `sync-request` type surface.
+
+Custom callback caches and stream request bodies remain outside the target:
+supporting them faithfully would require adapting asynchronous stream/callback
+contracts into a synchronous API. The lower-level `http-basic` duplex stream
+API and cache implementation hooks are likewise not parity targets. Cache
+policy callbacks (`isMatch`, `isExpired`, and `canCache`) should only be added
+if they can be exposed with a buffered synchronous contract without pretending
+to provide the upstream stream-shaped callback objects.
 
 ## TypeDoc
 
@@ -220,6 +225,10 @@ should be treated as the current baseline in future sessions:
 - `v1.0.24-remove-debug-option.patch` supersedes the temporary v1.0.22/v1.0.23
   debug work by removing the request debug option and all request-input
   serialization from transport errors.
+- `v1.0.25-then-request-sync-parity.patch` adds the two useful
+  `then-request` features that map directly to the synchronous in-process
+  architecture: HTTP-aware in-memory caching and function-valued GET retry and
+  retry-delay policies with one-based attempt context.
 
 
 Do not replace these behaviours with a response-body-only cache or move retry

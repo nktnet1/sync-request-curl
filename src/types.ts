@@ -12,6 +12,11 @@ import type {
 } from "#/validation";
 
 export type { FormDataEntry } from "#/form-data";
+export type {
+  RetryDelayFunction,
+  RetryFunction,
+  RetryResponse,
+} from "#/validation";
 
 /**
  * Values accepted for JSON request bodies.
