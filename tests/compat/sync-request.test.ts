@@ -24,13 +24,9 @@ describe("sync-request Node.js compatibility", () => {
   });
 
   test("appends qs values to an existing query string", () => {
-    const response = request(
-      "GET",
-      `${SERVER_URL}/compat/echo?existing=keep`,
-      {
-        qs: { value: "hello world", count: 2 },
-      },
-    );
+    const response = request("GET", `${SERVER_URL}/compat/echo?existing=keep`, {
+      qs: { value: "hello world", count: 2 },
+    });
     const body = response.getJSON<EchoResponse>();
     const searchParams = new URLSearchParams(body.search);
 

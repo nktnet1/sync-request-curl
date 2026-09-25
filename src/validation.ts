@@ -58,10 +58,7 @@ export const optionsSchema = v.custom<
 
 const httpMethodTokenSchema = v.pipe(
   v.string(),
-  v.regex(
-    /^[!#$%&'*+.^`|~\w-]+$/,
-    "Expected a valid HTTP method token",
-  ),
+  v.regex(/^[!#$%&'*+.^`|~\w-]+$/, "Expected a valid HTTP method token"),
 );
 
 export const uppercaseHttpVerbSchema = v.pipe(

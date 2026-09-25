@@ -70,7 +70,7 @@
   },
   "packageManager": "pnpm@12.6.0",
   "main": "./dist/index.cjs",
-  "module": "./dist/index.mjs",
+  "module": "./dist/index-esm.mjs",
   "types": "./dist/index.d.cts",
   "engines": {
     "node": ">=16.17.0"
@@ -80,16 +80,34 @@
   ],
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index-esm.d.mts",
+        "default": "./dist/index-esm.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./errors": {
-      "import": "./dist/errors.mjs",
-      "require": "./dist/errors.cjs"
+      "import": {
+        "types": "./dist/errors.d.mts",
+        "default": "./dist/errors.mjs"
+      },
+      "require": {
+        "types": "./dist/errors.d.cts",
+        "default": "./dist/errors.cjs"
+      }
     },
     "./types": {
-      "import": "./dist/types.mjs",
-      "require": "./dist/types.cjs"
+      "import": {
+        "types": "./dist/types.d.mts",
+        "default": "./dist/types.mjs"
+      },
+      "require": {
+        "types": "./dist/types.d.cts",
+        "default": "./dist/types.cjs"
+      }
     },
     "./package.json": "./package.json"
   }

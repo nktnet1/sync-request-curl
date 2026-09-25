@@ -169,6 +169,29 @@ jobs:
       - name: Verify Blob worker is shipped
         run: test -f dist/internal/blob-reader-worker.cjs
 
+      - name: Verify ESM root is ESM-only
+        run: |
+          test -f dist/index-esm.mjs
+          test -f dist/index-esm.d.mts
+          test ! -e dist/index-esm.cjs
+          test ! -e dist/index-esm.d.cts
+
+      - name: Verify root ESM TypeScript exports
+        run: |
+          cat > .root-exports-smoke.mts <<'TS'
+          import request, { FormData } from "sync-request-curl";
+          import type { Options, Response } from "sync-request-curl";
+
+          const form = new FormData();
+          const options: Options = { form };
+          const attachedFormData: typeof FormData = request.FormData;
+          const response: Response = request("POST", "https://example.com", options);
+          void attachedFormData;
+          void response;
+          TS
+          pnpm exec tsc --noEmit --strict --module NodeNext --moduleResolution NodeNext --target ES2022 --types node .root-exports-smoke.mts
+          rm .root-exports-smoke.mts
+
       - name: Upload runtime compatibility fixture
         uses: actions/upload-artifact@v4
         with:
@@ -231,9 +254,9 @@ jobs:
 
           node <<'NODE'
           const { Blob } = require("node:buffer");
-          const request = require("./dist/index.cjs");
-          const { FormData } = require("./dist/types.cjs");
-          const { CurlError } = require("./dist/errors.cjs");
+          const request = require("sync-request-curl");
+          const { FormData } = require("sync-request-curl/types");
+          const { CurlError } = require("sync-request-curl/errors");
           if (typeof request !== "function") throw new Error("CommonJS default export is not callable");
           if (typeof FormData !== "function") throw new Error("CommonJS types entry does not expose FormData");
           if (request.FormData !== FormData) throw new Error("CommonJS request.FormData does not match the exported FormData constructor");
@@ -246,11 +269,10 @@ jobs:
 
           node --input-type=module <<'NODE'
           import { Blob } from "node:buffer";
-          import request from "./dist/index.mjs";
-          import { FormData } from "./dist/types.mjs";
-          import { CurlError } from "./dist/errors.mjs";
+          import request, { FormData } from "sync-request-curl";
+          import { CurlError } from "sync-request-curl/errors";
           if (typeof request !== "function") throw new Error("ESM default export is not callable");
-          if (typeof FormData !== "function") throw new Error("ESM types entry does not expose FormData");
+          if (typeof FormData !== "function") throw new Error("ESM root entry does not expose FormData");
           if (request.FormData !== FormData) throw new Error("ESM request.FormData does not match the exported FormData constructor");
           const form = new request.FormData();
           form.append("blob", new Blob(["runtime compatibility"]), "runtime.txt");

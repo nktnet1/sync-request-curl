@@ -47,7 +47,7 @@ layer.
       `./types` entry.
 - [x] Match upstream `getBody()` status-error messages, including decoding the
       response body with the requested encoding.
-- [ ] Expose `FormData` as a named export from the root ESM entry and restore
+- [x] Expose `FormData` as a named export from the root ESM entry and restore
       upstream-style root named public types while preserving direct callable
       CommonJS `require("sync-request-curl")`.
 - [ ] Match `then-request` query parsing/merging/stringifying semantics for
@@ -80,7 +80,7 @@ Replace useful capabilities that were previously reachable through
 - [x] Cover agent-scoped connection reuse and one-shot agent behaviour.
 - [x] Cover file-cache freshness, validators, and cache bypass/revalidation.
 - [x] Add built-package smoke tests for the current ESM and CommonJS exports.
-- [ ] Extend built-package smoke tests to the upstream-style root ESM named
+- [x] Extend built-package smoke tests to the upstream-style root ESM named
       `FormData` export once that packaging change lands.
 - [ ] Keep native loading/prebuild coverage for every supported platform key.
 
@@ -94,19 +94,10 @@ intentional additive helper.
 
 The remaining observable compatibility work is narrower but important:
 
-- Root ESM does not yet support the upstream `then-request`-style
-  `import request, { FormData } from ...` shape, and the root entry does not
-  yet expose the upstream-style named public types. The current CommonJS entry
-  must remain directly callable, so the runtime export needs a packaging
-  solution rather than simply adding another root export while `cjsDefault`
-  is in use.
 - `qs` currently uses the WHATWG URL/query implementation rather than the
   `qs` parse/merge/stringify behaviour inherited from `then-request`; nested
   merge and byte-encoding details therefore still need compatibility tests
   and alignment.
-- The focused local tests cover implemented features, but the applicable
-  upstream Node.js test cases still need to be ported to catch smaller
-  behavioural differences.
 
 Features exposed by `then-request`/`http-basic` but explicitly excluded by
 `sync-request` are not v5 parity gaps: memory/custom caches and function-valued
@@ -192,6 +183,15 @@ should be treated as the current baseline in future sessions:
   public-API suite for the applicable `sync-request` Node.js behaviours: basic
   response shape, query appending, headers, string/Buffer/JSON bodies,
   `request.FormData`, redirects, `getBody()` errors, and HEAD responses.
+- `v1.0.12-root-esm-exports.patch` adds a dedicated ESM package entry that
+  exposes `FormData` and the public named types from the package root while
+  retaining the single-default CommonJS entry for directly callable
+  `require("sync-request-curl")`, with conditional declaration exports and
+  built-package runtime/type smoke coverage.
+- `v1.0.13-esm-only-root-entry.patch` builds that dedicated root entry only
+  as ESM, eliminating tsdown's mixed-export CommonJS warning and the unused
+  `index-esm.cjs`/`index-esm.d.cts` artifacts while preserving the callable
+  CommonJS `index.cjs` entry.
 
 
 Do not replace these behaviours with a response-body-only cache or move retry
