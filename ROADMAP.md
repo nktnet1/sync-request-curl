@@ -137,8 +137,9 @@ not all necessarily desirable behaviours to copy.
       `Content-Length: 0`.
 - [x] Remove `content-encoding` from the exposed response headers after
       transparent gzip/deflate decompression so the headers describe the body
-      actually returned to callers. Preserve the header when decompression is
-      disabled or the encoding is unsupported.
+      actually returned to callers. Also remove the encoded representation's
+      stale `content-length`; do not fabricate a decoded length. Preserve both
+      headers when decompression is disabled, unsupported, or fails.
 - [x] Match Node's duplicate response-header folding: expose `set-cookie` as
       an array even when only one value is present, join repeated `cookie`
       values with `; `, join ordinary repeated headers with `, `, and keep the
@@ -339,6 +340,13 @@ should be treated as the current baseline in future sessions:
   suppresses libcurl's `CURLOPT_POSTFIELDS` default
   `application/x-www-form-urlencoded`; explicit caller values and the generated
   JSON/multipart media types are unchanged.
+- `v1.0.36-decompression-content-length.patch` removes the encoded
+  representation's `content-length` after successful transparent gzip/deflate
+  decompression alongside `content-encoding`, so exposed response metadata does
+  not describe bytes that are no longer returned. Disabled, unsupported, and
+  failed decompression preserve the original headers. This intentionally
+  fixes an attached `http-basic` bug: its decompression wrapper deletes
+  `content-encoding` but leaves the compressed `content-length` exposed.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

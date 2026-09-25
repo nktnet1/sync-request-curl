@@ -52,6 +52,7 @@ export const decompressResponseBody = (
   try {
     const decoded = decodeBody(body, encodings);
     delete headers["content-encoding"];
+    delete headers["content-length"];
     return decoded;
   } catch (cause) {
     throw new RequestError(

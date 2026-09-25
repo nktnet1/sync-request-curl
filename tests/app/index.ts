@@ -360,18 +360,22 @@ app.get("/compressed/:encoding", (c) => {
   const body = Buffer.from(payload);
 
   if (encoding === "gzip") {
-    return new Response(toArrayBuffer(gzipSync(body)), {
+    const encoded = gzipSync(body);
+    return new Response(toArrayBuffer(encoded), {
       headers: {
         "content-encoding": "gzip",
+        "content-length": String(encoded.length),
         "content-type": "application/json",
       },
     });
   }
 
   if (encoding === "deflate") {
-    return new Response(toArrayBuffer(deflateSync(body)), {
+    const encoded = deflateSync(body);
+    return new Response(toArrayBuffer(encoded), {
       headers: {
         "content-encoding": "deflate",
+        "content-length": String(encoded.length),
         "content-type": "application/json",
       },
     });
