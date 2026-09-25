@@ -27,23 +27,17 @@ describe("file cache", () => {
     expect(second.getJSON()).toStrictEqual({ hits: 1 });
   });
 
-  test("revalidates stale ETag responses and returns the cached entity", () => {
-    const [first, second] = cachedPair("/cache/revalidate/etag");
+  test.for(["/cache/revalidate/etag", "/cache/revalidate/last-modified"])(
+    "revalidates stale responses for %s",
+    (path) => {
+      const [first, second] = cachedPair(path);
 
-    expect(first.getJSON()).toStrictEqual({ hits: 1 });
-    expect(second.statusCode).toBe(200);
-    expect(second.getJSON()).toStrictEqual({ hits: 1 });
-    expect(second.headers["x-origin-hits"]).toBe("2");
-  });
-
-  test("revalidates stale Last-Modified responses", () => {
-    const [first, second] = cachedPair("/cache/revalidate/last-modified");
-
-    expect(first.getJSON()).toStrictEqual({ hits: 1 });
-    expect(second.statusCode).toBe(200);
-    expect(second.getJSON()).toStrictEqual({ hits: 1 });
-    expect(second.headers["x-origin-hits"]).toBe("2");
-  });
+      expect(first.getJSON()).toStrictEqual({ hits: 1 });
+      expect(second.statusCode).toBe(200);
+      expect(second.getJSON()).toStrictEqual({ hits: 1 });
+      expect(second.headers["x-origin-hits"]).toBe("2");
+    },
+  );
 
   test("Cache-Control: no-cache bypasses freshness and replaces the entry", () => {
     const url = cacheUrl("/cache/fresh");
