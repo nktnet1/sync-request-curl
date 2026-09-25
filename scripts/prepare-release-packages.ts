@@ -8,7 +8,6 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
-import * as v from "valibot";
 import {
   getNativePackageName,
   type NativePlatformKey,
@@ -16,15 +15,15 @@ import {
 } from "#/native/platform-key";
 import { getPrebuildFilename } from "#scripts/native-platform";
 
-const packageJsonSchema = v.looseObject({
-  name: v.string(),
-  version: v.string(),
-  description: v.optional(v.string()),
-  repository: v.optional(v.unknown()),
-  license: v.optional(v.string()),
-  author: v.optional(v.unknown()),
-  engines: v.optional(v.record(v.string(), v.string())),
-});
+interface PackageJson extends Record<string, unknown> {
+  name: string;
+  version: string;
+  description?: string;
+  repository?: unknown;
+  license?: string;
+  author?: unknown;
+  engines?: Record<string, string>;
+}
 
 interface NativeTarget {
   os: NodeJS.Platform;
@@ -43,14 +42,43 @@ const nativeTargets: Record<NativePlatformKey, NativeTarget> = {
   "win32-x64-msvc": { os: "win32", cpu: "x64" },
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const isStringRecord = (value: unknown): value is Record<string, string> =>
+  isRecord(value) &&
+  Object.values(value).every((entry) => typeof entry === "string");
+
+const isPackageJson = (value: unknown): value is PackageJson => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.name === "string" &&
+    typeof value.version === "string" &&
+    (value.description === undefined ||
+      typeof value.description === "string") &&
+    (value.license === undefined || typeof value.license === "string") &&
+    (value.engines === undefined || isStringRecord(value.engines))
+  );
+};
+
+const parsePackageJson = (source: string): PackageJson => {
+  const value: unknown = JSON.parse(source);
+  if (!isPackageJson(value)) {
+    throw new TypeError("package.json is missing required package metadata");
+  }
+  return value;
+};
+
 const root = resolve(import.meta.dirname, "..");
 const releaseRoot = join(root, ".release");
 const mainOutput = join(releaseRoot, "main");
 const nativeOutput = join(releaseRoot, "native");
 const prebuilds = join(root, "prebuilds");
-const packageJson = v.parse(
-  packageJsonSchema,
-  JSON.parse(readFileSync(join(root, "package.json"), "utf8")),
+const packageJson = parsePackageJson(
+  readFileSync(join(root, "package.json"), "utf8"),
 );
 
 const writeJson = (path: string, value: unknown): void => {

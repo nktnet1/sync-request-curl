@@ -2,7 +2,6 @@ import { existsSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import * as v from "valibot";
 import type { LinuxLibc, NativePlatformKey } from "#scripts/native-platform";
 import { getLinuxLibc, getPrebuildFilename } from "#scripts/native-platform";
 import { run } from "#scripts/process";
@@ -47,29 +46,23 @@ const { values } = parseArgs({
   },
 });
 
-const cliArgsSchema = v.object({
-  libc: v.picklist(
-    ["gnu", "musl"] as const,
-    "--libc must be either gnu or musl",
-  ),
-  mode: v.optional(
-    v.picklist(
-      ["build", "test"] as const,
-      "--mode must be either build or test",
-    ),
-    "build",
-  ),
-  node: v.optional(v.string(), "24"),
-  inside: v.optional(v.boolean(), false),
-});
-const architectureSchema = v.picklist(["x64", "arm64"] as const);
+const libc = values.libc;
+const mode = values.mode ?? "build";
+const nodeVersion = values.node ?? "24";
+if (libc !== "gnu" && libc !== "musl") {
+  throw new Error("--libc must be either gnu or musl");
+}
+if (mode !== "build" && mode !== "test") {
+  throw new Error("--mode must be either build or test");
+}
 
-const args = v.parse(cliArgsSchema, values);
-const { libc, mode, node: nodeVersion } = args;
-
-type Architecture = v.InferOutput<typeof architectureSchema>;
-const getArchitecture = (): Architecture =>
-  v.parse(architectureSchema, process.arch);
+type Architecture = "x64" | "arm64";
+const getArchitecture = (): Architecture => {
+  if (process.arch === "x64" || process.arch === "arm64") {
+    return process.arch;
+  }
+  throw new Error(`Unsupported Linux architecture: ${process.arch}`);
+};
 
 const getPlatform = (targetLibc: LinuxLibc): NativePlatformKey =>
   `linux-${getArchitecture()}-${targetLibc}`;
@@ -221,7 +214,7 @@ const testInsideContainer = (targetLibc: LinuxLibc): void => {
   run("pnpm", ["test"], { cwd: root });
 };
 
-if (!args.inside) {
+if (!values.inside) {
   runInContainer();
 } else if (mode === "build") {
   buildInsideContainer(libc);

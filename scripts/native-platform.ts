@@ -1,21 +1,15 @@
-import * as v from "valibot";
 import {
   getLinuxLibcFromReport,
   type LinuxLibc,
-  linuxLibcSchema,
   type NativePlatformKey,
-  nativePlatformKeySchema,
   resolveNativePlatformKey,
 } from "#/native/platform-key";
 
 export type { LinuxLibc, NativePlatformKey } from "#/native/platform-key";
-export { supportedPlatformKeys } from "#/native/platform-key";
-
-export const parseLinuxLibc = (value: unknown): LinuxLibc =>
-  v.parse(linuxLibcSchema, value);
-
-export const parseNativePlatformKey = (value: unknown): NativePlatformKey =>
-  v.parse(nativePlatformKeySchema, value);
+export {
+  isNativePlatformKey,
+  supportedPlatformKeys,
+} from "#/native/platform-key";
 
 export const getLinuxLibc = (): LinuxLibc =>
   getLinuxLibcFromReport(process.report?.getReport());

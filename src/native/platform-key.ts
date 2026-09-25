@@ -1,5 +1,3 @@
-import * as v from "valibot";
-
 export const supportedPlatformKeys = [
   "darwin-arm64",
   "darwin-x64",
@@ -11,24 +9,24 @@ export const supportedPlatformKeys = [
   "win32-x64-msvc",
 ] as const;
 
-export const nativePlatformKeySchema = v.picklist(supportedPlatformKeys);
-export const linuxLibcSchema = v.picklist(["gnu", "musl"] as const);
-const architectureSchema = v.picklist(["x64", "arm64"] as const);
+export type NativePlatformKey = (typeof supportedPlatformKeys)[number];
+export type LinuxLibc = "gnu" | "musl";
 
-export type NativePlatformKey = v.InferOutput<typeof nativePlatformKeySchema>;
-export type LinuxLibc = v.InferOutput<typeof linuxLibcSchema>;
-
-const processReportSchema = v.object({
-  header: v.optional(
-    v.object({
-      glibcVersionRuntime: v.optional(v.string()),
-    }),
-  ),
-});
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
 
 export const getLinuxLibcFromReport = (report: unknown): LinuxLibc => {
-  const parsedReport = v.safeParse(processReportSchema, report);
-  return parsedReport.success && parsedReport.output.header?.glibcVersionRuntime
+  if (!isRecord(report)) {
+    return "musl";
+  }
+
+  const { header } = report;
+  if (!isRecord(header)) {
+    return "musl";
+  }
+
+  return typeof header.glibcVersionRuntime === "string" &&
+    header.glibcVersionRuntime.length > 0
     ? "gnu"
     : "musl";
 };
@@ -37,7 +35,7 @@ export const getNativePackageName = (platform: NativePlatformKey): string =>
   `@nktnet/sync-request-curl-${platform}`;
 
 export function isNativePlatformKey(value: string): value is NativePlatformKey {
-  return v.is(nativePlatformKeySchema, value);
+  return supportedPlatformKeys.some((platform) => platform === value);
 }
 
 export function resolveNativePlatformKey(
@@ -45,18 +43,17 @@ export function resolveNativePlatformKey(
   arch: string,
   linuxLibc: LinuxLibc,
 ): NativePlatformKey | undefined {
-  const parsedArch = v.safeParse(architectureSchema, arch);
-  if (!parsedArch.success) {
+  if (arch !== "x64" && arch !== "arm64") {
     return undefined;
   }
 
   switch (platform) {
     case "darwin":
-      return `darwin-${parsedArch.output}`;
+      return `darwin-${arch}`;
     case "linux":
-      return `linux-${parsedArch.output}-${linuxLibc}`;
+      return `linux-${arch}-${linuxLibc}`;
     case "win32":
-      return `win32-${parsedArch.output}-msvc`;
+      return `win32-${arch}-msvc`;
     default:
       return undefined;
   }

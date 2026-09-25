@@ -1,28 +1,6 @@
 import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
-import * as v from "valibot";
 import { run } from "#scripts/process";
-
-const argsSchema = v.object({
-  file: v.string("--file must point to a built native addon"),
-  libc: v.picklist(
-    ["gnu", "musl"] as const,
-    "--libc must be either gnu or musl",
-  ),
-  "glibc-max": v.optional(
-    v.pipe(v.string(), v.regex(/^\d+\.\d+$/, "Invalid glibc version")),
-  ),
-});
-
-const versionSchema = v.pipe(
-  v.string(),
-  v.regex(/^\d+\.\d+$/, "Invalid glibc version"),
-  v.transform((value): [number, number] => {
-    const [major, minor] = value.split(".");
-    return [Number(major), Number(minor)];
-  }),
-  v.tuple([v.pipe(v.number(), v.integer()), v.pipe(v.number(), v.integer())]),
-);
 
 const { values } = parseArgs({
   options: {
@@ -38,12 +16,17 @@ if (process.platform !== "linux") {
   );
 }
 
-const args = v.parse(argsSchema, values);
-if (!existsSync(args.file)) {
-  throw new Error(`Native addon does not exist: ${args.file}`);
+const file = values.file;
+if (!file || !existsSync(file)) {
+  throw new Error("--file must point to a built native addon");
 }
 
-const dynamicSection = run("readelf", ["-d", args.file], { capture: true });
+const libc = values.libc;
+if (libc !== "gnu" && libc !== "musl") {
+  throw new Error("--libc must be either gnu or musl");
+}
+
+const dynamicSection = run("readelf", ["-d", file], { capture: true });
 const dependencies = Array.from(
   dynamicSection.matchAll(/\(NEEDED\).*Shared library: \[([^\]]+)\]/g),
   (match) => match[1],
@@ -72,8 +55,15 @@ if (unexpected.length > 0) {
   );
 }
 
-const parseVersion = (value: string): [number, number] =>
-  v.parse(versionSchema, value);
+const parseVersion = (value: string): [number, number] => {
+  const [majorText, minorText] = value.split(".");
+  const major = Number(majorText);
+  const minor = Number(minorText);
+  if (!Number.isInteger(major) || !Number.isInteger(minor)) {
+    throw new TypeError(`Invalid glibc version: ${value}`);
+  }
+  return [major, minor];
+};
 
 const isNewer = (left: [number, number], right: [number, number]): boolean => {
   const [leftMajor, leftMinor] = left;
@@ -84,9 +74,10 @@ const isNewer = (left: [number, number], right: [number, number]): boolean => {
   );
 };
 
-if (args.libc === "gnu" && args["glibc-max"]) {
-  const maximum = parseVersion(args["glibc-max"]);
-  const versionInfo = run("readelf", ["--version-info", args.file], {
+const maximumVersion = values["glibc-max"];
+if (libc === "gnu" && maximumVersion) {
+  const maximum = parseVersion(maximumVersion);
+  const versionInfo = run("readelf", ["--version-info", file], {
     capture: true,
   });
   const requiredVersions = Array.from(
@@ -103,5 +94,5 @@ if (args.libc === "gnu" && args["glibc-max"]) {
 }
 
 console.log(
-  `Verified native dependencies for ${args.file}: ${dependencies.join(", ") || "none"}`,
+  `Verified native dependencies for ${file}: ${dependencies.join(", ") || "none"}`,
 );

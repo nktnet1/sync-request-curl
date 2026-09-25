@@ -38,9 +38,6 @@ jobs:
         with:
           node-version: 24.x
 
-      - name: Install runtime dependencies
-        run: npm install --ignore-scripts --no-package-lock --omit=dev --no-audit --no-fund
-
       - name: Restore cached native addon
         id: native-cache
         uses: actions/cache@v4
@@ -82,9 +79,6 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24.x
-
-      - name: Install runtime dependencies
-        run: npm install --ignore-scripts --no-package-lock --omit=dev --no-audit --no-fund
 
       - name: Restore cached native addon
         id: native-cache
@@ -136,9 +130,6 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24.x
-
-      - name: Install runtime dependencies
-        run: npm install --ignore-scripts --no-package-lock --omit=dev --no-audit --no-fund
 
       - name: Verify release matrix
         run: node scripts/verify-prebuilds.ts

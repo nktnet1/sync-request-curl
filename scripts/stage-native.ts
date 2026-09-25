@@ -4,7 +4,7 @@ import { parseArgs } from "node:util";
 import {
   getCurrentPlatformKey,
   getPrebuildFilename,
-  parseNativePlatformKey,
+  isNativePlatformKey,
 } from "#scripts/native-platform";
 
 const root = resolve(import.meta.dirname, "..");
@@ -16,9 +16,14 @@ const { values } = parseArgs({
   },
 });
 
-const platform = values.platform
-  ? parseNativePlatformKey(values.platform)
-  : getCurrentPlatformKey();
+const requestedPlatform = values.platform;
+let platform = getCurrentPlatformKey();
+if (requestedPlatform) {
+  if (!isNativePlatformKey(requestedPlatform)) {
+    throw new Error(`Unsupported native platform key: ${requestedPlatform}`);
+  }
+  platform = requestedPlatform;
+}
 
 if (!existsSync(source)) {
   throw new Error(
