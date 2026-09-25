@@ -148,6 +148,12 @@ not all necessarily desirable behaviours to copy.
       characters in values (including every repeated value), and reject
       `undefined` header values instead of silently dropping them. Valid empty
       values, horizontal tabs, and token punctuation remain supported.
+- [x] Keep raw `body` media-type neutral: when the caller does not supply
+      `Content-Type`, suppress libcurl's `CURLOPT_POSTFIELDS` default of
+      `application/x-www-form-urlencoded` instead of inventing a form media
+      type for arbitrary string/Buffer content. JSON and multipart payloads
+      keep their generated media types, and explicit caller values are
+      preserved.
 
 Intentional differences: do not reproduce `then-request`'s early rejection of a
 `body` on GET, DELETE, or HEAD. `sync-request-curl` passes explicit request
@@ -328,6 +334,11 @@ should be treated as the current baseline in future sessions:
   Node's public validators for request-header names and values before libcurl
   serialization. Invalid names, CR/LF/control characters, invalid repeated
   values, and `undefined` values now fail with Node-compatible errors.
+- `v1.0.35-raw-body-content-type.patch` keeps arbitrary raw request bodies
+  media-type neutral. If no `Content-Type` is supplied, the native transport
+  suppresses libcurl's `CURLOPT_POSTFIELDS` default
+  `application/x-www-form-urlencoded`; explicit caller values and the generated
+  JSON/multipart media types are unchanged.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

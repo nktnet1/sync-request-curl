@@ -136,6 +136,15 @@ impl HeaderList {
   }
 }
 
+fn header_name_matches(header: &str, expected_name: &str) -> bool {
+  let delimiter_index = header
+    .find(|character| character == ':' || character == ';')
+    .unwrap_or(header.len());
+  header[..delimiter_index]
+    .trim()
+    .eq_ignore_ascii_case(expected_name)
+}
+
 impl Drop for HeaderList {
   fn drop(&mut self) {
     if !self.0.is_null() {
@@ -776,6 +785,10 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   let has_form = options.form.is_some();
   let has_request_payload = request_body.is_some() || has_form;
   let form = options.form.unwrap_or_default();
+  let request_headers = options.headers.unwrap_or_default();
+  let has_content_type = request_headers
+    .iter()
+    .any(|header| header_name_matches(header, "content-type"));
   let no_body = options.no_body.unwrap_or(false);
 
   let easy = EasyHandle::new()?;
@@ -848,12 +861,18 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   });
   keep_first_error(&mut code, configure_default_ca(curl, &mut keepalive));
 
-  for header in options.headers.unwrap_or_default() {
+  for header in request_headers {
     let next = headers.append(&header);
     if next != CURLE_OK {
       code = CURLE_OUT_OF_MEMORY;
       break;
     }
+  }
+  // CURLOPT_POSTFIELDS otherwise invents application/x-www-form-urlencoded.
+  // A raw body has no implied media type, so suppress libcurl's generated
+  // Content-Type unless the caller (or JSON preparation) supplied one.
+  if code == CURLE_OK && request_body.is_some() && !has_form && !has_content_type {
+    code = headers.append("Content-Type:");
   }
   if !headers.0.is_null() {
     keep_first_error(&mut code, unsafe {

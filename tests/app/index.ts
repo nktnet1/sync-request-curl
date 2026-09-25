@@ -189,7 +189,7 @@ app.post("/content/length", async (c) => {
   });
 });
 
-app.post("/request/headers", async (c) => {
+app.all("/request/headers", async (c) => {
   await c.req.arrayBuffer();
   return c.json({
     contentType: c.req.header("content-type") ?? null,
