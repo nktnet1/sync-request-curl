@@ -19,6 +19,9 @@ const nativeResponse = (
     transportCode: number;
     transportMessage: string;
     statusCode: number;
+    effectiveUrl: string | null;
+    redirectUrl: string | null;
+    headers: string[];
     body: Buffer;
   }> = {},
 ) => ({
@@ -336,5 +339,100 @@ describe("request retries", () => {
       }),
     ).toThrow("retryDelay must resolve to a finite non-negative number");
     expect(nativeRequest).toHaveBeenCalledOnce();
+  });
+});
+
+describe("retry orchestration", () => {
+  test("retries an origin response before storing a cacheable error", () => {
+    const url = "https://example.com/retry-cacheable-error";
+    nativeRequest.mockReturnValue(
+      nativeResponse({
+        statusCode: 404,
+        effectiveUrl: url,
+        headers: ["Cache-Control: max-age=60"],
+        body: Buffer.from("missing"),
+      }),
+    );
+
+    const first = request("GET", url, {
+      cache: "memory",
+      retry: true,
+      retryDelay: 0,
+      maxRetries: 1,
+    });
+    const second = request("GET", url, {
+      cache: "memory",
+      retry: true,
+      retryDelay: 0,
+      maxRetries: 1,
+    });
+
+    expect(first.statusCode).toBe(404);
+    expect(second.statusCode).toBe(404);
+    expect(nativeRequest).toHaveBeenCalledTimes(2);
+  });
+
+  test("does not invoke the retry policy for a fresh cached response", () => {
+    const url = "https://example.com/retry-cache-hit";
+    nativeRequest.mockReturnValueOnce(
+      nativeResponse({
+        effectiveUrl: url,
+        headers: ["Cache-Control: max-age=60"],
+      }),
+    );
+
+    expect(request("GET", url, { cache: "memory" }).statusCode).toBe(200);
+
+    const retry = vi.fn(() => true);
+    const cached = request("GET", url, {
+      cache: "memory",
+      retry,
+      retryDelay: 0,
+      maxRetries: 1,
+    });
+
+    expect(cached.statusCode).toBe(200);
+    expect(retry).not.toHaveBeenCalled();
+    expect(nativeRequest).toHaveBeenCalledOnce();
+  });
+
+  test("retries only the failing redirect hop", () => {
+    const sourceUrl = "https://example.com/source";
+    const targetUrl = "https://example.com/target";
+    nativeRequest
+      .mockReturnValueOnce(
+        nativeResponse({
+          statusCode: 302,
+          effectiveUrl: sourceUrl,
+          redirectUrl: targetUrl,
+        }),
+      )
+      .mockReturnValueOnce(
+        nativeResponse({
+          statusCode: 503,
+          effectiveUrl: targetUrl,
+          body: Buffer.from("unavailable"),
+        }),
+      )
+      .mockReturnValueOnce(
+        nativeResponse({
+          effectiveUrl: targetUrl,
+          body: Buffer.from("ok"),
+        }),
+      );
+
+    const response = request("GET", sourceUrl, {
+      retry: true,
+      retryDelay: 0,
+      maxRetries: 1,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.url).toBe(targetUrl);
+    expect(nativeRequest.mock.calls.map(([options]) => options.url)).toEqual([
+      sourceUrl,
+      targetUrl,
+      targetUrl,
+    ]);
   });
 });

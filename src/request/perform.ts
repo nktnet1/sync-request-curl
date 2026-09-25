@@ -1,4 +1,4 @@
-import { throwForTransportError } from "#/errors";
+import { type CurlError, throwForTransportError } from "#/errors";
 import { decompressResponseBody } from "#/http/compression";
 import { parseResponseHeaders } from "#/http/headers";
 import native from "#/native/index";
@@ -12,7 +12,15 @@ import {
   refreshCacheEntry,
   storeCacheResponse,
 } from "#/request/cache";
-import { prepareRequest } from "#/request/prepare";
+import { type PreparedRequest, prepareRequest } from "#/request/prepare";
+import {
+  canRetryRequest,
+  defaultMaxRetries,
+  getRetryDelay,
+  isRetryableRequestError,
+  shouldRetryRequest,
+  waitForRetry,
+} from "#/request/retry";
 import { createResponse } from "#/response";
 import type { Options, Response, UppercaseHttpVerb } from "#/types";
 
@@ -37,36 +45,19 @@ const createRequestResult = (
   redirectUrl: getCachedRedirectUrl(response),
 });
 
-export const performRequest = (
+const performTransportRequest = (
   method: UppercaseHttpVerb,
-  url: string,
+  originalUrl: string,
   options: Options,
+  prepared: PreparedRequest,
 ): RequestResult => {
-  const { url: requestUrl, headers, body, form } = prepareRequest(url, options);
-  const requestTimestamp = options.cache ? Date.now() : 0;
-  const cacheLookup = prepareCacheLookup(
-    method,
-    requestUrl,
-    headers,
-    options.cache,
-    requestTimestamp,
-  );
-
-  if (cacheLookup.useCachedResponse && cacheLookup.entry) {
-    return createRequestResult(
-      method,
-      url,
-      getCachedResponse(cacheLookup.entry),
-    );
-  }
-
   const connectionPoolId = getAgentPoolId(options.agent);
   const result = native.request({
     method,
-    url: requestUrl,
-    headers: cacheLookup.revalidationHeaders,
-    ...(body === undefined ? {} : { body }),
-    ...(form === undefined ? {} : { form }),
+    url: prepared.url,
+    headers: prepared.headers,
+    ...(prepared.body === undefined ? {} : { body: prepared.body }),
+    ...(prepared.form === undefined ? {} : { form: prepared.form }),
     timeout: options.timeout ?? 0,
     socketTimeout: options.socketTimeout ?? 0,
     noBody: method === "HEAD",
@@ -81,13 +72,104 @@ export const performRequest = (
     responseHeaders,
     options.gzip !== false,
   );
+  const response: CacheableResponse = {
+    statusCode: result.statusCode,
+    headers: responseHeaders,
+    body: responseBody,
+    responseUrl: result.effectiveUrl ?? prepared.url,
+  };
+
+  return {
+    ...createRequestResult(method, originalUrl, response),
+    redirectUrl: result.redirectUrl,
+  };
+};
+
+const performRequestWithRetry = (
+  method: UppercaseHttpVerb,
+  url: string,
+  options: Options,
+  prepared: PreparedRequest,
+): RequestResult => {
+  if (!canRetryRequest(method, options.retry)) {
+    return performTransportRequest(method, url, options, prepared);
+  }
+
+  const retry = options.retry;
+  const maxRetries = options.maxRetries ?? defaultMaxRetries;
+
+  for (let retries = 0; ; retries += 1) {
+    const attemptNumber = retries + 1;
+    let retryError: CurlError | null = null;
+    let retryResponse: Response | undefined;
+
+    try {
+      const result = performTransportRequest(method, url, options, prepared);
+      if (
+        !shouldRetryRequest(retry, null, result.response, attemptNumber) ||
+        retries >= maxRetries
+      ) {
+        return result;
+      }
+      retryResponse = result.response;
+    } catch (error) {
+      if (!isRetryableRequestError(error)) {
+        throw error;
+      }
+      if (
+        !shouldRetryRequest(retry, error, undefined, attemptNumber) ||
+        retries >= maxRetries
+      ) {
+        throw error;
+      }
+      retryError = error;
+    }
+
+    waitForRetry(
+      getRetryDelay(
+        options.retryDelay,
+        retryError,
+        retryResponse,
+        attemptNumber,
+      ),
+    );
+  }
+};
+
+export const performRequest = (
+  method: UppercaseHttpVerb,
+  url: string,
+  options: Options,
+): RequestResult => {
+  const prepared = prepareRequest(url, options);
+  const requestTimestamp = options.cache ? Date.now() : 0;
+  const cacheLookup = prepareCacheLookup(
+    method,
+    prepared.url,
+    prepared.headers,
+    options.cache,
+    requestTimestamp,
+  );
+
+  if (cacheLookup.useCachedResponse && cacheLookup.entry) {
+    return createRequestResult(
+      method,
+      url,
+      getCachedResponse(cacheLookup.entry),
+    );
+  }
+
+  const result = performRequestWithRetry(method, url, options, {
+    ...prepared,
+    headers: cacheLookup.revalidationHeaders,
+  });
   const responseTimestamp = options.cache ? Date.now() : 0;
 
-  if (options.cache && method === "GET" && result.statusCode === 304) {
+  if (options.cache && method === "GET" && result.response.statusCode === 304) {
     const refreshedResponse = refreshCacheEntry(
-      requestUrl,
+      prepared.url,
       cacheLookup,
-      responseHeaders,
+      result.response.headers,
       responseTimestamp,
       options.cache,
     );
@@ -96,38 +178,33 @@ export const performRequest = (
     }
   }
 
-  const cacheableResponse: CacheableResponse = {
-    statusCode: result.statusCode,
-    headers: responseHeaders,
-    body: responseBody,
-    responseUrl: result.effectiveUrl ?? requestUrl,
-  };
-
   if (
     options.cache &&
     method === "GET" &&
     cacheLookup.allowStore &&
-    result.statusCode !== 304
+    result.response.statusCode !== 304
   ) {
     storeCacheResponse(
-      requestUrl,
+      prepared.url,
       cacheLookup.requestHeaders,
       requestTimestamp,
       responseTimestamp,
-      cacheableResponse,
+      {
+        statusCode: result.response.statusCode,
+        headers: result.response.headers,
+        body: result.response.body,
+        responseUrl: result.response.url,
+      },
       options.cache,
     );
   } else if (
     options.cache &&
     !["GET", "HEAD", "OPTIONS", "TRACE"].includes(method) &&
-    result.statusCode >= 200 &&
-    result.statusCode < 400
+    result.response.statusCode >= 200 &&
+    result.response.statusCode < 400
   ) {
-    invalidateCache(requestUrl, options.cache);
+    invalidateCache(prepared.url, options.cache);
   }
 
-  return {
-    ...createRequestResult(method, url, cacheableResponse),
-    redirectUrl: result.redirectUrl,
-  };
+  return result;
 };

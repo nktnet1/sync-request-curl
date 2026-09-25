@@ -1,20 +1,12 @@
 import { URL } from "node:url";
 import * as v from "valibot";
-import { type CurlError, RequestError } from "#/errors";
+import { RequestError } from "#/errors";
 import { performRequest } from "#/request/perform";
 import {
   getRedirectMethod,
   getRedirectOptions,
   getRemainingTimeout,
 } from "#/request/redirects";
-import {
-  canRetryRequest,
-  defaultMaxRetries,
-  getRetryDelay,
-  isRetryableRequestError,
-  shouldRetryRequest,
-  waitForRetry,
-} from "#/request/retry";
 import type { HttpVerb, Options, Response, UppercaseHttpVerb } from "#/types";
 import { httpVerbSchema, optionsSchema, requestUrlSchema } from "#/validation";
 
@@ -93,53 +85,7 @@ const request = (
   const originalUrl = v.parse(requestUrlSchema, url);
   const originalOptions = v.parse(optionsSchema, options);
 
-  if (!canRetryRequest(originalMethod, originalOptions.retry)) {
-    return performRequestAttempt(originalMethod, originalUrl, originalOptions);
-  }
-
-  const retry = originalOptions.retry;
-  const maxRetries = originalOptions.maxRetries ?? defaultMaxRetries;
-
-  for (let retries = 0; ; retries += 1) {
-    const attemptNumber = retries + 1;
-    let retryError: CurlError | null = null;
-    let retryResponse: Response | undefined;
-
-    try {
-      const response = performRequestAttempt(
-        originalMethod,
-        originalUrl,
-        originalOptions,
-      );
-      if (
-        !shouldRetryRequest(retry, null, response, attemptNumber) ||
-        retries >= maxRetries
-      ) {
-        return response;
-      }
-      retryResponse = response;
-    } catch (error) {
-      if (!isRetryableRequestError(error)) {
-        throw error;
-      }
-      if (
-        !shouldRetryRequest(retry, error, undefined, attemptNumber) ||
-        retries >= maxRetries
-      ) {
-        throw error;
-      }
-      retryError = error;
-    }
-
-    waitForRetry(
-      getRetryDelay(
-        originalOptions.retryDelay,
-        retryError,
-        retryResponse,
-        attemptNumber,
-      ),
-    );
-  }
+  return performRequestAttempt(originalMethod, originalUrl, originalOptions);
 };
 
 export default request;

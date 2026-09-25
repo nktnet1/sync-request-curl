@@ -108,6 +108,43 @@ policy callbacks (`isMatch`, `isExpired`, and `canCache`) should only be added
 if they can be exposed with a buffered synchronous contract without pretending
 to provide the upstream stream-shaped callback objects.
 
+Request orchestration now follows the effective upstream Node.js layering for
+each redirect hop: redirect handling wraps cache lookup/storage, cache wraps
+retry, and retry wraps the native transport. Fresh cache hits therefore bypass
+retry callbacks, cacheable error responses are only stored after retries finish,
+and a failure on a later redirect hop retries that hop instead of replaying the
+redirect chain. The existing TypeScript overall-timeout budget across redirects
+is retained rather than copying `http-basic` timeout quirks.
+
+### Remaining strict Node.js parity findings
+
+These are observable differences found while comparing the local sources for
+`sync-request`, `then-request`, and, only where necessary, `http-basic`. They are
+not all necessarily desirable behaviours to copy.
+
+- [ ] Accept `null` request options at runtime and normalise them to `{}`, as
+      `then-request` does. The current Valibot boundary rejects `null`.
+- [ ] Decide whether to match upstream payload precedence and generated-header
+      behaviour. `then-request` resolves `form` before `json` before `body` and
+      only adds generated payload headers when the caller did not provide them;
+      the current implementation resolves `json` before `body` before `form`,
+      replaces generated `Content-Type`/`Content-Length`, and emits
+      `Content-Length: 0` for an otherwise empty request.
+- [ ] Remove `content-encoding` from the exposed response headers after
+      transparent gzip/deflate decompression so the headers describe the body
+      actually returned to callers.
+- [ ] Match Node's duplicate response-header folding where useful: preserve
+      `set-cookie` as an array, join `cookie` with `; `, join ordinary repeated
+      headers with `, `, and apply Node's singleton-header duplicate rules.
+
+Intentional difference: do not reproduce `then-request`'s early rejection of a
+`body` on GET, DELETE, or HEAD. `sync-request-curl` allows request payloads to be
+passed through to libcurl for those methods and will document that behaviour as
+a Node-only v5 difference. Likewise, do not copy upstream implementation quirks
+such as treating `retryDelay: 0` as the default delay, treating
+`maxRetries: 0` as the default retry count, or lower-level stream/callback APIs
+that do not map cleanly to a synchronous buffered interface.
+
 ## TypeDoc
 
 Keep `README.md` at the pre-v5 develop version until the public API and
@@ -229,6 +266,12 @@ should be treated as the current baseline in future sessions:
   `then-request` features that map directly to the synchronous in-process
   architecture: HTTP-aware in-memory caching and function-valued GET retry and
   retry-delay policies with one-based attempt context.
+- `v1.0.28-retry-cache-ordering.patch` moves GET retry below the cache layer
+  on each redirect hop, matching the effective upstream request ordering. Cache
+  hits bypass retry policy, cache writes happen after retry completion, and a
+  failing redirected hop is retried without replaying earlier hops. It also
+  records the remaining strict Node.js parity findings and the intentional
+  GET/DELETE/HEAD request-body difference.
 
 
 Do not replace these behaviours with a response-body-only cache or move retry
