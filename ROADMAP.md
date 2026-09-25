@@ -41,7 +41,7 @@ layer.
       a response-body-only disk cache.
 - [x] Add `Blob` multipart values where they can be supported synchronously
       without depending on private runtime internals.
-- [ ] Verify CommonJS compatibility for `request.FormData` in the built
+- [x] Verify CommonJS compatibility for `request.FormData` in the built
       package, in addition to the named ESM export.
 
 ## Additional transport-neutral features
@@ -137,6 +137,10 @@ should be treated as the current baseline in future sessions:
   materialises their bytes synchronously through public worker-thread APIs,
   preserves filename and MIME metadata without relying on private Blob internals,
   and smoke-tests Blob append on the Node 16.17 runtime floor.
+- `v1.0.8-commonjs-formdata-built-package.patch` verifies the built CommonJS
+  entry is directly callable through `require()` and exposes the same
+  `request.FormData` constructor as the named `FormData` export, with matching
+  ESM coverage in the runtime compatibility matrix.
 
 
 Do not replace these behaviours with a response-body-only cache or move retry
