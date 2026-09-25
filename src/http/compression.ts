@@ -50,7 +50,9 @@ export const decompressResponseBody = (
   }
 
   try {
-    return decodeBody(body, encodings);
+    const decoded = decodeBody(body, encodings);
+    delete headers["content-encoding"];
+    return decoded;
   } catch (cause) {
     throw new RequestError(
       "ERR_REQUEST_FAILED",

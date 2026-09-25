@@ -9,7 +9,7 @@ describe("response compression", () => {
     (encoding) => {
       const response = request("GET", `${SERVER_URL}/compressed/${encoding}`);
 
-      expect(response.headers["content-encoding"]).toBe(encoding);
+      expect(response.headers["content-encoding"]).toBeUndefined();
       expect(response.getJSON()).toStrictEqual({
         acceptEncoding: "gzip, deflate",
         message: "Compressed response",
@@ -34,6 +34,7 @@ describe("response compression", () => {
     });
     const decoded = JSON.parse(gunzipSync(response.body).toString("utf8"));
 
+    expect(response.headers["content-encoding"]).toBe("gzip");
     expect(decoded).toStrictEqual({
       acceptEncoding: null,
       message: "Compressed response",
@@ -48,6 +49,7 @@ describe("response compression", () => {
     });
     const decoded = JSON.parse(gunzipSync(response.body).toString("utf8"));
 
+    expect(response.headers["content-encoding"]).toBe("gzip");
     expect(decoded).toStrictEqual({
       acceptEncoding: "gzip",
       message: "Compressed response",

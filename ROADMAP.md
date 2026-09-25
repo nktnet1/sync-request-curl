@@ -135,9 +135,10 @@ not all necessarily desirable behaviours to copy.
       requests no longer receive a generated `Content-Length: 0`. Empty
       methods that upstream treats as body-capable still receive
       `Content-Length: 0`.
-- [ ] Remove `content-encoding` from the exposed response headers after
+- [x] Remove `content-encoding` from the exposed response headers after
       transparent gzip/deflate decompression so the headers describe the body
-      actually returned to callers.
+      actually returned to callers. Preserve the header when decompression is
+      disabled or the encoding is unsupported.
 - [ ] Match Node's duplicate response-header folding where useful: preserve
       `set-cookie` as an array, join `cookie` with `; `, join ordinary repeated
       headers with `, `, and apply Node's singleton-header duplicate rules.
@@ -293,6 +294,10 @@ should be treated as the current baseline in future sessions:
   normalising it to an empty object at the public request boundary. The
   TypeScript declaration remains `options?: Options`, and direct schema
   validation remains strict.
+- `v1.0.31-decompression-header-parity.patch` removes `content-encoding` from
+  exposed response headers after successful transparent gzip/deflate
+  decompression, matching the attached `http-basic` behaviour while retaining
+  the header when decompression is disabled, unsupported, or not performed.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are
