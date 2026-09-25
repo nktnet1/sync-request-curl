@@ -1,46 +1,28 @@
 import * as v from "valibot";
+import {
+  getLinuxLibcFromReport as getLinuxLibcFromReportCore,
+  getNativePackageName as getNativePackageNameCore,
+  isNativePlatformKey as isNativePlatformKeyCore,
+  supportedPlatformKeys as platformKeys,
+  resolveNativePlatformKey as resolveNativePlatformKeyCore,
+  supportedLinuxLibcs,
+} from "#/native/platform-key-core";
 
-export const nativePlatformKeySchema = v.picklist([
-  "darwin-arm64",
-  "darwin-x64",
-  "linux-arm64-gnu",
-  "linux-arm64-musl",
-  "linux-x64-gnu",
-  "linux-x64-musl",
-  "win32-arm64-msvc",
-  "win32-x64-msvc",
-]);
-
-export const linuxLibcSchema = v.picklist(["gnu", "musl"]);
+export const nativePlatformKeySchema = v.picklist(platformKeys);
+export const linuxLibcSchema = v.picklist(supportedLinuxLibcs);
 
 export const supportedPlatformKeys = nativePlatformKeySchema.options;
 export type NativePlatformKey = v.InferOutput<typeof nativePlatformKeySchema>;
 export type LinuxLibc = v.InferOutput<typeof linuxLibcSchema>;
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
-
-export const getLinuxLibcFromReport = (report: unknown): LinuxLibc => {
-  if (!isRecord(report)) {
-    return "musl";
-  }
-
-  const { header } = report;
-  if (!isRecord(header)) {
-    return "musl";
-  }
-
-  return typeof header.glibcVersionRuntime === "string" &&
-    header.glibcVersionRuntime.length > 0
-    ? "gnu"
-    : "musl";
-};
+export const getLinuxLibcFromReport = (report: unknown): LinuxLibc =>
+  getLinuxLibcFromReportCore(report);
 
 export const getNativePackageName = (platform: NativePlatformKey): string =>
-  `@nktnet/sync-request-curl-${platform}`;
+  getNativePackageNameCore(platform);
 
 export function isNativePlatformKey(value: string): value is NativePlatformKey {
-  return v.is(nativePlatformKeySchema, value);
+  return isNativePlatformKeyCore(value);
 }
 
 export function resolveNativePlatformKey(
@@ -48,18 +30,5 @@ export function resolveNativePlatformKey(
   arch: string,
   linuxLibc: LinuxLibc,
 ): NativePlatformKey | undefined {
-  if (arch !== "x64" && arch !== "arm64") {
-    return undefined;
-  }
-
-  switch (platform) {
-    case "darwin":
-      return `darwin-${arch}`;
-    case "linux":
-      return `linux-${arch}-${linuxLibc}`;
-    case "win32":
-      return `win32-${arch}-msvc`;
-    default:
-      return undefined;
-  }
+  return resolveNativePlatformKeyCore(platform, arch, linuxLibc);
 }
