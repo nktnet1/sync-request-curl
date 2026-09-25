@@ -37,7 +37,7 @@ layer.
       existing overall `timeout` deadline.
 - [x] Resolve `agent` compatibility with real cross-request connection reuse;
       do not map it to TCP keepalive and call that equivalent.
-- [ ] Implement `cache: "file"` with correct HTTP cache semantics rather than
+- [x] Implement `cache: "file"` with correct HTTP cache semantics rather than
       a response-body-only disk cache.
 - [ ] Add `Blob` multipart values where they can be supported synchronously
       without depending on private runtime internals.
@@ -68,7 +68,7 @@ Replace useful capabilities that were previously reachable through
 - [x] Cover `socketTimeout` with streaming responses that both remain active
       and become inactive.
 - [x] Cover agent-scoped connection reuse and one-shot agent behaviour.
-- [ ] Cover file-cache freshness, validators, and cache bypass/revalidation.
+- [x] Cover file-cache freshness, validators, and cache bypass/revalidation.
 - [ ] Add built-package smoke tests for ESM and CommonJS exports.
 - [ ] Keep native loading/prebuild coverage for every supported platform key.
 

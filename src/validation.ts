@@ -42,6 +42,7 @@ const optionsObjectSchema = v.object({
   maxRedirects: v.optional(v.number()),
   allowRedirectHeaders: v.optional(v.array(v.string())),
   gzip: v.optional(v.boolean()),
+  cache: v.optional(v.literal("file")),
   agent: v.optional(v.union([v.literal(false), v.instance(Agent)])),
   retry: v.optional(v.boolean()),
   retryDelay: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),

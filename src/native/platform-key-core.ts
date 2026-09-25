@@ -37,7 +37,7 @@ export const getNativePackageName = (platform: NativePlatformKey): string =>
   `@nktnet/sync-request-curl-${platform}`;
 
 export function isNativePlatformKey(value: string): value is NativePlatformKey {
-  return supportedPlatformKeys.some((platform) => platform === value);
+  return (supportedPlatformKeys as readonly string[]).includes(value);
 }
 
 export function resolveNativePlatformKey(

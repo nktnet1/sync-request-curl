@@ -28,6 +28,9 @@ describe("agent connection pools", () => {
     expect(
       getAgentPoolId(new Agent({ keepAlive: true, maxFreeSockets: -1 })),
     ).toBeUndefined();
+    const nanFreeSockets = new Agent({ keepAlive: true });
+    nanFreeSockets.maxFreeSockets = Number.NaN;
+    expect(getAgentPoolId(nanFreeSockets)).toBeUndefined();
     expect(createConnectionPool).not.toHaveBeenCalled();
   });
 

@@ -11,3 +11,5 @@ native/build/
 native/target/
 prebuilds/*.node
 .release/
+
+.DS_Store

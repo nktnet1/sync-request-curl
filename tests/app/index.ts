@@ -10,6 +10,14 @@ import * as v from "valibot";
 const app = new Hono<{ Bindings: HttpBindings }>();
 const connectionIds = new WeakMap<object, number>();
 let nextConnectionId = 1;
+const cacheOriginHits = new Map<string, number>();
+const cacheVersions = new Map<string, number>();
+const nextCacheOriginHit = (name: string, key: string): number => {
+  const mapKey = `${name}:${key}`;
+  const next = (cacheOriginHits.get(mapKey) ?? 0) + 1;
+  cacheOriginHits.set(mapKey, next);
+  return next;
+};
 const toArrayBuffer = (buffer: Buffer): ArrayBuffer => {
   const arrayBuffer = new ArrayBuffer(buffer.length);
   new Uint8Array(arrayBuffer).set(buffer);
@@ -203,6 +211,139 @@ app.post("/text", (c) => {
 
 app.get("/large/response", (c) => {
   return c.body("x".repeat(512 * 1024));
+});
+
+app.get("/cache/fresh", (c) => {
+  const key = c.req.query("key") ?? "default";
+  const hits = nextCacheOriginHit("fresh", key);
+  const etag = `"fresh-${key}"`;
+  const headers = {
+    "cache-control": "max-age=3600",
+    etag,
+    "x-origin-hits": String(hits),
+  };
+
+  if (c.req.header("if-none-match") === etag) {
+    return new Response(null, { status: 304, headers });
+  }
+
+  for (const [name, value] of Object.entries(headers)) {
+    c.header(name, value);
+  }
+  return c.json({ hits });
+});
+
+app.get("/cache/no-store", (c) => {
+  const key = c.req.query("key") ?? "default";
+  const hits = nextCacheOriginHit("no-store", key);
+  c.header("Cache-Control", "no-store");
+  return c.json({ hits });
+});
+
+app.get("/cache/revalidate/etag", (c) => {
+  const key = c.req.query("key") ?? "default";
+  const hits = nextCacheOriginHit("etag", key);
+  const etag = '"cache-v1"';
+  const headers = {
+    "cache-control": "max-age=0",
+    etag,
+    "x-origin-hits": String(hits),
+  };
+
+  if (c.req.header("if-none-match") === etag) {
+    return new Response(null, { status: 304, headers });
+  }
+
+  for (const [name, value] of Object.entries(headers)) {
+    c.header(name, value);
+  }
+  return c.json({ hits });
+});
+
+app.get("/cache/revalidate/last-modified", (c) => {
+  const key = c.req.query("key") ?? "default";
+  const hits = nextCacheOriginHit("last-modified", key);
+  const lastModified = "Wed, 21 Oct 2015 07:28:00 GMT";
+  const headers = {
+    "cache-control": "max-age=0",
+    "last-modified": lastModified,
+    "x-origin-hits": String(hits),
+  };
+
+  if (c.req.header("if-modified-since") === lastModified) {
+    return new Response(null, { status: 304, headers });
+  }
+
+  for (const [name, value] of Object.entries(headers)) {
+    c.header(name, value);
+  }
+  return c.json({ hits });
+});
+
+app.get("/cache/vary", (c) => {
+  const key = c.req.query("key") ?? "default";
+  const hits = nextCacheOriginHit("vary", key);
+  const variant = c.req.header("x-variant") ?? "none";
+  c.header("Cache-Control", "max-age=3600");
+  c.header("Vary", "X-Variant");
+  return c.json({ hits, variant });
+});
+
+app.get("/cache/range", (c) => {
+  const key = c.req.query("key") ?? "default";
+  const hits = nextCacheOriginHit("range", key);
+  const headers = {
+    "cache-control": "max-age=3600",
+    "x-origin-hits": String(hits),
+  };
+
+  if (c.req.header("range") === "bytes=0-0") {
+    return new Response("a", {
+      status: 206,
+      headers: {
+        ...headers,
+        "content-range": "bytes 0-0/6",
+      },
+    });
+  }
+
+  for (const [name, value] of Object.entries(headers)) {
+    c.header(name, value);
+  }
+  return c.text("abcdef");
+});
+
+app.get("/cache/redirect", (c) => {
+  const key = c.req.query("key") ?? "default";
+  const hits = nextCacheOriginHit("redirect", key);
+  c.header("Cache-Control", "max-age=3600");
+  return c.redirect(
+    `/cache/redirect-target?key=${encodeURIComponent(key)}&sourceHits=${hits}`,
+    302,
+  );
+});
+
+app.get("/cache/redirect-target", (c) => {
+  const key = c.req.query("key") ?? "default";
+  const targetHits = nextCacheOriginHit("redirect-target", key);
+  const sourceHits = Number(c.req.query("sourceHits") ?? "0");
+  c.header("Cache-Control", "no-store");
+  return c.json({ sourceHits, targetHits });
+});
+
+app.get("/cache/mutable", (c) => {
+  const key = c.req.query("key") ?? "default";
+  const hits = nextCacheOriginHit("mutable", key);
+  const version = cacheVersions.get(key) ?? 0;
+  c.header("Cache-Control", "max-age=3600");
+  return c.json({ hits, version });
+});
+
+app.post("/cache/mutable", (c) => {
+  const key = c.req.query("key") ?? "default";
+  const version = (cacheVersions.get(key) ?? 0) + 1;
+  cacheVersions.set(key, version);
+  return c.json({ version });
 });
 
 app.get("/compressed/:encoding", (c) => {

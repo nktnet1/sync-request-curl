@@ -96,6 +96,7 @@ describe("runtime validation", () => {
         socketTimeout: 50,
         followRedirects: true,
         gzip: false,
+        cache: "file",
         agent: new Agent({ keepAlive: true }),
         retry: true,
         retryDelay: 200,
@@ -110,6 +111,8 @@ describe("runtime validation", () => {
       v.safeParse(optionsSchema, { socketTimeout: Number.NaN }).success,
     ).toBe(false);
     expect(v.safeParse(optionsSchema, { gzip: "yes" }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { cache: "file" }).success).toBe(true);
+    expect(v.safeParse(optionsSchema, { cache: "memory" }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { agent: false }).success).toBe(true);
     expect(v.safeParse(optionsSchema, { agent: true }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { agent: {} }).success).toBe(false);

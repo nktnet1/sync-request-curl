@@ -19,7 +19,11 @@ const hasKeepAlive = (agent: Agent): boolean =>
   Reflect.get(agent, "keepAlive") === true;
 
 const getMaximumConnections = (agent: Agent): number | undefined => {
-  if (!hasKeepAlive(agent) || !(agent.maxFreeSockets > 0)) {
+  if (
+    !hasKeepAlive(agent) ||
+    agent.maxFreeSockets <= 0 ||
+    Number.isNaN(agent.maxFreeSockets)
+  ) {
     return undefined;
   }
 
@@ -27,7 +31,7 @@ const getMaximumConnections = (agent: Agent): number | undefined => {
     return maximumNativePoolSize;
   }
 
-  if (!(agent.maxTotalSockets > 0)) {
+  if (agent.maxTotalSockets <= 0) {
     return undefined;
   }
 
