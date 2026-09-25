@@ -305,7 +305,6 @@ const readCacheEntries = (url: string): CacheEntry[] => {
   let serialized: string;
   try {
     // The URL is SHA-512 hashed by getCachePath, so it cannot control the path.
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
     serialized = readFileSync(getCachePath(url), "utf8");
   } catch (error) {
     if (isNotFoundError(error)) {
@@ -334,10 +333,8 @@ const writeCacheEntries = (url: string, entries: CacheEntry[]): void => {
   const bucket: CacheBucket = { version: 1, entries };
   try {
     // fileCacheDirectory is derived only from the OS temp directory and uid.
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
     mkdirSync(fileCacheDirectory, { recursive: true, mode: 0o700 });
     // The URL is SHA-512 hashed by getCachePath, so it cannot control the path.
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
     writeFileSync(getCachePath(url), JSON.stringify(bucket), {
       encoding: "utf8",
       mode: 0o600,

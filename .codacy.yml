@@ -1,19 +1,4 @@
 ---
-engines:
-  # This package targets Node.js only (see package.json engines/browserslist
-  # and tsconfig's Node-only type environment). Codacy's repository ESLint
-  # profiles can apply browser-oriented rules to native/build integration code,
-  # so leave those files to Biome, TypeScript, tests, and Codacy's other analyzers.
-  eslint-8:
-    exclude_paths:
-      - "scripts/**"
-      - "src/native/**"
-      - "src/types.ts"
-  eslint-9:
-    exclude_paths:
-      - "scripts/**"
-      - "src/native/**"
-      - "src/types.ts"
 exclude_paths:
   # Documentation is maintained separately from source analysis.
   - "ROADMAP.md"
