@@ -24,26 +24,30 @@ const cachedPair = (path: string, cache: CacheMode = "file") => {
   ] as const;
 };
 
-describe("file cache", () => {
-  test("reuses a fresh GET response without contacting the origin", () => {
-    const [first, second] = cachedPair("/cache/fresh");
+test.for(["file", "memory"] as const)(
+  "%s cache reuses a fresh GET response without contacting the origin",
+  (cache) => {
+    const [first, second] = cachedPair("/cache/fresh", cache);
 
     expect(first.getJSON()).toStrictEqual({ hits: 1 });
     expect(second.getJSON()).toStrictEqual({ hits: 1 });
-  });
+  },
+);
 
-  test.for(["/cache/revalidate/etag", "/cache/revalidate/last-modified"])(
-    "revalidates stale responses for %s",
-    (path) => {
-      const [first, second] = cachedPair(path);
+test.for([
+  { cache: "file" as const, path: "/cache/revalidate/etag" },
+  { cache: "file" as const, path: "/cache/revalidate/last-modified" },
+  { cache: "memory" as const, path: "/cache/revalidate/etag" },
+])("$cache cache revalidates stale responses for $path", ({ cache, path }) => {
+  const [first, second] = cachedPair(path, cache);
 
-      expect(first.getJSON()).toStrictEqual({ hits: 1 });
-      expect(second.statusCode).toBe(200);
-      expect(second.getJSON()).toStrictEqual({ hits: 1 });
-      expect(second.headers["x-origin-hits"]).toBe("2");
-    },
-  );
+  expect(first.getJSON()).toStrictEqual({ hits: 1 });
+  expect(second.statusCode).toBe(200);
+  expect(second.getJSON()).toStrictEqual({ hits: 1 });
+  expect(second.headers["x-origin-hits"]).toBe("2");
+});
 
+describe("file cache", () => {
   test("Cache-Control: no-cache bypasses freshness and replaces the entry", () => {
     const url = cacheUrl("/cache/fresh");
 
@@ -147,22 +151,6 @@ describe("file cache", () => {
 });
 
 describe("memory cache", () => {
-  test("reuses a fresh GET response without contacting the origin", () => {
-    const [first, second] = cachedPair("/cache/fresh", "memory");
-
-    expect(first.getJSON()).toStrictEqual({ hits: 1 });
-    expect(second.getJSON()).toStrictEqual({ hits: 1 });
-  });
-
-  test("revalidates stale responses using the same HTTP cache policy", () => {
-    const [first, second] = cachedPair("/cache/revalidate/etag", "memory");
-
-    expect(first.getJSON()).toStrictEqual({ hits: 1 });
-    expect(second.statusCode).toBe(200);
-    expect(second.getJSON()).toStrictEqual({ hits: 1 });
-    expect(second.headers["x-origin-hits"]).toBe("2");
-  });
-
   test("invalidates a cached GET after a successful unsafe request", () => {
     const url = cacheUrl("/cache/mutable");
 

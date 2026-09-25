@@ -32,6 +32,14 @@ const nativeResponse = (
   ...overrides,
 });
 
+const transportErrorResponse = () =>
+  nativeResponse({
+    transportCode: 7,
+    transportMessage: "Could not connect",
+    statusCode: 0,
+    body: Buffer.alloc(0),
+  });
+
 afterEach(() => {
   nativeRequest.mockReset();
   vi.restoreAllMocks();
@@ -77,10 +85,21 @@ describe("single request execution", () => {
 });
 
 describe("request retries", () => {
-  test("does not retry GET requests unless retry is enabled", () => {
+  test.for([
+    {
+      title: "does not retry GET requests unless retry is enabled",
+      method: "GET" as const,
+      options: undefined,
+    },
+    {
+      title: "does not retry non-GET requests",
+      method: "POST" as const,
+      options: { retry: true, retryDelay: 0, maxRetries: 5 },
+    },
+  ])("$title", ({ method, options }) => {
     nativeRequest.mockReturnValue(nativeResponse({ statusCode: 503 }));
 
-    const response = request("GET", "https://example.com/retry");
+    const response = request(method, "https://example.com/retry", options);
 
     expect(response.statusCode).toBe(503);
     expect(nativeRequest).toHaveBeenCalledOnce();
@@ -106,22 +125,8 @@ describe("request retries", () => {
 
   test("retries transport errors up to maxRetries", () => {
     nativeRequest
-      .mockReturnValueOnce(
-        nativeResponse({
-          transportCode: 7,
-          transportMessage: "Could not connect",
-          statusCode: 0,
-          body: Buffer.alloc(0),
-        }),
-      )
-      .mockReturnValueOnce(
-        nativeResponse({
-          transportCode: 7,
-          transportMessage: "Could not connect",
-          statusCode: 0,
-          body: Buffer.alloc(0),
-        }),
-      )
+      .mockReturnValueOnce(transportErrorResponse())
+      .mockReturnValueOnce(transportErrorResponse())
       .mockReturnValueOnce(nativeResponse());
 
     const response = request("GET", "https://example.com/retry", {
@@ -135,14 +140,7 @@ describe("request retries", () => {
   });
 
   test("throws the final transport error after maxRetries", () => {
-    nativeRequest.mockReturnValue(
-      nativeResponse({
-        transportCode: 7,
-        transportMessage: "Could not connect",
-        statusCode: 0,
-        body: Buffer.alloc(0),
-      }),
-    );
+    nativeRequest.mockReturnValue(transportErrorResponse());
 
     expect(() =>
       request("GET", "https://example.com/retry", {
@@ -225,17 +223,33 @@ describe("request retries", () => {
     expect(retry.mock.calls.map((call) => call[2])).toEqual([1, 2]);
   });
 
-  test("lets a function-valued retry policy reject the default HTTP retry", () => {
+  test.for([
+    {
+      title:
+        "lets a function-valued retry policy reject the default HTTP retry",
+      method: "GET" as const,
+      retryResult: false,
+      expectedRetryCalls: 1,
+    },
+    {
+      title:
+        "does not invoke a function-valued retry policy for non-GET requests",
+      method: "POST" as const,
+      retryResult: true,
+      expectedRetryCalls: 0,
+    },
+  ])("$title", ({ method, retryResult, expectedRetryCalls }) => {
     nativeRequest.mockReturnValue(nativeResponse({ statusCode: 503 }));
-    const retry = vi.fn(() => false);
+    const retry = vi.fn(() => retryResult);
 
-    const response = request("GET", "https://example.com/retry", {
+    const response = request(method, "https://example.com/retry", {
       retry,
+      retryDelay: 0,
       maxRetries: 5,
     });
 
     expect(response.statusCode).toBe(503);
-    expect(retry).toHaveBeenCalledOnce();
+    expect(retry).toHaveBeenCalledTimes(expectedRetryCalls);
     expect(nativeRequest).toHaveBeenCalledOnce();
   });
 
@@ -255,14 +269,7 @@ describe("request retries", () => {
 
   test("passes transport errors to a function-valued retry policy", () => {
     nativeRequest
-      .mockReturnValueOnce(
-        nativeResponse({
-          transportCode: 7,
-          transportMessage: "Could not connect",
-          statusCode: 0,
-          body: Buffer.alloc(0),
-        }),
-      )
+      .mockReturnValueOnce(transportErrorResponse())
       .mockReturnValueOnce(nativeResponse());
     const retry = vi.fn(
       (
@@ -328,34 +335,6 @@ describe("request retries", () => {
         maxRetries: 1,
       }),
     ).toThrow("retryDelay must resolve to a finite non-negative number");
-    expect(nativeRequest).toHaveBeenCalledOnce();
-  });
-
-  test("does not retry non-GET requests", () => {
-    nativeRequest.mockReturnValue(nativeResponse({ statusCode: 503 }));
-
-    const response = request("POST", "https://example.com/retry", {
-      retry: true,
-      retryDelay: 0,
-      maxRetries: 5,
-    });
-
-    expect(response.statusCode).toBe(503);
-    expect(nativeRequest).toHaveBeenCalledOnce();
-  });
-
-  test("does not invoke a function-valued retry policy for non-GET requests", () => {
-    nativeRequest.mockReturnValue(nativeResponse({ statusCode: 503 }));
-    const retry = vi.fn(() => true);
-
-    const response = request("POST", "https://example.com/retry", {
-      retry,
-      retryDelay: 0,
-      maxRetries: 5,
-    });
-
-    expect(response.statusCode).toBe(503);
-    expect(retry).not.toHaveBeenCalled();
     expect(nativeRequest).toHaveBeenCalledOnce();
   });
 });
