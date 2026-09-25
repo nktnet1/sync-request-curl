@@ -204,15 +204,22 @@ describe("Redirects", () => {
     });
   });
 
-  test.skip("External URL redirect - https://picsum.photos/200/300", () => {
-    const redirectResponse = wrapperRequest(
-      "GET",
-      "https://picsum.photos/200/300",
-    );
-    expect(redirectResponse).toMatchObject({ code: 200 });
-    const noRedirect = wrapperRequest("GET", "https://picsum.photos/200/300", {
-      followRedirects: false,
-    });
-    expect(noRedirect).toMatchObject({ code: 302 });
-  });
+  test.runIf(process.env.RUN_EXTERNAL_TEST === "1")(
+    "External URL redirect - https://picsum.photos/200/300",
+    () => {
+      const redirectResponse = wrapperRequest(
+        "GET",
+        "https://picsum.photos/200/300",
+      );
+      expect(redirectResponse).toMatchObject({ code: 200 });
+      const noRedirect = wrapperRequest(
+        "GET",
+        "https://picsum.photos/200/300",
+        {
+          followRedirects: false,
+        },
+      );
+      expect(noRedirect).toMatchObject({ code: 302 });
+    },
+  );
 });

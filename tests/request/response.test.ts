@@ -22,7 +22,7 @@ describe("res.getBody()", () => {
 describe("Response buffering", () => {
   test("large response assembled across multiple chunks", () => {
     const res = request("GET", `${SERVER_URL}/large/response`);
-    expect(res.getBody().length).toStrictEqual(512 * 1024);
+    expect(res.getBody()).toHaveLength(512 * 1024);
     expect(res.getBody().equals(Buffer.alloc(512 * 1024, "x"))).toStrictEqual(
       true,
     );
