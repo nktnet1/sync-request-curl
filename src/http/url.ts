@@ -144,6 +144,8 @@ export const appendQueryString = (
     qs.parse(existingQuery),
     parsedQuery,
   );
-  const serialized = qs.stringify(merged);
-  return `${base}${serialized ? `?${serialized}` : ""}${fragment}`;
+  const serialised = qs.stringify(merged);
+  const queryString = serialised ? `?${serialised}` : "";
+
+  return `${base}${queryString}${fragment}`;
 };
