@@ -24,7 +24,7 @@ export type PreparedFormDataEntry = v.InferOutput<
 const entries = new WeakMap<FormData, PreparedFormDataEntry[]>();
 
 const blobReaderWorkerUrl = new URL(
-  "./internal/blob-reader-worker.cjs",
+  "../dist/internal/blob-reader-worker.cjs",
   import.meta.url,
 );
 

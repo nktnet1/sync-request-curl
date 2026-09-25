@@ -15,8 +15,4 @@ export default defineConfig({
   sourcemap: true,
   exports: true,
   cjsDefault: true,
-  copy: {
-    from: "./src/internal/blob-reader-worker.cjs",
-    to: "./dist/internal",
-  },
 });
