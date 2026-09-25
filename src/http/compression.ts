@@ -1,8 +1,8 @@
-import type { IncomingHttpHeaders } from "node:http";
 import { gunzipSync, inflateSync } from "node:zlib";
 import { RequestError } from "#/errors";
+import type { Response } from "#/types";
 
-const getContentEncodings = (headers: IncomingHttpHeaders): string[] => {
+const getContentEncodings = (headers: Response["headers"]): string[] => {
   const contentEncoding = headers["content-encoding"];
   if (contentEncoding === undefined) {
     return [];
@@ -34,7 +34,7 @@ const decodeBody = (body: Buffer, encodings: string[]): Buffer => {
 
 export const decompressResponseBody = (
   body: Buffer,
-  headers: IncomingHttpHeaders,
+  headers: Response["headers"],
   enabled: boolean,
 ): Buffer => {
   if (!enabled || body.length === 0) {

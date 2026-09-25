@@ -1,12 +1,16 @@
-import type { IncomingHttpHeaders } from "node:http";
+import type * as v from "valibot";
 import { FormData } from "#/form-data";
+import type {
+  bufferEncodingSchema,
+  httpVerbInputSchema,
+  jsonLikeSchema,
+  optionsSchema,
+  responseDataSchema,
+  uppercaseHttpVerbSchema,
+} from "#/validation";
 
 export type { FormDataEntry } from "#/form-data";
 export { FormData };
-
-type JsonPrimitive = string | number | boolean | null;
-
-type NestedJsonLike = JsonLike | undefined | { toJSON(): NestedJsonLike };
 
 /**
  * Values accepted for JSON request bodies.
@@ -15,60 +19,15 @@ type NestedJsonLike = JsonLike | undefined | { toJSON(): NestedJsonLike };
  * only strict JSON syntax. `undefined` is allowed inside objects and arrays,
  * and objects with `toJSON()` (for example `Date`) are supported.
  */
-export type JsonLike =
-  | JsonPrimitive
-  | readonly NestedJsonLike[]
-  | { [key: string]: NestedJsonLike }
-  | { toJSON(): JsonLike };
+export type JsonLike = v.InferOutput<typeof jsonLikeSchema>;
 
-export type UppercaseHttpVerb =
-  | "GET"
-  | "HEAD"
-  | "POST"
-  | "PUT"
-  | "DELETE"
-  | "CONNECT"
-  | "OPTIONS"
-  | "TRACE"
-  | "PATCH";
+export type UppercaseHttpVerb = v.InferOutput<typeof uppercaseHttpVerbSchema>;
 
-export type HttpVerb = UppercaseHttpVerb | Lowercase<UppercaseHttpVerb>;
+export type HttpVerb = v.InferOutput<typeof httpVerbInputSchema>;
 
-export type BufferEncoding =
-  | "ascii"
-  | "utf8"
-  | "utf-8"
-  | "utf16le"
-  | "ucs2"
-  | "ucs-2"
-  | "base64"
-  | "base64url"
-  | "latin1"
-  | "binary"
-  | "hex";
+export type BufferEncoding = v.InferOutput<typeof bufferEncodingSchema>;
 
-export interface Options {
-  headers?: IncomingHttpHeaders;
-  qs?: Record<string, unknown>;
-
-  // Request payloads are mutually exclusive and resolved in this order.
-  json?: JsonLike;
-  body?: string | Buffer;
-  form?: FormData;
-
-  timeout?: number;
-  socketTimeout?: number;
-  followRedirects?: boolean;
-  maxRedirects?: number;
-  allowRedirectHeaders?: string[];
-  gzip?: boolean;
-  retry?: boolean;
-  retryDelay?: number;
-  maxRetries?: number;
-
-  /** Include request inputs in transport error messages. */
-  debug?: boolean;
-}
+export type Options = v.InferOutput<typeof optionsSchema>;
 
 export type GetBody = {
   <Encoding extends BufferEncoding>(encoding: Encoding): string;
@@ -77,11 +36,9 @@ export type GetBody = {
 
 export type GetJSON = <T = unknown>(encoding?: BufferEncoding) => T;
 
-export interface Response {
-  statusCode: number;
-  headers: IncomingHttpHeaders;
-  url: string;
-  body: Buffer;
+type ResponseData = v.InferOutput<typeof responseDataSchema>;
+
+export type Response = ResponseData & {
   getBody: GetBody;
   getJSON: GetJSON;
-}
+};

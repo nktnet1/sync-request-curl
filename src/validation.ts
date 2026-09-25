@@ -1,8 +1,14 @@
-import type { IncomingHttpHeaders } from "node:http";
 import { URL } from "node:url";
 import * as v from "valibot";
 import { FormData } from "#/form-data";
-import type { Options } from "#/types";
+
+type JsonPrimitive = string | number | boolean | null;
+type NestedJsonLike = JsonLikeValue | undefined | { toJSON(): NestedJsonLike };
+type JsonLikeValue =
+  | JsonPrimitive
+  | readonly NestedJsonLike[]
+  | { [key: string]: NestedJsonLike }
+  | { toJSON(): JsonLikeValue };
 
 const headerValueSchema = v.union([
   v.string(),
@@ -10,39 +16,42 @@ const headerValueSchema = v.union([
   v.undefined(),
 ]);
 
-export const incomingHttpHeadersSchema = v.custom<IncomingHttpHeaders>(
-  (input) => v.is(v.record(v.string(), headerValueSchema), input),
+const incomingHttpHeadersObjectSchema = v.record(v.string(), headerValueSchema);
+
+export const incomingHttpHeadersSchema = v.custom<
+  v.InferOutput<typeof incomingHttpHeadersObjectSchema>
+>(
+  (input) => v.is(incomingHttpHeadersObjectSchema, input),
   "Invalid HTTP headers",
 );
 
-export const optionsSchema = v.custom<Options>(
-  (input) =>
-    v.is(
-      v.object({
-        headers: v.optional(incomingHttpHeadersSchema),
-        qs: v.optional(v.record(v.string(), v.unknown())),
-        json: v.optional(v.unknown()),
-        body: v.optional(v.union([v.string(), v.instance(Buffer)])),
-        form: v.optional(v.instance(FormData)),
-        timeout: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),
-        socketTimeout: v.optional(
-          v.pipe(v.number(), v.finite(), v.minValue(0)),
-        ),
-        followRedirects: v.optional(v.boolean()),
-        maxRedirects: v.optional(v.number()),
-        allowRedirectHeaders: v.optional(v.array(v.string())),
-        gzip: v.optional(v.boolean()),
-        retry: v.optional(v.boolean()),
-        retryDelay: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),
-        maxRetries: v.optional(
-          v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0)),
-        ),
-        debug: v.optional(v.boolean()),
-      }),
-      input,
-    ),
-  "Invalid request options",
-);
+// JSON serializability is validated by jsonBodySchema immediately before use.
+// This schema carries the public input type without eagerly invoking toJSON().
+export const jsonLikeSchema = v.custom<JsonLikeValue>(() => true);
+
+const optionsObjectSchema = v.object({
+  headers: v.optional(incomingHttpHeadersSchema),
+  qs: v.optional(v.record(v.string(), v.unknown())),
+  json: v.optional(jsonLikeSchema),
+  body: v.optional(v.union([v.string(), v.instance(Buffer)])),
+  form: v.optional(v.instance(FormData)),
+  timeout: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),
+  socketTimeout: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),
+  followRedirects: v.optional(v.boolean()),
+  maxRedirects: v.optional(v.number()),
+  allowRedirectHeaders: v.optional(v.array(v.string())),
+  gzip: v.optional(v.boolean()),
+  retry: v.optional(v.boolean()),
+  retryDelay: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),
+  maxRetries: v.optional(
+    v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0)),
+  ),
+  debug: v.optional(v.boolean()),
+});
+
+export const optionsSchema = v.custom<
+  v.InferOutput<typeof optionsObjectSchema>
+>((input) => v.is(optionsObjectSchema, input), "Invalid request options");
 
 export const uppercaseHttpVerbSchema = v.picklist([
   "GET",
@@ -58,11 +67,49 @@ export const uppercaseHttpVerbSchema = v.picklist([
 
 export const uppercaseHttpVerbs = uppercaseHttpVerbSchema.options;
 
+const lowercaseHttpVerbSchema = v.picklist([
+  "get",
+  "head",
+  "post",
+  "put",
+  "delete",
+  "connect",
+  "options",
+  "trace",
+  "patch",
+]);
+
+export const httpVerbInputSchema = v.union([
+  uppercaseHttpVerbSchema,
+  lowercaseHttpVerbSchema,
+]);
+
 export const httpVerbSchema = v.pipe(
   v.string(),
   v.transform((method) => method.toUpperCase()),
   uppercaseHttpVerbSchema,
 );
+
+export const bufferEncodingSchema = v.picklist([
+  "ascii",
+  "utf8",
+  "utf-8",
+  "utf16le",
+  "ucs2",
+  "ucs-2",
+  "base64",
+  "base64url",
+  "latin1",
+  "binary",
+  "hex",
+]);
+
+export const responseDataSchema = v.object({
+  statusCode: v.number(),
+  headers: incomingHttpHeadersSchema,
+  url: v.string(),
+  body: v.instance(Buffer),
+});
 
 export const requestUrlSchema = v.pipe(
   v.union([v.string(), v.instance(URL)]),

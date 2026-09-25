@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import { type FormDataEntry, getFormDataEntries } from "#/form-data";
+import { getFormDataEntries } from "#/form-data";
 import {
   hasRequestHeader,
   serializeRequestHeaders,
@@ -7,14 +7,13 @@ import {
   setRequestHeader,
 } from "#/http/headers";
 import { appendQueryString, normalizeUrlHostname } from "#/http/url";
+import type { NativeRequestOptions } from "#/native/index";
 import type { Options } from "#/types";
 
-export interface PreparedRequest {
-  url: string;
-  headers: string[];
-  body?: string | Buffer;
-  form?: FormDataEntry[];
-}
+export type PreparedRequest = Pick<
+  NativeRequestOptions,
+  "url" | "headers" | "body" | "form"
+>;
 
 const jsonBodySchema = v.pipe(
   v.unknown(),

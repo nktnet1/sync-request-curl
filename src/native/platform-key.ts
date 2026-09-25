@@ -1,4 +1,6 @@
-export const supportedPlatformKeys = [
+import * as v from "valibot";
+
+export const nativePlatformKeySchema = v.picklist([
   "darwin-arm64",
   "darwin-x64",
   "linux-arm64-gnu",
@@ -7,10 +9,13 @@ export const supportedPlatformKeys = [
   "linux-x64-musl",
   "win32-arm64-msvc",
   "win32-x64-msvc",
-] as const;
+]);
 
-export type NativePlatformKey = (typeof supportedPlatformKeys)[number];
-export type LinuxLibc = "gnu" | "musl";
+export const linuxLibcSchema = v.picklist(["gnu", "musl"]);
+
+export const supportedPlatformKeys = nativePlatformKeySchema.options;
+export type NativePlatformKey = v.InferOutput<typeof nativePlatformKeySchema>;
+export type LinuxLibc = v.InferOutput<typeof linuxLibcSchema>;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -35,7 +40,7 @@ export const getNativePackageName = (platform: NativePlatformKey): string =>
   `@nktnet/sync-request-curl-${platform}`;
 
 export function isNativePlatformKey(value: string): value is NativePlatformKey {
-  return supportedPlatformKeys.includes(value as NativePlatformKey);
+  return v.is(nativePlatformKeySchema, value);
 }
 
 export function resolveNativePlatformKey(

@@ -17,6 +17,18 @@ describe("response decompression", () => {
     ).toStrictEqual(original);
   });
 
+  test("decodes content encoding header arrays", () => {
+    const original = Buffer.from("array encoding response");
+
+    expect(
+      decompressResponseBody(
+        gzipSync(original),
+        { "content-encoding": ["gzip"] },
+        true,
+      ),
+    ).toStrictEqual(original);
+  });
+
   test("leaves unsupported content encodings untouched", () => {
     const body = Buffer.from("opaque response");
 

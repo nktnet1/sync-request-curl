@@ -1,5 +1,5 @@
-import type { IncomingHttpHeaders } from "node:http";
 import * as v from "valibot";
+import type { Options, Response } from "#/types";
 import { incomingHttpHeadersSchema } from "#/validation";
 
 const getHeaderName = (header: string): string => {
@@ -54,7 +54,7 @@ export const setContentLengthHeader = (
  * transport.
  */
 export const serializeRequestHeaders = (
-  headers?: IncomingHttpHeaders,
+  headers?: NonNullable<Options["headers"]>,
 ): string[] => {
   if (!headers) {
     return [];
@@ -135,7 +135,7 @@ const findFinalStatusLineIndex = (headerLines: string[]): number => {
 /** Parses the final response header block and preserves repeated headers. */
 export const parseResponseHeaders = (
   headerLines: string[],
-): IncomingHttpHeaders => {
+): Response["headers"] => {
   const finalStatusLineIndex = findFinalStatusLineIndex(headerLines);
   const finalHeaderLines =
     finalStatusLineIndex >= 0

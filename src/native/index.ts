@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as v from "valibot";
-import type { FormDataEntry } from "#/form-data";
+import { formDataEntrySchema } from "#/form-data";
 import {
   getLinuxLibcFromReport,
   getNativePackageName,
@@ -11,27 +11,41 @@ import {
   type NativePlatformKey,
   resolveNativePlatformKey,
 } from "#/native/platform-key";
+import { uppercaseHttpVerbSchema } from "#/validation";
 
-export interface NativeRequestOptions {
-  method: string;
-  url: string;
-  headers: string[];
-  body?: string | Buffer;
-  form?: FormDataEntry[];
-  timeout: number;
-  socketTimeout: number;
-  noBody: boolean;
-}
+export const nativeRequestOptionsSchema = v.object({
+  method: uppercaseHttpVerbSchema,
+  url: v.string(),
+  headers: v.array(v.string()),
+  body: v.optional(v.union([v.string(), v.instance(Buffer)])),
+  form: v.optional(v.array(formDataEntrySchema)),
+  timeout: v.number(),
+  socketTimeout: v.number(),
+  noBody: v.boolean(),
+});
 
-export interface NativeResponse {
-  transportCode: number;
-  transportMessage: string;
-  statusCode: number;
-  effectiveUrl: string | null;
-  redirectUrl: string | null;
-  headers: string[];
-  body: Buffer;
-}
+export type NativeRequestOptions = v.InferOutput<
+  typeof nativeRequestOptionsSchema
+>;
+
+const nativeResponseObjectSchema = v.object({
+  transportCode: v.pipe(v.number(), v.integer()),
+  transportMessage: v.string(),
+  statusCode: v.pipe(v.number(), v.integer()),
+  effectiveUrl: v.nullable(v.string()),
+  redirectUrl: v.nullable(v.string()),
+  headers: v.array(v.string()),
+  body: v.instance(Buffer),
+});
+
+export const nativeResponseSchema = v.custom<
+  v.InferOutput<typeof nativeResponseObjectSchema>
+>(
+  (input) => v.is(nativeResponseObjectSchema, input),
+  "Native addon returned an invalid response",
+);
+
+export type NativeResponse = v.InferOutput<typeof nativeResponseSchema>;
 
 export interface NativeBinding {
   request(options: NativeRequestOptions): NativeResponse;
@@ -54,31 +68,13 @@ const moduleNotFoundErrorSchema = v.object({
   code: v.literal("MODULE_NOT_FOUND"),
 });
 
-interface RawNativeBinding {
-  request(options: NativeRequestOptions): unknown;
-}
-
-const rawNativeBindingSchema = v.custom<RawNativeBinding>(
-  (input) => v.is(v.object({ request: v.function() }), input),
+const rawNativeBindingObjectSchema = v.object({ request: v.function() });
+const rawNativeBindingSchema = v.custom<
+  v.InferOutput<typeof rawNativeBindingObjectSchema>
+>(
+  (input) => v.is(rawNativeBindingObjectSchema, input),
   "Native addon must export request()",
 );
-const nativeResponseSchema = v.custom<NativeResponse>(
-  (input) =>
-    v.is(
-      v.object({
-        transportCode: v.pipe(v.number(), v.integer()),
-        transportMessage: v.string(),
-        statusCode: v.pipe(v.number(), v.integer()),
-        effectiveUrl: v.nullable(v.string()),
-        redirectUrl: v.nullable(v.string()),
-        headers: v.array(v.string()),
-        body: v.instance(Buffer),
-      }),
-      input,
-    ),
-  "Native addon returned an invalid response",
-);
-
 const parseNativeBinding = (input: unknown): NativeBinding => {
   const binding = v.parse(rawNativeBindingSchema, input);
   return {

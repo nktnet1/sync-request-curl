@@ -109,13 +109,17 @@ export const normalizeUrlHostname = (url: string): string => {
   return `${prefix}${userInfo}${asciiHostname}${port}${remainder}`;
 };
 
-const plainObjectSchema = v.custom<Record<string, unknown>>((input) => {
-  if (typeof input !== "object" || input === null) {
-    return false;
-  }
-  const prototype = Object.getPrototypeOf(input);
-  return prototype === Object.prototype || prototype === null;
-}, "Expected a plain object");
+const recordSchema = v.record(v.string(), v.unknown());
+const plainObjectSchema = v.custom<v.InferOutput<typeof recordSchema>>(
+  (input) => {
+    if (!v.is(recordSchema, input)) {
+      return false;
+    }
+    const prototype = Object.getPrototypeOf(input);
+    return prototype === Object.prototype || prototype === null;
+  },
+  "Expected a plain object",
+);
 
 const deleteQueryValue = (searchParams: URLSearchParams, key: string): void => {
   const keysToDelete = new Set<string>();

@@ -1,12 +1,76 @@
 import { URL } from "node:url";
 import * as v from "valibot";
-import { describe, expect, test } from "vitest";
+import { describe, expect, expectTypeOf, test } from "vitest";
+import type { FormDataEntry, formDataEntrySchema } from "#/form-data";
+import type {
+  NativeRequestOptions,
+  NativeResponse,
+  nativeRequestOptionsSchema,
+  nativeResponseSchema,
+} from "#/native/index";
+import type {
+  LinuxLibc,
+  linuxLibcSchema,
+  NativePlatformKey,
+  nativePlatformKeySchema,
+} from "#/native/platform-key";
+import type {
+  BufferEncoding,
+  HttpVerb,
+  JsonLike,
+  Options,
+  Response,
+  UppercaseHttpVerb,
+} from "#/types";
 import {
+  type bufferEncodingSchema,
+  type httpVerbInputSchema,
   httpVerbSchema,
   incomingHttpHeadersSchema,
+  type jsonLikeSchema,
   optionsSchema,
   requestUrlSchema,
+  type responseDataSchema,
+  type uppercaseHttpVerbSchema,
 } from "#/validation";
+
+describe("schema-derived types", () => {
+  test("keeps public data types tied to their schemas", () => {
+    expectTypeOf<FormDataEntry>().toEqualTypeOf<
+      v.InferOutput<typeof formDataEntrySchema>
+    >();
+    expectTypeOf<JsonLike>().toEqualTypeOf<
+      v.InferOutput<typeof jsonLikeSchema>
+    >();
+    expectTypeOf<UppercaseHttpVerb>().toEqualTypeOf<
+      v.InferOutput<typeof uppercaseHttpVerbSchema>
+    >();
+    expectTypeOf<HttpVerb>().toEqualTypeOf<
+      v.InferOutput<typeof httpVerbInputSchema>
+    >();
+    expectTypeOf<BufferEncoding>().toEqualTypeOf<
+      v.InferOutput<typeof bufferEncodingSchema>
+    >();
+    expectTypeOf<Options>().toEqualTypeOf<
+      v.InferOutput<typeof optionsSchema>
+    >();
+    expectTypeOf<NativeRequestOptions>().toEqualTypeOf<
+      v.InferOutput<typeof nativeRequestOptionsSchema>
+    >();
+    expectTypeOf<NativeResponse>().toEqualTypeOf<
+      v.InferOutput<typeof nativeResponseSchema>
+    >();
+    expectTypeOf<NativePlatformKey>().toEqualTypeOf<
+      v.InferOutput<typeof nativePlatformKeySchema>
+    >();
+    expectTypeOf<LinuxLibc>().toEqualTypeOf<
+      v.InferOutput<typeof linuxLibcSchema>
+    >();
+    expectTypeOf<
+      Pick<Response, "statusCode" | "headers" | "url" | "body">
+    >().toEqualTypeOf<v.InferOutput<typeof responseDataSchema>>();
+  });
+});
 
 describe("runtime validation", () => {
   test("normalizes supported HTTP methods and rejects unsupported methods", () => {

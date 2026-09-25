@@ -1,4 +1,3 @@
-import type { IncomingHttpHeaders } from "node:http";
 import { ResponseError } from "#/errors";
 import type {
   BufferEncoding,
@@ -7,14 +6,14 @@ import type {
   UppercaseHttpVerb,
 } from "#/types";
 
-interface CreateResponseOptions {
+type CreateResponseOptions = Pick<
+  Response,
+  "statusCode" | "headers" | "body"
+> & {
   method: UppercaseHttpVerb;
   requestUrl: string;
   responseUrl: string;
-  statusCode: number;
-  headers: IncomingHttpHeaders;
-  body: Buffer;
-}
+};
 
 export const createResponse = ({
   method,

@@ -1,16 +1,13 @@
 import * as v from "valibot";
 
-export interface FormDataEntry {
-  key: string;
-  value: string | Buffer;
-  fileName?: string;
-}
-
-const formDataEntrySchema = v.object({
+export const formDataEntrySchema = v.object({
   key: v.string(),
   value: v.union([v.string(), v.instance(Buffer)]),
   fileName: v.optional(v.string()),
 });
+
+export type FormDataEntry = v.InferOutput<typeof formDataEntrySchema>;
+
 const entries = new WeakMap<FormData, FormDataEntry[]>();
 
 const getEntries = (form: FormData): FormDataEntry[] => {

@@ -1,6 +1,5 @@
-import type { IncomingHttpHeaders } from "node:http";
 import * as v from "valibot";
-import type { HttpVerb, Options } from "#/types";
+import type { HttpVerb, Options, Response } from "#/types";
 
 const requestErrorCodeSchema = v.picklist([
   "ERR_INVALID_URL",
@@ -62,10 +61,10 @@ export class RequestError extends Error {
 
 export class ResponseError extends Error {
   readonly statusCode: number;
-  readonly headers: IncomingHttpHeaders;
+  readonly headers: Response["headers"];
   readonly body: Buffer;
 
-  constructor(statusCode: number, headers: IncomingHttpHeaders, body: Buffer) {
+  constructor(statusCode: number, headers: Response["headers"], body: Buffer) {
     super(`Server responded with status code ${statusCode}`);
     this.name = "ResponseError";
     this.statusCode = statusCode;

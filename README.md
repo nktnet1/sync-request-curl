@@ -331,39 +331,13 @@ JSON.stringify({
 
 <br/>
 
-In [src/types.ts](src/types.ts), the `Options` interface following is defined as:
+Public request data types use Valibot schemas as their source of truth, so the runtime contract and TypeScript contract stay in sync. For example, [src/types.ts](src/types.ts) derives `Options` directly from `optionsSchema`:
 
 ```typescript
-type NestedJsonLike =
-  | JsonLike
-  | undefined
-  | { toJSON(): NestedJsonLike };
-
-export type JsonLike =
-  | string
-  | number
-  | boolean
-  | null
-  | readonly NestedJsonLike[]
-  | { [key: string]: NestedJsonLike }
-  | { toJSON(): JsonLike };
-
-export interface Options {
-  headers?: IncomingHttpHeaders;
-  qs?: Record<string, unknown>;
-
-  // Request payloads are mutually exclusive and resolved in this order.
-  json?: JsonLike;
-  body?: string | Buffer;
-  form?: FormData;
-
-  timeout?: number;
-  followRedirects?: boolean;
-  maxRedirects?: number;
-  allowRedirectHeaders?: string[];
-  debug?: boolean;
-}
+export type Options = v.InferOutput<typeof optionsSchema>;
 ```
+
+`JsonLike`, `UppercaseHttpVerb`, and `BufferEncoding` are derived from their corresponding schemas in the same way.
 
 ### 2.4. Response
 
@@ -374,17 +348,15 @@ export interface Options {
 - **`getBody`** - a function with an optional `encoding` argument that returns the `body` if `encoding` is undefined, otherwise `body.toString(encoding)`. If `statusCode >= 300`, an `Error` is thrown instead
 - **`getJSON`** - a function that returns the body parsed as `JSON`. An `Error` is thrown if the body cannot be parsed.
 
-In [src/types.ts](src/types.ts), the `Response` interface is defined as:
+The response data shape is also schema-derived, while the overloaded/generic helper methods remain explicit TypeScript function types:
 
 ```typescript
-export interface Response {
-  statusCode: number;
-  headers: IncomingHttpHeaders;
-  url: string;
-  body: string | Buffer;
-  getBody: (encoding?: BufferEncoding) => string | Buffer; // simplified
-  getJSON: <T = any>(encoding?: BufferEncoding) => T;
-}
+type ResponseData = v.InferOutput<typeof responseDataSchema>;
+
+export type Response = ResponseData & {
+  getBody: GetBody;
+  getJSON: GetJSON;
+};
 ```
 
 ### 2.5. Errors
