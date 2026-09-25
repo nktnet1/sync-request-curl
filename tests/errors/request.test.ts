@@ -19,6 +19,21 @@ const expectRequestError = (
 };
 
 describe("request transport errors", () => {
+  test("preserves ErrorOptions cause semantics", () => {
+    const withoutCause = new RequestError(
+      "ERR_REQUEST_FAILED",
+      "Request failed",
+      {},
+    );
+    expect(Object.hasOwn(withoutCause, "cause")).toBe(false);
+
+    const cause = new Error("underlying failure");
+    const withCause = new RequestError("ERR_REQUEST_FAILED", "Request failed", {
+      cause,
+    });
+    expect(withCause.cause).toBe(cause);
+  });
+
   test("malformed URL", () => {
     expectRequestError(() => request("GET", ""), "ERR_INVALID_URL");
   });

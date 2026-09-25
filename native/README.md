@@ -30,10 +30,11 @@ The build uses Cargo and produces:
 native/build/sync_request_curl_native.node
 ```
 
-`curl-sys` builds libcurl from its bundled source with HTTP/2 enabled. Unix TLS
-uses vendored OpenSSL; Windows uses Schannel. zlib and the Linux GCC runtime are
-forced static in the prebuild path so release binaries do not acquire accidental
-runtime dependencies on build-host libraries.
+`curl-sys` builds bundled libcurl with HTTP/2 enabled on Linux and Windows. Linux TLS
+uses vendored OpenSSL, Windows uses Schannel, and macOS links the system libcurl so
+certificate verification uses Apple's native trust configuration. zlib and the Linux
+GCC runtime are forced static in the prebuild path so Linux release binaries do not
+acquire accidental runtime dependencies on build-host libraries.
 
 ## Release prebuilds
 

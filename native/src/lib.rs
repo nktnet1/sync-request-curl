@@ -40,7 +40,7 @@ unsafe extern "C" {
 
 const CURLOPT_MIMEPOST: CURLoption = CURLOPTTYPE_OBJECTPOINT + 269;
 static CURL_INIT: OnceLock<CURLcode> = OnceLock::new();
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "macos")))]
 static CA_PROBE: OnceLock<openssl_probe::ProbeResult> = OnceLock::new();
 
 #[derive(Default)]
@@ -209,7 +209,7 @@ fn set_string_option(
   set_string_option_value(curl, option, value, keepalive)
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "macos")))]
 fn configure_default_ca(
   curl: *mut CURL,
   keepalive: &mut Vec<CString>,
@@ -245,7 +245,7 @@ fn configure_default_ca(
   code
 }
 
-#[cfg(not(unix))]
+#[cfg(any(not(unix), target_os = "macos"))]
 fn configure_default_ca(
   _curl: *mut CURL,
   _keepalive: &mut Vec<CString>,
