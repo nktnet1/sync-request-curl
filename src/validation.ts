@@ -49,7 +49,6 @@ const optionsObjectSchema = v.object({
   maxRetries: v.optional(
     v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0)),
   ),
-  debug: v.optional(v.boolean()),
 });
 
 export const optionsSchema = v.custom<

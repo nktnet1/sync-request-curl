@@ -306,13 +306,6 @@ JSON.stringify({
   </tr>
 
   <tr>
-    <td>debug</td>
-    <td>Include request inputs in CurlError messages. This may expose sensitive headers or request bodies, so it is disabled by default.</td>
-    <td><pre>true</pre></td>
-    <td><code>false</code></td>
-  </tr>
-
-  <tr>
     <td>setEasyOptions</td>
     <td>Optional callback for the supported low-level libcurl options. This has priority over existing request headers/options. Supported options are <code>HTTPHEADER</code>, <code>PROXY</code>, <code>PROXYUSERPWD</code>, <code>USERAGENT</code>, <code>REFERER</code>, <code>CAINFO</code>, <code>INTERFACE</code>, and <code>TCP_KEEPALIVE</code>.</td>
     <td>

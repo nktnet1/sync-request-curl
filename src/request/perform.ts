@@ -73,11 +73,7 @@ export const performRequest = (
     ...(connectionPoolId === undefined ? {} : { connectionPoolId }),
   });
 
-  throwForTransportError(result.transportCode, result.transportMessage, {
-    method,
-    url,
-    options,
-  });
+  throwForTransportError(result.transportCode, result.transportMessage);
 
   const responseHeaders = parseResponseHeaders(result.headers);
   const responseBody = decompressResponseBody(

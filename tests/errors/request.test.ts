@@ -44,27 +44,12 @@ describe("request transport errors", () => {
     expectCurlError(() => request("GET", ""), 3);
   });
 
-  test("request inputs are hidden by default", () => {
+  test("transport errors only include the transport message", () => {
     const error = captureCurlError(() =>
-      request("GET", "", { headers: { authorization: "secret-token" } }),
+      throwForTransportError(3, "transport failure"),
     );
 
-    expect(error.code).toBe(3);
-    expect(error.message).not.toContain("secret-token");
-    expect(error.message).not.toContain("DEBUG:");
-  });
-
-  test("request inputs are included when debug is enabled", () => {
-    const error = captureCurlError(() =>
-      request("GET", "", {
-        debug: true,
-        headers: { authorization: "secret-token" },
-      }),
-    );
-
-    expect(error.code).toBe(3);
-    expect(error.message).toContain("secret-token");
-    expect(error.message).toContain("DEBUG:");
+    expect(error.message).toBe("Request failed: transport failure");
   });
 
   test("non-existent server", () => {
@@ -89,12 +74,7 @@ describe("request transport errors", () => {
     "preserves transport code %i",
     (transportCode) => {
       expectCurlError(
-        () =>
-          throwForTransportError(transportCode, "transport failure", {
-            method: "GET",
-            url: "https://example.com",
-            options: {},
-          }),
+        () => throwForTransportError(transportCode, "transport failure"),
         transportCode,
       );
     },

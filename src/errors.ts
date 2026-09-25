@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import type { BufferEncoding, HttpVerb, Options, Response } from "#/types";
+import type { BufferEncoding, Response } from "#/types";
 
 const requestErrorCodeSchema = v.picklist([
   "ERR_INVALID_URL",
@@ -80,28 +80,10 @@ export class ResponseError extends Error {
   }
 }
 
-interface RequestInputs {
-  method: HttpVerb;
-  url: string;
-  options: Options;
-}
-
-const debugDetails = ({ method, url, options }: RequestInputs): string =>
-  options.debug
-    ? `\n\nDEBUG: ${JSON.stringify({ method, url, options }, null, 2)}`
-    : "";
-
-export const throwForTransportError = (
-  code: number,
-  message: string,
-  inputs: RequestInputs,
-): void => {
+export const throwForTransportError = (code: number, message: string): void => {
   if (code === 0) {
     return;
   }
 
-  throw new CurlError(
-    code,
-    `Request failed: ${message}${debugDetails(inputs)}`,
-  );
+  throw new CurlError(code, `Request failed: ${message}`);
 };

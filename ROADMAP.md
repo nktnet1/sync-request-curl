@@ -58,8 +58,6 @@ layer.
 Replace useful capabilities that were previously reachable through
 `setEasyOptions` with explicit high-level options where appropriate:
 
-- [ ] Redact credentials and other sensitive values from debug error details
-      before adding credential-bearing transport options.
 - [ ] Proxy URL and proxy authentication.
 - [ ] TLS verification and custom CA configuration.
 - [ ] Local interface/address binding.
@@ -219,6 +217,9 @@ should be treated as the current baseline in future sessions:
 - `v1.0.21-url-null-prototype-coverage.patch` covers the remaining
   `appendQueryString` plain-object validation branch with a null-prototype
   top-level query object, without changing runtime behaviour.
+- `v1.0.24-remove-debug-option.patch` supersedes the temporary v1.0.22/v1.0.23
+  debug work by removing the request debug option and all request-input
+  serialization from transport errors.
 
 
 Do not replace these behaviours with a response-body-only cache or move retry
