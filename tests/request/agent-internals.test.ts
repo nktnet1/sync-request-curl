@@ -22,7 +22,7 @@ beforeEach(() => {
 
 describe("agent connection pools", () => {
   test("does not allocate a pool without a keep-alive agent", () => {
-    expect(getAgentPoolId(undefined)).toBeUndefined();
+    expect(getAgentPoolId()).toBeUndefined();
     expect(getAgentPoolId(false)).toBeUndefined();
     expect(getAgentPoolId(new Agent())).toBeUndefined();
     expect(
