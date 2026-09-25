@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -6,26 +5,13 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   getCachedRedirectUrl,
   prepareFileCacheLookup,
   storeFileCacheResponse,
 } from "#/request/cache";
-
-const cacheDirectory = join(
-  tmpdir(),
-  `sync-request-curl-${typeof process.getuid === "function" ? process.getuid() : "user"}`,
-  "cache",
-);
-
-const getCachePath = (url: string): string =>
-  join(
-    cacheDirectory,
-    `${createHash("sha512").update(url).digest("hex")}.json`,
-  );
+import { fileCacheDirectory, getCachePath } from "#/request/cache-path";
 
 let nextUrl = 0;
 const touchedPaths = new Set<string>();
@@ -47,11 +33,21 @@ const response = (
   responseUrl: url,
 });
 
+const storeFreshResponse = (url: string): void => {
+  storeFileCacheResponse(
+    url,
+    {},
+    0,
+    0,
+    response(url, { "cache-control": "max-age=3600" }),
+  );
+};
+
 const writeBucket = (
   url: string,
   entries: Array<Record<string, unknown>>,
 ): void => {
-  mkdirSync(cacheDirectory, { recursive: true });
+  mkdirSync(fileCacheDirectory, { recursive: true });
   writeFileSync(
     getCachePath(url),
     JSON.stringify({ version: 1, entries }),
@@ -214,13 +210,7 @@ describe("file cache policy", () => {
 
   test("honours request cache directives including empty segments and max-age", () => {
     const url = cacheUrl();
-    storeFileCacheResponse(
-      url,
-      {},
-      0,
-      0,
-      response(url, { "cache-control": "max-age=3600" }),
-    );
+    storeFreshResponse(url);
 
     const lookup = prepareFileCacheLookup(
       "GET",
@@ -237,13 +227,7 @@ describe("file cache policy", () => {
 
   test("treats Pragma: no-cache as a request revalidation directive", () => {
     const url = cacheUrl();
-    storeFileCacheResponse(
-      url,
-      {},
-      0,
-      0,
-      response(url, { "cache-control": "max-age=3600" }),
-    );
+    storeFreshResponse(url);
 
     const lookup = prepareFileCacheLookup(
       "GET",
@@ -354,7 +338,7 @@ describe("file cache policy", () => {
 
   test("removes malformed cache files and treats them as misses", () => {
     const url = cacheUrl();
-    mkdirSync(cacheDirectory, { recursive: true });
+    mkdirSync(fileCacheDirectory, { recursive: true });
     writeFileSync(getCachePath(url), "{", "utf8");
 
     const lookup = prepareFileCacheLookup("GET", url, [], "file", 0);

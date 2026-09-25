@@ -1,13 +1,11 @@
-import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import * as v from "valibot";
 import {
   hasRequestHeader,
   parseRequestHeaderLine,
   setRequestHeader,
 } from "#/http/headers";
+import { fileCacheDirectory, getCachePath } from "#/request/cache-path";
 import type { Response } from "#/types";
 import { incomingHttpHeadersSchema } from "#/validation";
 
@@ -51,18 +49,6 @@ const defaultCacheableStatusCodes = new Set([
   200, 203, 204, 300, 301, 308, 404, 405, 410, 414, 501,
 ]);
 const redirectStatusCodes = new Set([301, 302, 303, 307, 308]);
-
-const fileCacheDirectory = join(
-  tmpdir(),
-  `sync-request-curl-${typeof process.getuid === "function" ? process.getuid() : "user"}`,
-  "cache",
-);
-
-const getCachePath = (url: string): string =>
-  join(
-    fileCacheDirectory,
-    `${createHash("sha512").update(url).digest("hex")}.json`,
-  );
 
 const isNotFoundError = (error: unknown): error is NodeJS.ErrnoException =>
   error instanceof Error && "code" in error && error.code === "ENOENT";

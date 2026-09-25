@@ -6,6 +6,12 @@ import request from "#/index";
 import { FormData } from "#/types";
 import { SERVER_URL } from "#tests/app/config";
 
+const upload = (form: FormData): unknown => {
+  const response = request("POST", `${SERVER_URL}/upload`, { form });
+  expect(response.statusCode).toStrictEqual(200);
+  return response.getJSON();
+};
+
 describe("multipart/form-data", () => {
   test("uploads buffer and text fields with FormData", () => {
     const testFileLocation = "./tests/data/test-upload.txt";
@@ -14,10 +20,7 @@ describe("multipart/form-data", () => {
     form.append("1-test-file-upload", file, path.basename(testFileLocation));
     form.append("2-test-contents", "Example Content!");
 
-    const res = request("POST", `${SERVER_URL}/upload`, { form });
-
-    expect(res.statusCode).toStrictEqual(200);
-    expect(res.getJSON()).toStrictEqual([
+    expect(upload(form)).toStrictEqual([
       {
         name: "1-test-file-upload",
         file: {
@@ -40,10 +43,7 @@ describe("multipart/form-data", () => {
       "blob-upload.txt",
     );
 
-    const res = request("POST", `${SERVER_URL}/upload`, { form });
-
-    expect(res.statusCode).toStrictEqual(200);
-    expect(res.getJSON()).toStrictEqual([
+    expect(upload(form)).toStrictEqual([
       {
         name: "blob-upload",
         file: {

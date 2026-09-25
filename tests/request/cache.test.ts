@@ -8,22 +8,27 @@ const cacheUrl = (path: string): string => {
   return `${SERVER_URL}${path}?key=${process.pid}-${Date.now()}-${nextCacheKey}`;
 };
 
+const cachedJson = (url: string, headers?: Record<string, string>): unknown =>
+  request("GET", url, { cache: "file", headers }).getJSON();
+
+const cachedPair = (path: string) => {
+  const url = cacheUrl(path);
+  return [
+    request("GET", url, { cache: "file" }),
+    request("GET", url, { cache: "file" }),
+  ] as const;
+};
+
 describe("file cache", () => {
   test("reuses a fresh GET response without contacting the origin", () => {
-    const url = cacheUrl("/cache/fresh");
-
-    const first = request("GET", url, { cache: "file" });
-    const second = request("GET", url, { cache: "file" });
+    const [first, second] = cachedPair("/cache/fresh");
 
     expect(first.getJSON()).toStrictEqual({ hits: 1 });
     expect(second.getJSON()).toStrictEqual({ hits: 1 });
   });
 
   test("revalidates stale ETag responses and returns the cached entity", () => {
-    const url = cacheUrl("/cache/revalidate/etag");
-
-    const first = request("GET", url, { cache: "file" });
-    const second = request("GET", url, { cache: "file" });
+    const [first, second] = cachedPair("/cache/revalidate/etag");
 
     expect(first.getJSON()).toStrictEqual({ hits: 1 });
     expect(second.statusCode).toBe(200);
@@ -32,10 +37,7 @@ describe("file cache", () => {
   });
 
   test("revalidates stale Last-Modified responses", () => {
-    const url = cacheUrl("/cache/revalidate/last-modified");
-
-    const first = request("GET", url, { cache: "file" });
-    const second = request("GET", url, { cache: "file" });
+    const [first, second] = cachedPair("/cache/revalidate/last-modified");
 
     expect(first.getJSON()).toStrictEqual({ hits: 1 });
     expect(second.statusCode).toBe(200);
@@ -46,18 +48,11 @@ describe("file cache", () => {
   test("Cache-Control: no-cache bypasses freshness and replaces the entry", () => {
     const url = cacheUrl("/cache/fresh");
 
-    expect(request("GET", url, { cache: "file" }).getJSON()).toStrictEqual({
-      hits: 1,
-    });
-    expect(
-      request("GET", url, {
-        cache: "file",
-        headers: { "Cache-Control": "no-cache" },
-      }).getJSON(),
-    ).toStrictEqual({ hits: 2 });
-    expect(request("GET", url, { cache: "file" }).getJSON()).toStrictEqual({
+    expect(cachedJson(url)).toStrictEqual({ hits: 1 });
+    expect(cachedJson(url, { "Cache-Control": "no-cache" })).toStrictEqual({
       hits: 2,
     });
+    expect(cachedJson(url)).toStrictEqual({ hits: 2 });
   });
 
   test("preserves caller-supplied conditional requests", () => {
@@ -74,66 +69,45 @@ describe("file cache", () => {
 
     expect(conditional.statusCode).toBe(304);
     expect(conditional.headers["x-origin-hits"]).toBe("2");
-    expect(request("GET", url, { cache: "file" }).getJSON()).toStrictEqual({
-      hits: 1,
-    });
+    expect(cachedJson(url)).toStrictEqual({ hits: 1 });
   });
 
   test("Cache-Control: no-store bypasses reads without replacing the entry", () => {
     const url = cacheUrl("/cache/fresh");
 
-    expect(request("GET", url, { cache: "file" }).getJSON()).toStrictEqual({
-      hits: 1,
+    expect(cachedJson(url)).toStrictEqual({ hits: 1 });
+    expect(cachedJson(url, { "Cache-Control": "no-store" })).toStrictEqual({
+      hits: 2,
     });
-    expect(
-      request("GET", url, {
-        cache: "file",
-        headers: { "Cache-Control": "no-store" },
-      }).getJSON(),
-    ).toStrictEqual({ hits: 2 });
-    expect(request("GET", url, { cache: "file" }).getJSON()).toStrictEqual({
-      hits: 1,
-    });
+    expect(cachedJson(url)).toStrictEqual({ hits: 1 });
   });
 
   test("does not store responses marked no-store", () => {
     const url = cacheUrl("/cache/no-store");
 
-    expect(request("GET", url, { cache: "file" }).getJSON()).toStrictEqual({
-      hits: 1,
-    });
-    expect(request("GET", url, { cache: "file" }).getJSON()).toStrictEqual({
-      hits: 2,
-    });
+    expect(cachedJson(url)).toStrictEqual({ hits: 1 });
+    expect(cachedJson(url)).toStrictEqual({ hits: 2 });
   });
 
   test("honours Vary when matching cached responses", () => {
     const url = cacheUrl("/cache/vary");
 
-    expect(
-      request("GET", url, {
-        cache: "file",
-        headers: { "X-Variant": "a" },
-      }).getJSON(),
-    ).toStrictEqual({ hits: 1, variant: "a" });
-    expect(
-      request("GET", url, {
-        cache: "file",
-        headers: { "X-Variant": "a" },
-      }).getJSON(),
-    ).toStrictEqual({ hits: 1, variant: "a" });
-    expect(
-      request("GET", url, {
-        cache: "file",
-        headers: { "X-Variant": "b" },
-      }).getJSON(),
-    ).toStrictEqual({ hits: 2, variant: "b" });
-    expect(
-      request("GET", url, {
-        cache: "file",
-        headers: { "X-Variant": "a" },
-      }).getJSON(),
-    ).toStrictEqual({ hits: 1, variant: "a" });
+    expect(cachedJson(url, { "X-Variant": "a" })).toStrictEqual({
+      hits: 1,
+      variant: "a",
+    });
+    expect(cachedJson(url, { "X-Variant": "a" })).toStrictEqual({
+      hits: 1,
+      variant: "a",
+    });
+    expect(cachedJson(url, { "X-Variant": "b" })).toStrictEqual({
+      hits: 2,
+      variant: "b",
+    });
+    expect(cachedJson(url, { "X-Variant": "a" })).toStrictEqual({
+      hits: 1,
+      variant: "a",
+    });
   });
 
   test("does not satisfy range requests from a complete cached response", () => {
@@ -155,10 +129,7 @@ describe("file cache", () => {
   });
 
   test("follows cached redirect responses through the normal redirect pipeline", () => {
-    const url = cacheUrl("/cache/redirect");
-
-    const first = request("GET", url, { cache: "file" });
-    const second = request("GET", url, { cache: "file" });
+    const [first, second] = cachedPair("/cache/redirect");
 
     expect(first.getJSON()).toStrictEqual({ sourceHits: 1, targetHits: 1 });
     expect(second.getJSON()).toStrictEqual({ sourceHits: 1, targetHits: 2 });
@@ -167,20 +138,11 @@ describe("file cache", () => {
   test("invalidates a cached GET after a successful unsafe request", () => {
     const url = cacheUrl("/cache/mutable");
 
-    expect(request("GET", url, { cache: "file" }).getJSON()).toStrictEqual({
-      hits: 1,
-      version: 0,
-    });
-    expect(request("GET", url, { cache: "file" }).getJSON()).toStrictEqual({
-      hits: 1,
-      version: 0,
-    });
+    expect(cachedJson(url)).toStrictEqual({ hits: 1, version: 0 });
+    expect(cachedJson(url)).toStrictEqual({ hits: 1, version: 0 });
     expect(request("POST", url, { cache: "file" }).getJSON()).toStrictEqual({
       version: 1,
     });
-    expect(request("GET", url, { cache: "file" }).getJSON()).toStrictEqual({
-      hits: 2,
-      version: 1,
-    });
+    expect(cachedJson(url)).toStrictEqual({ hits: 2, version: 1 });
   });
 });

@@ -1,7 +1,7 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { deflateSync, gzipSync } from "node:zlib";
 import type { HttpBindings } from "@hono/node-server";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import { streamText } from "hono/streaming";
@@ -18,6 +18,32 @@ const nextCacheOriginHit = (name: string, key: string): number => {
   cacheOriginHits.set(mapKey, next);
   return next;
 };
+const conditionalCacheResponse = (
+  c: Context<{ Bindings: HttpBindings }>,
+  name: string,
+  key: string,
+  maxAge: number,
+  requestHeader: string,
+  validatorHeader: string,
+  validatorValue: string,
+) => {
+  const hits = nextCacheOriginHit(name, key);
+  const headers: Record<string, string> = {
+    "cache-control": `max-age=${maxAge}`,
+    [validatorHeader]: validatorValue,
+    "x-origin-hits": String(hits),
+  };
+
+  if (c.req.header(requestHeader) === validatorValue) {
+    return new Response(null, { status: 304, headers });
+  }
+
+  for (const [headerName, value] of Object.entries(headers)) {
+    c.header(headerName, value);
+  }
+  return c.json({ hits });
+};
+
 const toArrayBuffer = (buffer: Buffer): ArrayBuffer => {
   const arrayBuffer = new ArrayBuffer(buffer.length);
   new Uint8Array(arrayBuffer).set(buffer);
@@ -215,22 +241,15 @@ app.get("/large/response", (c) => {
 
 app.get("/cache/fresh", (c) => {
   const key = c.req.query("key") ?? "default";
-  const hits = nextCacheOriginHit("fresh", key);
-  const etag = `"fresh-${key}"`;
-  const headers = {
-    "cache-control": "max-age=3600",
-    etag,
-    "x-origin-hits": String(hits),
-  };
-
-  if (c.req.header("if-none-match") === etag) {
-    return new Response(null, { status: 304, headers });
-  }
-
-  for (const [name, value] of Object.entries(headers)) {
-    c.header(name, value);
-  }
-  return c.json({ hits });
+  return conditionalCacheResponse(
+    c,
+    "fresh",
+    key,
+    3600,
+    "if-none-match",
+    "etag",
+    `"fresh-${key}"`,
+  );
 });
 
 app.get("/cache/no-store", (c) => {
@@ -242,42 +261,28 @@ app.get("/cache/no-store", (c) => {
 
 app.get("/cache/revalidate/etag", (c) => {
   const key = c.req.query("key") ?? "default";
-  const hits = nextCacheOriginHit("etag", key);
-  const etag = '"cache-v1"';
-  const headers = {
-    "cache-control": "max-age=0",
-    etag,
-    "x-origin-hits": String(hits),
-  };
-
-  if (c.req.header("if-none-match") === etag) {
-    return new Response(null, { status: 304, headers });
-  }
-
-  for (const [name, value] of Object.entries(headers)) {
-    c.header(name, value);
-  }
-  return c.json({ hits });
+  return conditionalCacheResponse(
+    c,
+    "etag",
+    key,
+    0,
+    "if-none-match",
+    "etag",
+    '"cache-v1"',
+  );
 });
 
 app.get("/cache/revalidate/last-modified", (c) => {
   const key = c.req.query("key") ?? "default";
-  const hits = nextCacheOriginHit("last-modified", key);
-  const lastModified = "Wed, 21 Oct 2015 07:28:00 GMT";
-  const headers = {
-    "cache-control": "max-age=0",
-    "last-modified": lastModified,
-    "x-origin-hits": String(hits),
-  };
-
-  if (c.req.header("if-modified-since") === lastModified) {
-    return new Response(null, { status: 304, headers });
-  }
-
-  for (const [name, value] of Object.entries(headers)) {
-    c.header(name, value);
-  }
-  return c.json({ hits });
+  return conditionalCacheResponse(
+    c,
+    "last-modified",
+    key,
+    0,
+    "if-modified-since",
+    "last-modified",
+    "Wed, 21 Oct 2015 07:28:00 GMT",
+  );
 });
 
 app.get("/cache/vary", (c) => {
