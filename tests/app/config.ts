@@ -12,9 +12,4 @@ const portSchema = v.pipe(
 
 export const PORT = v.parse(portSchema, process.env.PORT ?? "49152");
 export const HOST = v.parse(v.string(), process.env.IP ?? "127.0.0.1");
-export const DEBUG =
-  v.parse(
-    v.optional(v.picklist(["true", "false"] as const), "true"),
-    process.env.DEBUG,
-  ) !== "false";
 export const SERVER_URL = `http://${HOST}:${PORT}`;

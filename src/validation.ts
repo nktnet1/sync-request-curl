@@ -68,8 +68,6 @@ export const uppercaseHttpVerbSchema = v.picklist([
   "PATCH",
 ]);
 
-export const uppercaseHttpVerbs = uppercaseHttpVerbSchema.options;
-
 const lowercaseHttpVerbSchema = v.picklist([
   "get",
   "head",

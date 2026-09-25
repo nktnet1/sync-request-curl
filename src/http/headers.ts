@@ -39,7 +39,7 @@ export const parseRequestHeaderLine = (
   };
 };
 
-export const removeRequestHeader = (headers: string[], name: string): void => {
+const removeRequestHeader = (headers: string[], name: string): void => {
   const normalizedName = name.toLowerCase();
   const retainedHeaders = headers.filter(
     (header) => getHeaderName(header) !== normalizedName,
