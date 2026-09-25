@@ -6,13 +6,15 @@ Make `sync-request-curl` a transport-neutral superset of the Node.js API and
 features provided by `sync-request`, while keeping the existing synchronous
 in-process native transport and the `Response#getJSON()` helper.
 
-Public APIs must not expose node-libcurl/libcurl implementation details. Native
-transport details stay behind the TypeScript request layer.
+Public APIs keep `CurlError` as the compatibility surface for raw libcurl
+transport failures. Other native transport details stay behind the TypeScript request
+layer.
 
 ## Foundation
 
 - [x] Remove the public node-libcurl-style API (`setEasyOptions`, `Easy`,
-      `CurlOption`, `CurlError`, `formData`, and `HttpPostField`).
+      `CurlOption`, `formData`, and `HttpPostField`) while retaining `CurlError`
+      with its numeric libcurl error code.
 - [x] Keep `Response#getJSON()` as an additive API.
 - [x] Support `string | URL` request URLs and case-insensitive HTTP methods.
 - [x] Replace multipart `formData` input with `sync-request`-style `FormData`
@@ -51,8 +53,8 @@ Replace useful capabilities that were previously reachable through
 - [ ] TLS verification and custom CA configuration.
 - [ ] Local interface/address binding.
 - [ ] TCP keepalive configuration.
-- [ ] Extend stable `RequestError` codes for transport failures without
-      exposing native/libcurl numeric codes.
+- [x] Use `CurlError` with the raw numeric libcurl code for native transport
+      failures; keep `RequestError` for errors created by the TypeScript layer.
 - [ ] Redact credentials and other sensitive values from debug error details.
 
 ## Tests

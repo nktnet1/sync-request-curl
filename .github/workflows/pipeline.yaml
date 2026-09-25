@@ -211,9 +211,11 @@ jobs:
           node <<'NODE'
           const imported = require("./dist/index.cjs");
           const types = require("./dist/types.cjs");
+          const errors = require("./dist/errors.cjs");
           const request = typeof imported === "function" ? imported : imported.default;
           if (typeof request !== "function") throw new Error("CommonJS default export is not callable");
           if (typeof types.FormData !== "function") throw new Error("CommonJS types entry does not expose FormData");
+          if (new errors.CurlError(60, "TLS failure").code !== 60) throw new Error("CommonJS errors entry does not preserve CurlError code");
           const response = request("GET", "http://127.0.0.1:18765/");
           if (response.statusCode !== 200) throw new Error(`Unexpected CommonJS status: ${response.statusCode}`);
           NODE
@@ -221,9 +223,11 @@ jobs:
           node --input-type=module <<'NODE'
           const imported = await import("./dist/index.mjs");
           const types = await import("./dist/types.mjs");
+          const errors = await import("./dist/errors.mjs");
           const request = imported.default;
           if (typeof request !== "function") throw new Error("ESM default export is not callable");
           if (typeof types.FormData !== "function") throw new Error("ESM types entry does not expose FormData");
+          if (new errors.CurlError(60, "TLS failure").code !== 60) throw new Error("ESM errors entry does not preserve CurlError code");
           const response = request("GET", "http://127.0.0.1:18765/");
           if (response.statusCode !== 200) throw new Error(`Unexpected ESM status: ${response.statusCode}`);
           NODE

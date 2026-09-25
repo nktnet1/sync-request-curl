@@ -428,9 +428,9 @@ export class CurlError extends Error {
   code: number;
   constructor(code: number, message: string) {
     super(message);
-    if (code < 1 || code > 99) {
+    if (code < 1 || code > 101) {
       throw new Error(
-        `CurlError code must be between 1 and 99. Given: ${code}`,
+        `CurlError code must be between 1 and 101. Given: ${code}`,
       );
     }
     this.code = code;

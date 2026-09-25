@@ -8,6 +8,25 @@ export type RequestErrorCode =
   | "ERR_TOO_MANY_REDIRECTS"
   | "ERR_REQUEST_FAILED";
 
+export class CurlError extends Error {
+  // https://curl.se/libcurl/c/libcurl-errors.html
+  code: number;
+
+  constructor(code: number, message: string) {
+    super(message);
+    if (code < 1 || code > 101) {
+      throw new Error(`
+        CurlError code must be between 1 and 101. Given: ${code}.
+
+        Please take a look at the resource below for valid Libcurl errors:
+          - https://curl.se/libcurl/c/libcurl-errors.html
+      `);
+    }
+    this.code = code;
+    Object.setPrototypeOf(this, CurlError.prototype);
+  }
+}
+
 export class RequestError extends Error {
   readonly code: RequestErrorCode;
 
@@ -49,21 +68,6 @@ interface RequestInputs {
   options: Options;
 }
 
-const transportErrorCode = (code: number): RequestErrorCode => {
-  switch (code) {
-    case 3:
-      return "ERR_INVALID_URL";
-    case 6:
-      return "ENOTFOUND";
-    case 28:
-      return "ETIMEDOUT";
-    case 47:
-      return "ERR_TOO_MANY_REDIRECTS";
-    default:
-      return "ERR_REQUEST_FAILED";
-  }
-};
-
 const debugDetails = ({ method, url, options }: RequestInputs): string =>
   options.debug
     ? `\n\nDEBUG: ${JSON.stringify({ method, url, options }, null, 2)}`
@@ -78,8 +82,8 @@ export const throwForTransportError = (
     return;
   }
 
-  throw new RequestError(
-    transportErrorCode(code),
+  throw new CurlError(
+    code,
     `Request failed: ${message}${debugDetails(inputs)}`,
   );
 };

@@ -1,11 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { RequestError, throwForTransportError } from "#/errors";
+import { CurlError, RequestError, throwForTransportError } from "#/errors";
 import request from "#/index";
 import { SERVER_URL } from "../app/config";
 
-const expectRequestError = (
+const expectCurlError = (
   requestWrapped: () => void,
-  code: RequestError["code"],
+  code: CurlError["code"],
 ): void => {
   let error: unknown;
   try {
@@ -14,12 +14,19 @@ const expectRequestError = (
     error = caught;
   }
 
-  expect(error).toBeInstanceOf(RequestError);
-  expect((error as RequestError).code).toStrictEqual(code);
+  expect(error).toBeInstanceOf(CurlError);
+  expect((error as CurlError).code).toStrictEqual(code);
 };
 
 describe("request transport errors", () => {
-  test("preserves ErrorOptions cause semantics", () => {
+  test("CurlError preserves the libcurl error code", () => {
+    expect(new CurlError(1, "transport failure").code).toBe(1);
+    expect(new CurlError(101, "transport failure").code).toBe(101);
+    expect(() => new CurlError(0, "transport failure")).toThrow(Error);
+    expect(() => new CurlError(102, "transport failure")).toThrow(Error);
+  });
+
+  test("RequestError preserves ErrorOptions cause semantics", () => {
     const withoutCause = new RequestError(
       "ERR_REQUEST_FAILED",
       "Request failed",
@@ -35,7 +42,7 @@ describe("request transport errors", () => {
   });
 
   test("malformed URL", () => {
-    expectRequestError(() => request("GET", ""), "ERR_INVALID_URL");
+    expectCurlError(() => request("GET", ""), 3);
   });
 
   test("request inputs are hidden by default", () => {
@@ -46,7 +53,8 @@ describe("request transport errors", () => {
       error = caught;
     }
 
-    expect(error).toBeInstanceOf(RequestError);
+    expect(error).toBeInstanceOf(CurlError);
+    expect((error as CurlError).code).toBe(3);
     expect((error as Error).message).not.toContain("secret-token");
     expect((error as Error).message).not.toContain("DEBUG:");
   });
@@ -62,41 +70,42 @@ describe("request transport errors", () => {
       error = caught;
     }
 
-    expect(error).toBeInstanceOf(RequestError);
+    expect(error).toBeInstanceOf(CurlError);
+    expect((error as CurlError).code).toBe(3);
     expect((error as Error).message).toContain("secret-token");
     expect((error as Error).message).toContain("DEBUG:");
   });
 
   test("non-existent server", () => {
-    expectRequestError(
+    expectCurlError(
       () => request("GET", "https://sync-request-curl.invalid"),
-      "ENOTFOUND",
+      6,
     );
   });
 
   test("request timeout", () => {
-    expectRequestError(
+    expectCurlError(
       () =>
         request("POST", `${SERVER_URL}/timeout`, {
           json: { timeout: 1000 },
           timeout: 200,
         }),
-      "ETIMEDOUT",
+      28,
     );
   });
 
-  test.each([
-    [47, "ERR_TOO_MANY_REDIRECTS"],
-    [99, "ERR_REQUEST_FAILED"],
-  ] as const)("maps transport code %i to %s", (transportCode, expectedCode) => {
-    expectRequestError(
-      () =>
-        throwForTransportError(transportCode, "transport failure", {
-          method: "GET",
-          url: "https://example.com",
-          options: {},
-        }),
-      expectedCode,
-    );
-  });
+  test.each([47, 60, 99, 101])(
+    "preserves transport code %i",
+    (transportCode) => {
+      expectCurlError(
+        () =>
+          throwForTransportError(transportCode, "transport failure", {
+            method: "GET",
+            url: "https://example.com",
+            options: {},
+          }),
+        transportCode,
+      );
+    },
+  );
 });
