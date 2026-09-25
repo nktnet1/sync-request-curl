@@ -192,6 +192,13 @@ should be treated as the current baseline in future sessions:
   as ESM, eliminating tsdown's mixed-export CommonJS warning and the unused
   `index-esm.cjs`/`index-esm.d.cts` artifacts while preserving the callable
   CommonJS `index.cjs` entry.
+- `v1.0.14-typescript-7-root-export-smoke.patch` makes the one-file root
+  export type smoke test explicit about ignoring the repository `tsconfig.json`,
+  satisfying TypeScript 6+/7 TS5112 while retaining the isolated NodeNext
+  package-export check.
+- `v1.0.15-coverage-entry-validation.patch` excludes the packaging-only
+  `src/index-esm.ts` re-export shim from source coverage (matching `src/index.ts`)
+  and adds runtime coverage for uppercase HTTP method validation.
 
 
 Do not replace these behaviours with a response-body-only cache or move retry

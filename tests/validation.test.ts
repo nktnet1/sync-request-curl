@@ -33,7 +33,7 @@ import {
   optionsSchema,
   requestUrlSchema,
   type responseDataSchema,
-  type uppercaseHttpVerbSchema,
+  uppercaseHttpVerbSchema,
 } from "#/validation";
 
 describe("schema-derived types", () => {
@@ -78,6 +78,15 @@ describe("schema-derived types", () => {
 });
 
 describe("runtime validation", () => {
+  test("validates uppercase HTTP methods", () => {
+    expect(v.parse(uppercaseHttpVerbSchema, "GET")).toBe("GET");
+    expect(v.parse(uppercaseHttpVerbSchema, "PROPFIND")).toBe("PROPFIND");
+    expect(v.safeParse(uppercaseHttpVerbSchema, "post").success).toBe(false);
+    expect(v.safeParse(uppercaseHttpVerbSchema, "bad method").success).toBe(
+      false,
+    );
+  });
+
   test("normalizes standard and extension HTTP methods", () => {
     expect(v.parse(httpVerbSchema, "post")).toBe("POST");
     expect(v.parse(httpVerbSchema, "propfind")).toBe("PROPFIND");

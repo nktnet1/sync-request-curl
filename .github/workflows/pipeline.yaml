@@ -189,7 +189,7 @@ jobs:
           void attachedFormData;
           void response;
           TS
-          pnpm exec tsc --noEmit --strict --module NodeNext --moduleResolution NodeNext --target ES2022 --types node .root-exports-smoke.mts
+          pnpm exec tsc --ignoreConfig --noEmit --strict --module NodeNext --moduleResolution NodeNext --target ES2022 --types node .root-exports-smoke.mts
           rm .root-exports-smoke.mts
 
       - name: Upload runtime compatibility fixture
