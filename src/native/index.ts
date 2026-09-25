@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import * as v from "valibot";
 import type { FormDataEntry } from "#/form-data";
 import {
+  getLinuxLibcFromReport,
   getNativePackageName,
   type LinuxLibc,
   type NativePlatformKey,
@@ -47,14 +48,6 @@ export interface NativeLoadOptions {
   requireNative?: NativeRequire;
   resolveNative?: NativeResolve;
 }
-
-const processReportSchema = v.object({
-  header: v.optional(
-    v.object({
-      glibcVersionRuntime: v.optional(v.string()),
-    }),
-  ),
-});
 
 const moduleNotFoundErrorSchema = v.object({
   code: v.literal("MODULE_NOT_FOUND"),
@@ -123,12 +116,7 @@ export const findPackageRoot = (
 
 export const getLinuxLibc = (
   report: unknown = process.report?.getReport(),
-): LinuxLibc => {
-  const parsedReport = v.safeParse(processReportSchema, report);
-  return parsedReport.success && parsedReport.output.header?.glibcVersionRuntime
-    ? "gnu"
-    : "musl";
-};
+): LinuxLibc => getLinuxLibcFromReport(report);
 
 export const getPlatformKey = (
   platform: NodeJS.Platform = process.platform,

@@ -6,18 +6,19 @@ export { FormData };
 
 type JsonPrimitive = string | number | boolean | null;
 
+type NestedJsonLike = JsonLike | undefined | { toJSON(): NestedJsonLike };
+
 /**
  * Values accepted for JSON request bodies.
  *
  * This intentionally follows practical `JSON.stringify()` inputs rather than
- * only strict JSON syntax. `undefined` is allowed in nested structures, and
- * objects with `toJSON()` (for example `Date`) are supported.
+ * only strict JSON syntax. `undefined` is allowed inside objects and arrays,
+ * and objects with `toJSON()` (for example `Date`) are supported.
  */
 export type JsonLike =
   | JsonPrimitive
-  | undefined
-  | readonly JsonLike[]
-  | { [key: string]: JsonLike }
+  | readonly NestedJsonLike[]
+  | { [key: string]: NestedJsonLike }
   | { toJSON(): JsonLike };
 
 export type UppercaseHttpVerb =
@@ -66,7 +67,7 @@ export interface Options {
 
 export type GetBody = {
   <Encoding extends BufferEncoding>(encoding: Encoding): string;
-  (encoding?: undefined): Buffer;
+  (): Buffer;
 };
 
 export type GetJSON = <T = unknown>(encoding?: BufferEncoding) => T;

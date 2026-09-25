@@ -1,5 +1,6 @@
 import * as v from "valibot";
 import {
+  getLinuxLibcFromReport,
   type LinuxLibc,
   linuxLibcSchema,
   type NativePlatformKey,
@@ -10,26 +11,14 @@ import {
 export type { LinuxLibc, NativePlatformKey } from "#/native/platform-key";
 export { supportedPlatformKeys } from "#/native/platform-key";
 
-const processReportSchema = v.object({
-  header: v.optional(
-    v.object({
-      glibcVersionRuntime: v.optional(v.string()),
-    }),
-  ),
-});
-
 export const parseLinuxLibc = (value: unknown): LinuxLibc =>
   v.parse(linuxLibcSchema, value);
 
 export const parseNativePlatformKey = (value: unknown): NativePlatformKey =>
   v.parse(nativePlatformKeySchema, value);
 
-export const getLinuxLibc = (): LinuxLibc => {
-  const report = v.safeParse(processReportSchema, process.report?.getReport());
-  return report.success && report.output.header?.glibcVersionRuntime
-    ? "gnu"
-    : "musl";
-};
+export const getLinuxLibc = (): LinuxLibc =>
+  getLinuxLibcFromReport(process.report?.getReport());
 
 export const getCurrentPlatformKey = (): NativePlatformKey => {
   const { platform, arch } = process;

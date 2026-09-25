@@ -11,6 +11,15 @@ describe("request preparation", () => {
     ).toThrow("The json option must be JSON-serializable");
   });
 
+  test("rejects a top-level toJSON result of undefined", () => {
+    expect(() =>
+      Reflect.apply(prepareRequest, undefined, [
+        "https://example.com",
+        { json: { toJSON: () => undefined } },
+      ]),
+    ).toThrow("The json option must be JSON-serializable");
+  });
+
   test("serializes JsonLike values with toJSON and nested undefined", () => {
     expect(
       prepareRequest("https://example.com", {

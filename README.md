@@ -334,14 +334,18 @@ JSON.stringify({
 In [src/types.ts](src/types.ts), the `Options` interface following is defined as:
 
 ```typescript
+type NestedJsonLike =
+  | JsonLike
+  | undefined
+  | { toJSON(): NestedJsonLike };
+
 export type JsonLike =
   | string
   | number
   | boolean
   | null
-  | undefined
-  | readonly JsonLike[]
-  | { [key: string]: JsonLike }
+  | readonly NestedJsonLike[]
+  | { [key: string]: NestedJsonLike }
   | { toJSON(): JsonLike };
 
 export interface Options {

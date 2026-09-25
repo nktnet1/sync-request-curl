@@ -1,6 +1,11 @@
 import type { IncomingHttpHeaders } from "node:http";
 import { ResponseError } from "#/errors";
-import type { BufferEncoding, Response, UppercaseHttpVerb } from "#/types";
+import type {
+  BufferEncoding,
+  GetBody,
+  Response,
+  UppercaseHttpVerb,
+} from "#/types";
 
 interface CreateResponseOptions {
   method: UppercaseHttpVerb;
@@ -19,14 +24,12 @@ export const createResponse = ({
   headers,
   body,
 }: CreateResponseOptions): Response => {
-  function getBody<Encoding extends BufferEncoding>(encoding: Encoding): string;
-  function getBody(encoding?: undefined): Buffer;
-  function getBody(encoding?: BufferEncoding): string | Buffer {
+  const getBody = ((encoding?: BufferEncoding): string | Buffer => {
     if (statusCode >= 300) {
       throw new ResponseError(statusCode, headers, body);
     }
     return encoding ? body.toString(encoding) : body;
-  }
+  }) as GetBody;
 
   const getJSON = <T = unknown>(encoding?: BufferEncoding): T => {
     try {

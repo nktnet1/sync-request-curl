@@ -18,6 +18,21 @@ const architectureSchema = v.picklist(["x64", "arm64"] as const);
 export type NativePlatformKey = v.InferOutput<typeof nativePlatformKeySchema>;
 export type LinuxLibc = v.InferOutput<typeof linuxLibcSchema>;
 
+const processReportSchema = v.object({
+  header: v.optional(
+    v.object({
+      glibcVersionRuntime: v.optional(v.string()),
+    }),
+  ),
+});
+
+export const getLinuxLibcFromReport = (report: unknown): LinuxLibc => {
+  const parsedReport = v.safeParse(processReportSchema, report);
+  return parsedReport.success && parsedReport.output.header?.glibcVersionRuntime
+    ? "gnu"
+    : "musl";
+};
+
 export const getNativePackageName = (platform: NativePlatformKey): string =>
   `@nktnet/sync-request-curl-${platform}`;
 
