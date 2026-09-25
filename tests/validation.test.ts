@@ -30,10 +30,20 @@ describe("runtime validation", () => {
         timeout: 100,
         followRedirects: true,
         gzip: false,
+        retry: true,
+        retryDelay: 200,
+        maxRetries: 5,
       }).success,
     ).toBe(true);
     expect(v.safeParse(optionsSchema, { timeout: "fast" }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { gzip: "yes" }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { retry: "yes" }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { retryDelay: -1 }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { retryDelay: Number.NaN }).success).toBe(
+      false,
+    );
+    expect(v.safeParse(optionsSchema, { maxRetries: -1 }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { maxRetries: 1.5 }).success).toBe(false);
     expect(
       v.safeParse(optionsSchema, { maxRedirects: Number.NaN }).success,
     ).toBe(false);

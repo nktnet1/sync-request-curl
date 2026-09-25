@@ -29,6 +29,11 @@ export const optionsSchema = v.custom<Options>(
         maxRedirects: v.optional(v.number()),
         allowRedirectHeaders: v.optional(v.array(v.string())),
         gzip: v.optional(v.boolean()),
+        retry: v.optional(v.boolean()),
+        retryDelay: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),
+        maxRetries: v.optional(
+          v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0)),
+        ),
         debug: v.optional(v.boolean()),
       }),
       input,

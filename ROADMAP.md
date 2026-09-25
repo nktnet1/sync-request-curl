@@ -31,7 +31,7 @@ layer.
       allow-list semantics.
 - [x] Add `gzip`, enabled by default, with transparent response decompression
       and an explicit opt-out.
-- [ ] Add `retry`, `retryDelay`, and `maxRetries` with `sync-request`
+- [x] Add `retry`, `retryDelay`, and `maxRetries` with `sync-request`
       compatible defaults and retry conditions.
 - [ ] Add `socketTimeout` as an inactivity timeout. Keep it distinct from the
       existing overall `timeout` deadline.
@@ -64,7 +64,7 @@ Replace useful capabilities that were previously reachable through
 - [x] Cover redirect-header allow-list behaviour for same-origin and
       cross-origin redirects.
 - [x] Cover compressed responses and `gzip: false`.
-- [ ] Cover retry count, delay, HTTP error retries, and transport error retries.
+- [x] Cover retry count, delay, HTTP error retries, and transport error retries.
 - [ ] Cover `socketTimeout` with streaming responses that both remain active
       and become inactive.
 - [ ] Cover file-cache freshness, validators, and cache bypass/revalidation.

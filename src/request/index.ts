@@ -7,6 +7,14 @@ import {
   getRedirectOptions,
   getRemainingTimeout,
 } from "#/request/redirects";
+import {
+  canRetryRequest,
+  DEFAULT_MAX_RETRIES,
+  DEFAULT_RETRY_DELAY,
+  isRetryableRequestError,
+  shouldRetryResponse,
+  waitForRetry,
+} from "#/request/retry";
 import type { HttpVerb, Options, Response, UppercaseHttpVerb } from "#/types";
 import { httpVerbSchema, optionsSchema, requestUrlSchema } from "#/validation";
 
@@ -24,18 +32,13 @@ const getRedirectLimit = (maxRedirects: number | undefined): number => {
   return Math.ceil(maxRedirects);
 };
 
-const request = (
-  method: HttpVerb,
-  url: string | URL,
-  options: Options = {},
+const performRequestAttempt = (
+  originalMethod: UppercaseHttpVerb,
+  originalUrl: string,
+  originalOptions: Options,
 ): Response => {
-  const originalMethod = normalizeMethod(method);
-  const originalUrl = v.parse(requestUrlSchema, url);
-  const originalOptions = v.parse(optionsSchema, options);
-
   if (originalOptions.followRedirects === false) {
-    return performRequest(originalMethod, originalUrl, originalOptions)
-      .response;
+    return performRequest(originalMethod, originalUrl, originalOptions).response;
   }
 
   const startedAt = Date.now();
@@ -77,6 +80,42 @@ const request = (
     );
     currentMethod = nextMethod;
     currentUrl = nextUrl;
+  }
+};
+
+const request = (
+  method: HttpVerb,
+  url: string | URL,
+  options: Options = {},
+): Response => {
+  const originalMethod = normalizeMethod(method);
+  const originalUrl = v.parse(requestUrlSchema, url);
+  const originalOptions = v.parse(optionsSchema, options);
+
+  if (!canRetryRequest(originalMethod, originalOptions.retry)) {
+    return performRequestAttempt(originalMethod, originalUrl, originalOptions);
+  }
+
+  const retryDelay = originalOptions.retryDelay ?? DEFAULT_RETRY_DELAY;
+  const maxRetries = originalOptions.maxRetries ?? DEFAULT_MAX_RETRIES;
+
+  for (let retries = 0; ; retries += 1) {
+    try {
+      const response = performRequestAttempt(
+        originalMethod,
+        originalUrl,
+        originalOptions,
+      );
+      if (!shouldRetryResponse(response) || retries >= maxRetries) {
+        return response;
+      }
+    } catch (error) {
+      if (!isRetryableRequestError(error) || retries >= maxRetries) {
+        throw error;
+      }
+    }
+
+    waitForRetry(retryDelay);
   }
 };
 

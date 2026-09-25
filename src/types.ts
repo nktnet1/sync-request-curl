@@ -61,6 +61,9 @@ export interface Options {
   maxRedirects?: number;
   allowRedirectHeaders?: string[];
   gzip?: boolean;
+  retry?: boolean;
+  retryDelay?: number;
+  maxRetries?: number;
 
   /** Include request inputs in transport error messages. */
   debug?: boolean;
