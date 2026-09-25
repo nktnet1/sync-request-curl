@@ -1,12 +1,15 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { deflateSync, gzipSync } from "node:zlib";
+import type { HttpBindings } from "@hono/node-server";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import { streamText } from "hono/streaming";
 import * as v from "valibot";
 
-const app = new Hono();
+const app = new Hono<{ Bindings: HttpBindings }>();
+const connectionIds = new WeakMap<object, number>();
+let nextConnectionId = 1;
 const toArrayBuffer = (buffer: Buffer): ArrayBuffer => {
   const arrayBuffer = new ArrayBuffer(buffer.length);
   new Uint8Array(arrayBuffer).set(buffer);
@@ -29,6 +32,17 @@ app.use("*", logger());
 
 app.get("/", (c) => {
   return c.json({ message: "Hello, world!" });
+});
+
+app.get("/connection/id", (c) => {
+  const socket = c.env.incoming.socket;
+  let connectionId = connectionIds.get(socket);
+  if (connectionId === undefined) {
+    connectionId = nextConnectionId;
+    nextConnectionId += 1;
+    connectionIds.set(socket, connectionId);
+  }
+  return c.json({ connectionId });
 });
 
 app.get("/get", (c) => {

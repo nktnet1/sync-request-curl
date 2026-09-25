@@ -1,3 +1,4 @@
+import { Agent } from "node:http";
 import { URL } from "node:url";
 import * as v from "valibot";
 import { FormData } from "#/form-data";
@@ -41,6 +42,7 @@ const optionsObjectSchema = v.object({
   maxRedirects: v.optional(v.number()),
   allowRedirectHeaders: v.optional(v.array(v.string())),
   gzip: v.optional(v.boolean()),
+  agent: v.optional(v.union([v.literal(false), v.instance(Agent)])),
   retry: v.optional(v.boolean()),
   retryDelay: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),
   maxRetries: v.optional(

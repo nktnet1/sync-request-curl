@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_long, c_void};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use curl_sys::{
@@ -42,6 +44,9 @@ unsafe extern "C" {
 
 const CURLOPT_MIMEPOST: CURLoption = CURLOPTTYPE_OBJECTPOINT + 269;
 static CURL_INIT: OnceLock<CURLcode> = OnceLock::new();
+static CONNECTION_POOLS: OnceLock<Mutex<HashMap<i64, Arc<Mutex<MultiHandle>>>>> =
+  OnceLock::new();
+static NEXT_CONNECTION_POOL_ID: AtomicI64 = AtomicI64::new(1);
 #[cfg(all(unix, not(target_os = "macos")))]
 static CA_PROBE: OnceLock<openssl_probe::ProbeResult> = OnceLock::new();
 
@@ -86,6 +91,11 @@ impl Drop for EasyHandle {
 }
 
 struct MultiHandle(*mut CURLM);
+
+// A pool is never used concurrently: every transfer locks its MultiHandle.
+// libcurl permits moving handles between threads as long as only one thread
+// uses a handle at a time.
+unsafe impl Send for MultiHandle {}
 
 impl MultiHandle {
   fn new() -> std::result::Result<Self, CURLcode> {
@@ -166,6 +176,8 @@ pub struct NativeRequestOptions {
   pub socket_timeout: Option<i64>,
   #[napi(js_name = "noBody")]
   pub no_body: Option<bool>,
+  #[napi(js_name = "connectionPoolId")]
+  pub connection_pool_id: Option<i64>,
 }
 
 #[napi(object, object_from_js = false, use_nullable = true)]
@@ -182,6 +194,61 @@ pub struct NativeResponse {
   pub redirect_url: Option<String>,
   pub headers: Vec<String>,
   pub body: Buffer,
+}
+
+fn connection_pools() -> &'static Mutex<HashMap<i64, Arc<Mutex<MultiHandle>>>> {
+  CONNECTION_POOLS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn multi_error_message(code: CURLMcode) -> String {
+  let message = unsafe { curl_sys::curl_multi_strerror(code) };
+  if message.is_null() {
+    return format!("multi transport error {code}");
+  }
+  unsafe { CStr::from_ptr(message) }
+    .to_string_lossy()
+    .into_owned()
+}
+
+#[napi(js_name = "createConnectionPool")]
+pub fn create_connection_pool(max_connections: i64) -> Result<i64> {
+  ensure_curl_initialized()?;
+  if max_connections <= 0 {
+    return Err(Error::from_reason(
+      "Connection pool maxConnections must be greater than zero",
+    ));
+  }
+
+  let multi =
+    MultiHandle::new().map_err(|code| Error::from_reason(curl_error_message(code)))?;
+  let code = unsafe {
+    curl_sys::curl_multi_setopt(
+      multi.0,
+      curl_sys::CURLMOPT_MAXCONNECTS,
+      max_connections.min(i64::from(c_long::MAX)) as c_long,
+    )
+  };
+  if code != CURLM_OK {
+    return Err(Error::from_reason(multi_error_message(code)));
+  }
+
+  let pool_id = NEXT_CONNECTION_POOL_ID.fetch_add(1, Ordering::Relaxed);
+  let mut pools = connection_pools()
+    .lock()
+    .map_err(|_| Error::from_reason("Connection pool registry is unavailable"))?;
+  pools.insert(pool_id, Arc::new(Mutex::new(multi)));
+  Ok(pool_id)
+}
+
+#[napi(js_name = "releaseConnectionPool")]
+pub fn release_connection_pool(pool_id: i64) {
+  if let Ok(mut pools) = connection_pools().lock() {
+    pools.remove(&pool_id);
+  }
+}
+
+fn get_connection_pool(pool_id: i64) -> Option<Arc<Mutex<MultiHandle>>> {
+  connection_pools().lock().ok()?.get(&pool_id).cloned()
 }
 
 fn curl_string(value: &str) -> CString {
@@ -452,9 +519,9 @@ fn multi_timeout(multi: *mut CURLM) -> std::result::Result<Option<Duration>, CUR
 
 fn wait_for_multi(
   multi: *mut CURLM,
-  inactivity_remaining: Duration,
+  wait_limit: Duration,
 ) -> std::result::Result<bool, CURLcode> {
-  let timeout_ms = duration_to_wait_ms(inactivity_remaining);
+  let timeout_ms = duration_to_wait_ms(wait_limit);
   let started_at = Instant::now();
   let mut active_fds = 0;
   let code = unsafe {
@@ -476,8 +543,8 @@ fn wait_for_multi(
   // curl_multi_wait() is allowed to return immediately when libcurl has no
   // descriptors yet. Avoid a busy loop without hiding a newly due libcurl
   // timer or the caller's inactivity deadline behind a long sleep.
-  let inactivity_remaining = inactivity_remaining.saturating_sub(started_at.elapsed());
-  if inactivity_remaining.is_zero() {
+  let remaining_wait = wait_limit.saturating_sub(started_at.elapsed());
+  if remaining_wait.is_zero() {
     return Ok(false);
   }
 
@@ -486,7 +553,7 @@ fn wait_for_multi(
     return Ok(false);
   }
 
-  let mut sleep_for = inactivity_remaining.min(EMPTY_MULTI_WAIT_SLICE);
+  let mut sleep_for = remaining_wait.min(EMPTY_MULTI_WAIT_SLICE);
   if let Some(curl_remaining) = curl_remaining {
     sleep_for = sleep_for.min(curl_remaining);
   }
@@ -511,48 +578,45 @@ fn read_multi_result(multi: *mut CURLM, curl: *mut CURL) -> CURLcode {
   }
 }
 
-fn perform_with_socket_timeout(
+fn perform_with_multi(
   curl: *mut CURL,
+  multi: *mut CURLM,
   state: *mut RequestState,
   socket_timeout_ms: i64,
 ) -> CURLcode {
-  if socket_timeout_ms <= 0 {
-    return unsafe { curl_sys::curl_easy_perform(curl) };
-  }
-
-  let Ok(socket_timeout_ms) = u64::try_from(socket_timeout_ms) else {
-    return CURLE_FAILED_INIT;
+  let socket_timeout = if socket_timeout_ms > 0 {
+    let Ok(socket_timeout_ms) = u64::try_from(socket_timeout_ms) else {
+      return CURLE_FAILED_INIT;
+    };
+    Some(Duration::from_millis(socket_timeout_ms))
+  } else {
+    None
   };
-  let socket_timeout = Duration::from_millis(socket_timeout_ms);
   unsafe {
     (*state).last_activity = Instant::now();
   }
 
-  let multi = match MultiHandle::new() {
-    Ok(multi) => multi,
-    Err(code) => return code,
-  };
-  let add_code = unsafe { curl_sys::curl_multi_add_handle(multi.0, curl) };
+  let add_code = unsafe { curl_sys::curl_multi_add_handle(multi, curl) };
   if add_code != CURLM_OK {
     return multi_error_to_curl(add_code);
   }
 
   let result = (|| {
     let mut running_handles = 0;
-    let mut code = multi_perform(multi.0, &mut running_handles);
+    let mut code = multi_perform(multi, &mut running_handles);
     if code != CURLM_OK {
       return multi_error_to_curl(code);
     }
     while running_handles > 0 {
       let elapsed = unsafe { (*state).last_activity.elapsed() };
-      if elapsed >= socket_timeout {
+      if socket_timeout.is_some_and(|timeout| elapsed >= timeout) {
         return CURLE_OPERATION_TIMEDOUT;
       }
 
-      let socket_activity = match wait_for_multi(
-        multi.0,
-        socket_timeout.saturating_sub(elapsed),
-      ) {
+      let wait_limit = socket_timeout
+        .map(|timeout| timeout.saturating_sub(elapsed))
+        .unwrap_or(Duration::from_secs(1));
+      let socket_activity = match wait_for_multi(multi, wait_limit) {
         Ok(socket_activity) => socket_activity,
         Err(code) => return code,
       };
@@ -562,23 +626,52 @@ fn perform_with_socket_timeout(
         }
       }
 
-      if unsafe { (*state).last_activity.elapsed() } >= socket_timeout {
+      if socket_timeout.is_some_and(|timeout| unsafe {
+        (*state).last_activity.elapsed() >= timeout
+      }) {
         return CURLE_OPERATION_TIMEDOUT;
       }
 
-      code = multi_perform(multi.0, &mut running_handles);
+      code = multi_perform(multi, &mut running_handles);
       if code != CURLM_OK {
         return multi_error_to_curl(code);
       }
     }
 
-    read_multi_result(multi.0, curl)
+    read_multi_result(multi, curl)
   })();
 
   unsafe {
-    curl_sys::curl_multi_remove_handle(multi.0, curl);
+    curl_sys::curl_multi_remove_handle(multi, curl);
   }
   result
+}
+
+fn perform_request(
+  curl: *mut CURL,
+  state: *mut RequestState,
+  socket_timeout_ms: i64,
+  connection_pool_id: Option<i64>,
+) -> CURLcode {
+  if let Some(pool_id) = connection_pool_id {
+    let Some(pool) = get_connection_pool(pool_id) else {
+      return CURLE_FAILED_INIT;
+    };
+    let Ok(pool) = pool.lock() else {
+      return CURLE_FAILED_INIT;
+    };
+    return perform_with_multi(curl, pool.0, state, socket_timeout_ms);
+  }
+
+  if socket_timeout_ms <= 0 {
+    return unsafe { curl_sys::curl_easy_perform(curl) };
+  }
+
+  let multi = match MultiHandle::new() {
+    Ok(multi) => multi,
+    Err(code) => return code,
+  };
+  perform_with_multi(curl, multi.0, state, socket_timeout_ms)
 }
 
 fn get_string_info(curl: *mut CURL, info: curl_sys::CURLINFO) -> Option<String> {
@@ -711,10 +804,11 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   }
 
   if code == CURLE_OK {
-    code = perform_with_socket_timeout(
+    code = perform_request(
       curl,
       state_pointer.cast::<RequestState>(),
       options.socket_timeout.unwrap_or_default(),
+      options.connection_pool_id,
     );
   }
 

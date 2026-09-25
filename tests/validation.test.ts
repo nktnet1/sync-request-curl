@@ -1,3 +1,4 @@
+import { Agent } from "node:http";
 import { URL } from "node:url";
 import * as v from "valibot";
 import { describe, expect, expectTypeOf, test } from "vitest";
@@ -95,6 +96,7 @@ describe("runtime validation", () => {
         socketTimeout: 50,
         followRedirects: true,
         gzip: false,
+        agent: new Agent({ keepAlive: true }),
         retry: true,
         retryDelay: 200,
         maxRetries: 5,
@@ -108,6 +110,9 @@ describe("runtime validation", () => {
       v.safeParse(optionsSchema, { socketTimeout: Number.NaN }).success,
     ).toBe(false);
     expect(v.safeParse(optionsSchema, { gzip: "yes" }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { agent: false }).success).toBe(true);
+    expect(v.safeParse(optionsSchema, { agent: true }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { agent: {} }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { retry: "yes" }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { retryDelay: -1 }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { retryDelay: Number.NaN }).success).toBe(

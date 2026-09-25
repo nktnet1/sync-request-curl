@@ -22,6 +22,7 @@ export const nativeRequestOptionsSchema = v.object({
   timeout: v.number(),
   socketTimeout: v.number(),
   noBody: v.boolean(),
+  connectionPoolId: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
 });
 
 export type NativeRequestOptions = v.InferOutput<
@@ -49,6 +50,8 @@ export type NativeResponse = v.InferOutput<typeof nativeResponseSchema>;
 
 export interface NativeBinding {
   request(options: NativeRequestOptions): NativeResponse;
+  createConnectionPool(maxConnections: number): number;
+  releaseConnectionPool(poolId: number): void;
 }
 
 type NativeRequire = (path: string) => NativeBinding;
@@ -68,18 +71,30 @@ const moduleNotFoundErrorSchema = v.object({
   code: v.literal("MODULE_NOT_FOUND"),
 });
 
-const rawNativeBindingObjectSchema = v.object({ request: v.function() });
+const rawNativeBindingObjectSchema = v.object({
+  request: v.function(),
+  createConnectionPool: v.function(),
+  releaseConnectionPool: v.function(),
+});
 const rawNativeBindingSchema = v.custom<
   v.InferOutput<typeof rawNativeBindingObjectSchema>
 >(
   (input) => v.is(rawNativeBindingObjectSchema, input),
-  "Native addon must export request()",
+  "Native addon must export request(), createConnectionPool(), and releaseConnectionPool()",
 );
 const parseNativeBinding = (input: unknown): NativeBinding => {
   const binding = v.parse(rawNativeBindingSchema, input);
   return {
     request: (options) =>
       v.parse(nativeResponseSchema, binding.request(options)),
+    createConnectionPool: (maxConnections) =>
+      v.parse(
+        v.pipe(v.number(), v.integer(), v.minValue(1)),
+        binding.createConnectionPool(maxConnections),
+      ),
+    releaseConnectionPool: (poolId) => {
+      binding.releaseConnectionPool(poolId);
+    },
   };
 };
 

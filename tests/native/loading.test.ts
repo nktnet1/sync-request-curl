@@ -12,6 +12,8 @@ const fakeBinding = (): NativeBinding => ({
   request: vi.fn(() => {
     throw new Error("not used");
   }),
+  createConnectionPool: vi.fn(() => 1),
+  releaseConnectionPool: vi.fn(),
 });
 
 describe("native binding loading", () => {

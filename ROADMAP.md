@@ -35,7 +35,7 @@ layer.
       compatible defaults and retry conditions.
 - [x] Add `socketTimeout` as an inactivity timeout. Keep it distinct from the
       existing overall `timeout` deadline.
-- [ ] Resolve `agent` compatibility with real cross-request connection reuse;
+- [x] Resolve `agent` compatibility with real cross-request connection reuse;
       do not map it to TCP keepalive and call that equivalent.
 - [ ] Implement `cache: "file"` with correct HTTP cache semantics rather than
       a response-body-only disk cache.
@@ -67,6 +67,7 @@ Replace useful capabilities that were previously reachable through
 - [x] Cover retry count, delay, HTTP error retries, and transport error retries.
 - [x] Cover `socketTimeout` with streaming responses that both remain active
       and become inactive.
+- [x] Cover agent-scoped connection reuse and one-shot agent behaviour.
 - [ ] Cover file-cache freshness, validators, and cache bypass/revalidation.
 - [ ] Add built-package smoke tests for ESM and CommonJS exports.
 - [ ] Keep native loading/prebuild coverage for every supported platform key.

@@ -2,6 +2,7 @@ import { throwForTransportError } from "#/errors";
 import { decompressResponseBody } from "#/http/compression";
 import { parseResponseHeaders } from "#/http/headers";
 import native from "#/native/index";
+import { getAgentPoolId } from "#/request/agent";
 import { prepareRequest } from "#/request/prepare";
 import { createResponse } from "#/response";
 import type { Options, Response, UppercaseHttpVerb } from "#/types";
@@ -18,6 +19,7 @@ export const performRequest = (
 ): RequestResult => {
   const { url: requestUrl, headers, body, form } = prepareRequest(url, options);
 
+  const connectionPoolId = getAgentPoolId(options.agent);
   const result = native.request({
     method,
     url: requestUrl,
@@ -27,6 +29,7 @@ export const performRequest = (
     timeout: options.timeout ?? 0,
     socketTimeout: options.socketTimeout ?? 0,
     noBody: method === "HEAD",
+    ...(connectionPoolId === undefined ? {} : { connectionPoolId }),
   });
 
   throwForTransportError(result.transportCode, result.transportMessage, {
