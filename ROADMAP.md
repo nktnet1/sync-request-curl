@@ -69,8 +69,8 @@ Replace useful capabilities that were previously reachable through
 
 ## Tests
 
-- [ ] Port the applicable upstream `sync-request` Node.js tests into a focused
-      compatibility suite.
+- [x] Port the applicable upstream `sync-request` Node.js behaviours into a
+      focused public-API compatibility suite.
 - [x] Cover redirect-header allow-list behaviour for same-origin and
       cross-origin redirects.
 - [x] Cover compressed responses and `gzip: false`.
@@ -188,6 +188,10 @@ should be treated as the current baseline in future sessions:
   case-insensitive string HTTP methods (including extension verbs), restores
   the upstream `getBody()` status-error body/encoding text, and records the
   remaining `sync-request`/`then-request`/`http-basic` parity boundaries.
+- `v1.0.10-upstream-compatibility-suite.patch` adds a focused end-to-end
+  public-API suite for the applicable `sync-request` Node.js behaviours: basic
+  response shape, query appending, headers, string/Buffer/JSON bodies,
+  `request.FormData`, redirects, `getBody()` errors, and HEAD responses.
 
 
 Do not replace these behaviours with a response-body-only cache or move retry

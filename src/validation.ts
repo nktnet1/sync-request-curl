@@ -59,7 +59,7 @@ export const optionsSchema = v.custom<
 const httpMethodTokenSchema = v.pipe(
   v.string(),
   v.regex(
-    /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/,
+    /^[!#$%&'*+.^`|~\w-]+$/,
     "Expected a valid HTTP method token",
   ),
 );

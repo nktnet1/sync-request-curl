@@ -380,6 +380,20 @@ app.get("/compressed/:encoding", (c) => {
   return c.json({ error: "Unsupported compression encoding" }, 400);
 });
 
+app.all("/compat/echo", async (c) => {
+  const url = new URL(c.req.url);
+  const body = Buffer.from(await c.req.arrayBuffer());
+
+  return c.json({
+    method: c.req.method,
+    search: url.search,
+    contentType: c.req.header("content-type") ?? null,
+    customHeader: c.req.header("x-compat-value") ?? null,
+    body: body.toString("utf8"),
+    bodyHex: body.toString("hex"),
+  });
+});
+
 app.post("/upload", async (c) => {
   const body = await c.req.parseBody();
   const returnedBody = Object.entries(body)
