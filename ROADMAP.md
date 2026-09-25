@@ -199,6 +199,9 @@ should be treated as the current baseline in future sessions:
 - `v1.0.15-coverage-entry-validation.patch` excludes the packaging-only
   `src/index-esm.ts` re-export shim from source coverage (matching `src/index.ts`)
   and adds runtime coverage for uppercase HTTP method validation.
+- `v1.0.16-knip-native-deps-entry.patch` adds an explicit Knip entry for
+  `scripts/verify-native-deps.ts`, which is executed dynamically by the Linux
+  prebuild workflow and therefore is not discoverable as a static module edge.
 
 
 Do not replace these behaviours with a response-body-only cache or move retry
