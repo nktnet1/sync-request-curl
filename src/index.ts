@@ -1,5 +1,5 @@
 import { FormData } from "#/form-data";
-import request from "#/request";
+import request from "#/request/index";
 
 export type { FormDataEntry } from "#/form-data";
 export { FormData } from "#/form-data";

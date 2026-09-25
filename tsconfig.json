@@ -15,9 +15,7 @@
     "target": "es2022",
     "erasableSyntaxOnly": true,
     "paths": {
-      "#/*": ["./src/*"],
-      "#/native": ["./src/native/index.ts"],
-      "#/request": ["./src/request/index.ts"]
+      "#/*": ["./src/*"]
     }
   }
 }

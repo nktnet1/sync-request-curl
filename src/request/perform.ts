@@ -1,6 +1,6 @@
 import { throwForTransportError } from "#/errors";
 import { parseResponseHeaders } from "#/http/headers";
-import native from "#/native";
+import native from "#/native/index";
 import { prepareRequest } from "#/request/prepare";
 import { createResponse } from "#/response";
 import type { Options, Response, UppercaseHttpVerb } from "#/types";

@@ -4,7 +4,7 @@ const { nativeRequest } = vi.hoisted(() => ({
   nativeRequest: vi.fn(),
 }));
 
-vi.mock("#/native", () => ({
+vi.mock("#/native/index", () => ({
   default: {
     request: nativeRequest,
   },

@@ -6,7 +6,7 @@ import {
   loadFirstExisting,
   type NativeBinding,
   resolveOptionalNativePackage,
-} from "#/native";
+} from "#/native/index";
 
 const fakeBinding = (): NativeBinding => ({
   request: vi.fn(() => {

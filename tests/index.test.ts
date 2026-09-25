@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import request, { FormData } from "#/index";
-import requestImplementation from "#/request";
+import requestImplementation from "#/request/index";
 
 describe("public entrypoint", () => {
   test("exports the request implementation as default", () => {

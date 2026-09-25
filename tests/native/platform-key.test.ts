@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { getLinuxLibc, getPlatformKey } from "#/native";
+import { getLinuxLibc, getPlatformKey } from "#/native/index";
 import {
   getNativePackageName,
   isNativePlatformKey,

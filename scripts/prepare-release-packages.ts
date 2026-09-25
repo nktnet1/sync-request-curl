@@ -12,7 +12,7 @@ import {
   getNativePackageName,
   type NativePlatformKey,
   supportedPlatformKeys,
-} from "#native-platform-key";
+} from "#/native/platform-key";
 import { getPrebuildFilename } from "#scripts/native-platform";
 
 interface PackageJson {
