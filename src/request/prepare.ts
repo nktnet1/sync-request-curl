@@ -8,7 +8,7 @@ import {
 } from "#/http/headers";
 import { appendQueryString, normalizeUrlHostname } from "#/http/url";
 import type { NativeRequestOptions } from "#/native/index";
-import type { Options } from "#/types";
+import type { Options, UppercaseHttpVerb } from "#/types";
 
 export type PreparedRequest = Pick<
   NativeRequestOptions,
@@ -21,12 +21,19 @@ const jsonBodySchema = v.pipe(
 );
 
 const preparePayload = (
+  method: UppercaseHttpVerb,
   options: Options,
   headers: string[],
 ): Pick<PreparedRequest, "body" | "form"> => {
+  if (options.form) {
+    return { form: getFormDataEntries(options.form) };
+  }
+
   if (options.json !== undefined) {
     const body = v.parse(jsonBodySchema, options.json);
-    setRequestHeader(headers, "Content-Type", "application/json");
+    if (!hasRequestHeader(headers, "content-type")) {
+      setRequestHeader(headers, "Content-Type", "application/json");
+    }
     setContentLengthHeader(headers, Buffer.byteLength(body));
     return { body };
   }
@@ -40,11 +47,9 @@ const preparePayload = (
     return { body };
   }
 
-  if (options.form) {
-    return { form: getFormDataEntries(options.form) };
+  if (!["GET", "DELETE", "HEAD"].includes(method)) {
+    setContentLengthHeader(headers, 0);
   }
-
-  setContentLengthHeader(headers, 0);
   return {};
 };
 
@@ -56,6 +61,7 @@ const prepareUrl = (url: string, options: Options): string => {
 export const prepareRequest = (
   url: string,
   options: Options,
+  method: UppercaseHttpVerb = "POST",
 ): PreparedRequest => {
   const headers = serializeRequestHeaders(options.headers);
 
@@ -66,6 +72,6 @@ export const prepareRequest = (
   return {
     url: prepareUrl(url, options),
     headers,
-    ...preparePayload(options, headers),
+    ...preparePayload(method, options, headers),
   };
 };

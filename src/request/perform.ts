@@ -141,7 +141,7 @@ export const performRequest = (
   url: string,
   options: Options,
 ): RequestResult => {
-  const prepared = prepareRequest(url, options);
+  const prepared = prepareRequest(url, options, method);
   const requestTimestamp = options.cache ? Date.now() : 0;
   const cacheLookup = prepareCacheLookup(
     method,

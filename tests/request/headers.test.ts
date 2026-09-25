@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import request from "#/index";
+import { prepareRequest } from "#/request/prepare";
 import { SERVER_URL } from "#tests/app/config";
 import { wrapperRequest } from "#tests/request/helpers";
 
@@ -74,55 +75,68 @@ describe("Correctly set content-length", () => {
 });
 
 describe("Generated request headers", () => {
-  test("JSON headers replace conflicting caller headers", () => {
-    const json = { message: "hi" };
-    const res = request("POST", `${SERVER_URL}/request/headers`, {
-      json,
+  test("JSON headers preserve conflicting caller headers", () => {
+    const prepared = prepareRequest("https://example.com", {
+      json: { message: "hi" },
       headers: {
         "content-type": "text/plain",
         "Content-Length": "999",
       },
     });
 
-    expect(res.getJSON()).toStrictEqual({
-      contentType: "application/json",
-      contentLength: String(Buffer.byteLength(JSON.stringify(json))),
-      transferEncoding: null,
-    });
+    expect(prepared.headers).toEqual(
+      expect.arrayContaining([
+        "content-type: text/plain",
+        "Content-Length: 999",
+      ]),
+    );
   });
 
-  test("body content-length replaces a conflicting caller value", () => {
-    const body = "hello";
-    const res = request("POST", `${SERVER_URL}/request/headers`, {
-      body,
+  test("body content-length preserves a caller value", () => {
+    const prepared = prepareRequest("https://example.com", {
+      body: "hello",
       headers: { "content-length": "999" },
     });
 
-    expect(res.getJSON()).toMatchObject({
-      contentLength: String(Buffer.byteLength(body)),
-    });
+    expect(prepared.headers).toContain("content-length: 999");
   });
 
-  test("empty requests replace a conflicting caller content-length", () => {
-    const res = request("POST", `${SERVER_URL}/request/headers`, {
+  test("empty requests preserve a caller content-length", () => {
+    const prepared = prepareRequest("https://example.com", {
       headers: { "Content-Length": "999" },
     });
 
-    expect(res.getJSON()).toMatchObject({ contentLength: "0" });
+    expect(prepared.headers).toContain("Content-Length: 999");
   });
 
   test("transfer-encoding suppresses generated content-length", () => {
-    const res = request("POST", `${SERVER_URL}/request/headers`, {
+    const prepared = prepareRequest("https://example.com", {
       json: { message: "hi" },
+      headers: { "Transfer-Encoding": "chunked" },
+    });
+
+    expect(prepared.headers).toContain("Transfer-Encoding: chunked");
+    expect(
+      prepared.headers.some((header) =>
+        header.toLowerCase().startsWith("content-length"),
+      ),
+    ).toBe(false);
+  });
+
+  test("preserves an explicit content-length alongside transfer-encoding", () => {
+    const prepared = prepareRequest("https://example.com", {
+      body: "hello",
       headers: {
-        "Transfer-Encoding": "chunked",
         "Content-Length": "999",
+        "Transfer-Encoding": "chunked",
       },
     });
 
-    expect(res.getJSON()).toMatchObject({
-      contentLength: null,
-      transferEncoding: "chunked",
-    });
+    expect(prepared.headers).toEqual(
+      expect.arrayContaining([
+        "Content-Length: 999",
+        "Transfer-Encoding: chunked",
+      ]),
+    );
   });
 });

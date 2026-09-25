@@ -124,12 +124,13 @@ not all necessarily desirable behaviours to copy.
 
 - [ ] Accept `null` request options at runtime and normalise them to `{}`, as
       `then-request` does. The current Valibot boundary rejects `null`.
-- [ ] Decide whether to match upstream payload precedence and generated-header
-      behaviour. `then-request` resolves `form` before `json` before `body` and
-      only adds generated payload headers when the caller did not provide them;
-      the current implementation resolves `json` before `body` before `form`,
-      replaces generated `Content-Type`/`Content-Length`, and emits
-      `Content-Length: 0` for an otherwise empty request.
+- [x] Match upstream payload precedence and caller-header preservation where it
+      maps cleanly to the buffered API. Payload selection is `form` before
+      `json` before `body`; generated JSON `Content-Type` and payload
+      `Content-Length` only fill missing headers; and empty GET/DELETE/HEAD
+      requests no longer receive a generated `Content-Length: 0`. Empty
+      methods that upstream treats as body-capable still receive
+      `Content-Length: 0`.
 - [ ] Remove `content-encoding` from the exposed response headers after
       transparent gzip/deflate decompression so the headers describe the body
       actually returned to callers.
@@ -137,13 +138,19 @@ not all necessarily desirable behaviours to copy.
       `set-cookie` as an array, join `cookie` with `; `, join ordinary repeated
       headers with `, `, and apply Node's singleton-header duplicate rules.
 
-Intentional difference: do not reproduce `then-request`'s early rejection of a
-`body` on GET, DELETE, or HEAD. `sync-request-curl` allows request payloads to be
-passed through to libcurl for those methods and will document that behaviour as
-a Node-only v5 difference. Likewise, do not copy upstream implementation quirks
-such as treating `retryDelay: 0` as the default delay, treating
-`maxRetries: 0` as the default retry count, or lower-level stream/callback APIs
-that do not map cleanly to a synchronous buffered interface.
+Intentional differences: do not reproduce `then-request`'s early rejection of a
+`body` on GET, DELETE, or HEAD. `sync-request-curl` passes explicit request
+payloads through to libcurl for those methods, including the corresponding
+generated payload length when the caller did not provide one. Falsy JSON values
+(`false`, `0`, `""`, and `null`) also remain valid JSON payloads instead of
+copying `then-request`'s truthiness check. An explicit `Transfer-Encoding`
+suppresses generation of `Content-Length`, while an explicitly supplied
+`Content-Length` is preserved; this avoids manufacturing conflicting framing
+headers while still respecting caller-provided values. Likewise, do not copy
+upstream implementation quirks such as treating `retryDelay: 0` as the default
+delay, treating `maxRetries: 0` as the default retry count, or lower-level
+stream/callback APIs that do not map cleanly to a synchronous buffered
+interface.
 
 ## TypeDoc
 
@@ -272,7 +279,11 @@ should be treated as the current baseline in future sessions:
   failing redirected hop is retried without replaying earlier hops. It also
   records the remaining strict Node.js parity findings and the intentional
   GET/DELETE/HEAD request-body difference.
-
+- `v1.0.29-payload-header-parity.patch` aligns buffered payload precedence with
+  `then-request` (`form` before `json` before `body`), preserves caller-supplied
+  payload headers, avoids generating `Content-Length: 0` for empty
+  GET/DELETE/HEAD requests, and records the intentional request-body and framing
+  differences retained by the libcurl transport.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

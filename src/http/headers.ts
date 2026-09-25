@@ -65,8 +65,10 @@ export const setContentLengthHeader = (
   headers: string[],
   length: number,
 ): void => {
-  if (hasRequestHeader(headers, "transfer-encoding")) {
-    removeRequestHeader(headers, "content-length");
+  if (
+    hasRequestHeader(headers, "content-length") ||
+    hasRequestHeader(headers, "transfer-encoding")
+  ) {
     return;
   }
   setRequestHeader(headers, "Content-Length", length);
