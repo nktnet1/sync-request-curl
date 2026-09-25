@@ -3,6 +3,7 @@ import { deflateSync, gzipSync } from "node:zlib";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
+import { streamText } from "hono/streaming";
 import * as v from "valibot";
 
 const app = new Hono();
@@ -162,6 +163,25 @@ app.post("/timeout", async (c) => {
 
   return c.json({});
 });
+
+app.get("/socket-timeout/active", (c) =>
+  streamText(c, async (stream) => {
+    for (let index = 0; index < 6; index += 1) {
+      await stream.write(String(index));
+      if (index < 5) {
+        await stream.sleep(75);
+      }
+    }
+  }),
+);
+
+app.get("/socket-timeout/inactive", (c) =>
+  streamText(c, async (stream) => {
+    await stream.write("before");
+    await stream.sleep(450);
+    await stream.write("after");
+  }),
+);
 
 app.post("/text", (c) => {
   return c.text("Hello world!");

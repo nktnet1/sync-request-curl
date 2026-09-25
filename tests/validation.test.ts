@@ -28,6 +28,7 @@ describe("runtime validation", () => {
       v.safeParse(optionsSchema, {
         headers: { "x-test": ["one", "two"] },
         timeout: 100,
+        socketTimeout: 50,
         followRedirects: true,
         gzip: false,
         retry: true,
@@ -36,6 +37,12 @@ describe("runtime validation", () => {
       }).success,
     ).toBe(true);
     expect(v.safeParse(optionsSchema, { timeout: "fast" }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { socketTimeout: -1 }).success).toBe(
+      false,
+    );
+    expect(
+      v.safeParse(optionsSchema, { socketTimeout: Number.NaN }).success,
+    ).toBe(false);
     expect(v.safeParse(optionsSchema, { gzip: "yes" }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { retry: "yes" }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { retryDelay: -1 }).success).toBe(false);

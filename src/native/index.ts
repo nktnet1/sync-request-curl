@@ -19,6 +19,7 @@ export interface NativeRequestOptions {
   body?: string | Buffer;
   form?: FormDataEntry[];
   timeout: number;
+  socketTimeout: number;
   noBody: boolean;
 }
 

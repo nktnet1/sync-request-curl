@@ -1,12 +1,14 @@
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_long, c_void};
+use std::os::raw::{c_char, c_int, c_long, c_void};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 
 use curl_sys::{
-  curl_off_t, curl_slist, CURLcode, CURLoption, CURL, CURLE_OK, CURLE_OUT_OF_MEMORY,
-  CURLOPTTYPE_OBJECTPOINT,
+  curl_off_t, curl_slist, CURLcode, CURLoption, CURLMcode, CURL, CURLM,
+  CURLE_FAILED_INIT, CURLE_OK, CURLE_OPERATION_TIMEDOUT, CURLE_OUT_OF_MEMORY,
+  CURLM_CALL_MULTI_PERFORM, CURLM_OK, CURLM_OUT_OF_MEMORY, CURLOPTTYPE_OBJECTPOINT,
 };
 use napi::bindgen_prelude::{Buffer, Either};
 use napi::{Error, Result};
@@ -43,10 +45,26 @@ static CURL_INIT: OnceLock<CURLcode> = OnceLock::new();
 #[cfg(all(unix, not(target_os = "macos")))]
 static CA_PROBE: OnceLock<openssl_probe::ProbeResult> = OnceLock::new();
 
-#[derive(Default)]
 struct RequestState {
   body: Vec<u8>,
   headers: Vec<String>,
+  last_activity: Instant,
+}
+
+impl Default for RequestState {
+  fn default() -> Self {
+    Self {
+      body: Vec::new(),
+      headers: Vec::new(),
+      last_activity: Instant::now(),
+    }
+  }
+}
+
+impl RequestState {
+  fn mark_activity(&mut self) {
+    self.last_activity = Instant::now();
+  }
 }
 
 struct EasyHandle(*mut CURL);
@@ -64,6 +82,24 @@ impl EasyHandle {
 impl Drop for EasyHandle {
   fn drop(&mut self) {
     unsafe { curl_sys::curl_easy_cleanup(self.0) };
+  }
+}
+
+struct MultiHandle(*mut CURLM);
+
+impl MultiHandle {
+  fn new() -> std::result::Result<Self, CURLcode> {
+    let handle = unsafe { curl_sys::curl_multi_init() };
+    if handle.is_null() {
+      return Err(CURLE_OUT_OF_MEMORY);
+    }
+    Ok(Self(handle))
+  }
+}
+
+impl Drop for MultiHandle {
+  fn drop(&mut self) {
+    unsafe { curl_sys::curl_multi_cleanup(self.0) };
   }
 }
 
@@ -126,6 +162,8 @@ pub struct NativeRequestOptions {
   pub body: Option<Either<String, Buffer>>,
   pub form: Option<Vec<NativeFormDataEntry>>,
   pub timeout: Option<i64>,
+  #[napi(js_name = "socketTimeout")]
+  pub socket_timeout: Option<i64>,
   #[napi(js_name = "noBody")]
   pub no_body: Option<bool>,
 }
@@ -273,6 +311,7 @@ where
   catch_unwind(AssertUnwindSafe(|| unsafe {
     let state = &mut *userdata.cast::<RequestState>();
     let chunk = std::slice::from_raw_parts(data.cast::<u8>(), bytes);
+    state.mark_activity();
     handle_chunk(state, chunk);
     bytes
   }))
@@ -372,6 +411,174 @@ fn build_mime(
   }
 
   Ok(mime)
+}
+
+fn multi_error_to_curl(code: CURLMcode) -> CURLcode {
+  if code == CURLM_OUT_OF_MEMORY {
+    CURLE_OUT_OF_MEMORY
+  } else {
+    CURLE_FAILED_INIT
+  }
+}
+
+fn multi_perform(multi: *mut CURLM, running_handles: &mut c_int) -> CURLMcode {
+  loop {
+    let code = unsafe { curl_sys::curl_multi_perform(multi, running_handles) };
+    if code != CURLM_CALL_MULTI_PERFORM {
+      return code;
+    }
+  }
+}
+
+const EMPTY_MULTI_WAIT_SLICE: Duration = Duration::from_millis(10);
+
+fn duration_to_wait_ms(duration: Duration) -> c_int {
+  duration.as_millis().max(1).min(c_int::MAX as u128) as c_int
+}
+
+fn multi_timeout(multi: *mut CURLM) -> std::result::Result<Option<Duration>, CURLcode> {
+  let mut timeout_ms: c_long = -1;
+  let code = unsafe { curl_sys::curl_multi_timeout(multi, &mut timeout_ms) };
+  if code != CURLM_OK {
+    return Err(multi_error_to_curl(code));
+  }
+
+  if timeout_ms < 0 {
+    Ok(None)
+  } else {
+    Ok(Some(Duration::from_millis(timeout_ms as u64)))
+  }
+}
+
+fn wait_for_multi(
+  multi: *mut CURLM,
+  inactivity_remaining: Duration,
+) -> std::result::Result<bool, CURLcode> {
+  let timeout_ms = duration_to_wait_ms(inactivity_remaining);
+  let started_at = Instant::now();
+  let mut active_fds = 0;
+  let code = unsafe {
+    curl_sys::curl_multi_wait(
+      multi,
+      ptr::null_mut(),
+      0,
+      timeout_ms,
+      &mut active_fds,
+    )
+  };
+  if code != CURLM_OK {
+    return Err(multi_error_to_curl(code));
+  }
+  if active_fds > 0 {
+    return Ok(true);
+  }
+
+  // curl_multi_wait() is allowed to return immediately when libcurl has no
+  // descriptors yet. Avoid a busy loop without hiding a newly due libcurl
+  // timer or the caller's inactivity deadline behind a long sleep.
+  let inactivity_remaining = inactivity_remaining.saturating_sub(started_at.elapsed());
+  if inactivity_remaining.is_zero() {
+    return Ok(false);
+  }
+
+  let curl_remaining = multi_timeout(multi)?;
+  if curl_remaining == Some(Duration::ZERO) {
+    return Ok(false);
+  }
+
+  let mut sleep_for = inactivity_remaining.min(EMPTY_MULTI_WAIT_SLICE);
+  if let Some(curl_remaining) = curl_remaining {
+    sleep_for = sleep_for.min(curl_remaining);
+  }
+  if !sleep_for.is_zero() {
+    std::thread::sleep(sleep_for);
+  }
+  Ok(false)
+}
+
+fn read_multi_result(multi: *mut CURLM, curl: *mut CURL) -> CURLcode {
+  let mut queued_messages = 0;
+  loop {
+    let message = unsafe { curl_sys::curl_multi_info_read(multi, &mut queued_messages) };
+    if message.is_null() {
+      return CURLE_FAILED_INIT;
+    }
+
+    let message = unsafe { &*message };
+    if message.msg == curl_sys::CURLMSG_DONE && message.easy_handle == curl {
+      return message.data as CURLcode;
+    }
+  }
+}
+
+fn perform_with_socket_timeout(
+  curl: *mut CURL,
+  state: *mut RequestState,
+  socket_timeout_ms: i64,
+) -> CURLcode {
+  if socket_timeout_ms <= 0 {
+    return unsafe { curl_sys::curl_easy_perform(curl) };
+  }
+
+  let Ok(socket_timeout_ms) = u64::try_from(socket_timeout_ms) else {
+    return CURLE_FAILED_INIT;
+  };
+  let socket_timeout = Duration::from_millis(socket_timeout_ms);
+  unsafe {
+    (*state).last_activity = Instant::now();
+  }
+
+  let multi = match MultiHandle::new() {
+    Ok(multi) => multi,
+    Err(code) => return code,
+  };
+  let add_code = unsafe { curl_sys::curl_multi_add_handle(multi.0, curl) };
+  if add_code != CURLM_OK {
+    return multi_error_to_curl(add_code);
+  }
+
+  let result = (|| {
+    let mut running_handles = 0;
+    let mut code = multi_perform(multi.0, &mut running_handles);
+    if code != CURLM_OK {
+      return multi_error_to_curl(code);
+    }
+    while running_handles > 0 {
+      let elapsed = unsafe { (*state).last_activity.elapsed() };
+      if elapsed >= socket_timeout {
+        return CURLE_OPERATION_TIMEDOUT;
+      }
+
+      let socket_activity = match wait_for_multi(
+        multi.0,
+        socket_timeout.saturating_sub(elapsed),
+      ) {
+        Ok(socket_activity) => socket_activity,
+        Err(code) => return code,
+      };
+      if socket_activity {
+        unsafe {
+          (*state).mark_activity();
+        }
+      }
+
+      if unsafe { (*state).last_activity.elapsed() } >= socket_timeout {
+        return CURLE_OPERATION_TIMEDOUT;
+      }
+
+      code = multi_perform(multi.0, &mut running_handles);
+      if code != CURLM_OK {
+        return multi_error_to_curl(code);
+      }
+    }
+
+    read_multi_result(multi.0, curl)
+  })();
+
+  unsafe {
+    curl_sys::curl_multi_remove_handle(multi.0, curl);
+  }
+  result
 }
 
 fn get_string_info(curl: *mut CURL, info: curl_sys::CURLINFO) -> Option<String> {
@@ -504,7 +711,11 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   }
 
   if code == CURLE_OK {
-    code = unsafe { curl_sys::curl_easy_perform(curl) };
+    code = perform_with_socket_timeout(
+      curl,
+      state_pointer.cast::<RequestState>(),
+      options.socket_timeout.unwrap_or_default(),
+    );
   }
 
   let mut status_code: c_long = 0;

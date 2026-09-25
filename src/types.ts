@@ -57,6 +57,7 @@ export interface Options {
   form?: FormData;
 
   timeout?: number;
+  socketTimeout?: number;
   followRedirects?: boolean;
   maxRedirects?: number;
   allowRedirectHeaders?: string[];

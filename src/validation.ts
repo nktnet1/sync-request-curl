@@ -25,6 +25,9 @@ export const optionsSchema = v.custom<Options>(
         body: v.optional(v.union([v.string(), v.instance(Buffer)])),
         form: v.optional(v.instance(FormData)),
         timeout: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),
+        socketTimeout: v.optional(
+          v.pipe(v.number(), v.finite(), v.minValue(0)),
+        ),
         followRedirects: v.optional(v.boolean()),
         maxRedirects: v.optional(v.number()),
         allowRedirectHeaders: v.optional(v.array(v.string())),

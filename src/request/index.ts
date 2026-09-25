@@ -38,7 +38,8 @@ const performRequestAttempt = (
   originalOptions: Options,
 ): Response => {
   if (originalOptions.followRedirects === false) {
-    return performRequest(originalMethod, originalUrl, originalOptions).response;
+    return performRequest(originalMethod, originalUrl, originalOptions)
+      .response;
   }
 
   const startedAt = Date.now();

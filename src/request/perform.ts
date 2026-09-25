@@ -25,6 +25,7 @@ export const performRequest = (
     ...(body === undefined ? {} : { body }),
     ...(form === undefined ? {} : { form }),
     timeout: options.timeout ?? 0,
+    socketTimeout: options.socketTimeout ?? 0,
     noBody: method === "HEAD",
   });
 

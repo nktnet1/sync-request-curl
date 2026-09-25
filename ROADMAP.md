@@ -33,7 +33,7 @@ layer.
       and an explicit opt-out.
 - [x] Add `retry`, `retryDelay`, and `maxRetries` with `sync-request`
       compatible defaults and retry conditions.
-- [ ] Add `socketTimeout` as an inactivity timeout. Keep it distinct from the
+- [x] Add `socketTimeout` as an inactivity timeout. Keep it distinct from the
       existing overall `timeout` deadline.
 - [ ] Resolve `agent` compatibility with real cross-request connection reuse;
       do not map it to TCP keepalive and call that equivalent.
@@ -65,7 +65,7 @@ Replace useful capabilities that were previously reachable through
       cross-origin redirects.
 - [x] Cover compressed responses and `gzip: false`.
 - [x] Cover retry count, delay, HTTP error retries, and transport error retries.
-- [ ] Cover `socketTimeout` with streaming responses that both remain active
+- [x] Cover `socketTimeout` with streaming responses that both remain active
       and become inactive.
 - [ ] Cover file-cache freshness, validators, and cache bypass/revalidation.
 - [ ] Add built-package smoke tests for ESM and CommonJS exports.
