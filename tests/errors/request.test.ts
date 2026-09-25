@@ -1,11 +1,7 @@
 import { describe, expect, test } from "vitest";
-import request from "../src";
-import {
-  RequestError,
-  ResponseError,
-  throwForTransportError,
-} from "../src/errors";
-import { SERVER_URL } from "./app/config";
+import { RequestError, throwForTransportError } from "#/errors";
+import request from "#/index";
+import { SERVER_URL } from "../app/config";
 
 const expectRequestError = (
   requestWrapped: () => void,
@@ -87,33 +83,5 @@ describe("request transport errors", () => {
         }),
       expectedCode,
     );
-  });
-});
-
-describe("response errors", () => {
-  test("getBody() exposes the 401 response", () => {
-    const res = request("DELETE", `${SERVER_URL}/delete`, {
-      headers: { value: "header" },
-    });
-
-    expect(res.statusCode).toBe(401);
-    expect(() => res.getBody()).toThrow(ResponseError);
-
-    try {
-      res.getBody();
-    } catch (error) {
-      expect(error).toBeInstanceOf(ResponseError);
-      expect(error).toMatchObject({
-        statusCode: 401,
-        headers: res.headers,
-        body: res.body,
-      });
-    }
-  });
-
-  test("getBody() throws for a 404 response", () => {
-    const res = request("DELETE", `${SERVER_URL}/unknown`);
-    expect(res.statusCode).toBe(404);
-    expect(() => res.getBody()).toThrow(ResponseError);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import request, { type HttpVerb } from "../src";
+import request, { type HttpVerb } from "#/index";
 import { SERVER_URL } from "./app/config";
 
 describe.each([
