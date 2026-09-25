@@ -143,6 +143,11 @@ not all necessarily desirable behaviours to copy.
       an array even when only one value is present, join repeated `cookie`
       values with `; `, join ordinary repeated headers with `, `, and keep the
       first value for Node's singleton-header set.
+- [x] Match Node's outbound request-header validation inherited by
+      `http-basic`: validate names as HTTP tokens, reject invalid/control
+      characters in values (including every repeated value), and reject
+      `undefined` header values instead of silently dropping them. Valid empty
+      values, horizontal tabs, and token punctuation remain supported.
 
 Intentional differences: do not reproduce `then-request`'s early rejection of a
 `body` on GET, DELETE, or HEAD. `sync-request-curl` passes explicit request
@@ -318,6 +323,11 @@ should be treated as the current baseline in future sessions:
   extension work end-to-end: explicit body, JSON, and multipart payloads are
   transmitted while the native transport still completes after the final HEAD
   response headers and returns an empty response body.
+- `v1.0.34-node-request-header-validation.patch` matches the outbound header
+  validation that `then-request` inherits from Node through `http-basic`, using
+  Node's public validators for request-header names and values before libcurl
+  serialization. Invalid names, CR/LF/control characters, invalid repeated
+  values, and `undefined` values now fail with Node-compatible errors.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

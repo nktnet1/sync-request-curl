@@ -6,6 +6,15 @@ import {
   serializeRequestHeaders,
 } from "#/http/headers";
 
+const captureError = (callback: () => void): NodeJS.ErrnoException => {
+  try {
+    callback();
+  } catch (error) {
+    return error as NodeJS.ErrnoException;
+  }
+  throw new Error("Expected callback to throw");
+};
+
 describe("parseResponseHeaders", () => {
   test("folds repeated response headers like Node", () => {
     const headers = parseResponseHeaders([
@@ -95,14 +104,56 @@ describe("parseResponseHeaders", () => {
     expect(headers["x-final"]).toBe("second");
   });
 
-  test("serializes arrays, empty values, and skips undefined headers", () => {
+  test("serializes arrays and empty values", () => {
     expect(
       serializeRequestHeaders({
         "x-list": ["first", "second"],
         "x-empty": "",
-        "x-omitted": undefined,
       }),
     ).toStrictEqual(["x-list: first", "x-list: second", "x-empty;"]);
+  });
+
+  test("rejects invalid request header names like Node", () => {
+    const error = captureError(() =>
+      serializeRequestHeaders({ "Bad Header": "value" }),
+    );
+
+    expect(error.code).toBe("ERR_INVALID_HTTP_TOKEN");
+  });
+
+  test.each(["hello\r\nInjected: yes", "hello\nworld", "hello\0world"])(
+    "rejects invalid request header values like Node: %j",
+    (value) => {
+      const error = captureError(() =>
+        serializeRequestHeaders({ "X-Test": value }),
+      );
+
+      expect(error.code).toBe("ERR_INVALID_CHAR");
+    },
+  );
+
+  test("validates every request header array item", () => {
+    const error = captureError(() =>
+      serializeRequestHeaders({ "X-Test": ["valid", "bad\r\nvalue"] }),
+    );
+
+    expect(error.code).toBe("ERR_INVALID_CHAR");
+  });
+
+  test("rejects undefined request header values like Node", () => {
+    const error = captureError(() =>
+      serializeRequestHeaders({ "X-Test": undefined }),
+    );
+
+    expect(error.code).toBe("ERR_HTTP_INVALID_HEADER_VALUE");
+  });
+
+  test("accepts valid HTTP token punctuation and horizontal tabs", () => {
+    expect(
+      serializeRequestHeaders({
+        "!#$%&'*+-.^_`|~Token": "hello\tworld",
+      }),
+    ).toStrictEqual(["!#$%&'*+-.^_`|~Token: hello\tworld"]);
   });
 
   test("parses request header line formats through the shared parser", () => {

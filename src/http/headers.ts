@@ -1,3 +1,4 @@
+import { validateHeaderName, validateHeaderValue } from "node:http";
 import * as v from "valibot";
 import type { Options, Response } from "#/types";
 import { incomingHttpHeadersSchema } from "#/validation";
@@ -87,13 +88,15 @@ export const serializeRequestHeaders = (
 
   const serialized: string[] = [];
   for (const [name, value] of Object.entries(headers)) {
-    if (value === undefined) {
-      continue;
-    }
+    validateHeaderName(name);
 
     const values = Array.isArray(value) ? value : [value];
     for (const item of values) {
-      serialized.push(item === "" ? `${name};` : `${name}: ${item}`);
+      // IncomingHttpHeaders permits undefined, but Node rejects it outbound.
+      validateHeaderValue(name, item as string);
+      if (item !== undefined) {
+        serialized.push(item === "" ? `${name};` : `${name}: ${item}`);
+      }
     }
   }
   return serialized;

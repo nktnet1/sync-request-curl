@@ -60,6 +60,28 @@ describe("sync-request Node.js compatibility", () => {
     );
   });
 
+  test("inherits Node outbound header validation", () => {
+    let nameError: NodeJS.ErrnoException | undefined;
+    try {
+      request("GET", `${SERVER_URL}/compat/echo`, {
+        headers: { "Bad Header": "value" },
+      });
+    } catch (error) {
+      nameError = error as NodeJS.ErrnoException;
+    }
+    expect(nameError?.code).toBe("ERR_INVALID_HTTP_TOKEN");
+
+    let valueError: NodeJS.ErrnoException | undefined;
+    try {
+      request("GET", `${SERVER_URL}/compat/echo`, {
+        headers: { "X-Test": "hello\r\nInjected: yes" },
+      });
+    } catch (error) {
+      valueError = error as NodeJS.ErrnoException;
+    }
+    expect(valueError?.code).toBe("ERR_INVALID_CHAR");
+  });
+
   test("passes caller headers and string bodies unchanged", () => {
     const response = request("POST", `${SERVER_URL}/compat/echo`, {
       headers: {
