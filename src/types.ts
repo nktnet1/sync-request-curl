@@ -1,5 +1,7 @@
 import type * as v from "valibot";
-import { FormData } from "#/form-data";
+
+export { FormData } from "#/form-data";
+
 import type {
   bufferEncodingSchema,
   httpVerbInputSchema,
@@ -10,7 +12,6 @@ import type {
 } from "#/validation";
 
 export type { FormDataEntry } from "#/form-data";
-export { FormData };
 
 /**
  * Values accepted for JSON request bodies.
