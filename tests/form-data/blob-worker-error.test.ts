@@ -12,7 +12,7 @@ vi.mock("node:worker_threads", () => ({
       Atomics.notify(state, 0);
     }
 
-    unref(): void {}
+    unref = vi.fn();
   },
 }));
 

@@ -9,6 +9,7 @@ engines:
       - "scripts/**"
       - "src/native/**"
       - "src/types.ts"
+      - "src/internal/blob-reader-worker.ts"
   eslint-9:
     exclude_paths:
       - "scripts/**"
