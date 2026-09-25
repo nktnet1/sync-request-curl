@@ -5,7 +5,11 @@ export default defineConfig({
     globalSetup: ["./tests/globalSetup.ts"],
     coverage: {
       include: ["src/**/*.ts"],
-      exclude: ["src/index.ts", "src/types.ts"],
+      exclude: [
+        "src/index.ts",
+        "src/types.ts",
+        "src/internal/blob-reader-worker.ts",
+      ],
     },
   },
 });

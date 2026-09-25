@@ -22,4 +22,6 @@ const main = async (): Promise<void> => {
   }
 };
 
-void main();
+main()
+  .then(() => process.exit())
+  .catch(() => process.exit(1));
