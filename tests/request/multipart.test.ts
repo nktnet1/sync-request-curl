@@ -1,3 +1,4 @@
+import { Blob } from "node:buffer";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
@@ -27,6 +28,31 @@ describe("multipart/form-data", () => {
         },
       },
       { name: "2-test-contents", content: "Example Content!" },
+    ]);
+  });
+
+  test("uploads Blob fields with filename and content type", () => {
+    const contents = "Blob upload contents";
+    const form = new FormData();
+    form.append(
+      "blob-upload",
+      new Blob([contents], { type: "text/x-sync-request-curl" }),
+      "blob-upload.txt",
+    );
+
+    const res = request("POST", `${SERVER_URL}/upload`, { form });
+
+    expect(res.statusCode).toStrictEqual(200);
+    expect(res.getJSON()).toStrictEqual([
+      {
+        name: "blob-upload",
+        file: {
+          name: "blob-upload.txt",
+          size: Buffer.byteLength(contents),
+          type: "text/x-sync-request-curl",
+          lastModified: expect.any(Number),
+        },
+      },
     ]);
   });
 });

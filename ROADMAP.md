@@ -39,7 +39,7 @@ layer.
       do not map it to TCP keepalive and call that equivalent.
 - [x] Implement `cache: "file"` with correct HTTP cache semantics rather than
       a response-body-only disk cache.
-- [ ] Add `Blob` multipart values where they can be supported synchronously
+- [x] Add `Blob` multipart values where they can be supported synchronously
       without depending on private runtime internals.
 - [ ] Verify CommonJS compatibility for `request.FormData` in the built
       package, in addition to the named ESM export.
@@ -133,6 +133,10 @@ should be treated as the current baseline in future sessions:
 - `v1.0.6-cache-vary-length-coverage.patch` explicitly covers the `Vary`
   request-header vector length-mismatch path, ensuring cache entries do not
   match when a repeated varied request header changes the number of values.
+- `v1.0.7-blob-multipart.patch` accepts Node `Blob`/`File` multipart values,
+  materialises their bytes synchronously through public worker-thread APIs,
+  preserves filename and MIME metadata without relying on private Blob internals,
+  and smoke-tests Blob append on the Node 16 runtime floor.
 
 
 Do not replace these behaviours with a response-body-only cache or move retry

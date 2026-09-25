@@ -1,3 +1,4 @@
+import type { Blob } from "node:buffer";
 import { Agent } from "node:http";
 import { URL } from "node:url";
 import * as v from "valibot";
@@ -39,6 +40,9 @@ describe("schema-derived types", () => {
   test("keeps public data types tied to their schemas", () => {
     expectTypeOf<FormDataEntry>().toEqualTypeOf<
       v.InferOutput<typeof formDataEntrySchema>
+    >();
+    expectTypeOf<FormDataEntry["value"]>().toEqualTypeOf<
+      string | Buffer | Blob
     >();
     expectTypeOf<JsonLike>().toEqualTypeOf<
       v.InferOutput<typeof jsonLikeSchema>

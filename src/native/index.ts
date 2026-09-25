@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as v from "valibot";
-import { formDataEntrySchema } from "#/form-data";
+import { preparedFormDataEntrySchema } from "#/form-data";
 import {
   getLinuxLibcFromReport,
   getNativePackageName,
@@ -18,7 +18,7 @@ export const nativeRequestOptionsSchema = v.object({
   url: v.string(),
   headers: v.array(v.string()),
   body: v.optional(v.union([v.string(), v.instance(Buffer)])),
-  form: v.optional(v.array(formDataEntrySchema)),
+  form: v.optional(v.array(preparedFormDataEntrySchema)),
   timeout: v.number(),
   socketTimeout: v.number(),
   noBody: v.boolean(),

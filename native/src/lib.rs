@@ -40,6 +40,7 @@ unsafe extern "C" {
     data_size: usize,
   ) -> CURLcode;
   fn curl_mime_filename(part: *mut CurlMimePart, filename: *const c_char) -> CURLcode;
+  fn curl_mime_type(part: *mut CurlMimePart, mimetype: *const c_char) -> CURLcode;
 }
 
 const CURLOPT_MIMEPOST: CURLoption = CURLOPTTYPE_OBJECTPOINT + 269;
@@ -162,6 +163,8 @@ pub struct NativeFormDataEntry {
   pub value: Either<String, Buffer>,
   #[napi(js_name = "fileName")]
   pub file_name: Option<String>,
+  #[napi(js_name = "contentType")]
+  pub content_type: Option<String>,
 }
 
 #[napi(object, object_to_js = false)]
@@ -466,6 +469,22 @@ fn build_mime(
         .expect("just pushed MIME filename")
         .as_ptr();
       code = unsafe { curl_mime_filename(part, file_name) };
+      if code != CURLE_OK {
+        return Err(code);
+      }
+    }
+
+    if let Some(content_type) = field
+      .content_type
+      .as_deref()
+      .filter(|value| !value.is_empty())
+    {
+      keepalive.push(curl_string(content_type));
+      let content_type = keepalive
+        .last()
+        .expect("just pushed MIME content type")
+        .as_ptr();
+      code = unsafe { curl_mime_type(part, content_type) };
       if code != CURLE_OK {
         return Err(code);
       }
