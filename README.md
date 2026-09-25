@@ -334,26 +334,30 @@ JSON.stringify({
 In [src/types.ts](src/types.ts), the `Options` interface following is defined as:
 
 ```typescript
+export type JsonLike =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | readonly JsonLike[]
+  | { [key: string]: JsonLike }
+  | { toJSON(): JsonLike };
+
 export interface Options {
   headers?: IncomingHttpHeaders;
-  qs?: { [key: string]: any };
+  qs?: Record<string, unknown>;
 
-  // You should only specify one of these.
-  // They are processed in the order listed below.
-  //
-  // When no json, body or formdata is provided, Content-Length = 0
-  // will be set in the headers.
-  json?: any;
+  // Request payloads are mutually exclusive and resolved in this order.
+  json?: JsonLike;
   body?: string | Buffer;
-  formData?: HttpPostField[];
+  form?: FormData;
 
   timeout?: number;
   followRedirects?: boolean;
   maxRedirects?: number;
-
-  insecure?: boolean;
+  allowRedirectHeaders?: string[];
   debug?: boolean;
-  setEasyOptions?: SetEasyOptionCallback;
 }
 ```
 

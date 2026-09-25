@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import request from "#/index";
-import { SERVER_URL } from "../app/config";
-import { wrapperRequest } from "./helpers";
+import { SERVER_URL } from "#tests/app/config";
+import { wrapperRequest } from "#tests/request/helpers";
 
 describe("Headers", () => {
   test("DELETE request with headers, code 401", () => {

@@ -15,7 +15,8 @@
     "target": "es2022",
     "erasableSyntaxOnly": true,
     "paths": {
-      "#/*": ["./src/*"]
+      "#/*": ["./src/*"],
+      "#tests/*": ["./tests/*"]
     }
   }
 }

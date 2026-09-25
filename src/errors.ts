@@ -1,12 +1,23 @@
 import type { IncomingHttpHeaders } from "node:http";
+import * as v from "valibot";
 import type { HttpVerb, Options } from "#/types";
 
-export type RequestErrorCode =
-  | "ERR_INVALID_URL"
-  | "ENOTFOUND"
-  | "ETIMEDOUT"
-  | "ERR_TOO_MANY_REDIRECTS"
-  | "ERR_REQUEST_FAILED";
+const requestErrorCodeSchema = v.picklist([
+  "ERR_INVALID_URL",
+  "ENOTFOUND",
+  "ETIMEDOUT",
+  "ERR_TOO_MANY_REDIRECTS",
+  "ERR_REQUEST_FAILED",
+] as const);
+
+export type RequestErrorCode = v.InferOutput<typeof requestErrorCodeSchema>;
+
+const curlErrorCodeSchema = v.pipe(
+  v.number(),
+  v.integer(),
+  v.minValue(1),
+  v.maxValue(101),
+);
 
 export class CurlError extends Error {
   // https://curl.se/libcurl/c/libcurl-errors.html
@@ -14,7 +25,8 @@ export class CurlError extends Error {
 
   constructor(code: number, message: string) {
     super(message);
-    if (code < 1 || code > 101) {
+    const parsedCode = v.safeParse(curlErrorCodeSchema, code);
+    if (!parsedCode.success) {
       throw new Error(`
         CurlError code must be between 1 and 101. Given: ${code}.
 
@@ -22,7 +34,7 @@ export class CurlError extends Error {
           - https://curl.se/libcurl/c/libcurl-errors.html
       `);
     }
-    this.code = code;
+    this.code = parsedCode.output;
     Object.setPrototypeOf(this, CurlError.prototype);
   }
 }
@@ -44,7 +56,7 @@ export class RequestError extends Error {
       });
     }
     this.name = "RequestError";
-    this.code = code;
+    this.code = v.parse(requestErrorCodeSchema, code);
   }
 }
 

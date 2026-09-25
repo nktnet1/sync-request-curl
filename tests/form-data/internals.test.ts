@@ -1,16 +1,20 @@
+import * as v from "valibot";
 import { describe, expect, test } from "vitest";
 import { FormData, getFormDataEntries } from "#/form-data";
 
+const detachedFormData = (): FormData =>
+  v.parse(v.instance(FormData), Object.create(FormData.prototype));
+
 describe("FormData internals", () => {
-  test("rejects values that are not library FormData instances", () => {
-    expect(() => getFormDataEntries({} as FormData)).toThrow(
+  test("rejects objects that did not run the FormData constructor", () => {
+    expect(() => getFormDataEntries(detachedFormData())).toThrow(
       "Expected a FormData instance created by sync-request-curl",
     );
   });
 
-  test("rejects append calls with an invalid receiver", () => {
+  test("append rejects an invalid receiver", () => {
     expect(() =>
-      FormData.prototype.append.call({} as FormData, "field", "value"),
+      FormData.prototype.append.call(detachedFormData(), "field", "value"),
     ).toThrow("Expected a FormData instance created by sync-request-curl");
   });
 });

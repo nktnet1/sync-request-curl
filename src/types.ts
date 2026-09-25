@@ -4,8 +4,21 @@ import { FormData } from "#/form-data";
 export type { FormDataEntry } from "#/form-data";
 export { FormData };
 
-// biome-ignore lint/suspicious/noExplicitAny: matches sync-request's JSON input/output type
-export type CustomJsonType = any;
+type JsonPrimitive = string | number | boolean | null;
+
+/**
+ * Values accepted for JSON request bodies.
+ *
+ * This intentionally follows practical `JSON.stringify()` inputs rather than
+ * only strict JSON syntax. `undefined` is allowed in nested structures, and
+ * objects with `toJSON()` (for example `Date`) are supported.
+ */
+export type JsonLike =
+  | JsonPrimitive
+  | undefined
+  | readonly JsonLike[]
+  | { [key: string]: JsonLike }
+  | { toJSON(): JsonLike };
 
 export type UppercaseHttpVerb =
   | "GET"
@@ -35,10 +48,10 @@ export type BufferEncoding =
 
 export interface Options {
   headers?: IncomingHttpHeaders;
-  qs?: Record<string, CustomJsonType>;
+  qs?: Record<string, unknown>;
 
   // Request payloads are mutually exclusive and resolved in this order.
-  json?: CustomJsonType;
+  json?: JsonLike;
   body?: string | Buffer;
   form?: FormData;
 
@@ -56,7 +69,7 @@ export type GetBody = {
   (encoding?: undefined): Buffer;
 };
 
-export type GetJSON = <T = CustomJsonType>(encoding?: BufferEncoding) => T;
+export type GetJSON = <T = unknown>(encoding?: BufferEncoding) => T;
 
 export interface Response {
   statusCode: number;

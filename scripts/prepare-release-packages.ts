@@ -8,6 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
+import * as v from "valibot";
 import {
   getNativePackageName,
   type NativePlatformKey,
@@ -15,16 +16,15 @@ import {
 } from "#/native/platform-key";
 import { getPrebuildFilename } from "#scripts/native-platform";
 
-interface PackageJson {
-  name: string;
-  version: string;
-  description?: string;
-  repository?: unknown;
-  license?: string;
-  author?: unknown;
-  engines?: Record<string, string>;
-  [key: string]: unknown;
-}
+const packageJsonSchema = v.looseObject({
+  name: v.string(),
+  version: v.string(),
+  description: v.optional(v.string()),
+  repository: v.optional(v.unknown()),
+  license: v.optional(v.string()),
+  author: v.optional(v.unknown()),
+  engines: v.optional(v.record(v.string(), v.string())),
+});
 
 interface NativeTarget {
   os: NodeJS.Platform;
@@ -48,9 +48,10 @@ const releaseRoot = join(root, ".release");
 const mainOutput = join(releaseRoot, "main");
 const nativeOutput = join(releaseRoot, "native");
 const prebuilds = join(root, "prebuilds");
-const packageJson = JSON.parse(
-  readFileSync(join(root, "package.json"), "utf8"),
-) as PackageJson;
+const packageJson = v.parse(
+  packageJsonSchema,
+  JSON.parse(readFileSync(join(root, "package.json"), "utf8")),
+);
 
 const writeJson = (path: string, value: unknown): void => {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
@@ -73,11 +74,11 @@ const prepareMainPackage = (): void => {
   cpSync(join(root, "README.md"), join(mainOutput, "README.md"));
   copyCommonFiles(mainOutput);
 
-  const manifest = {
+  const manifest: Record<string, unknown> = {
     ...packageJson,
     files: ["dist"],
     optionalDependencies,
-  } as Record<string, unknown>;
+  };
 
   delete manifest.devDependencies;
   delete manifest.imports;

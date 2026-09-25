@@ -66,6 +66,18 @@ describe("normalizeUrlHostname", () => {
 });
 
 describe("appendQueryString", () => {
+  test.each([null, "invalid"])(
+    "rejects non-object top-level query values: %j",
+    (query) => {
+      expect(() =>
+        Reflect.apply(appendQueryString, undefined, [
+          "https://example.com/path",
+          query,
+        ]),
+      ).toThrow("Expected a plain object");
+    },
+  );
+
   test("serializes nested objects and arrays with bracket notation", () => {
     const url = appendQueryString("https://example.com/path?existing=1", {
       filter: {
@@ -122,7 +134,7 @@ describe("appendQueryString", () => {
   });
 
   test("skips nested undefined values and supports bigint values", () => {
-    const nullPrototype = Object.create(null) as Record<string, unknown>;
+    const nullPrototype: Record<string, unknown> = Object.create(null);
     nullPrototype.value = "kept";
 
     const url = appendQueryString("https://example.com/path", {

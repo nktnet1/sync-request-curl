@@ -3,7 +3,8 @@
   "type": "module",
   "imports": {
     "#/*": "./src/*.ts",
-    "#scripts/*": "./scripts/*.ts"
+    "#scripts/*": "./scripts/*.ts",
+    "#tests/*": "./tests/*.ts"
   },
   "repository": {
     "type": "git",
@@ -51,6 +52,9 @@
   "author": "Khiet Tam Nguyen",
   "license": "MIT",
   "description": "Fast synchronous HTTP requests for Node.js using an in-process Node-API binding to libcurl.",
+  "dependencies": {
+    "valibot": "^1.5.0"
+  },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
     "@hono/node-server": "^2.1.1",

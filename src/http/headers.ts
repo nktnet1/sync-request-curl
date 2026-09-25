@@ -1,4 +1,6 @@
 import type { IncomingHttpHeaders } from "node:http";
+import * as v from "valibot";
+import { incomingHttpHeadersSchema } from "#/validation";
 
 const getHeaderName = (header: string): string => {
   const colonIndex = header.indexOf(":");
@@ -160,5 +162,5 @@ export const parseResponseHeaders = (
     }
   }
 
-  return Object.fromEntries(parsedHeaders) as IncomingHttpHeaders;
+  return v.parse(incomingHttpHeadersSchema, Object.fromEntries(parsedHeaders));
 };

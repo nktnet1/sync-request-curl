@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import request from "#/index";
-import { SERVER_URL } from "../app/config";
-import { wrapperRequest } from "./helpers";
+import { SERVER_URL } from "#tests/app/config";
+import { wrapperRequest } from "#tests/request/helpers";
 
 describe("Redirects", () => {
   test("No redirect", () => {
@@ -87,17 +87,20 @@ describe("Redirects", () => {
     });
   });
 
-  test.each([Number.NaN, -1])(
-    "treats maxRedirects=%s as unbounded",
-    (maxRedirects) => {
-      const res = wrapperRequest("GET", SERVER_URL, { maxRedirects });
+  test("rejects maxRedirects=NaN", () => {
+    expect(() =>
+      wrapperRequest("GET", SERVER_URL, { maxRedirects: Number.NaN }),
+    ).toThrow("Invalid request options");
+  });
 
-      expect(res).toMatchObject({
-        code: 200,
-        json: { message: "Hello, world!" },
-      });
-    },
-  );
+  test("treats negative maxRedirects as unbounded", () => {
+    const res = wrapperRequest("GET", SERVER_URL, { maxRedirects: -1 });
+
+    expect(res).toMatchObject({
+      code: 200,
+      json: { message: "Hello, world!" },
+    });
+  });
 
   test("Final url returned not redirected", () => {
     const res = wrapperRequest("GET", `${SERVER_URL}/redirect/source`, {

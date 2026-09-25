@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { describe, expect, test } from "vitest";
-import { SERVER_URL } from "../app/config";
-import { wrapperRequest } from "./helpers";
+import { SERVER_URL } from "#tests/app/config";
+import { wrapperRequest } from "#tests/request/helpers";
 
 describe("Sending a buffer", () => {
   const body = fs.readFileSync("./tests/data/length-165.dmp");

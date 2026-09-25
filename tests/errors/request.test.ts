@@ -1,21 +1,20 @@
+import * as v from "valibot";
 import { describe, expect, test } from "vitest";
 import { CurlError, RequestError, throwForTransportError } from "#/errors";
 import request from "#/index";
-import { SERVER_URL } from "../app/config";
+import { SERVER_URL } from "#tests/app/config";
 
-const expectCurlError = (
-  requestWrapped: () => void,
-  code: CurlError["code"],
-): void => {
-  let error: unknown;
+const captureCurlError = (requestWrapped: () => void): CurlError => {
   try {
     requestWrapped();
-  } catch (caught) {
-    error = caught;
+  } catch (error) {
+    return v.parse(v.instance(CurlError), error);
   }
+  throw new Error("Expected request to throw CurlError");
+};
 
-  expect(error).toBeInstanceOf(CurlError);
-  expect((error as CurlError).code).toStrictEqual(code);
+const expectCurlError = (requestWrapped: () => void, code: number): void => {
+  expect(captureCurlError(requestWrapped).code).toStrictEqual(code);
 };
 
 describe("request transport errors", () => {
@@ -46,34 +45,26 @@ describe("request transport errors", () => {
   });
 
   test("request inputs are hidden by default", () => {
-    let error: unknown;
-    try {
-      request("GET", "", { headers: { authorization: "secret-token" } });
-    } catch (caught) {
-      error = caught;
-    }
+    const error = captureCurlError(() =>
+      request("GET", "", { headers: { authorization: "secret-token" } }),
+    );
 
-    expect(error).toBeInstanceOf(CurlError);
-    expect((error as CurlError).code).toBe(3);
-    expect((error as Error).message).not.toContain("secret-token");
-    expect((error as Error).message).not.toContain("DEBUG:");
+    expect(error.code).toBe(3);
+    expect(error.message).not.toContain("secret-token");
+    expect(error.message).not.toContain("DEBUG:");
   });
 
   test("request inputs are included when debug is enabled", () => {
-    let error: unknown;
-    try {
+    const error = captureCurlError(() =>
       request("GET", "", {
         debug: true,
         headers: { authorization: "secret-token" },
-      });
-    } catch (caught) {
-      error = caught;
-    }
+      }),
+    );
 
-    expect(error).toBeInstanceOf(CurlError);
-    expect((error as CurlError).code).toBe(3);
-    expect((error as Error).message).toContain("secret-token");
-    expect((error as Error).message).toContain("DEBUG:");
+    expect(error.code).toBe(3);
+    expect(error.message).toContain("secret-token");
+    expect(error.message).toContain("DEBUG:");
   });
 
   test("non-existent server", () => {

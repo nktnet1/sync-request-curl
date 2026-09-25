@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { ResponseError } from "#/errors";
 import request from "#/index";
-import { SERVER_URL } from "../app/config";
+import { SERVER_URL } from "#tests/app/config";
 
 describe("response errors", () => {
   test("getBody() exposes the 401 response", () => {

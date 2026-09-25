@@ -1,12 +1,20 @@
+import * as v from "valibot";
+
 export interface FormDataEntry {
   key: string;
   value: string | Buffer;
   fileName?: string;
 }
 
+const formDataEntrySchema = v.object({
+  key: v.string(),
+  value: v.union([v.string(), v.instance(Buffer)]),
+  fileName: v.optional(v.string()),
+});
 const entries = new WeakMap<FormData, FormDataEntry[]>();
 
 const getEntries = (form: FormData): FormDataEntry[] => {
+  v.parse(v.instance(FormData), form);
   const formEntries = entries.get(form);
   if (!formEntries) {
     throw new TypeError(
@@ -25,7 +33,8 @@ export class FormData {
   }
 
   append(key: string, value: string | Buffer, fileName?: string): void {
-    getEntries(this).push({ key, value, fileName });
+    const entry = v.parse(formDataEntrySchema, { key, value, fileName });
+    getEntries(this).push(entry);
   }
 }
 

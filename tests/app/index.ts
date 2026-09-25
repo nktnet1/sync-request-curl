@@ -2,8 +2,21 @@ import { setTimeout as delay } from "node:timers/promises";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
+import * as v from "valibot";
 
 const app = new Hono();
+const valueBodySchema = v.object({ value: v.optional(v.unknown()) });
+const decimalIntegerSchema = v.pipe(
+  v.string(),
+  v.regex(/^\d+$/),
+  v.transform(Number),
+  v.number(),
+  v.integer(),
+);
+const timeoutBodySchema = v.object({
+  timeout: v.pipe(v.number(), v.finite(), v.minValue(0)),
+});
+const abortErrorSchema = v.object({ name: v.literal("AbortError") });
 
 app.use("*", logger());
 
@@ -28,7 +41,7 @@ app.delete("/delete", (c) => {
 });
 
 app.post("/post", async (c) => {
-  const body = await c.req.json();
+  const body = v.parse(valueBodySchema, await c.req.json());
   const value = body.value;
   if (value === "post") {
     throw new HTTPException(400, { message: "Cannot post 'post'!" });
@@ -41,7 +54,7 @@ app.post("/json/echo", async (c) => {
 });
 
 app.put("/put", async (c) => {
-  const body = await c.req.json();
+  const body = v.parse(valueBodySchema, await c.req.json());
   const value = body.value;
   if (value === "put") {
     throw new HTTPException(403, { message: "Cannot put 'put'!" });
@@ -50,9 +63,9 @@ app.put("/put", async (c) => {
 });
 
 app.get("/redirect/source", (c) => {
-  const redirectNumber = Number.parseInt(
+  const redirectNumber = v.parse(
+    decimalIntegerSchema,
     c.req.query("redirectNumber") ?? "0",
-    10,
   );
   return redirectNumber > 0
     ? c.redirect(`/redirect/source?redirectNumber=${redirectNumber - 1}`, 302)
@@ -110,9 +123,9 @@ app.get("/redirect/headers/destination", (c) => {
 });
 
 app.post("/content/length", async (c) => {
-  const contentLength = Number.parseInt(
+  const contentLength = v.parse(
+    decimalIntegerSchema,
     c.req.header("content-length") ?? "0",
-    10,
   );
   const buffer = await c.req.arrayBuffer();
   return c.json({
@@ -131,12 +144,12 @@ app.post("/request/headers", async (c) => {
 });
 
 app.post("/timeout", async (c) => {
-  const body = await c.req.json();
+  const body = v.parse(timeoutBodySchema, await c.req.json());
 
   try {
     await delay(body.timeout, undefined, { signal: c.req.raw.signal });
   } catch (error) {
-    if (!(error instanceof Error && error.name === "AbortError")) {
+    if (!v.is(abortErrorSchema, error)) {
       throw error;
     }
   }

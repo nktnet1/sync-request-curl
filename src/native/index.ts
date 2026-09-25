@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as v from "valibot";
 import type { FormDataEntry } from "#/form-data";
 import {
   getNativePackageName,
@@ -38,10 +39,6 @@ type NativeRequire = (path: string) => NativeBinding;
 type NativeResolve = (request: string) => string;
 type FileExists = (path: string) => boolean;
 
-interface ProcessReport {
-  header?: { glibcVersionRuntime?: string };
-}
-
 export interface NativeLoadOptions {
   explicitPath?: string;
   platformKey?: NativePlatformKey;
@@ -51,8 +48,54 @@ export interface NativeLoadOptions {
   resolveNative?: NativeResolve;
 }
 
+const processReportSchema = v.object({
+  header: v.optional(
+    v.object({
+      glibcVersionRuntime: v.optional(v.string()),
+    }),
+  ),
+});
+
+const moduleNotFoundErrorSchema = v.object({
+  code: v.literal("MODULE_NOT_FOUND"),
+});
+
+interface RawNativeBinding {
+  request(options: NativeRequestOptions): unknown;
+}
+
+const rawNativeBindingSchema = v.custom<RawNativeBinding>(
+  (input) => v.is(v.object({ request: v.function() }), input),
+  "Native addon must export request()",
+);
+const nativeResponseSchema = v.custom<NativeResponse>(
+  (input) =>
+    v.is(
+      v.object({
+        transportCode: v.pipe(v.number(), v.integer()),
+        transportMessage: v.string(),
+        statusCode: v.pipe(v.number(), v.integer()),
+        effectiveUrl: v.nullable(v.string()),
+        redirectUrl: v.nullable(v.string()),
+        headers: v.array(v.string()),
+        body: v.instance(Buffer),
+      }),
+      input,
+    ),
+  "Native addon returned an invalid response",
+);
+
+const parseNativeBinding = (input: unknown): NativeBinding => {
+  const binding = v.parse(rawNativeBindingSchema, input);
+  return {
+    request: (options) =>
+      v.parse(nativeResponseSchema, binding.request(options)),
+  };
+};
+
 const moduleRequire = createRequire(import.meta.url);
-const nativeRequire = moduleRequire as NativeRequire;
+const nativeRequire: NativeRequire = (path) =>
+  parseNativeBinding(moduleRequire(path));
 const nativeResolve = moduleRequire.resolve.bind(moduleRequire);
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
 
@@ -79,8 +122,13 @@ export const findPackageRoot = (
 };
 
 export const getLinuxLibc = (
-  report = process.report?.getReport() as ProcessReport | undefined,
-): LinuxLibc => (report?.header?.glibcVersionRuntime ? "gnu" : "musl");
+  report: unknown = process.report?.getReport(),
+): LinuxLibc => {
+  const parsedReport = v.safeParse(processReportSchema, report);
+  return parsedReport.success && parsedReport.output.header?.glibcVersionRuntime
+    ? "gnu"
+    : "musl";
+};
 
 export const getPlatformKey = (
   platform: NodeJS.Platform = process.platform,
@@ -117,11 +165,7 @@ export const resolveOptionalNativePackage = (
   try {
     return resolveNative(packageName);
   } catch (error) {
-    if (
-      error instanceof Error &&
-      "code" in error &&
-      error.code === "MODULE_NOT_FOUND"
-    ) {
+    if (v.is(moduleNotFoundErrorSchema, error)) {
       return undefined;
     }
     throw error;

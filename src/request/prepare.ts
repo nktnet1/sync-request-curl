@@ -1,3 +1,4 @@
+import * as v from "valibot";
 import { type FormDataEntry, getFormDataEntries } from "#/form-data";
 import {
   serializeRequestHeaders,
@@ -14,15 +15,17 @@ export interface PreparedRequest {
   form?: FormDataEntry[];
 }
 
+const jsonBodySchema = v.pipe(
+  v.unknown(),
+  v.stringifyJson(undefined, "The json option must be JSON-serializable"),
+);
+
 const preparePayload = (
   options: Options,
   headers: string[],
 ): Pick<PreparedRequest, "body" | "form"> => {
   if (options.json !== undefined) {
-    const body = JSON.stringify(options.json);
-    if (body === undefined) {
-      throw new TypeError("The json option must be JSON-serializable");
-    }
+    const body = v.parse(jsonBodySchema, options.json);
     setRequestHeader(headers, "Content-Type", "application/json");
     setContentLengthHeader(headers, Buffer.byteLength(body));
     return { body };

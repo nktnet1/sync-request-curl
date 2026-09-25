@@ -1,6 +1,8 @@
 import type { IncomingHttpHeaders } from "node:http";
+import * as v from "valibot";
 import { RequestError } from "#/errors";
 import type { Options, UppercaseHttpVerb } from "#/types";
+import { incomingHttpHeadersSchema } from "#/validation";
 
 export const getRedirectMethod = (
   method: UppercaseHttpVerb,
@@ -37,7 +39,7 @@ const getRedirectHeaders = (
     allowedNames.has(name.toLowerCase()),
   );
   return entries.length > 0
-    ? (Object.fromEntries(entries) as IncomingHttpHeaders)
+    ? v.parse(incomingHttpHeadersSchema, Object.fromEntries(entries))
     : undefined;
 };
 

@@ -1,4 +1,5 @@
 import { domainToASCII, URL, type URLSearchParams } from "node:url";
+import * as v from "valibot";
 
 const hasNonAscii = (value: string): boolean => {
   for (let i = 0; i < value.length; i += 1) {
@@ -108,10 +109,13 @@ export const normalizeUrlHostname = (url: string): string => {
   return `${prefix}${userInfo}${asciiHostname}${port}${remainder}`;
 };
 
-const isPlainObject = (value: object): value is Record<string, unknown> => {
-  const prototype = Object.getPrototypeOf(value);
+const plainObjectSchema = v.custom<Record<string, unknown>>((input) => {
+  if (typeof input !== "object" || input === null) {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(input);
   return prototype === Object.prototype || prototype === null;
-};
+}, "Expected a plain object");
 
 const deleteQueryValue = (searchParams: URLSearchParams, key: string): void => {
   const keysToDelete = new Set<string>();
@@ -175,7 +179,7 @@ const appendQueryValue = (
       return;
     }
 
-    if (!isPlainObject(value)) {
+    if (!v.is(plainObjectSchema, value)) {
       throw new TypeError(`Unsupported query-string object for "${key}"`);
     }
 
@@ -197,8 +201,9 @@ export const appendQueryString = (
   query: Record<string, unknown>,
 ): string => {
   const parsed = new URL(url);
+  const parsedQuery = v.parse(plainObjectSchema, query);
 
-  for (const [key, value] of Object.entries(query)) {
+  for (const [key, value] of Object.entries(parsedQuery)) {
     if (value === undefined) {
       continue;
     }

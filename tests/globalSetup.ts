@@ -2,13 +2,15 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { once } from "node:events";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { HOST as host, PORT as port } from "./app/config";
+import * as v from "valibot";
+import { HOST as host, PORT as port } from "#tests/app/config";
 
 const root = resolve(import.meta.dirname, "..");
 const serverUrl = `http://${host}:${port}`;
 const SERVER_READY_MESSAGE = "sync-request-curl:test-server-ready";
 const SERVER_START_TIMEOUT_MS = 5_000;
 const SERVER_STOP_TIMEOUT_MS = 5_000;
+const healthResponseSchema = v.object({ message: v.optional(v.string()) });
 
 let testServer: ChildProcess | undefined;
 
@@ -18,7 +20,7 @@ const isServerReady = async (): Promise<boolean> => {
     if (!response.ok) {
       return false;
     }
-    const body = (await response.json()) as { message?: string };
+    const body = v.parse(healthResponseSchema, await response.json());
     return body.message === "Hello, world!";
   } catch {
     return false;

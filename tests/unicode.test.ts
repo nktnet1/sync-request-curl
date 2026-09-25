@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import request from "#/index";
-import { SERVER_URL } from "./app/config";
+import { SERVER_URL } from "#tests/app/config";
 
 describe.each([
   "😂",

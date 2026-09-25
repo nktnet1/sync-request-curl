@@ -1,4 +1,5 @@
 import { URL } from "node:url";
+import * as v from "valibot";
 import { RequestError } from "#/errors";
 import { performRequest } from "#/request/perform";
 import {
@@ -7,9 +8,10 @@ import {
   getRemainingTimeout,
 } from "#/request/redirects";
 import type { HttpVerb, Options, Response, UppercaseHttpVerb } from "#/types";
+import { httpVerbSchema, optionsSchema, requestUrlSchema } from "#/validation";
 
 const normalizeMethod = (method: HttpVerb): UppercaseHttpVerb =>
-  method.toUpperCase() as UppercaseHttpVerb;
+  v.parse(httpVerbSchema, method);
 
 const getRedirectLimit = (maxRedirects: number | undefined): number => {
   if (
@@ -28,23 +30,25 @@ const request = (
   options: Options = {},
 ): Response => {
   const originalMethod = normalizeMethod(method);
-  const originalUrl = typeof url === "string" ? url : url.href;
+  const originalUrl = v.parse(requestUrlSchema, url);
+  const originalOptions = v.parse(optionsSchema, options);
 
-  if (options.followRedirects === false) {
-    return performRequest(originalMethod, originalUrl, options).response;
+  if (originalOptions.followRedirects === false) {
+    return performRequest(originalMethod, originalUrl, originalOptions)
+      .response;
   }
 
   const startedAt = Date.now();
-  const redirectLimit = getRedirectLimit(options.maxRedirects);
+  const redirectLimit = getRedirectLimit(originalOptions.maxRedirects);
   let currentMethod = originalMethod;
   let currentUrl = originalUrl;
-  let currentOptions = options;
+  let currentOptions = originalOptions;
 
   for (let redirectsFollowed = 0; ; redirectsFollowed += 1) {
-    if (options.timeout && options.timeout > 0) {
+    if (originalOptions.timeout && originalOptions.timeout > 0) {
       currentOptions = {
         ...currentOptions,
-        timeout: getRemainingTimeout(options.timeout, startedAt),
+        timeout: getRemainingTimeout(originalOptions.timeout, startedAt),
       };
     }
 

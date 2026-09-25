@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, test } from "vitest";
 import request from "#/index";
 import { FormData } from "#/types";
-import { SERVER_URL } from "../app/config";
+import { SERVER_URL } from "#tests/app/config";
 
 describe("multipart/form-data", () => {
   test("uploads buffer and text fields with FormData", () => {

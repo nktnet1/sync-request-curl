@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
-import app from ".";
-import { HOST, PORT, SERVER_URL } from "./config";
+import { HOST, PORT, SERVER_URL } from "#tests/app/config";
+import app from "#tests/app/index";
 
 const server = serve(
   {

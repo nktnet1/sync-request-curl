@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import request from "#/index";
-import { SERVER_URL } from "../app/config";
-import { wrapperRequest } from "./helpers";
+import { SERVER_URL } from "#tests/app/config";
+import { wrapperRequest } from "#tests/request/helpers";
 
 describe("POST Requests", () => {
   test.each([false, 0, "", null])("POST request with falsy JSON %j", (json) => {
