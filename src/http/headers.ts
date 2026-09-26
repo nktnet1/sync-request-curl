@@ -1,5 +1,6 @@
 import { validateHeaderName, validateHeaderValue } from "node:http";
 import * as v from "valibot";
+import { RequestError } from "#/errors";
 import type { Options, Response } from "#/types";
 import { incomingHttpHeadersSchema } from "#/validation";
 
@@ -163,7 +164,6 @@ const findFinalStatusLineIndex = (headerLines: string[]): number => {
 const singletonResponseHeaders = new Set([
   "age",
   "authorization",
-  "content-length",
   "content-type",
   "etag",
   "expires",
@@ -180,6 +180,82 @@ const singletonResponseHeaders = new Set([
   "server",
   "user-agent",
 ]);
+
+const invalidResponseFraming = (message: string): never => {
+  throw new RequestError(
+    "ERR_REQUEST_FAILED",
+    `Request failed: Invalid response framing: ${message}`,
+  );
+};
+
+const normalizeContentLengthValue = (value: string): string => {
+  if (value.length === 0) {
+    invalidResponseFraming("invalid Content-Length");
+  }
+
+  for (const character of value) {
+    if (!isAsciiDigit(character)) {
+      invalidResponseFraming("invalid Content-Length");
+    }
+  }
+
+  const normalized = value.replace(/^0+(?=\d)/, "");
+  return normalized;
+};
+
+const validateAndNormalizeContentLength = (
+  values: string[],
+): string | undefined => {
+  if (values.length === 0) {
+    return undefined;
+  }
+
+  const candidates = values.flatMap((value) => value.split(","));
+  const first = candidates[0]?.trim() ?? "";
+  const normalizedFirst = normalizeContentLengthValue(first);
+
+  for (const candidate of candidates.slice(1)) {
+    const trimmed = candidate.trim();
+    if (normalizeContentLengthValue(trimmed) !== normalizedFirst) {
+      invalidResponseFraming("conflicting Content-Length values");
+    }
+  }
+
+  return first;
+};
+
+export const throwForResponseFramingTransportError = (
+  transportCode: number,
+  transportMessage: string,
+  headerLines: string[],
+): void => {
+  if (
+    transportCode !== 8 ||
+    !transportMessage.includes("Invalid Content-Length")
+  ) {
+    return;
+  }
+
+  const finalStatusLineIndex = findFinalStatusLineIndex(headerLines);
+  const finalHeaderLines =
+    finalStatusLineIndex >= 0
+      ? headerLines.slice(finalStatusLineIndex + 1)
+      : headerLines;
+  const capturedContentLength = finalHeaderLines.some((header) => {
+    const separatorIndex = header.indexOf(":");
+    return (
+      separatorIndex > 0 &&
+      header.slice(0, separatorIndex).trim().toLowerCase() ===
+        "content-length"
+    );
+  });
+
+  invalidResponseFraming(
+    capturedContentLength
+      ? "conflicting Content-Length values"
+      : "invalid Content-Length",
+  );
+};
 
 const appendResponseHeader = (
   parsedHeaders: Map<string, string | string[]>,
@@ -219,6 +295,8 @@ export const parseResponseHeaders = (
       ? headerLines.slice(finalStatusLineIndex + 1)
       : headerLines;
   const parsedHeaders = new Map<string, string | string[]>();
+  const contentLengthValues: string[] = [];
+  let hasTransferEncoding = false;
 
   for (const header of finalHeaderLines) {
     const separatorIndex = header.indexOf(":");
@@ -228,7 +306,24 @@ export const parseResponseHeaders = (
 
     const name = header.slice(0, separatorIndex).trim().toLowerCase();
     const value = header.slice(separatorIndex + 1).trim();
+    if (name === "content-length") {
+      contentLengthValues.push(value);
+      continue;
+    }
+    if (name === "transfer-encoding") {
+      hasTransferEncoding = true;
+    }
     appendResponseHeader(parsedHeaders, name, value);
+  }
+
+  const contentLength = validateAndNormalizeContentLength(contentLengthValues);
+  if (contentLength !== undefined) {
+    if (hasTransferEncoding) {
+      invalidResponseFraming(
+        "Content-Length cannot be combined with Transfer-Encoding",
+      );
+    }
+    parsedHeaders.set("content-length", contentLength);
   }
 
   return v.parse(incomingHttpHeadersSchema, Object.fromEntries(parsedHeaders));

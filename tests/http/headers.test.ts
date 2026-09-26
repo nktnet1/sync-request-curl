@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { RequestError } from "#/errors";
 import {
   hasRequestHeader,
   parseRequestHeaderLine,
@@ -54,7 +55,6 @@ describe("parseResponseHeaders", () => {
   test.for([
     "age",
     "authorization",
-    "content-length",
     "content-type",
     "etag",
     "expires",
@@ -74,6 +74,84 @@ describe("parseResponseHeaders", () => {
     const headers = parseResponseHeaders([`${name}: first`, `${name}: second`]);
 
     expect(headers[name]).toBe("first");
+  });
+
+  test("normalizes identical repeated content-length fields", () => {
+    const headers = parseResponseHeaders([
+      "HTTP/1.1 200 OK",
+      "Content-Length: 5",
+      "Content-Length: 5",
+      "",
+    ]);
+
+    expect(headers["content-length"]).toBe("5");
+  });
+
+  test("normalizes identical comma-separated content-length values", () => {
+    const headers = parseResponseHeaders([
+      "HTTP/1.1 200 OK",
+      "Content-Length: 005, 5",
+      "",
+    ]);
+
+    expect(headers["content-length"]).toBe("005");
+  });
+
+  test.each([
+    ["repeated fields", ["Content-Length: 5", "Content-Length: 6"]],
+    ["comma-separated values", ["Content-Length: 5, 6"]],
+  ])("rejects conflicting content-length %s", (_description, values) => {
+    expect(() =>
+      parseResponseHeaders(["HTTP/1.1 200 OK", ...values, ""]),
+    ).toThrowError(
+      new RequestError(
+        "ERR_REQUEST_FAILED",
+        "Request failed: Invalid response framing: conflicting Content-Length values",
+      ),
+    );
+  });
+
+  test.each(["", "-1", "+1", "1x", "1 1", "1,,1"])(
+    "rejects invalid content-length value %j",
+    (value) => {
+      expect(() =>
+        parseResponseHeaders([
+          "HTTP/1.1 200 OK",
+          `Content-Length: ${value}`,
+          "",
+        ]),
+      ).toThrow(RequestError);
+    },
+  );
+
+  test("rejects content-length combined with transfer-encoding", () => {
+    expect(() =>
+      parseResponseHeaders([
+        "HTTP/1.1 200 OK",
+        "Content-Length: 5",
+        "Transfer-Encoding: chunked",
+        "",
+      ]),
+    ).toThrowError(
+      new RequestError(
+        "ERR_REQUEST_FAILED",
+        "Request failed: Invalid response framing: Content-Length cannot be combined with Transfer-Encoding",
+      ),
+    );
+  });
+
+  test("ignores invalid framing from an intermediate response block", () => {
+    const headers = parseResponseHeaders([
+      "HTTP/1.1 100 Continue",
+      "Content-Length: 1",
+      "Content-Length: 2",
+      "",
+      "HTTP/1.1 200 OK",
+      "Content-Length: 5",
+      "",
+    ]);
+
+    expect(headers["content-length"]).toBe("5");
   });
 
   test("parses header lines without a status line", () => {

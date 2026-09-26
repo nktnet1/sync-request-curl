@@ -85,6 +85,77 @@ describe("single request execution", () => {
       expect.objectContaining({ timeout: 900, socketTimeout: 125 }),
     );
   });
+
+  test("surfaces captured framing errors before libcurl parser errors", () => {
+    nativeRequest.mockReturnValueOnce(
+      nativeResponse({
+        transportCode: 8,
+        transportMessage: "Weird server reply",
+        headers: [
+          "HTTP/1.1 200 OK",
+          "Content-Length: 5",
+          "Content-Length: 6",
+          "",
+        ],
+        body: Buffer.alloc(0),
+      }),
+    );
+
+    expect(() =>
+      performRequest("GET", "https://example.com/path", {}),
+    ).toThrow(
+      "Request failed: Invalid response framing: conflicting Content-Length values",
+    );
+  });
+
+  test("maps libcurl Content-Length parser failures using captured framing context", () => {
+    nativeRequest.mockReturnValueOnce(
+      nativeResponse({
+        transportCode: 8,
+        transportMessage: "Invalid Content-Length: value",
+        headers: ["HTTP/1.1 200 OK", "Content-Length: 5"],
+        body: Buffer.alloc(0),
+      }),
+    );
+
+    expect(() =>
+      performRequest("GET", "https://example.com/path", {}),
+    ).toThrow(
+      "Request failed: Invalid response framing: conflicting Content-Length values",
+    );
+  });
+
+  test("maps an uncaptured invalid Content-Length parser failure", () => {
+    nativeRequest.mockReturnValueOnce(
+      nativeResponse({
+        transportCode: 8,
+        transportMessage: "Invalid Content-Length: value",
+        headers: ["HTTP/1.1 200 OK"],
+        body: Buffer.alloc(0),
+      }),
+    );
+
+    expect(() =>
+      performRequest("GET", "https://example.com/path", {}),
+    ).toThrow(
+      "Request failed: Invalid response framing: invalid Content-Length",
+    );
+  });
+
+  test("preserves transport errors when captured response framing is valid", () => {
+    nativeRequest.mockReturnValueOnce(
+      nativeResponse({
+        transportCode: 8,
+        transportMessage: "Weird server reply",
+        headers: ["HTTP/1.1 200 OK", "Content-Length: 5", ""],
+        body: Buffer.alloc(0),
+      }),
+    );
+
+    expect(() =>
+      performRequest("GET", "https://example.com/path", {}),
+    ).toThrow("Request failed: Weird server reply");
+  });
 });
 
 describe("request retries", () => {
@@ -140,6 +211,28 @@ describe("request retries", () => {
 
     expect(response.statusCode).toBe(200);
     expect(nativeRequest).toHaveBeenCalledTimes(3);
+  });
+
+  test("does not retry deterministic response framing errors", () => {
+    nativeRequest.mockReturnValue(
+      nativeResponse({
+        transportCode: 8,
+        transportMessage: "Invalid Content-Length: value",
+        headers: ["HTTP/1.1 200 OK", "Content-Length: 5"],
+        body: Buffer.alloc(0),
+      }),
+    );
+
+    expect(() =>
+      request("GET", "https://example.com/retry", {
+        retry: true,
+        retryDelay: 0,
+        maxRetries: 2,
+      }),
+    ).toThrow(
+      "Request failed: Invalid response framing: conflicting Content-Length values",
+    );
+    expect(nativeRequest).toHaveBeenCalledOnce();
   });
 
   test("throws the final transport error after maxRetries", () => {

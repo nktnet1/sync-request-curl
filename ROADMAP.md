@@ -155,6 +155,14 @@ not all necessarily desirable behaviours to copy.
       type for arbitrary string/Buffer content. JSON and multipart payloads
       keep their generated media types, and explicit caller values are
       preserved.
+- [x] Validate response message framing before exposing headers: accept and
+      normalize repeated `Content-Length` values only when every decimal value
+      agrees, reject invalid or conflicting lengths, and reject responses that
+      combine `Content-Length` with `Transfer-Encoding`. Parse captured response
+      headers before surfacing libcurl transport failures so libcurl's own
+      malformed-framing rejection cannot mask the library's deterministic
+      `RequestError`. This follows RFC 9112 rather than copying Node's stricter
+      rejection of all duplicate `Content-Length` fields.
 
 Intentional differences: do not reproduce `then-request`'s early rejection of a
 `body` on GET, DELETE, or HEAD. `sync-request-curl` passes explicit request
@@ -323,9 +331,10 @@ should be treated as the current baseline in future sessions:
   `IncomingMessage.headers` shape inherited by `http-basic`/`then-request`:
   `set-cookie` is always an array, repeated `cookie` values use `; `, ordinary
   repeated fields use `, `, and Node's singleton response headers keep their
-  first value. This normalises the raw header lines supplied by libcurl; it does
-  not emulate Node's HTTP parser rejecting malformed framing before a response
-  object is created.
+  first value. This normalises the raw header lines supplied by libcurl; the
+  later v1.0.37 framing patch adds standards-based rejection for ambiguous
+  `Content-Length`/`Transfer-Encoding` responses without copying Node's
+  stricter rejection of identical duplicate lengths.
 - `v1.0.33-head-request-payloads.patch` makes the intentional HEAD request-body
   extension work end-to-end: explicit body, JSON, and multipart payloads are
   transmitted while the native transport still completes after the final HEAD
@@ -347,6 +356,27 @@ should be treated as the current baseline in future sessions:
   failed decompression preserve the original headers. This intentionally
   fixes an attached `http-basic` bug: its decompression wrapper deletes
   `content-encoding` but leaves the compressed `content-length` exposed.
+- `v1.0.37-response-framing-validation.patch` validates final response framing
+  before Node-style header folding can hide ambiguity: identical duplicate or
+  comma-separated `Content-Length` values are reduced to one field, conflicting
+  or syntactically invalid lengths fail the request, and `Content-Length` plus
+  `Transfer-Encoding` is rejected. This is deliberately standards-driven:
+  upstream Node rejects duplicate `Content-Length` fields even when identical,
+  while RFC 9112 permits recipients to normalize identical values.
+- `v1.0.38-framing-error-precedence.patch` parses any response headers already
+  captured by the native callback before converting a non-zero libcurl result
+  into `CurlError`. Newer libcurl releases can reject conflicting or malformed
+  `Content-Length` values themselves with `CURLE_WEIRD_SERVER_REPLY`; this keeps
+  the public error deterministic by preserving the more specific standards-level
+  `RequestError`, while unrelated transport failures still remain `CurlError`.
+- `v1.0.39-libcurl-framing-error-detail.patch` handles the remaining libcurl
+  parser edge case where the rejected `Content-Length` line never reaches the
+  header callback. The native transport now preserves libcurl's detailed
+  `CURLOPT_ERRORBUFFER` message; `CURLE_WEIRD_SERVER_REPLY` with libcurl's
+  `Invalid Content-Length` detail is translated into the same deterministic
+  framing `RequestError`, using any previously captured final-response
+  `Content-Length` to distinguish a conflict from a malformed first value.
+  Other code-8 transport failures remain `CurlError`.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

@@ -288,6 +288,16 @@ fn curl_error_message(code: CURLcode) -> String {
     .into_owned()
 }
 
+fn transport_error_message(code: CURLcode, error_buffer: &[c_char]) -> String {
+  if code != CURLE_OK && error_buffer.first().is_some_and(|value| *value != 0) {
+    return unsafe { CStr::from_ptr(error_buffer.as_ptr()) }
+      .to_string_lossy()
+      .into_owned();
+  }
+
+  curl_error_message(code)
+}
+
 fn ensure_curl_initialized() -> Result<()> {
   let code = *CURL_INIT.get_or_init(|| unsafe {
     curl_sys::curl_global_init(curl_sys::CURL_GLOBAL_DEFAULT)
@@ -796,11 +806,19 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   let mut state = Box::new(RequestState::default());
   state.stop_after_final_headers = no_body && has_request_payload;
   let state_pointer = (&mut *state as *mut RequestState).cast::<c_void>();
+  let mut error_buffer = vec![0 as c_char; curl_sys::CURL_ERROR_SIZE as usize];
   let mut headers = HeaderList::default();
   let mut mime: Option<Mime> = None;
   let mut keepalive = Vec::<CString>::new();
   let mut code = CURLE_OK;
 
+  keep_first_error(&mut code, unsafe {
+    curl_sys::curl_easy_setopt(
+      curl,
+      curl_sys::CURLOPT_ERRORBUFFER,
+      error_buffer.as_mut_ptr(),
+    )
+  });
   keep_first_error(
     &mut code,
     set_string_option(
@@ -937,7 +955,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
 
   Ok(NativeResponse {
     transport_code: i64::from(code),
-    transport_message: curl_error_message(code),
+    transport_message: transport_error_message(code, &error_buffer),
     status_code: status_code as i64,
     effective_url,
     redirect_url,

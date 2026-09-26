@@ -1,6 +1,9 @@
 import { type CurlError, throwForTransportError } from "#/errors";
 import { decompressResponseBody } from "#/http/compression";
-import { parseResponseHeaders } from "#/http/headers";
+import {
+  parseResponseHeaders,
+  throwForResponseFramingTransportError,
+} from "#/http/headers";
 import native from "#/native/index";
 import { getAgentPoolId } from "#/request/agent";
 import {
@@ -64,9 +67,18 @@ const performTransportRequest = (
     ...(connectionPoolId === undefined ? {} : { connectionPoolId }),
   });
 
-  throwForTransportError(result.transportCode, result.transportMessage);
-
+  // libcurl may reject malformed HTTP framing itself (for example,
+  // conflicting Content-Length values) after it has already delivered the
+  // response header lines to our callback. Parse those captured headers first
+  // so standards-level response framing errors are surfaced consistently
+  // instead of being hidden behind a generic transport error.
   const responseHeaders = parseResponseHeaders(result.headers);
+  throwForResponseFramingTransportError(
+    result.transportCode,
+    result.transportMessage,
+    result.headers,
+  );
+  throwForTransportError(result.transportCode, result.transportMessage);
   const responseBody = decompressResponseBody(
     result.body,
     responseHeaders,

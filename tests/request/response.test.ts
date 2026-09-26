@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
+import { RequestError } from "#/errors";
 import request from "#/index";
-import { SERVER_URL } from "#tests/app/config";
+import { FRAMING_SERVER_URL, SERVER_URL } from "#tests/app/config";
 import { wrapperRequest } from "#tests/request/helpers";
 
 describe("res.getBody()", () => {
@@ -18,6 +19,43 @@ describe("res.getBody()", () => {
 });
 
 // ========================================================================= //
+
+describe("Response framing", () => {
+  test("normalizes identical duplicate content-length fields", () => {
+    const res = request(
+      "GET",
+      `${FRAMING_SERVER_URL}/content-length/identical`,
+    );
+
+    expect(res.headers["content-length"]).toBe("5");
+    expect(res.body.toString()).toBe("hello");
+  });
+
+  test("rejects conflicting content-length fields", () => {
+    expect(() =>
+      request("GET", `${FRAMING_SERVER_URL}/content-length/conflicting`),
+    ).toThrowError(
+      new RequestError(
+        "ERR_REQUEST_FAILED",
+        "Request failed: Invalid response framing: conflicting Content-Length values",
+      ),
+    );
+  });
+
+  test("rejects content-length combined with transfer-encoding", () => {
+    expect(() =>
+      request(
+        "GET",
+        `${FRAMING_SERVER_URL}/content-length/transfer-encoding`,
+      ),
+    ).toThrowError(
+      new RequestError(
+        "ERR_REQUEST_FAILED",
+        "Request failed: Invalid response framing: Content-Length cannot be combined with Transfer-Encoding",
+      ),
+    );
+  });
+});
 
 describe("Response buffering", () => {
   test("large response assembled across multiple chunks", () => {

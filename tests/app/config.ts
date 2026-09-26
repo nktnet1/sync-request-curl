@@ -11,5 +11,10 @@ const portSchema = v.pipe(
 );
 
 export const PORT = v.parse(portSchema, process.env.PORT ?? "49152");
+export const FRAMING_PORT = v.parse(
+  portSchema,
+  process.env.FRAMING_PORT ?? String(PORT === 65_535 ? PORT - 1 : PORT + 1),
+);
 export const HOST = v.parse(v.string(), process.env.IP ?? "127.0.0.1");
 export const SERVER_URL = `http://${HOST}:${PORT}`;
+export const FRAMING_SERVER_URL = `http://${HOST}:${FRAMING_PORT}`;

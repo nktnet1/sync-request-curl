@@ -75,7 +75,7 @@ const stopServer = async (server: ChildProcess): Promise<void> => {
 };
 
 /**
- * Starts the local Hono server used by the HTTP integration tests.
+ * Starts the local servers used by the HTTP integration tests.
  */
 export async function setup(): Promise<void> {
   if (await isServerReady()) {
