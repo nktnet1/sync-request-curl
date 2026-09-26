@@ -142,6 +142,23 @@ describe("single request execution", () => {
     );
   });
 
+  test("maps Content-Length parser failures when no status line was captured", () => {
+    nativeRequest.mockReturnValueOnce(
+      nativeResponse({
+        transportCode: 8,
+        transportMessage: "Invalid Content-Length: value",
+        headers: ["Content-Length: 5"],
+        body: Buffer.alloc(0),
+      }),
+    );
+
+    expect(() =>
+      performRequest("GET", "https://example.com/path", {}),
+    ).toThrow(
+      "Request failed: Invalid response framing: conflicting Content-Length values",
+    );
+  });
+
   test("preserves transport errors when captured response framing is valid", () => {
     nativeRequest.mockReturnValueOnce(
       nativeResponse({

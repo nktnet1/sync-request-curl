@@ -63,6 +63,18 @@ export const setRequestHeader = (
   headers.push(`${name}: ${value}`);
 };
 
+export const validateRequestFraming = (headers: string[]): void => {
+  if (
+    hasRequestHeader(headers, "content-length") &&
+    hasRequestHeader(headers, "transfer-encoding")
+  ) {
+    throw new RequestError(
+      "ERR_REQUEST_FAILED",
+      "Request failed: Invalid request framing: Content-Length cannot be combined with Transfer-Encoding",
+    );
+  }
+};
+
 export const setContentLengthHeader = (
   headers: string[],
   length: number,
@@ -211,7 +223,7 @@ const validateAndNormalizeContentLength = (
   }
 
   const candidates = values.flatMap((value) => value.split(","));
-  const first = candidates[0]?.trim() ?? "";
+  const first = candidates[0]!.trim();
   const normalizedFirst = normalizeContentLengthValue(first);
 
   for (const candidate of candidates.slice(1)) {

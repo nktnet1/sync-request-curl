@@ -123,20 +123,31 @@ describe("Generated request headers", () => {
     ).toBe(false);
   });
 
-  test("preserves an explicit content-length alongside transfer-encoding", () => {
-    const prepared = prepareRequest("https://example.com", {
-      body: "hello",
-      headers: {
-        "Content-Length": "999",
-        "Transfer-Encoding": "chunked",
-      },
-    });
+  test("rejects explicit content-length alongside transfer-encoding", () => {
+    expect(() =>
+      prepareRequest("https://example.com", {
+        body: "hello",
+        headers: {
+          "Content-Length": "999",
+          "Transfer-Encoding": "chunked",
+        },
+      }),
+    ).toThrow(
+      "Request failed: Invalid request framing: Content-Length cannot be combined with Transfer-Encoding",
+    );
+  });
 
-    expect(prepared.headers).toEqual(
-      expect.arrayContaining([
-        "Content-Length: 999",
-        "Transfer-Encoding: chunked",
-      ]),
+  test("rejects content-length and transfer-encoding before transport", () => {
+    expect(() =>
+      request("POST", `${SERVER_URL}/request/headers`, {
+        body: "hello",
+        headers: {
+          "content-length": "5",
+          "transfer-encoding": "chunked",
+        },
+      }),
+    ).toThrow(
+      "Request failed: Invalid request framing: Content-Length cannot be combined with Transfer-Encoding",
     );
   });
 });

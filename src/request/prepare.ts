@@ -5,6 +5,7 @@ import {
   serializeRequestHeaders,
   setContentLengthHeader,
   setRequestHeader,
+  validateRequestFraming,
 } from "#/http/headers";
 import { appendQueryString, normalizeUrlHostname } from "#/http/url";
 import type { NativeRequestOptions } from "#/native/index";
@@ -64,6 +65,7 @@ export const prepareRequest = (
   method: UppercaseHttpVerb = "POST",
 ): PreparedRequest => {
   const headers = serializeRequestHeaders(options.headers);
+  validateRequestFraming(headers);
 
   if (options.gzip !== false && !hasRequestHeader(headers, "accept-encoding")) {
     setRequestHeader(headers, "Accept-Encoding", "gzip, deflate");

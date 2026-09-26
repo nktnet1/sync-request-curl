@@ -163,6 +163,11 @@ not all necessarily desirable behaviours to copy.
       malformed-framing rejection cannot mask the library's deterministic
       `RequestError`. This follows RFC 9112 rather than copying Node's stricter
       rejection of all duplicate `Content-Length` fields.
+- [x] Reject outbound request framing that combines caller-supplied
+      `Content-Length` with `Transfer-Encoding`. RFC 9112 forbids senders from
+      emitting both fields in one message; fail before cache, retry, or native
+      transport rather than preserving Node/`then-request`'s permissive
+      behaviour.
 
 Intentional differences: do not reproduce `then-request`'s early rejection of a
 `body` on GET, DELETE, or HEAD. `sync-request-curl` passes explicit request
@@ -170,9 +175,10 @@ payloads through to libcurl for those methods, including the corresponding
 generated payload length when the caller did not provide one. Falsy JSON values
 (`false`, `0`, `""`, and `null`) also remain valid JSON payloads instead of
 copying `then-request`'s truthiness check. An explicit `Transfer-Encoding`
-suppresses generation of `Content-Length`, while an explicitly supplied
-`Content-Length` is preserved; this avoids manufacturing conflicting framing
-headers while still respecting caller-provided values. Likewise, do not copy
+suppresses generation of `Content-Length`; if the caller explicitly supplies
+both `Content-Length` and `Transfer-Encoding`, request preparation rejects the
+ambiguous framing instead of copying Node/`then-request`'s permissive
+behaviour. Likewise, do not copy
 upstream implementation quirks such as treating `retryDelay: 0` as the default
 delay, treating `maxRetries: 0` as the default retry count, or lower-level
 stream/callback APIs that do not map cleanly to a synchronous buffered
@@ -377,6 +383,18 @@ should be treated as the current baseline in future sessions:
   framing `RequestError`, using any previously captured final-response
   `Content-Length` to distinguish a conflict from a malformed first value.
   Other code-8 transport failures remain `CurlError`.
+- `v1.0.40-request-framing-validation.patch` rejects outbound requests that
+  explicitly contain both `Content-Length` and `Transfer-Encoding`, as required
+  by RFC 9112. Validation runs immediately after Node-compatible header
+  serialization and before generated headers, caching, retry, redirects, or
+  native transport, while `Transfer-Encoding` by itself continues to suppress
+  generated `Content-Length`. This intentionally fixes permissive behaviour
+  inherited by `then-request`/`http-basic` from Node's request stack.
+- `v1.0.41-header-branch-coverage.patch` removes an unreachable defensive
+  branch from Content-Length candidate normalization and covers the fallback
+  used when libcurl reports a Content-Length parser failure without a captured
+  HTTP status line. This is test/coverage hardening only; public behaviour is
+  unchanged.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are
