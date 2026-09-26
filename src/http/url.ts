@@ -1,6 +1,7 @@
 import { domainToASCII, URL } from "node:url";
 import qs from "qs";
 import * as v from "valibot";
+import { CurlError } from "#/errors";
 
 const hasNonAscii = (value: string): boolean => {
   for (let i = 0; i < value.length; i += 1) {
@@ -111,7 +112,16 @@ export const normalizeUrlHostname = (url: string): string => {
 };
 
 export const assertSupportedHttpUrl = (url: string): void => {
-  const parsed = new URL(url);
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new CurlError(
+      3,
+      "Request failed: URL using bad/illegal format or missing URL",
+    );
+  }
+
   if (parsed.protocol === "http:" || parsed.protocol === "https:") {
     return;
   }

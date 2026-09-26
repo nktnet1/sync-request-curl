@@ -173,13 +173,6 @@ not all necessarily desirable behaviours to copy.
       payload size is known. The value must use the `1*DIGIT` grammar, repeated
       outbound fields are rejected, and the decimal value must match the actual
       byte length of raw/JSON content or the known zero-length empty request.
-- [x] Restrict public request targets and followed redirects to absolute
-      `http:`/`https:` URLs. Reject schemeless targets instead of allowing
-      libcurl to guess a protocol, and reject non-HTTP schemes before they can
-      reach the native transport.
-- [x] Disable libcurl's ambient proxy-environment discovery. Requests do not
-      implicitly inherit `http_proxy`, `HTTPS_PROXY`, `ALL_PROXY`, or related
-      variables; proxy routing remains an explicit future high-level option.
       Matching values (including leading zeroes) are preserved. Empty
       GET/DELETE/HEAD requests still do not gain a generated length, but an
       explicit non-zero length is rejected. This intentionally fixes the
@@ -187,6 +180,15 @@ not all necessarily desirable behaviours to copy.
       metadata known to be incorrect, which RFC 9110 section 8.6 forbids.
       Multipart remains separate because native libcurl serialization owns its
       final boundary and encoded size.
+- [x] Restrict public request targets and followed redirects to absolute
+      `http:`/`https:` URLs. Reject schemeless targets instead of allowing
+      libcurl to guess a protocol, and reject non-HTTP schemes before they can
+      reach the native transport. Preserve the existing public malformed-URL
+      contract by surfacing syntactically invalid/schemeless targets as
+      `CurlError` code 3 rather than leaking Node's `TypeError` from `new URL()`.
+- [x] Disable libcurl's ambient proxy-environment discovery. Requests do not
+      implicitly inherit `http_proxy`, `HTTPS_PROXY`, `ALL_PROXY`, or related
+      variables; proxy routing remains an explicit future high-level option.
 
 Intentional differences: do not reproduce `then-request`'s early rejection of a
 `body` on GET, DELETE, or HEAD. `sync-request-curl` passes explicit request
@@ -432,6 +434,12 @@ should be treated as the current baseline in future sessions:
   variables such as `http_proxy`, `HTTPS_PROXY`, and `ALL_PROXY` from silently
   changing routing. Proxy support remains reserved for the explicit roadmap
   option rather than ambient process state.
+- `v1.0.45-malformed-url-curl-error.patch` keeps the HTTP(S)-only URL
+  restriction without regressing the established malformed-URL error contract.
+  Invalid or schemeless absolute targets fail before transport as `CurlError`
+  code 3, matching the public error shape callers received from libcurl before
+  protocol pre-validation was added; valid non-HTTP schemes remain rejected as
+  unsupported protocols.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

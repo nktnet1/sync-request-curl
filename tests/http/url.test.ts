@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { CurlError } from "#/errors";
 import {
   appendQueryString,
   assertSupportedHttpUrl,
@@ -86,11 +87,17 @@ describe("assertSupportedHttpUrl", () => {
     },
   );
 
-  test("rejects schemeless URLs", () => {
-    expect(() => assertSupportedHttpUrl("example.com/path")).toThrow(
-      /Invalid URL/,
-    );
-  });
+  test.each(["", "example.com/path"])(
+    "preserves CurlError code 3 for malformed absolute URL %j",
+    (url) => {
+      expect(() => assertSupportedHttpUrl(url)).toThrow(CurlError);
+      try {
+        assertSupportedHttpUrl(url);
+      } catch (error) {
+        expect((error as CurlError).code).toBe(3);
+      }
+    },
+  );
 });
 
 describe("appendQueryString", () => {

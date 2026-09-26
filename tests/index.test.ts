@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
+import { CurlError } from "#/errors";
 import request from "#/index";
 import esmRequest, {
   FormData as RootFormData,
@@ -33,7 +34,7 @@ describe("request URL protocols", () => {
     },
   );
 
-  test("rejects schemeless URLs instead of letting libcurl guess", () => {
-    expect(() => request("GET", "example.com/path")).toThrow(/Invalid URL/);
+  test("rejects schemeless URLs without letting libcurl guess", () => {
+    expect(() => request("GET", "example.com/path")).toThrow(CurlError);
   });
 });
