@@ -48,9 +48,11 @@ const preparePayload = (
     return { body };
   }
 
-  if (!["GET", "DELETE", "HEAD"].includes(method)) {
-    setContentLengthHeader(headers, 0);
-  }
+  setContentLengthHeader(
+    headers,
+    0,
+    !["GET", "DELETE", "HEAD"].includes(method),
+  );
   return {};
 };
 

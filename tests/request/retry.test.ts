@@ -101,9 +101,7 @@ describe("single request execution", () => {
       }),
     );
 
-    expect(() =>
-      performRequest("GET", "https://example.com/path", {}),
-    ).toThrow(
+    expect(() => performRequest("GET", "https://example.com/path", {})).toThrow(
       "Request failed: Invalid response framing: conflicting Content-Length values",
     );
   });
@@ -118,9 +116,7 @@ describe("single request execution", () => {
       }),
     );
 
-    expect(() =>
-      performRequest("GET", "https://example.com/path", {}),
-    ).toThrow(
+    expect(() => performRequest("GET", "https://example.com/path", {})).toThrow(
       "Request failed: Invalid response framing: conflicting Content-Length values",
     );
   });
@@ -135,9 +131,7 @@ describe("single request execution", () => {
       }),
     );
 
-    expect(() =>
-      performRequest("GET", "https://example.com/path", {}),
-    ).toThrow(
+    expect(() => performRequest("GET", "https://example.com/path", {})).toThrow(
       "Request failed: Invalid response framing: invalid Content-Length",
     );
   });
@@ -152,9 +146,7 @@ describe("single request execution", () => {
       }),
     );
 
-    expect(() =>
-      performRequest("GET", "https://example.com/path", {}),
-    ).toThrow(
+    expect(() => performRequest("GET", "https://example.com/path", {})).toThrow(
       "Request failed: Invalid response framing: conflicting Content-Length values",
     );
   });
@@ -169,9 +161,9 @@ describe("single request execution", () => {
       }),
     );
 
-    expect(() =>
-      performRequest("GET", "https://example.com/path", {}),
-    ).toThrow("Request failed: Weird server reply");
+    expect(() => performRequest("GET", "https://example.com/path", {})).toThrow(
+      "Request failed: Weird server reply",
+    );
   });
 });
 

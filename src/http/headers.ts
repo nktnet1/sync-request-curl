@@ -63,29 +63,69 @@ export const setRequestHeader = (
   headers.push(`${name}: ${value}`);
 };
 
+const invalidRequestFraming = (message: string): never => {
+  throw new RequestError(
+    "ERR_REQUEST_FAILED",
+    `Request failed: Invalid request framing: ${message}`,
+  );
+};
+
 export const validateRequestFraming = (headers: string[]): void => {
   if (
     hasRequestHeader(headers, "content-length") &&
     hasRequestHeader(headers, "transfer-encoding")
   ) {
-    throw new RequestError(
-      "ERR_REQUEST_FAILED",
-      "Request failed: Invalid request framing: Content-Length cannot be combined with Transfer-Encoding",
+    invalidRequestFraming(
+      "Content-Length cannot be combined with Transfer-Encoding",
     );
   }
+};
+
+const normalizeRequestContentLength = (value: string): string => {
+  if (value.length === 0) {
+    invalidRequestFraming("invalid Content-Length");
+  }
+
+  for (const character of value) {
+    if (character < "0" || character > "9") {
+      invalidRequestFraming("invalid Content-Length");
+    }
+  }
+
+  return value.replace(/^0+(?=\d)/, "");
 };
 
 export const setContentLengthHeader = (
   headers: string[],
   length: number,
+  generateIfMissing = true,
 ): void => {
-  if (
-    hasRequestHeader(headers, "content-length") ||
-    hasRequestHeader(headers, "transfer-encoding")
-  ) {
+  if (hasRequestHeader(headers, "transfer-encoding")) {
     return;
   }
-  setRequestHeader(headers, "Content-Length", length);
+
+  const contentLengthValues = headers.flatMap((header) => {
+    const parsed = parseRequestHeaderLine(header);
+    return parsed?.name === "content-length" ? [parsed.value] : [];
+  });
+
+  if (contentLengthValues.length === 0) {
+    if (generateIfMissing) {
+      setRequestHeader(headers, "Content-Length", length);
+    }
+    return;
+  }
+
+  if (contentLengthValues.length > 1) {
+    invalidRequestFraming("multiple Content-Length fields are not allowed");
+  }
+
+  const contentLength = normalizeRequestContentLength(contentLengthValues[0]!);
+  if (contentLength !== String(length)) {
+    invalidRequestFraming(
+      `Content-Length does not match the request body length (${length})`,
+    );
+  }
 };
 
 /**
@@ -257,8 +297,7 @@ export const throwForResponseFramingTransportError = (
     const separatorIndex = header.indexOf(":");
     return (
       separatorIndex > 0 &&
-      header.slice(0, separatorIndex).trim().toLowerCase() ===
-        "content-length"
+      header.slice(0, separatorIndex).trim().toLowerCase() === "content-length"
     );
   });
 

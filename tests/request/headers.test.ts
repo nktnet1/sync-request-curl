@@ -75,38 +75,152 @@ describe("Correctly set content-length", () => {
 });
 
 describe("Generated request headers", () => {
-  test("JSON headers preserve conflicting caller headers", () => {
+  test("JSON preserves caller content type and matching content-length", () => {
+    const json = { message: "hi" };
+    const length = Buffer.byteLength(JSON.stringify(json));
     const prepared = prepareRequest("https://example.com", {
-      json: { message: "hi" },
+      json,
       headers: {
         "content-type": "text/plain",
-        "Content-Length": "999",
+        "Content-Length": String(length),
       },
     });
 
     expect(prepared.headers).toEqual(
       expect.arrayContaining([
         "content-type: text/plain",
-        "Content-Length: 999",
+        `Content-Length: ${length}`,
       ]),
     );
   });
 
-  test("body content-length preserves a caller value", () => {
-    const prepared = prepareRequest("https://example.com", {
-      body: "hello",
-      headers: { "content-length": "999" },
-    });
-
-    expect(prepared.headers).toContain("content-length: 999");
+  test("rejects a JSON content-length that does not match the serialized body", () => {
+    expect(() =>
+      prepareRequest("https://example.com", {
+        json: { message: "hi" },
+        headers: { "Content-Length": "999" },
+      }),
+    ).toThrow(
+      "Request failed: Invalid request framing: Content-Length does not match the request body length (16)",
+    );
   });
 
-  test("empty requests preserve a caller content-length", () => {
+  test("body content-length preserves a matching caller value", () => {
     const prepared = prepareRequest("https://example.com", {
-      headers: { "Content-Length": "999" },
+      body: "hello",
+      headers: { "content-length": "5" },
     });
 
-    expect(prepared.headers).toContain("Content-Length: 999");
+    expect(prepared.headers).toContain("content-length: 5");
+  });
+
+  test("compares content-length using body bytes rather than string characters", () => {
+    const prepared = prepareRequest("https://example.com", {
+      body: "é",
+      headers: { "Content-Length": "2" },
+    });
+
+    expect(prepared.headers).toContain("Content-Length: 2");
+  });
+
+  test("accepts a matching content-length with leading zeroes", () => {
+    const prepared = prepareRequest("https://example.com", {
+      body: "hello",
+      headers: { "Content-Length": "005" },
+    });
+
+    expect(prepared.headers).toContain("Content-Length: 005");
+  });
+
+  test("rejects a body content-length that does not match the payload", () => {
+    expect(() =>
+      prepareRequest("https://example.com", {
+        body: "hello",
+        headers: { "content-length": "999" },
+      }),
+    ).toThrow(
+      "Request failed: Invalid request framing: Content-Length does not match the request body length (5)",
+    );
+  });
+
+  test.each(["", "-1", "5, 5", "5x"])(
+    "rejects invalid outbound content-length %j",
+    (contentLength) => {
+      expect(() =>
+        prepareRequest("https://example.com", {
+          body: "hello",
+          headers: { "Content-Length": contentLength },
+        }),
+      ).toThrow(
+        "Request failed: Invalid request framing: invalid Content-Length",
+      );
+    },
+  );
+
+  test("rejects repeated outbound content-length fields", () => {
+    expect(() =>
+      prepareRequest("https://example.com", {
+        body: "hello",
+        headers: { "Content-Length": ["5", "5"] },
+      }),
+    ).toThrow(
+      "Request failed: Invalid request framing: multiple Content-Length fields are not allowed",
+    );
+  });
+
+  test("empty body-capable requests preserve a caller content-length of zero", () => {
+    const prepared = prepareRequest("https://example.com", {
+      headers: { "Content-Length": "0" },
+    });
+
+    expect(prepared.headers).toContain("Content-Length: 0");
+  });
+
+  test("rejects non-zero content-length on an empty body-capable request", () => {
+    expect(() =>
+      prepareRequest("https://example.com", {
+        headers: { "Content-Length": "999" },
+      }),
+    ).toThrow(
+      "Request failed: Invalid request framing: Content-Length does not match the request body length (0)",
+    );
+  });
+
+  test("validates but does not generate content-length for empty GET", () => {
+    expect(
+      prepareRequest(
+        "https://example.com",
+        { headers: { "Content-Length": "0" } },
+        "GET",
+      ).headers,
+    ).toContain("Content-Length: 0");
+
+    expect(
+      prepareRequest("https://example.com", {}, "GET").headers.some((header) =>
+        header.toLowerCase().startsWith("content-length"),
+      ),
+    ).toBe(false);
+
+    expect(() =>
+      prepareRequest(
+        "https://example.com",
+        { headers: { "Content-Length": "1" } },
+        "GET",
+      ),
+    ).toThrow(
+      "Request failed: Invalid request framing: Content-Length does not match the request body length (0)",
+    );
+  });
+
+  test("rejects a mismatched content-length before transport", () => {
+    expect(() =>
+      request("POST", `${SERVER_URL}/request/headers`, {
+        body: "hello",
+        headers: { "Content-Length": "6" },
+      }),
+    ).toThrow(
+      "Request failed: Invalid request framing: Content-Length does not match the request body length (5)",
+    );
   });
 
   test("transfer-encoding suppresses generated content-length", () => {

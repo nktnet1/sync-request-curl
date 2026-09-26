@@ -44,10 +44,7 @@ describe("Response framing", () => {
 
   test("rejects content-length combined with transfer-encoding", () => {
     expect(() =>
-      request(
-        "GET",
-        `${FRAMING_SERVER_URL}/content-length/transfer-encoding`,
-      ),
+      request("GET", `${FRAMING_SERVER_URL}/content-length/transfer-encoding`),
     ).toThrowError(
       new RequestError(
         "ERR_REQUEST_FAILED",

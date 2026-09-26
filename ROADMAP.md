@@ -130,11 +130,12 @@ not all necessarily desirable behaviours to copy.
       `null`.
 - [x] Match upstream payload precedence and caller-header preservation where it
       maps cleanly to the buffered API. Payload selection is `form` before
-      `json` before `body`; generated JSON `Content-Type` and payload
-      `Content-Length` only fill missing headers; and empty GET/DELETE/HEAD
-      requests no longer receive a generated `Content-Length: 0`. Empty
-      methods that upstream treats as body-capable still receive
-      `Content-Length: 0`.
+      `json` before `body`; generated JSON `Content-Type` only fills a missing
+      header; and empty GET/DELETE/HEAD requests no longer receive a generated
+      `Content-Length: 0`. Empty methods that upstream treats as body-capable
+      still receive `Content-Length: 0`. Caller-supplied `Content-Length` is
+      preserved only when it is valid and matches the exact buffered payload
+      size, as required by the later standards-driven framing validation.
 - [x] Remove `content-encoding` from the exposed response headers after
       transparent gzip/deflate decompression so the headers describe the body
       actually returned to callers. Also remove the encoded representation's
@@ -168,6 +169,17 @@ not all necessarily desirable behaviours to copy.
       emitting both fields in one message; fail before cache, retry, or native
       transport rather than preserving Node/`then-request`'s permissive
       behaviour.
+- [x] Validate caller-supplied `Content-Length` whenever the exact request
+      payload size is known. The value must use the `1*DIGIT` grammar, repeated
+      outbound fields are rejected, and the decimal value must match the actual
+      byte length of raw/JSON content or the known zero-length empty request.
+      Matching values (including leading zeroes) are preserved. Empty
+      GET/DELETE/HEAD requests still do not gain a generated length, but an
+      explicit non-zero length is rejected. This intentionally fixes the
+      permissive Node/`then-request` behaviour rather than forwarding framing
+      metadata known to be incorrect, which RFC 9110 section 8.6 forbids.
+      Multipart remains separate because native libcurl serialization owns its
+      final boundary and encoded size.
 
 Intentional differences: do not reproduce `then-request`'s early rejection of a
 `body` on GET, DELETE, or HEAD. `sync-request-curl` passes explicit request
@@ -395,6 +407,14 @@ should be treated as the current baseline in future sessions:
   used when libcurl reports a Content-Length parser failure without a captured
   HTTP status line. This is test/coverage hardening only; public behaviour is
   unchanged.
+- `v1.0.42-request-content-length-validation.patch` validates explicit outbound
+  `Content-Length` against the exact byte size whenever request preparation
+  knows it. Invalid syntax, repeated fields, mismatched raw/JSON lengths, and
+  non-zero lengths on known-empty requests fail before transport; matching
+  decimal values are preserved and empty GET/DELETE/HEAD requests still avoid
+  an automatically generated zero length. This intentionally fixes the
+  permissive Node/`then-request` behaviour in accordance with RFC 9110 section
+  8.6. Multipart is unchanged because libcurl owns the final encoded form size.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

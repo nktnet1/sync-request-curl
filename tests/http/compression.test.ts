@@ -65,9 +65,9 @@ describe("response decompression", () => {
       "content-length": String(body.length),
     };
 
-    expect(() =>
-      decompressResponseBody(body, headers, true),
-    ).toThrow(RequestError);
+    expect(() => decompressResponseBody(body, headers, true)).toThrow(
+      RequestError,
+    );
     expect(headers["content-encoding"]).toBe("gzip");
     expect(headers["content-length"]).toBe(String(body.length));
   });
