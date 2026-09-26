@@ -55,4 +55,18 @@ describe("multipart/form-data", () => {
       },
     ]);
   });
+
+  test("rejects caller-supplied content-length for multipart forms", () => {
+    const form = new FormData();
+    form.append("field", "value");
+
+    expect(() =>
+      request("POST", `${SERVER_URL}/upload`, {
+        form,
+        headers: { "Content-Length": "5" },
+      }),
+    ).toThrow(
+      "Invalid request framing: Content-Length cannot be supplied with multipart form payloads",
+    );
+  });
 });

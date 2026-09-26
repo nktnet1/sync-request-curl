@@ -193,6 +193,10 @@ not all necessarily desirable behaviours to copy.
       cannot model safely: reject CONNECT because the buffered API cannot expose
       its tunnel, reject non-empty TRACE content, and require `Content-Type` for
       OPTIONS requests that contain content.
+- [x] Reject caller-supplied `Content-Length` for multipart forms. The final
+      MIME boundary and encoded byte length are owned by libcurl, so the
+      TypeScript layer cannot verify a caller assertion safely; libcurl remains
+      solely responsible for multipart framing.
 
 Intentional differences: do not reproduce `then-request`'s early rejection of a
 `body` on GET, DELETE, or HEAD. `sync-request-curl` passes explicit request
@@ -449,6 +453,11 @@ should be treated as the current baseline in future sessions:
   TRACE cannot carry non-empty content, and OPTIONS content must have a non-empty
   `Content-Type` (with JSON and libcurl-generated multipart types accepted).
   Empty TRACE raw bodies remain valid because they carry no content.
+- `v1.0.47-multipart-content-length-safety.patch` rejects explicit
+  `Content-Length` on multipart form requests. Because libcurl constructs the
+  MIME boundary and final encoded body, request preparation cannot verify a
+  caller-supplied length; leaving multipart length generation entirely to
+  libcurl preserves the outbound framing guarantees added in v1.0.42.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

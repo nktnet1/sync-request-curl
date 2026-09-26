@@ -92,6 +92,14 @@ export const validateRequestFraming = (headers: string[]): void => {
   }
 };
 
+export const rejectMultipartContentLength = (headers: string[]): void => {
+  if (hasRequestHeader(headers, "content-length")) {
+    invalidRequestFraming(
+      "Content-Length cannot be supplied with multipart form payloads",
+    );
+  }
+};
+
 const normalizeRequestContentLength = (value: string): string => {
   if (value.length === 0) {
     invalidRequestFraming("invalid Content-Length");

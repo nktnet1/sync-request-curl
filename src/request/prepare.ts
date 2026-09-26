@@ -4,6 +4,7 @@ import { getFormDataEntries } from "#/form-data";
 import {
   hasNonEmptyRequestHeader,
   hasRequestHeader,
+  rejectMultipartContentLength,
   serializeRequestHeaders,
   setContentLengthHeader,
   setRequestHeader,
@@ -80,6 +81,7 @@ const preparePayload = (
   headers: string[],
 ): Pick<PreparedRequest, "body" | "form"> => {
   if (options.form) {
+    rejectMultipartContentLength(headers);
     return { form: getFormDataEntries(options.form) };
   }
 
