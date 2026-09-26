@@ -54,6 +54,17 @@ export const hasRequestHeader = (headers: string[], name: string): boolean => {
   return headers.some((header) => getHeaderName(header) === normalizedName);
 };
 
+export const hasNonEmptyRequestHeader = (
+  headers: string[],
+  name: string,
+): boolean => {
+  const normalizedName = name.toLowerCase();
+  return headers.some((header) => {
+    const parsed = parseRequestHeaderLine(header);
+    return parsed?.name === normalizedName && parsed.value.length > 0;
+  });
+};
+
 export const setRequestHeader = (
   headers: string[],
   name: string,

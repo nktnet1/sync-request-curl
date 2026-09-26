@@ -189,6 +189,10 @@ not all necessarily desirable behaviours to copy.
 - [x] Disable libcurl's ambient proxy-environment discovery. Requests do not
       implicitly inherit `http_proxy`, `HTTPS_PROXY`, `ALL_PROXY`, or related
       variables; proxy routing remains an explicit future high-level option.
+- [x] Enforce HTTP method semantics that the generic libcurl custom-method path
+      cannot model safely: reject CONNECT because the buffered API cannot expose
+      its tunnel, reject non-empty TRACE content, and require `Content-Type` for
+      OPTIONS requests that contain content.
 
 Intentional differences: do not reproduce `then-request`'s early rejection of a
 `body` on GET, DELETE, or HEAD. `sync-request-curl` passes explicit request
@@ -440,6 +444,11 @@ should be treated as the current baseline in future sessions:
   code 3, matching the public error shape callers received from libcurl before
   protocol pre-validation was added; valid non-HTTP schemes remain rejected as
   unsupported protocols.
+- `v1.0.46-http-method-semantics.patch` enforces semantics that cannot be
+  represented by a generic buffered custom-method request: CONNECT is rejected,
+  TRACE cannot carry non-empty content, and OPTIONS content must have a non-empty
+  `Content-Type` (with JSON and libcurl-generated multipart types accepted).
+  Empty TRACE raw bodies remain valid because they carry no content.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

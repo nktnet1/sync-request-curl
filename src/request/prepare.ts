@@ -1,6 +1,8 @@
 import * as v from "valibot";
+import { RequestError } from "#/errors";
 import { getFormDataEntries } from "#/form-data";
 import {
+  hasNonEmptyRequestHeader,
   hasRequestHeader,
   serializeRequestHeaders,
   setContentLengthHeader,
@@ -20,6 +22,57 @@ const jsonBodySchema = v.pipe(
   v.unknown(),
   v.stringifyJson(undefined, "The json option must be JSON-serializable"),
 );
+
+const invalidRequestSemantics = (message: string): never => {
+  throw new RequestError(
+    "ERR_REQUEST_FAILED",
+    `Request failed: Invalid request semantics: ${message}`,
+  );
+};
+
+const payloadHasContent = (
+  payload: Pick<PreparedRequest, "body" | "form">,
+): boolean => {
+  if (payload.form !== undefined) {
+    return true;
+  }
+  if (payload.body === undefined) {
+    return false;
+  }
+  return Buffer.isBuffer(payload.body)
+    ? payload.body.length > 0
+    : Buffer.byteLength(payload.body) > 0;
+};
+
+const validateMethodSemantics = (
+  method: UppercaseHttpVerb,
+  headers: string[],
+  payload: Pick<PreparedRequest, "body" | "form">,
+): void => {
+  if (!payloadHasContent(payload)) {
+    return;
+  }
+
+  if (method === "TRACE") {
+    invalidRequestSemantics("TRACE requests cannot contain content");
+  }
+
+  if (method === "OPTIONS") {
+    const hasContentType = hasRequestHeader(headers, "content-type");
+    const hasContentTypeValue = hasNonEmptyRequestHeader(
+      headers,
+      "content-type",
+    );
+    const nativeMultipartContentType =
+      payload.form !== undefined && !hasContentType;
+
+    if (!hasContentTypeValue && !nativeMultipartContentType) {
+      invalidRequestSemantics(
+        "OPTIONS requests with content require Content-Type",
+      );
+    }
+  }
+};
 
 const preparePayload = (
   method: UppercaseHttpVerb,
@@ -68,14 +121,22 @@ export const prepareRequest = (
 ): PreparedRequest => {
   const headers = serializeRequestHeaders(options.headers);
   validateRequestFraming(headers);
+  if (method === "CONNECT") {
+    invalidRequestSemantics(
+      "CONNECT is not supported by the buffered request API",
+    );
+  }
 
   if (options.gzip !== false && !hasRequestHeader(headers, "accept-encoding")) {
     setRequestHeader(headers, "Accept-Encoding", "gzip, deflate");
   }
 
+  const payload = preparePayload(method, options, headers);
+  validateMethodSemantics(method, headers, payload);
+
   return {
     url: prepareUrl(url, options),
     headers,
-    ...preparePayload(method, options, headers),
+    ...payload,
   };
 };
