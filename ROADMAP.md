@@ -201,6 +201,11 @@ not all necessarily desirable behaviours to copy.
       chunked trailers through the same header callback, so parse only the
       final response header section up to its terminating blank line; retain the
       declared `Trailer` header but do not fold trailer fields into headers.
+- [x] Keep decoded cached representations internally consistent when a stale
+      entry is refreshed by `304 Not Modified`. Do not merge a 304
+      `Content-Length` into the stored response, and do not reintroduce
+      `Content-Encoding` when the cached body was already transparently decoded.
+      Preserve ordinary 304 metadata updates and omitted original fields.
 
 Intentional differences: do not reproduce `then-request`'s early rejection of a
 `body` on GET, DELETE, or HEAD. `sync-request-curl` passes explicit request
@@ -467,6 +472,13 @@ should be treated as the current baseline in future sessions:
   header callback also reports chunked trailer fields, but those fields are no
   longer folded into `response.headers`; the ordinary `Trailer` declaration is
   retained and raw callback lines remain available internally for diagnostics.
+
+
+- `v1.0.49-cache-revalidation-metadata.patch` applies RFC 9111 stored-response
+  update rules to processed cache entries. `Content-Length` from a 304 is not
+  merged into stored metadata, and `Content-Encoding` is not reintroduced when
+  the cached body was already transparently decoded; ordinary revalidation
+  metadata still updates while omitted cached fields remain intact.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

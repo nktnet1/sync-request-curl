@@ -537,7 +537,29 @@ export const storeFileCacheResponse = (
 const mergeRevalidationHeaders = (
   cached: Response["headers"],
   revalidated: Response["headers"],
-): Response["headers"] => ({ ...cached, ...revalidated });
+): Response["headers"] => {
+  const merged = { ...cached };
+  const cachedWasDecoded = cached["content-encoding"] === undefined;
+
+  for (const [name, value] of Object.entries(revalidated)) {
+    // RFC 9111 section 3.2 excludes Content-Length from stored-header updates.
+    if (name === "content-length") {
+      continue;
+    }
+
+    // Cached responses are stored after transparent decompression. Reapplying a
+    // 304 Content-Encoding to an already decoded body would make its metadata
+    // describe bytes that are no longer stored. RFC 9111 explicitly permits a
+    // processed cache to omit such updates to preserve representation integrity.
+    if (name === "content-encoding" && cachedWasDecoded) {
+      continue;
+    }
+
+    merged[name] = value;
+  }
+
+  return merged;
+};
 
 export const refreshCacheEntry = (
   url: string,

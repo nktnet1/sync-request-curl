@@ -259,6 +259,71 @@ describe("file cache policy", () => {
     expect(lookup.useCachedResponse).toBe(false);
   });
 
+  test("keeps processed cached metadata consistent during 304 revalidation", () => {
+    const url = cacheUrl();
+    storeFileCacheResponse(
+      url,
+      {},
+      0,
+      0,
+      response(url, {
+        "cache-control": "max-age=0",
+        "content-type": "application/json",
+        etag: '"v1"',
+      }),
+    );
+
+    const lookup = prepareFileCacheLookup("GET", url, [], "file", 1);
+    const refreshed = refreshFileCacheEntry(
+      url,
+      lookup,
+      {
+        "cache-control": "max-age=60",
+        "content-encoding": "gzip",
+        "content-length": "123",
+        "x-revalidated": "yes",
+      },
+      2,
+    );
+
+    expect(refreshed?.headers).toStrictEqual({
+      "cache-control": "max-age=60",
+      "content-type": "application/json",
+      etag: '"v1"',
+      "x-revalidated": "yes",
+    });
+    expect(refreshed?.body.toString()).toBe("cached");
+  });
+
+  test("allows Content-Encoding revalidation when the cached body is still encoded", () => {
+    const url = cacheUrl();
+    storeFileCacheResponse(
+      url,
+      {},
+      0,
+      0,
+      response(url, {
+        "cache-control": "max-age=0",
+        "content-encoding": "br",
+        etag: '"v1"',
+      }),
+    );
+
+    const lookup = prepareFileCacheLookup("GET", url, [], "file", 1);
+    const refreshed = refreshFileCacheEntry(
+      url,
+      lookup,
+      {
+        "content-encoding": "br",
+        "content-length": "999",
+      },
+      2,
+    );
+
+    expect(refreshed?.headers["content-encoding"]).toBe("br");
+    expect(refreshed?.headers["content-length"]).toBeUndefined();
+  });
+
   test("refreshes a stale entry through the file-cache compatibility wrapper", () => {
     const url = cacheUrl();
     storeFileCacheResponse(
