@@ -48,6 +48,12 @@ const framingServer = createServer((request, response) => {
       response.setHeader("Transfer-Encoding", "chunked");
       response.end("hello");
       return;
+    case "/trailers":
+      response.setHeader("Trailer", "X-Checksum");
+      response.write("hello");
+      response.addTrailers({ "X-Checksum": "abc123" });
+      response.end();
+      return;
     default:
       response.statusCode = 404;
       response.end("Not found");

@@ -234,6 +234,17 @@ const findFinalStatusLineIndex = (headerLines: string[]): number => {
   return finalStatusLineIndex;
 };
 
+const getFinalResponseHeaderLines = (headerLines: string[]): string[] => {
+  const finalStatusLineIndex = findFinalStatusLineIndex(headerLines);
+  const finalBlock =
+    finalStatusLineIndex >= 0
+      ? headerLines.slice(finalStatusLineIndex + 1)
+      : headerLines;
+  const headerEndIndex = finalBlock.indexOf("");
+
+  return headerEndIndex >= 0 ? finalBlock.slice(0, headerEndIndex) : finalBlock;
+};
+
 const singletonResponseHeaders = new Set([
   "age",
   "authorization",
@@ -317,11 +328,7 @@ export const throwForResponseFramingTransportError = (
     return;
   }
 
-  const finalStatusLineIndex = findFinalStatusLineIndex(headerLines);
-  const finalHeaderLines =
-    finalStatusLineIndex >= 0
-      ? headerLines.slice(finalStatusLineIndex + 1)
-      : headerLines;
+  const finalHeaderLines = getFinalResponseHeaderLines(headerLines);
   const capturedContentLength = finalHeaderLines.some((header) => {
     const separatorIndex = header.indexOf(":");
     return (
@@ -369,11 +376,7 @@ const appendResponseHeader = (
 export const parseResponseHeaders = (
   headerLines: string[],
 ): Response["headers"] => {
-  const finalStatusLineIndex = findFinalStatusLineIndex(headerLines);
-  const finalHeaderLines =
-    finalStatusLineIndex >= 0
-      ? headerLines.slice(finalStatusLineIndex + 1)
-      : headerLines;
+  const finalHeaderLines = getFinalResponseHeaderLines(headerLines);
   const parsedHeaders = new Map<string, string | string[]>();
   const contentLengthValues: string[] = [];
   let hasTransferEncoding = false;

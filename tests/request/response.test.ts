@@ -52,6 +52,14 @@ describe("Response framing", () => {
       ),
     );
   });
+
+  test("does not expose chunked trailers as response headers", () => {
+    const response = request("GET", `${FRAMING_SERVER_URL}/trailers`);
+
+    expect(response.body.toString()).toBe("hello");
+    expect(response.headers.trailer).toBe("X-Checksum");
+    expect(response.headers["x-checksum"]).toBeUndefined();
+  });
 });
 
 describe("Response buffering", () => {

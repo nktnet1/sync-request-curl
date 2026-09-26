@@ -168,6 +168,20 @@ describe("parseResponseHeaders", () => {
     expect(headers.location).toStrictEqual("https://example.com:8443/path");
   });
 
+  test("does not fold response trailers into the header section", () => {
+    const headers = parseResponseHeaders([
+      "HTTP/1.1 200 OK",
+      "Transfer-Encoding: chunked",
+      "Trailer: X-Checksum",
+      "",
+      "X-Checksum: abc123",
+      "",
+    ]);
+
+    expect(headers.trailer).toBe("X-Checksum");
+    expect(headers["x-checksum"]).toBeUndefined();
+  });
+
   test("uses only the final HTTP response header block", () => {
     const headers = parseResponseHeaders([
       "HTTP/1.1 301 Moved Permanently",

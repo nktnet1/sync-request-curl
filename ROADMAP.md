@@ -197,6 +197,10 @@ not all necessarily desirable behaviours to copy.
       MIME boundary and encoded byte length are owned by libcurl, so the
       TypeScript layer cannot verify a caller assertion safely; libcurl remains
       solely responsible for multipart framing.
+- [x] Keep HTTP response trailers out of `response.headers`. Libcurl delivers
+      chunked trailers through the same header callback, so parse only the
+      final response header section up to its terminating blank line; retain the
+      declared `Trailer` header but do not fold trailer fields into headers.
 
 Intentional differences: do not reproduce `then-request`'s early rejection of a
 `body` on GET, DELETE, or HEAD. `sync-request-curl` passes explicit request
@@ -458,6 +462,11 @@ should be treated as the current baseline in future sessions:
   MIME boundary and final encoded body, request preparation cannot verify a
   caller-supplied length; leaving multipart length generation entirely to
   libcurl preserves the outbound framing guarantees added in v1.0.42.
+- `v1.0.48-response-trailer-isolation.patch` stops public response-header
+  parsing at the blank line terminating the final header section. Libcurl's
+  header callback also reports chunked trailer fields, but those fields are no
+  longer folded into `response.headers`; the ordinary `Trailer` declaration is
+  retained and raw callback lines remain available internally for diagnostics.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

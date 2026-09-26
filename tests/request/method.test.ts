@@ -26,9 +26,9 @@ describe("HTTP method semantics", () => {
     ["raw body", { body: "trace-content" }],
     ["JSON", { json: { trace: true } }],
   ] as const)("rejects TRACE content supplied as %s", (_case, options) => {
-    expect(() => request("TRACE", `${SERVER_URL}/compat/echo`, options)).toThrow(
-      "TRACE requests cannot contain content",
-    );
+    expect(() =>
+      request("TRACE", `${SERVER_URL}/compat/echo`, options),
+    ).toThrow("TRACE requests cannot contain content");
   });
 
   test("rejects TRACE multipart content", () => {
