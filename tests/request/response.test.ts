@@ -60,6 +60,12 @@ describe("Response framing", () => {
     expect(response.headers.trailer).toBe("X-Checksum");
     expect(response.headers["x-checksum"]).toBeUndefined();
   });
+
+  test("preserves non-ASCII response header bytes without UTF-8 replacement", () => {
+    const response = request("GET", `${FRAMING_SERVER_URL}/obs-text`);
+
+    expect(response.headers["x-obs-text"]).toBe("caf\u00e9\u0080\u00ff");
+  });
 });
 
 describe("Response buffering", () => {

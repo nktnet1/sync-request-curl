@@ -54,6 +54,18 @@ const framingServer = createServer((request, response) => {
       response.addTrailers({ "X-Checksum": "abc123" });
       response.end();
       return;
+    case "/obs-text": {
+      const rawResponse = Buffer.concat([
+        Buffer.from("HTTP/1.1 200 OK\r\nX-Obs-Text: caf", "ascii"),
+        Buffer.from([0xe9, 0x80, 0xff]),
+        Buffer.from(
+          "\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+          "ascii",
+        ),
+      ]);
+      request.socket.end(rawResponse);
+      return;
+    }
     default:
       response.statusCode = 404;
       response.end("Not found");

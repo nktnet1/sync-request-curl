@@ -431,6 +431,10 @@ request_callback!(write_callback, |state: &mut RequestState, chunk: &[u8]| {
   state.body.extend_from_slice(chunk);
 });
 
+fn header_bytes_to_latin1(bytes: &[u8]) -> String {
+  bytes.iter().map(|byte| char::from(*byte)).collect()
+}
+
 fn trim_header_line(bytes: &[u8]) -> &[u8] {
   let is_space = |byte: u8| matches!(byte, b' ' | b'\t' | b'\r' | b'\n');
   let begin = bytes
@@ -481,9 +485,7 @@ extern "C" fn header_callback(
     let chunk = std::slice::from_raw_parts(data.cast::<u8>(), bytes);
     let line = trim_header_line(chunk);
     state.mark_activity();
-    state
-      .headers
-      .push(String::from_utf8_lossy(line).into_owned());
+    state.headers.push(header_bytes_to_latin1(line));
 
     if let Some(status_code) = parse_http_status_code(line) {
       state.current_status_code = Some(status_code);

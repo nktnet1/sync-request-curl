@@ -206,6 +206,10 @@ not all necessarily desirable behaviours to copy.
       `Content-Length` into the stored response, and do not reintroduce
       `Content-Encoding` when the cached body was already transparently decoded.
       Preserve ordinary 304 metadata updates and omitted original fields.
+- [x] Preserve HTTP/1 response header bytes using Node-compatible Latin-1
+      semantics instead of UTF-8 lossy decoding in the native header callback.
+      Bytes in the HTTP `obs-text` range (`0x80`-`0xFF`) therefore survive
+      round-tripping without replacement characters.
 
 Intentional differences: do not reproduce `then-request`'s early rejection of a
 `body` on GET, DELETE, or HEAD. `sync-request-curl` passes explicit request
@@ -479,6 +483,10 @@ should be treated as the current baseline in future sessions:
   merged into stored metadata, and `Content-Encoding` is not reintroduced when
   the cached body was already transparently decoded; ordinary revalidation
   metadata still updates while omitted cached fields remain intact.
+- `v1.0.50-latin1-response-headers.patch` replaces lossy UTF-8 conversion in
+  the native header callback with a lossless byte-to-Latin-1 mapping, matching
+  Node's HTTP header string model for `obs-text` bytes and preventing `0x80`-
+  `0xFF` response field values from being corrupted to replacement characters.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are
