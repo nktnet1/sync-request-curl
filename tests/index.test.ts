@@ -24,3 +24,16 @@ describe("public entrypoint", () => {
     expectTypeOf<RootResponse>().toEqualTypeOf<Response>();
   });
 });
+
+describe("request URL protocols", () => {
+  test.each(["file:///tmp/example", "ftp://example.com/file"])(
+    "rejects %s",
+    (url) => {
+      expect(() => request("GET", url)).toThrow(/protocol .* is not supported/);
+    },
+  );
+
+  test("rejects schemeless URLs instead of letting libcurl guess", () => {
+    expect(() => request("GET", "example.com/path")).toThrow(/Invalid URL/);
+  });
+});

@@ -173,6 +173,13 @@ not all necessarily desirable behaviours to copy.
       payload size is known. The value must use the `1*DIGIT` grammar, repeated
       outbound fields are rejected, and the decimal value must match the actual
       byte length of raw/JSON content or the known zero-length empty request.
+- [x] Restrict public request targets and followed redirects to absolute
+      `http:`/`https:` URLs. Reject schemeless targets instead of allowing
+      libcurl to guess a protocol, and reject non-HTTP schemes before they can
+      reach the native transport.
+- [x] Disable libcurl's ambient proxy-environment discovery. Requests do not
+      implicitly inherit `http_proxy`, `HTTPS_PROXY`, `ALL_PROXY`, or related
+      variables; proxy routing remains an explicit future high-level option.
       Matching values (including leading zeroes) are preserved. Empty
       GET/DELETE/HEAD requests still do not gain a generated length, but an
       explicit non-zero length is rejected. This intentionally fixes the
@@ -415,6 +422,16 @@ should be treated as the current baseline in future sessions:
   an automatically generated zero length. This intentionally fixes the
   permissive Node/`then-request` behaviour in accordance with RFC 9110 section
   8.6. Multipart is unchanged because libcurl owns the final encoded form size.
+- `v1.0.43-http-protocol-restriction.patch` restricts initial request targets
+  and manually followed redirects to absolute HTTP(S) URLs before native
+  transport. Schemeless targets no longer reach libcurl's protocol guessing,
+  and schemes such as `file:` or FTP are rejected consistently with the Node
+  `http-basic` transport boundary.
+- `v1.0.44-disable-ambient-proxy-env.patch` explicitly disables libcurl's
+  environment-proxy discovery for the native transport, preventing process
+  variables such as `http_proxy`, `HTTPS_PROXY`, and `ALL_PROXY` from silently
+  changing routing. Proxy support remains reserved for the explicit roadmap
+  option rather than ambient process state.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

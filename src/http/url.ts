@@ -1,4 +1,4 @@
-import { domainToASCII } from "node:url";
+import { domainToASCII, URL } from "node:url";
 import qs from "qs";
 import * as v from "valibot";
 
@@ -108,6 +108,18 @@ export const normalizeUrlHostname = (url: string): string => {
 
   const port = hasPort ? hostAndPort.slice(portSeparator) : "";
   return `${prefix}${userInfo}${asciiHostname}${port}${remainder}`;
+};
+
+export const assertSupportedHttpUrl = (url: string): void => {
+  const parsed = new URL(url);
+  if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+    return;
+  }
+
+  const protocol = parsed.protocol.replace(/:$/, "");
+  throw new TypeError(
+    `The protocol "${protocol}" is not supported, cannot load "${url}"`,
+  );
 };
 
 const recordSchema = v.record(v.string(), v.unknown());

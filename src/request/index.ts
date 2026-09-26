@@ -1,6 +1,7 @@
 import { URL } from "node:url";
 import * as v from "valibot";
 import { RequestError } from "#/errors";
+import { assertSupportedHttpUrl } from "#/http/url";
 import { performRequest } from "#/request/perform";
 import {
   getRedirectMethod,
@@ -41,6 +42,8 @@ const performRequestAttempt = (
   let currentOptions = originalOptions;
 
   for (let redirectsFollowed = 0; ; redirectsFollowed += 1) {
+    assertSupportedHttpUrl(currentUrl);
+
     if (originalOptions.timeout && originalOptions.timeout > 0) {
       currentOptions = {
         ...currentOptions,

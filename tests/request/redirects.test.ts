@@ -38,6 +38,12 @@ describe("Redirects", () => {
     ).toThrow(Error);
   });
 
+  test("rejects redirects to non-HTTP protocols before transport", () => {
+    expect(() => request("GET", `${SERVER_URL}/redirect/non-http`)).toThrow(
+      /protocol .* is not supported/,
+    );
+  });
+
   test("Only final response headers are returned after redirects", () => {
     const res = request(
       "GET",

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { appendQueryString, normalizeUrlHostname } from "#/http/url";
+import {
+  appendQueryString,
+  assertSupportedHttpUrl,
+  normalizeUrlHostname,
+} from "#/http/url";
 
 describe("normalizeUrlHostname", () => {
   test("converts an internationalized hostname to ASCII", () => {
@@ -62,6 +66,30 @@ describe("normalizeUrlHostname", () => {
     ["a malformed URL", "not a url münchen.example"],
   ])("leaves %s unchanged", (_case, url) => {
     expect(normalizeUrlHostname(url)).toBe(url);
+  });
+});
+
+describe("assertSupportedHttpUrl", () => {
+  test.each(["http://example.com", "https://example.com"])(
+    "accepts %s",
+    (url) => {
+      expect(() => assertSupportedHttpUrl(url)).not.toThrow();
+    },
+  );
+
+  test.each(["file:///tmp/example", "ftp://example.com/file"])(
+    "rejects unsupported protocol %s",
+    (url) => {
+      expect(() => assertSupportedHttpUrl(url)).toThrow(
+        /protocol .* is not supported/,
+      );
+    },
+  );
+
+  test("rejects schemeless URLs", () => {
+    expect(() => assertSupportedHttpUrl("example.com/path")).toThrow(
+      /Invalid URL/,
+    );
   });
 });
 

@@ -131,6 +131,11 @@ app.get("/redirect/destination", (c) => {
   return c.json({ message: "Redirect success!" });
 });
 
+app.get("/redirect/non-http", (c) => {
+  c.header("Location", "file:///tmp/sync-request-curl-redirect");
+  return c.body(null, 302);
+});
+
 app.get("/redirect/response-headers/source", (c) => {
   c.header("x-intermediate-response", "intermediate");
   return c.redirect("/redirect/response-headers/destination", 302);

@@ -829,6 +829,19 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
       false,
     ),
   );
+  // Do not let libcurl implicitly route requests through process-level
+  // http_proxy/HTTPS_PROXY/ALL_PROXY variables. Proxying is an explicit
+  // high-level feature and must not change request behaviour ambiently.
+  keep_first_error(
+    &mut code,
+    set_string_option(
+      curl,
+      curl_sys::CURLOPT_PROXY,
+      Some(""),
+      &mut keepalive,
+      true,
+    ),
+  );
   keep_first_error(
     &mut code,
     set_string_option(
