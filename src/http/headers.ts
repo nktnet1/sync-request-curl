@@ -120,11 +120,13 @@ export const setContentLengthHeader = (
     invalidRequestFraming("multiple Content-Length fields are not allowed");
   }
 
-  const contentLength = normalizeRequestContentLength(contentLengthValues[0]!);
-  if (contentLength !== String(length)) {
-    invalidRequestFraming(
-      `Content-Length does not match the request body length (${length})`,
-    );
+  for (const contentLengthValue of contentLengthValues) {
+    const contentLength = normalizeRequestContentLength(contentLengthValue);
+    if (contentLength !== String(length)) {
+      invalidRequestFraming(
+        `Content-Length does not match the request body length (${length})`,
+      );
+    }
   }
 };
 
@@ -263,12 +265,20 @@ const validateAndNormalizeContentLength = (
   }
 
   const candidates = values.flatMap((value) => value.split(","));
-  const first = candidates[0]!.trim();
-  const normalizedFirst = normalizeContentLengthValue(first);
+  let first: string | undefined;
+  let normalizedFirst: string | undefined;
 
-  for (const candidate of candidates.slice(1)) {
+  for (const candidate of candidates) {
     const trimmed = candidate.trim();
-    if (normalizeContentLengthValue(trimmed) !== normalizedFirst) {
+    const normalized = normalizeContentLengthValue(trimmed);
+
+    if (first === undefined) {
+      first = trimmed;
+      normalizedFirst = normalized;
+      continue;
+    }
+
+    if (normalized !== normalizedFirst) {
       invalidResponseFraming("conflicting Content-Length values");
     }
   }
