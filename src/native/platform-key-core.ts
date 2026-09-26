@@ -9,8 +9,32 @@ export const supportedPlatformKeys = [
   "win32-x64-msvc",
 ] as const;
 
+export const supportedLinuxLibcs = ["gnu", "musl"] as const;
+
 export type NativePlatformKey = (typeof supportedPlatformKeys)[number];
-export type LinuxLibc = "gnu" | "musl";
+export type LinuxLibc = (typeof supportedLinuxLibcs)[number];
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+export const getLinuxLibcFromReport = (report: unknown): LinuxLibc => {
+  if (!isRecord(report)) {
+    return "musl";
+  }
+
+  const { header } = report;
+  if (!isRecord(header)) {
+    return "musl";
+  }
+
+  return typeof header.glibcVersionRuntime === "string" &&
+    header.glibcVersionRuntime.length > 0
+    ? "gnu"
+    : "musl";
+};
+
+export const getNativePackageName = (platform: NativePlatformKey): string =>
+  `@nktnet/sync-request-curl-${platform}`;
 
 export function isNativePlatformKey(value: string): value is NativePlatformKey {
   return (supportedPlatformKeys as readonly string[]).includes(value);
@@ -21,7 +45,9 @@ export function resolveNativePlatformKey(
   arch: string,
   linuxLibc: LinuxLibc,
 ): NativePlatformKey | undefined {
-  if (arch !== "x64" && arch !== "arm64") return undefined;
+  if (arch !== "x64" && arch !== "arm64") {
+    return undefined;
+  }
 
   switch (platform) {
     case "darwin":

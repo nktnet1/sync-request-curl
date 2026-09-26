@@ -1,5 +1,9 @@
 pre-commit:
   commands:
+    typecheck:
+      glob: "*.{ts,cts,mts}"
+      run: >
+        pnpm typecheck
     check:
       glob: "*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc,css}"
       run: >

@@ -1,20 +1,25 @@
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_long, c_void};
+use std::os::raw::{c_char, c_int, c_long, c_void};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use curl_sys::{
-  curl_off_t, curl_slist, CURLcode, CURLoption, CURL, CURLE_OK, CURLE_OUT_OF_MEMORY,
+  curl_off_t, curl_slist, CURLcode, CURLoption, CURLMcode, CURL, CURLM,
+  CURLE_FAILED_INIT, CURLE_OK, CURLE_OPERATION_TIMEDOUT, CURLE_OUT_OF_MEMORY,
+  CURLE_WRITE_ERROR, CURLM_CALL_MULTI_PERFORM, CURLM_OK, CURLM_OUT_OF_MEMORY,
   CURLOPTTYPE_OBJECTPOINT,
 };
 use napi::bindgen_prelude::{Buffer, Either};
-use napi::{Error, Result, Status};
+use napi::{Error, Result};
 use napi_derive::napi;
 
 // curl-sys intentionally exposes the older form API but not libcurl's MIME API.
 // The MIME symbols are part of libcurl's public ABI; keep this small bridge here
-// so multipart requests retain the same implementation as the former C++ addon.
+// for multipart requests without exposing transport-specific APIs to JavaScript.
 #[repr(C)]
 struct CurlMime {
   _private: [u8; 0],
@@ -35,25 +40,44 @@ unsafe extern "C" {
     data: *const c_char,
     data_size: usize,
   ) -> CURLcode;
-  fn curl_mime_filedata(part: *mut CurlMimePart, filename: *const c_char) -> CURLcode;
-  fn curl_mime_type(part: *mut CurlMimePart, mime_type: *const c_char) -> CURLcode;
   fn curl_mime_filename(part: *mut CurlMimePart, filename: *const c_char) -> CURLcode;
+  fn curl_mime_type(part: *mut CurlMimePart, mimetype: *const c_char) -> CURLcode;
 }
 
 const CURLOPT_MIMEPOST: CURLoption = CURLOPTTYPE_OBJECTPOINT + 269;
-// curl-sys 0.4.90 bundles libcurl 8.21.0. CURLFOLLOW_OBEYCODE (2), added
-// in libcurl 8.13.0, preserves our redirect method semantics when
-// CURLOPT_CUSTOMREQUEST is set.
-const CURL_FOLLOW_OBEY_CODE: c_long = 2;
-
 static CURL_INIT: OnceLock<CURLcode> = OnceLock::new();
-#[cfg(unix)]
+static CONNECTION_POOLS: OnceLock<Mutex<HashMap<i64, Arc<Mutex<MultiHandle>>>>> =
+  OnceLock::new();
+static NEXT_CONNECTION_POOL_ID: AtomicI64 = AtomicI64::new(1);
+#[cfg(all(unix, not(target_os = "macos")))]
 static CA_PROBE: OnceLock<openssl_probe::ProbeResult> = OnceLock::new();
 
-#[derive(Default)]
 struct RequestState {
   body: Vec<u8>,
   headers: Vec<String>,
+  last_activity: Instant,
+  stop_after_final_headers: bool,
+  current_status_code: Option<u16>,
+  stopped_after_final_headers: bool,
+}
+
+impl Default for RequestState {
+  fn default() -> Self {
+    Self {
+      body: Vec::new(),
+      headers: Vec::new(),
+      last_activity: Instant::now(),
+      stop_after_final_headers: false,
+      current_status_code: None,
+      stopped_after_final_headers: false,
+    }
+  }
+}
+
+impl RequestState {
+  fn mark_activity(&mut self) {
+    self.last_activity = Instant::now();
+  }
 }
 
 struct EasyHandle(*mut CURL);
@@ -74,6 +98,29 @@ impl Drop for EasyHandle {
   }
 }
 
+struct MultiHandle(*mut CURLM);
+
+// A pool is never used concurrently: every transfer locks its MultiHandle.
+// libcurl permits moving handles between threads as long as only one thread
+// uses a handle at a time.
+unsafe impl Send for MultiHandle {}
+
+impl MultiHandle {
+  fn new() -> std::result::Result<Self, CURLcode> {
+    let handle = unsafe { curl_sys::curl_multi_init() };
+    if handle.is_null() {
+      return Err(CURLE_OUT_OF_MEMORY);
+    }
+    Ok(Self(handle))
+  }
+}
+
+impl Drop for MultiHandle {
+  fn drop(&mut self) {
+    unsafe { curl_sys::curl_multi_cleanup(self.0) };
+  }
+}
+
 #[derive(Default)]
 struct HeaderList(*mut curl_slist);
 
@@ -87,6 +134,15 @@ impl HeaderList {
     self.0 = next;
     CURLE_OK
   }
+}
+
+fn header_name_matches(header: &str, expected_name: &str) -> bool {
+  let delimiter_index = header
+    .find(|character| character == ':' || character == ';')
+    .unwrap_or(header.len());
+  header[..delimiter_index]
+    .trim()
+    .eq_ignore_ascii_case(expected_name)
 }
 
 impl Drop for HeaderList {
@@ -118,28 +174,13 @@ impl Drop for Mime {
 }
 
 #[napi(object, object_to_js = false)]
-pub struct NativeCurlOptions {
-  pub proxy: Option<String>,
-  #[napi(js_name = "proxyUserPwd")]
-  pub proxy_user_pwd: Option<String>,
-  #[napi(js_name = "userAgent")]
-  pub user_agent: Option<String>,
-  pub referer: Option<String>,
-  #[napi(js_name = "caInfo")]
-  pub ca_info: Option<String>,
-  pub interface: Option<String>,
-  #[napi(js_name = "tcpKeepAlive")]
-  pub tcp_keep_alive: Option<bool>,
-}
-
-#[napi(object, object_to_js = false)]
-pub struct NativePostField {
-  pub name: String,
-  pub contents: Option<String>,
-  pub file: Option<String>,
-  #[napi(js_name = "type")]
+pub struct NativeFormDataEntry {
+  pub key: String,
+  pub value: Either<String, Buffer>,
+  #[napi(js_name = "fileName")]
+  pub file_name: Option<String>,
+  #[napi(js_name = "contentType")]
   pub content_type: Option<String>,
-  pub filename: Option<String>,
 }
 
 #[napi(object, object_to_js = false)]
@@ -148,25 +189,22 @@ pub struct NativeRequestOptions {
   pub url: String,
   pub headers: Option<Vec<String>>,
   pub body: Option<Either<String, Buffer>>,
-  #[napi(js_name = "formData")]
-  pub form_data: Option<Vec<NativePostField>>,
+  pub form: Option<Vec<NativeFormDataEntry>>,
   pub timeout: Option<i64>,
-  pub insecure: Option<bool>,
+  #[napi(js_name = "socketTimeout")]
+  pub socket_timeout: Option<i64>,
   #[napi(js_name = "noBody")]
   pub no_body: Option<bool>,
-  #[napi(js_name = "followRedirects")]
-  pub follow_redirects: Option<bool>,
-  #[napi(js_name = "maxRedirects")]
-  pub max_redirects: Option<i64>,
-  #[napi(js_name = "curlOptions")]
-  pub curl_options: Option<NativeCurlOptions>,
+  #[napi(js_name = "connectionPoolId")]
+  pub connection_pool_id: Option<i64>,
 }
 
 #[napi(object, object_from_js = false, use_nullable = true)]
 pub struct NativeResponse {
-  pub code: i64,
-  #[napi(js_name = "errorMessage")]
-  pub error_message: String,
+  #[napi(js_name = "transportCode")]
+  pub transport_code: i64,
+  #[napi(js_name = "transportMessage")]
+  pub transport_message: String,
   #[napi(js_name = "statusCode")]
   pub status_code: i64,
   #[napi(js_name = "effectiveUrl")]
@@ -175,6 +213,61 @@ pub struct NativeResponse {
   pub redirect_url: Option<String>,
   pub headers: Vec<String>,
   pub body: Buffer,
+}
+
+fn connection_pools() -> &'static Mutex<HashMap<i64, Arc<Mutex<MultiHandle>>>> {
+  CONNECTION_POOLS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn multi_error_message(code: CURLMcode) -> String {
+  let message = unsafe { curl_sys::curl_multi_strerror(code) };
+  if message.is_null() {
+    return format!("multi transport error {code}");
+  }
+  unsafe { CStr::from_ptr(message) }
+    .to_string_lossy()
+    .into_owned()
+}
+
+#[napi(js_name = "createConnectionPool")]
+pub fn create_connection_pool(max_connections: i64) -> Result<i64> {
+  ensure_curl_initialized()?;
+  if max_connections <= 0 {
+    return Err(Error::from_reason(
+      "Connection pool maxConnections must be greater than zero",
+    ));
+  }
+
+  let multi =
+    MultiHandle::new().map_err(|code| Error::from_reason(curl_error_message(code)))?;
+  let code = unsafe {
+    curl_sys::curl_multi_setopt(
+      multi.0,
+      curl_sys::CURLMOPT_MAXCONNECTS,
+      max_connections.min(i64::from(c_long::MAX)) as c_long,
+    )
+  };
+  if code != CURLM_OK {
+    return Err(Error::from_reason(multi_error_message(code)));
+  }
+
+  let pool_id = NEXT_CONNECTION_POOL_ID.fetch_add(1, Ordering::Relaxed);
+  let mut pools = connection_pools()
+    .lock()
+    .map_err(|_| Error::from_reason("Connection pool registry is unavailable"))?;
+  pools.insert(pool_id, Arc::new(Mutex::new(multi)));
+  Ok(pool_id)
+}
+
+#[napi(js_name = "releaseConnectionPool")]
+pub fn release_connection_pool(pool_id: i64) {
+  if let Ok(mut pools) = connection_pools().lock() {
+    pools.remove(&pool_id);
+  }
+}
+
+fn get_connection_pool(pool_id: i64) -> Option<Arc<Mutex<MultiHandle>>> {
+  connection_pools().lock().ok()?.get(&pool_id).cloned()
 }
 
 fn curl_string(value: &str) -> CString {
@@ -188,11 +281,21 @@ fn curl_string(value: &str) -> CString {
 fn curl_error_message(code: CURLcode) -> String {
   let message = unsafe { curl_sys::curl_easy_strerror(code) };
   if message.is_null() {
-    return format!("libcurl error {code}");
+    return format!("transport error {code}");
   }
   unsafe { CStr::from_ptr(message) }
     .to_string_lossy()
     .into_owned()
+}
+
+fn transport_error_message(code: CURLcode, error_buffer: &[c_char]) -> String {
+  if code != CURLE_OK && error_buffer.first().is_some_and(|value| *value != 0) {
+    return unsafe { CStr::from_ptr(error_buffer.as_ptr()) }
+      .to_string_lossy()
+      .into_owned();
+  }
+
+  curl_error_message(code)
 }
 
 fn ensure_curl_initialized() -> Result<()> {
@@ -240,16 +343,11 @@ fn set_string_option(
   set_string_option_value(curl, option, value, keepalive)
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "macos")))]
 fn configure_default_ca(
   curl: *mut CURL,
-  custom_ca_info: Option<&str>,
   keepalive: &mut Vec<CString>,
 ) -> CURLcode {
-  if custom_ca_info.is_some_and(|value| !value.is_empty()) {
-    return CURLE_OK;
-  }
-
   let probe = CA_PROBE.get_or_init(openssl_probe::probe);
   let mut code = CURLE_OK;
   if let Some(cert_file) = &probe.cert_file {
@@ -281,10 +379,9 @@ fn configure_default_ca(
   code
 }
 
-#[cfg(not(unix))]
+#[cfg(any(not(unix), target_os = "macos"))]
 fn configure_default_ca(
   _curl: *mut CURL,
-  _custom_ca_info: Option<&str>,
   _keepalive: &mut Vec<CString>,
 ) -> CURLcode {
   CURLE_OK
@@ -310,6 +407,7 @@ where
   catch_unwind(AssertUnwindSafe(|| unsafe {
     let state = &mut *userdata.cast::<RequestState>();
     let chunk = std::slice::from_raw_parts(data.cast::<u8>(), bytes);
+    state.mark_activity();
     handle_chunk(state, chunk);
     bytes
   }))
@@ -346,100 +444,333 @@ fn trim_header_line(bytes: &[u8]) -> &[u8] {
   &bytes[begin..end]
 }
 
-request_callback!(header_callback, |state: &mut RequestState, chunk: &[u8]| {
-  state
-    .headers
-    .push(String::from_utf8_lossy(trim_header_line(chunk)).into_owned());
-});
+fn parse_http_status_code(line: &[u8]) -> Option<u16> {
+  let line = trim_header_line(line);
+  if line.len() < 8 || !line[..5].eq_ignore_ascii_case(b"HTTP/") {
+    return None;
+  }
+
+  let status_start = line.iter().position(|byte| *byte == b' ')? + 1;
+  let status = line.get(status_start..status_start + 3)?;
+  if !status.iter().all(u8::is_ascii_digit) {
+    return None;
+  }
+
+  Some(
+    u16::from(status[0] - b'0') * 100
+      + u16::from(status[1] - b'0') * 10
+      + u16::from(status[2] - b'0'),
+  )
+}
+
+extern "C" fn header_callback(
+  data: *mut c_char,
+  size: usize,
+  count: usize,
+  userdata: *mut c_void,
+) -> usize {
+  let Some(bytes) = size.checked_mul(count) else {
+    return 0;
+  };
+  if bytes == 0 {
+    return 0;
+  }
+
+  catch_unwind(AssertUnwindSafe(|| unsafe {
+    let state = &mut *userdata.cast::<RequestState>();
+    let chunk = std::slice::from_raw_parts(data.cast::<u8>(), bytes);
+    let line = trim_header_line(chunk);
+    state.mark_activity();
+    state
+      .headers
+      .push(String::from_utf8_lossy(line).into_owned());
+
+    if let Some(status_code) = parse_http_status_code(line) {
+      state.current_status_code = Some(status_code);
+    }
+
+    if state.stop_after_final_headers
+      && line.is_empty()
+      && state
+        .current_status_code
+        .is_some_and(|status_code| !(100..200).contains(&status_code))
+    {
+      state.stopped_after_final_headers = true;
+      return 0;
+    }
+
+    bytes
+  }))
+  .unwrap_or(0)
+}
 
 fn build_mime(
   curl: *mut CURL,
-  fields: &[NativePostField],
+  fields: &[NativeFormDataEntry],
   keepalive: &mut Vec<CString>,
-) -> Result<std::result::Result<Mime, CURLcode>> {
-  for field in fields {
-    if field.file.is_none() && field.contents.is_none() {
-      return Err(Error::new(
-        Status::InvalidArg,
-        "Missing native request option: contents".to_string(),
-      ));
-    }
-  }
-
-  let mime = match Mime::new(curl) {
-    Ok(mime) => mime,
-    Err(code) => return Ok(Err(code)),
-  };
+) -> std::result::Result<Mime, CURLcode> {
+  let mime = Mime::new(curl)?;
 
   for field in fields {
     let part = unsafe { curl_mime_addpart(mime.0) };
     if part.is_null() {
-      return Ok(Err(CURLE_OUT_OF_MEMORY));
+      return Err(CURLE_OUT_OF_MEMORY);
     }
 
-    keepalive.push(curl_string(&field.name));
+    keepalive.push(curl_string(&field.key));
     let name = keepalive.last().expect("just pushed MIME name").as_ptr();
     let mut code = unsafe { curl_mime_name(part, name) };
     if code != CURLE_OK {
-      return Ok(Err(code));
+      return Err(code);
     }
 
-    if let Some(file) = &field.file {
-      keepalive.push(curl_string(file));
-      let file = keepalive.last().expect("just pushed MIME file").as_ptr();
-      code = unsafe { curl_mime_filedata(part, file) };
-      if code != CURLE_OK {
-        return Ok(Err(code));
-      }
-
-      if let Some(content_type) = field.content_type.as_deref().filter(|value| !value.is_empty()) {
-        keepalive.push(curl_string(content_type));
-        let content_type = keepalive
-          .last()
-          .expect("just pushed MIME content type")
-          .as_ptr();
-        code = unsafe { curl_mime_type(part, content_type) };
-        if code != CURLE_OK {
-          return Ok(Err(code));
-        }
-      }
-
-      if let Some(filename) = field.filename.as_deref().filter(|value| !value.is_empty()) {
-        keepalive.push(curl_string(filename));
-        let filename = keepalive
-          .last()
-          .expect("just pushed MIME filename")
-          .as_ptr();
-        code = unsafe { curl_mime_filename(part, filename) };
-        if code != CURLE_OK {
-          return Ok(Err(code));
-        }
-      }
-      continue;
-    }
-
-    let contents = field
-      .contents
-      .as_deref()
-      .expect("validated non-file MIME field has contents");
-    code = unsafe {
-      curl_mime_data(
-        part,
-        contents.as_bytes().as_ptr().cast::<c_char>(),
-        contents.len(),
-      )
+    let data: &[u8] = match &field.value {
+      Either::A(text) => text.as_bytes(),
+      Either::B(buffer) => buffer.as_ref(),
     };
+    let data_pointer = if data.is_empty() {
+      c"".as_ptr()
+    } else {
+      data.as_ptr().cast::<c_char>()
+    };
+    code = unsafe { curl_mime_data(part, data_pointer, data.len()) };
     if code != CURLE_OK {
-      return Ok(Err(code));
+      return Err(code);
+    }
+
+    if let Some(file_name) = field
+      .file_name
+      .as_deref()
+      .filter(|value| !value.is_empty())
+    {
+      keepalive.push(curl_string(file_name));
+      let file_name = keepalive
+        .last()
+        .expect("just pushed MIME filename")
+        .as_ptr();
+      code = unsafe { curl_mime_filename(part, file_name) };
+      if code != CURLE_OK {
+        return Err(code);
+      }
+    }
+
+    if let Some(content_type) = field
+      .content_type
+      .as_deref()
+      .filter(|value| !value.is_empty())
+    {
+      keepalive.push(curl_string(content_type));
+      let content_type = keepalive
+        .last()
+        .expect("just pushed MIME content type")
+        .as_ptr();
+      code = unsafe { curl_mime_type(part, content_type) };
+      if code != CURLE_OK {
+        return Err(code);
+      }
     }
   }
 
   let code = unsafe { curl_sys::curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime.0) };
   if code != CURLE_OK {
-    return Ok(Err(code));
+    return Err(code);
   }
 
-  Ok(Ok(mime))
+  Ok(mime)
+}
+
+fn multi_error_to_curl(code: CURLMcode) -> CURLcode {
+  if code == CURLM_OUT_OF_MEMORY {
+    CURLE_OUT_OF_MEMORY
+  } else {
+    CURLE_FAILED_INIT
+  }
+}
+
+fn multi_perform(multi: *mut CURLM, running_handles: &mut c_int) -> CURLMcode {
+  loop {
+    let code = unsafe { curl_sys::curl_multi_perform(multi, running_handles) };
+    if code != CURLM_CALL_MULTI_PERFORM {
+      return code;
+    }
+  }
+}
+
+const EMPTY_MULTI_WAIT_SLICE: Duration = Duration::from_millis(10);
+
+fn duration_to_wait_ms(duration: Duration) -> c_int {
+  duration.as_millis().max(1).min(c_int::MAX as u128) as c_int
+}
+
+fn multi_timeout(multi: *mut CURLM) -> std::result::Result<Option<Duration>, CURLcode> {
+  let mut timeout_ms: c_long = -1;
+  let code = unsafe { curl_sys::curl_multi_timeout(multi, &mut timeout_ms) };
+  if code != CURLM_OK {
+    return Err(multi_error_to_curl(code));
+  }
+
+  if timeout_ms < 0 {
+    Ok(None)
+  } else {
+    Ok(Some(Duration::from_millis(timeout_ms as u64)))
+  }
+}
+
+fn wait_for_multi(
+  multi: *mut CURLM,
+  wait_limit: Duration,
+) -> std::result::Result<bool, CURLcode> {
+  let timeout_ms = duration_to_wait_ms(wait_limit);
+  let started_at = Instant::now();
+  let mut active_fds = 0;
+  let code = unsafe {
+    curl_sys::curl_multi_wait(
+      multi,
+      ptr::null_mut(),
+      0,
+      timeout_ms,
+      &mut active_fds,
+    )
+  };
+  if code != CURLM_OK {
+    return Err(multi_error_to_curl(code));
+  }
+  if active_fds > 0 {
+    return Ok(true);
+  }
+
+  // curl_multi_wait() is allowed to return immediately when libcurl has no
+  // descriptors yet. Avoid a busy loop without hiding a newly due libcurl
+  // timer or the caller's inactivity deadline behind a long sleep.
+  let remaining_wait = wait_limit.saturating_sub(started_at.elapsed());
+  if remaining_wait.is_zero() {
+    return Ok(false);
+  }
+
+  let curl_remaining = multi_timeout(multi)?;
+  if curl_remaining == Some(Duration::ZERO) {
+    return Ok(false);
+  }
+
+  let mut sleep_for = remaining_wait.min(EMPTY_MULTI_WAIT_SLICE);
+  if let Some(curl_remaining) = curl_remaining {
+    sleep_for = sleep_for.min(curl_remaining);
+  }
+  if !sleep_for.is_zero() {
+    std::thread::sleep(sleep_for);
+  }
+  Ok(false)
+}
+
+fn read_multi_result(multi: *mut CURLM, curl: *mut CURL) -> CURLcode {
+  let mut queued_messages = 0;
+  loop {
+    let message = unsafe { curl_sys::curl_multi_info_read(multi, &mut queued_messages) };
+    if message.is_null() {
+      return CURLE_FAILED_INIT;
+    }
+
+    let message = unsafe { &*message };
+    if message.msg == curl_sys::CURLMSG_DONE && message.easy_handle == curl {
+      return message.data as CURLcode;
+    }
+  }
+}
+
+fn perform_with_multi(
+  curl: *mut CURL,
+  multi: *mut CURLM,
+  state: *mut RequestState,
+  socket_timeout_ms: i64,
+) -> CURLcode {
+  let socket_timeout = if socket_timeout_ms > 0 {
+    let Ok(socket_timeout_ms) = u64::try_from(socket_timeout_ms) else {
+      return CURLE_FAILED_INIT;
+    };
+    Some(Duration::from_millis(socket_timeout_ms))
+  } else {
+    None
+  };
+  unsafe {
+    (*state).last_activity = Instant::now();
+  }
+
+  let add_code = unsafe { curl_sys::curl_multi_add_handle(multi, curl) };
+  if add_code != CURLM_OK {
+    return multi_error_to_curl(add_code);
+  }
+
+  let result = (|| {
+    let mut running_handles = 0;
+    let mut code = multi_perform(multi, &mut running_handles);
+    if code != CURLM_OK {
+      return multi_error_to_curl(code);
+    }
+    while running_handles > 0 {
+      let elapsed = unsafe { (*state).last_activity.elapsed() };
+      if socket_timeout.is_some_and(|timeout| elapsed >= timeout) {
+        return CURLE_OPERATION_TIMEDOUT;
+      }
+
+      let wait_limit = socket_timeout
+        .map(|timeout| timeout.saturating_sub(elapsed))
+        .unwrap_or(Duration::from_secs(1));
+      let socket_activity = match wait_for_multi(multi, wait_limit) {
+        Ok(socket_activity) => socket_activity,
+        Err(code) => return code,
+      };
+      if socket_activity {
+        unsafe {
+          (*state).mark_activity();
+        }
+      }
+
+      if socket_timeout.is_some_and(|timeout| unsafe {
+        (*state).last_activity.elapsed() >= timeout
+      }) {
+        return CURLE_OPERATION_TIMEDOUT;
+      }
+
+      code = multi_perform(multi, &mut running_handles);
+      if code != CURLM_OK {
+        return multi_error_to_curl(code);
+      }
+    }
+
+    read_multi_result(multi, curl)
+  })();
+
+  unsafe {
+    curl_sys::curl_multi_remove_handle(multi, curl);
+  }
+  result
+}
+
+fn perform_request(
+  curl: *mut CURL,
+  state: *mut RequestState,
+  socket_timeout_ms: i64,
+  connection_pool_id: Option<i64>,
+) -> CURLcode {
+  if let Some(pool_id) = connection_pool_id {
+    let Some(pool) = get_connection_pool(pool_id) else {
+      return CURLE_FAILED_INIT;
+    };
+    let Ok(pool) = pool.lock() else {
+      return CURLE_FAILED_INIT;
+    };
+    return perform_with_multi(curl, pool.0, state, socket_timeout_ms);
+  }
+
+  if socket_timeout_ms <= 0 {
+    return unsafe { curl_sys::curl_easy_perform(curl) };
+  }
+
+  let multi = match MultiHandle::new() {
+    Ok(multi) => multi,
+    Err(code) => return code,
+  };
+  perform_with_multi(curl, multi.0, state, socket_timeout_ms)
 }
 
 fn get_string_info(curl: *mut CURL, info: curl_sys::CURLINFO) -> Option<String> {
@@ -461,19 +792,33 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   // Keep the original Node Buffer alive for the whole synchronous transfer.
   // napi::Buffer is zero-copy; converting it to Vec<u8> would duplicate large uploads.
   let request_body = options.body;
-  let has_form_data = options.form_data.is_some();
-  let form_data = options.form_data.unwrap_or_default();
-  let curl_options = options.curl_options;
+  let has_form = options.form.is_some();
+  let has_request_payload = request_body.is_some() || has_form;
+  let form = options.form.unwrap_or_default();
+  let request_headers = options.headers.unwrap_or_default();
+  let has_content_type = request_headers
+    .iter()
+    .any(|header| header_name_matches(header, "content-type"));
+  let no_body = options.no_body.unwrap_or(false);
 
   let easy = EasyHandle::new()?;
   let curl = easy.0;
   let mut state = Box::new(RequestState::default());
+  state.stop_after_final_headers = no_body && has_request_payload;
   let state_pointer = (&mut *state as *mut RequestState).cast::<c_void>();
+  let mut error_buffer = vec![0 as c_char; curl_sys::CURL_ERROR_SIZE as usize];
   let mut headers = HeaderList::default();
   let mut mime: Option<Mime> = None;
   let mut keepalive = Vec::<CString>::new();
   let mut code = CURLE_OK;
 
+  keep_first_error(&mut code, unsafe {
+    curl_sys::curl_easy_setopt(
+      curl,
+      curl_sys::CURLOPT_ERRORBUFFER,
+      error_buffer.as_mut_ptr(),
+    )
+  });
   keep_first_error(
     &mut code,
     set_string_option(
@@ -482,6 +827,19 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
       Some(&options.url),
       &mut keepalive,
       false,
+    ),
+  );
+  // Do not let libcurl implicitly route requests through process-level
+  // http_proxy/HTTPS_PROXY/ALL_PROXY variables. Proxying is an explicit
+  // high-level feature and must not change request behaviour ambiently.
+  keep_first_error(
+    &mut code,
+    set_string_option(
+      curl,
+      curl_sys::CURLOPT_PROXY,
+      Some(""),
+      &mut keepalive,
+      true,
     ),
   );
   keep_first_error(
@@ -504,33 +862,14 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(
       curl,
-      curl_sys::CURLOPT_SSL_VERIFYPEER,
-      if options.insecure.unwrap_or(false) { 0 as c_long } else { 1 as c_long },
-    )
-  });
-  keep_first_error(&mut code, unsafe {
-    curl_sys::curl_easy_setopt(
-      curl,
       curl_sys::CURLOPT_NOBODY,
-      if options.no_body.unwrap_or(false) { 1 as c_long } else { 0 as c_long },
+      if no_body && !has_request_payload {
+        1 as c_long
+      } else {
+        0 as c_long
+      },
     )
   });
-  if options.follow_redirects.unwrap_or(false) {
-    keep_first_error(&mut code, unsafe {
-      curl_sys::curl_easy_setopt(
-        curl,
-        curl_sys::CURLOPT_FOLLOWLOCATION,
-        CURL_FOLLOW_OBEY_CODE,
-      )
-    });
-    keep_first_error(&mut code, unsafe {
-      curl_sys::curl_easy_setopt(
-        curl,
-        curl_sys::CURLOPT_MAXREDIRS,
-        options.max_redirects.unwrap_or(-1) as c_long,
-      )
-    });
-  }
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(
       curl,
@@ -551,20 +890,20 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_HEADERDATA, state_pointer)
   });
-  let custom_ca_info = curl_options
-    .as_ref()
-    .and_then(|options| options.ca_info.as_deref());
-  keep_first_error(
-    &mut code,
-    configure_default_ca(curl, custom_ca_info, &mut keepalive),
-  );
+  keep_first_error(&mut code, configure_default_ca(curl, &mut keepalive));
 
-  for header in options.headers.unwrap_or_default() {
+  for header in request_headers {
     let next = headers.append(&header);
     if next != CURLE_OK {
       code = CURLE_OUT_OF_MEMORY;
       break;
     }
+  }
+  // CURLOPT_POSTFIELDS otherwise invents application/x-www-form-urlencoded.
+  // A raw body has no implied media type, so suppress libcurl's generated
+  // Content-Type unless the caller (or JSON preparation) supplied one.
+  if code == CURLE_OK && request_body.is_some() && !has_form && !has_content_type {
+    code = headers.append("Content-Type:");
   }
   if !headers.0.is_null() {
     keep_first_error(&mut code, unsafe {
@@ -594,85 +933,23 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     });
   }
 
-  if code == CURLE_OK && has_form_data {
-    match build_mime(curl, &form_data, &mut keepalive)? {
+  if code == CURLE_OK && has_form {
+    match build_mime(curl, &form, &mut keepalive) {
       Ok(next_mime) => mime = Some(next_mime),
       Err(next_code) => code = next_code,
     }
   }
 
   if code == CURLE_OK {
-    if let Some(curl_options) = &curl_options {
-      keep_first_error(
-        &mut code,
-        set_string_option(
-          curl,
-          curl_sys::CURLOPT_PROXY,
-          curl_options.proxy.as_deref(),
-          &mut keepalive,
-          true,
-        ),
-      );
-      keep_first_error(
-        &mut code,
-        set_string_option(
-          curl,
-          curl_sys::CURLOPT_PROXYUSERPWD,
-          curl_options.proxy_user_pwd.as_deref(),
-          &mut keepalive,
-          false,
-        ),
-      );
-      keep_first_error(
-        &mut code,
-        set_string_option(
-          curl,
-          curl_sys::CURLOPT_USERAGENT,
-          curl_options.user_agent.as_deref(),
-          &mut keepalive,
-          false,
-        ),
-      );
-      keep_first_error(
-        &mut code,
-        set_string_option(
-          curl,
-          curl_sys::CURLOPT_REFERER,
-          curl_options.referer.as_deref(),
-          &mut keepalive,
-          false,
-        ),
-      );
-      keep_first_error(
-        &mut code,
-        set_string_option(
-          curl,
-          curl_sys::CURLOPT_CAINFO,
-          curl_options.ca_info.as_deref(),
-          &mut keepalive,
-          false,
-        ),
-      );
-      keep_first_error(
-        &mut code,
-        set_string_option(
-          curl,
-          curl_sys::CURLOPT_INTERFACE,
-          curl_options.interface.as_deref(),
-          &mut keepalive,
-          false,
-        ),
-      );
-      if curl_options.tcp_keep_alive.unwrap_or(false) {
-        keep_first_error(&mut code, unsafe {
-          curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_TCP_KEEPALIVE, 1 as c_long)
-        });
-      }
+    code = perform_request(
+      curl,
+      state_pointer.cast::<RequestState>(),
+      options.socket_timeout.unwrap_or_default(),
+      options.connection_pool_id,
+    );
+    if code == CURLE_WRITE_ERROR && state.stopped_after_final_headers {
+      code = CURLE_OK;
     }
-  }
-
-  if code == CURLE_OK {
-    code = unsafe { curl_sys::curl_easy_perform(curl) };
   }
 
   let mut status_code: c_long = 0;
@@ -690,8 +967,8 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   let _keepalive = keepalive;
 
   Ok(NativeResponse {
-    code: i64::from(code),
-    error_message: curl_error_message(code),
+    transport_code: i64::from(code),
+    transport_message: transport_error_message(code, &error_buffer),
     status_code: status_code as i64,
     effective_url,
     redirect_url,

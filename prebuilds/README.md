@@ -2,8 +2,10 @@
 
 Release CI builds one Node-API addon for each supported platform and places the
 finished artifacts alongside this file in the repository-level `prebuilds/`
-directory. The `.node` files are generated release artifacts; this README
-documents their supported matrix, naming, and verification.
+directory. The publish workflow repackages each `.node` artifact into its own
+platform-specific optional npm package, while the public entry point remains
+`sync-request-curl`. This README documents the supported matrix, naming, and
+verification.
 
 The release matrix contains:
 
@@ -30,4 +32,8 @@ prebuilds/sync_request_curl_native.<platform>.node
 ```
 
 `pnpm verify:prebuilds` checks that the complete eight-binary release matrix is
-present before packaging.
+present before packaging. `pnpm prepare:release-packages` then creates the main
+package plus eight `@nktnet/sync-request-curl-<platform>` packages under
+`.release/`. The main package declares those packages as exact-version optional
+dependencies; npm-compatible package managers use each companion package's `os`,
+`cpu`, and (on Linux) `libc` metadata to install only the matching binary.

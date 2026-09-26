@@ -10,14 +10,19 @@ name = "sync_request_curl_native"
 crate-type = ["cdylib"]
 
 [dependencies]
-curl-sys = { version = "=0.4.90", default-features = false, features = ["http2", "ssl", "static-curl", "static-ssl"] }
 napi = { version = "=3.13.0", default-features = false, features = ["dyn-symbols", "napi8"] }
 napi-derive = "=3.6.3"
 # Keep the macro crate on the backend release it was published against.
 # napi-derive-backend 6.1.4 moved to convert_case 0.12 while napi-derive 3.6.3 still uses 0.11.
 napi-derive-backend = "=6.1.2"
 
-[target.'cfg(unix)'.dependencies]
+[target.'cfg(target_os = "macos")'.dependencies]
+curl-sys = { version = "=0.4.90", default-features = false, features = ["force-system-lib-on-osx"] }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+curl-sys = { version = "=0.4.90", default-features = false, features = ["http2", "ssl", "static-curl", "static-ssl"] }
+
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
 openssl-probe = "=0.2.1"
 
 [build-dependencies]

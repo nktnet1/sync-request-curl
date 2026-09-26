@@ -30,21 +30,22 @@ The build uses Cargo and produces:
 native/build/sync_request_curl_native.node
 ```
 
-`curl-sys` builds libcurl from its bundled source with HTTP/2 enabled. Unix TLS
-uses vendored OpenSSL; Windows uses Schannel. zlib and the Linux GCC runtime are
-forced static in the prebuild path so release binaries do not acquire accidental
-runtime dependencies on build-host libraries.
+`curl-sys` builds bundled libcurl with HTTP/2 enabled on Linux and Windows. Linux TLS
+uses vendored OpenSSL, Windows uses Schannel, and macOS links the system libcurl so
+certificate verification uses Apple's native trust configuration. zlib and the Linux
+GCC runtime are forced static in the prebuild path so Linux release binaries do not
+acquire accidental runtime dependencies on build-host libraries.
 
 ## Release prebuilds
 
 See [the prebuilds README](../prebuilds/README.md) for the release matrix and CI details.
 
-Package consumers never compile this directory. The published package contains
-only the generated `.node` files under `prebuilds/`, so installation does not
-require Rust, a C/C++ compiler, CMake, vcpkg, node-gyp, or lifecycle-script
+Package consumers never compile this directory. Release CI publishes each generated
+`.node` file in a platform-specific optional npm package, so installation does
+not require Rust, a C/C++ compiler, CMake, vcpkg, node-gyp, or lifecycle-script
 approval.
 
 All repository automation under `scripts/` is TypeScript and runs directly in
-Node.js. Local development with those scripts requires a Node.js release where
-type stripping is enabled by default; `scripts/` is not included in the npm
-package and does not change the published library runtime requirement.
+Node.js. Local development and release automation use Node.js 24.14+ or 26+;
+`scripts/` is not included in the npm package and does not change the published
+library runtime requirement of Node.js 16.17.0 or newer.

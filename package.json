@@ -3,8 +3,8 @@
   "type": "module",
   "imports": {
     "#/*": "./src/*.ts",
-    "#native-platform-key": "./src/native-platform-key.ts",
-    "#scripts/*": "./scripts/*.ts"
+    "#scripts/*": "./scripts/*.ts",
+    "#tests/*": "./tests/*.ts"
   },
   "repository": {
     "type": "git",
@@ -12,26 +12,28 @@
   },
   "version": "5.0.0",
   "files": [
-    "dist",
-    "prebuilds"
+    "dist"
   ],
   "scripts": {
     "start": "tsx tests/app/server",
     "dev": "tsx watch --include ./tests/app ./tests/app/server.ts",
-    "test": "node scripts/build-native.ts --if-needed && vitest run",
-    "tc": "node scripts/build-native.ts --if-needed && vitest run --coverage",
+    "test": "pnpm build:worker && node scripts/build-native.ts --if-needed && vitest run",
+    "tc": "pnpm build:worker && node scripts/build-native.ts --if-needed && vitest run --coverage",
     "lint": "biome lint",
     "format": "biome format",
     "check": "biome check",
     "typecheck": "tsc --noEmit",
-    "build": "tsdown",
+    "build": "tsdown && pnpm build:worker",
+    "build:worker": "tsdown --config tsdown.worker.config.ts",
     "build:native": "node scripts/build-native.ts",
     "stage:native": "node scripts/stage-native.ts",
     "verify:prebuilds": "node scripts/verify-prebuilds.ts",
-    "prepack": "pnpm run build && pnpm run verify:prebuilds",
+    "prepack": "pnpm build",
+    "prepublishOnly": "node scripts/prevent-direct-publish.ts",
     "build:linux:gnu": "node scripts/linux-prebuild.ts --libc=gnu --mode=build",
     "build:linux:musl": "node scripts/linux-prebuild.ts --libc=musl --mode=build",
-    "test:linux:musl": "node scripts/linux-prebuild.ts --libc=musl --mode=test"
+    "test:linux:musl": "node scripts/linux-prebuild.ts --libc=musl --mode=test",
+    "prepare:release-packages": "node scripts/prepare-release-packages.ts"
   },
   "keywords": [
     "sync",
@@ -50,34 +52,64 @@
   ],
   "author": "Khiet Tam Nguyen",
   "license": "MIT",
-  "description": "Fast synchronous HTTP requests for Node.js using an in-process Node-API binding to libcurl. No install scripts or local native compilation required.",
+  "description": "Fast synchronous HTTP requests for Node.js using an in-process Node-API binding to libcurl.",
+  "dependencies": {
+    "qs": "^6.16.0",
+    "valibot": "^1.5.0"
+  },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
     "@hono/node-server": "^2.1.1",
-    "@types/node": "^26.6.1",
+    "@types/node": "^26.6.2",
+    "@types/qs": "^6.15.1",
     "@vitest/coverage-v8": "5.0.1",
-    "hono": "^4.13.8",
+    "hono": "^4.13.9",
     "lefthook": "2.1.14",
     "tsdown": "^0.23.0",
-    "tsx": "^4.23.13",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"
   },
-  "packageManager": "pnpm@12.4.2",
+  "packageManager": "pnpm@12.6.0",
   "main": "./dist/index.cjs",
-  "module": "./dist/index.mjs",
+  "module": "./dist/index-esm.mjs",
   "types": "./dist/index.d.cts",
   "engines": {
-    "node": ">=22"
+    "node": ">=16.17.0"
   },
+  "browserslist": [
+    "node >= 16.17.0"
+  ],
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index-esm.d.mts",
+        "default": "./dist/index-esm.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./errors": {
-      "import": "./dist/errors.mjs",
-      "require": "./dist/errors.cjs"
+      "import": {
+        "types": "./dist/errors.d.mts",
+        "default": "./dist/errors.mjs"
+      },
+      "require": {
+        "types": "./dist/errors.d.cts",
+        "default": "./dist/errors.cjs"
+      }
+    },
+    "./types": {
+      "import": {
+        "types": "./dist/types.d.mts",
+        "default": "./dist/types.mjs"
+      },
+      "require": {
+        "types": "./dist/types.d.cts",
+        "default": "./dist/types.cjs"
+      }
     },
     "./package.json": "./package.json"
   }

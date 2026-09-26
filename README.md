@@ -2,7 +2,7 @@
 
 # [![Sync Request Curl](logo.svg)](https://github.com/nktnet1/sync-request-curl)
 
-[![pipeline](https://github.com/nktnet1/sync-request-curl/actions/workflows/pipeline.yml/badge.svg)](https://github.com/nktnet1/sync-request-curl/actions/workflows/pipeline.yml)
+[![pipeline](https://github.com/nktnet1/sync-request-curl/actions/workflows/pipeline.yaml/badge.svg)](https://github.com/nktnet1/sync-request-curl/actions/workflows/pipeline.yaml)
 &nbsp;
 [![codecov](https://codecov.io/gh/nktnet1/sync-request-curl/branch/main/graph/badge.svg?token=RAC7SKJTGU)](https://codecov.io/gh/nktnet1/sync-request-curl)
 &nbsp;
@@ -34,7 +34,7 @@
 
 Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but up to 20 times more quickly.
 
-Uses a small in-process Node-API binding to libcurl for performance instead of spawning child processes like sync-request. The published package ships prebuilt native addons and does not run install or postinstall scripts.
+Uses a small in-process Node-API binding to libcurl for performance instead of spawning child processes like sync-request. The published package selects a platform-specific optional native package and does not run install or postinstall scripts.
 
 Designed to run on NodeJS. It will not work in a browser.
 
@@ -64,7 +64,7 @@ Designed to run on NodeJS. It will not work in a browser.
 npm install sync-request-curl
 ```
 
-No compiler, Python, CMake, node-gyp, or install-script approval is required when installing a published release. Please refer to the [compatibility](#4-compatibility) section for the platforms that have prebuilt binaries.
+No compiler, Python, CMake, node-gyp, or install-script approval is required when installing a published release. The package manager installs the matching platform-specific native package rather than every release binary. Please refer to the [compatibility](#4-compatibility) section for the platforms that have prebuilt binaries.
 
 ## 2. Usage
 
@@ -75,6 +75,14 @@ Try with [Replit](https://replit.com/@nktnet1/sync-request-curl-example#index.js
 
 ```typescript
 request(method, url, options);
+```
+
+The request function is the package default export. Public types and `FormData` are named exports from the `/types` entry:
+
+```typescript
+import request from 'sync-request-curl';
+import { FormData } from 'sync-request-curl/types';
+import type { Options, Response } from 'sync-request-curl/types';
 ```
 
 <details closed>
@@ -298,13 +306,6 @@ JSON.stringify({
   </tr>
 
   <tr>
-    <td>debug</td>
-    <td>Include request inputs in CurlError messages. This may expose sensitive headers or request bodies, so it is disabled by default.</td>
-    <td><pre>true</pre></td>
-    <td><code>false</code></td>
-  </tr>
-
-  <tr>
     <td>setEasyOptions</td>
     <td>Optional callback for the supported low-level libcurl options. This has priority over existing request headers/options. Supported options are <code>HTTPHEADER</code>, <code>PROXY</code>, <code>PROXYUSERPWD</code>, <code>USERAGENT</code>, <code>REFERER</code>, <code>CAINFO</code>, <code>INTERFACE</code>, and <code>TCP_KEEPALIVE</code>.</td>
     <td>
@@ -323,31 +324,13 @@ JSON.stringify({
 
 <br/>
 
-In [src/types.ts](src/types.ts), the `Options` interface following is defined as:
+Public request data types use Valibot schemas as their source of truth, so the runtime contract and TypeScript contract stay in sync. For example, [src/types.ts](src/types.ts) derives `Options` directly from `optionsSchema`:
 
 ```typescript
-export interface Options {
-  headers?: IncomingHttpHeaders;
-  qs?: { [key: string]: any };
-
-  // You should only specify one of these.
-  // They are processed in the order listed below.
-  //
-  // When no json, body or formdata is provided, Content-Length = 0
-  // will be set in the headers.
-  json?: any;
-  body?: string | Buffer;
-  formData?: HttpPostField[];
-
-  timeout?: number;
-  followRedirects?: boolean;
-  maxRedirects?: number;
-
-  insecure?: boolean;
-  debug?: boolean;
-  setEasyOptions?: SetEasyOptionCallback;
-}
+export type Options = v.InferOutput<typeof optionsSchema>;
 ```
+
+`JsonLike`, `UppercaseHttpVerb`, and `BufferEncoding` are derived from their corresponding schemas in the same way.
 
 ### 2.4. Response
 
@@ -358,17 +341,15 @@ export interface Options {
 - **`getBody`** - a function with an optional `encoding` argument that returns the `body` if `encoding` is undefined, otherwise `body.toString(encoding)`. If `statusCode >= 300`, an `Error` is thrown instead
 - **`getJSON`** - a function that returns the body parsed as `JSON`. An `Error` is thrown if the body cannot be parsed.
 
-In [src/types.ts](src/types.ts), the `Response` interface is defined as:
+The response data shape is also schema-derived, while the overloaded/generic helper methods remain explicit TypeScript function types:
 
 ```typescript
-export interface Response {
-  statusCode: number;
-  headers: IncomingHttpHeaders;
-  url: string;
-  body: string | Buffer;
-  getBody: (encoding?: BufferEncoding) => string | Buffer; // simplified
-  getJSON: <T = any>(encoding?: BufferEncoding) => T;
-}
+type ResponseData = v.InferOutput<typeof responseDataSchema>;
+
+export type Response = ResponseData & {
+  getBody: GetBody;
+  getJSON: GetJSON;
+};
 ```
 
 ### 2.5. Errors
@@ -420,9 +401,9 @@ export class CurlError extends Error {
   code: number;
   constructor(code: number, message: string) {
     super(message);
-    if (code < 1 || code > 99) {
+    if (code < 1 || code > 101) {
       throw new Error(
-        `CurlError code must be between 1 and 99. Given: ${code}`,
+        `CurlError code must be between 1 and 101. Given: ${code}`,
       );
     }
     this.code = code;
@@ -466,9 +447,11 @@ DEALINGS IN THE SOFTWARE.
 
 ## 4. Compatibility
 
-`sync-request-curl` uses the stable Node-API ABI rather than the Node/V8 ABI. A prebuilt addon is therefore tied to its operating system, CPU architecture, and C runtime, but not to a specific Node.js major version. The same prebuilt binary can be reused by newer Node.js releases that support the targeted Node-API version.
+`sync-request-curl` supports Node.js 16.17.0 and newer at runtime. The native addon targets Node-API v8, so a prebuilt addon is tied to its operating system, CPU architecture, and C runtime, but not to a specific Node.js major version. The same prebuilt binary can be reused by Node.js releases that support Node-API v8.
 
-The published package does not download or compile native code during installation. If a matching prebuilt addon is not present, loading the package fails with an explicit unsupported-platform error instead of falling back to `node-gyp`.
+Repository build and release automation runs on newer Node.js versions independently of the published runtime requirement. Package consumers do not execute those TypeScript build scripts or compile the native addon.
+
+The published package does not download or compile native code during installation. Each release declares platform-specific optional packages, so the package manager installs only the native binary compatible with the current operating system, CPU architecture, and Linux C runtime. If optional dependencies are disabled or a matching package is unavailable, loading fails with an explicit error instead of falling back to `node-gyp`.
 
 ### 4.1. Windows
 

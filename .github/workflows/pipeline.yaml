@@ -1,0 +1,309 @@
+name: Pipeline
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**/README.md'
+  pull_request:
+    branches:
+      - '*'
+    paths-ignore:
+      - '**/README.md'
+
+jobs:
+  native:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            artifact: ubuntu-latest
+            platform: linux-x64-gnu
+            kind: linux
+            libc: gnu
+          - runner: ubuntu-24.04
+            artifact: alpine-latest
+            platform: linux-x64-musl
+            kind: linux
+            libc: musl
+          - runner: macos-15
+            artifact: macos-latest
+            platform: darwin-arm64
+            kind: desktop
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+
+      - name: Restore cached native addon
+        id: native-cache
+        uses: actions/cache@v4
+        with:
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          key: native-prebuild-v1-${{ matrix.platform }}-${{ hashFiles('native/**', 'rust-toolchain.toml', 'scripts/*.ts') }}
+
+      - name: Build Linux prebuild
+        if: matrix.kind == 'linux' && steps.native-cache.outputs.cache-hit != 'true'
+        run: node scripts/linux-prebuild.ts --libc=${{ matrix.libc }} --mode=build
+
+      - name: Set up Rust
+        if: matrix.kind == 'desktop' && steps.native-cache.outputs.cache-hit != 'true'
+        run: rustup toolchain install 1.88.0 --profile minimal --no-self-update
+
+      - name: Build native addon
+        if: matrix.kind == 'desktop' && steps.native-cache.outputs.cache-hit != 'true'
+        run: node scripts/build-native.ts
+
+      - name: Stage native addon
+        if: matrix.kind == 'desktop' && steps.native-cache.outputs.cache-hit != 'true'
+        run: node scripts/stage-native.ts --platform=${{ matrix.platform }}
+
+      - name: Verify native addon loads
+        if: matrix.kind == 'desktop'
+        run: node scripts/verify-native-load.ts --file=prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+
+      - name: Upload native addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.artifact }}
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          if-no-files-found: error
+
+  test:
+    needs: native
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+        node-version:
+          - 24.x
+          - 26.x
+      fail-fast: true
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Enable pnpm via corepack
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download native addon
+        uses: actions/download-artifact@v4
+        with:
+          name: native-${{ matrix.os }}
+          path: prebuilds
+
+      - name: Run lint and format
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm check
+
+      - name: Run typecheck
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm typecheck
+
+      - name: Build package
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm build
+
+      - name: Run tests with coverage
+        run: pnpm test --coverage
+
+      - name: Upload coverage reports to Codecov
+        if: matrix.os == 'ubuntu-latest' && github.ref_name == 'main'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  build-runtime-compat:
+    needs: native
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Enable pnpm via corepack
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Set up build Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download GNU native addon
+        uses: actions/download-artifact@v4
+        with:
+          name: native-ubuntu-latest
+          path: prebuilds
+
+      - name: Build published JavaScript
+        run: pnpm build
+
+      - name: Verify Blob worker is shipped
+        run: test -f dist/internal/blob-reader-worker.cjs
+
+      - name: Verify ESM root is ESM-only
+        run: |
+          test -f dist/index-esm.mjs
+          test -f dist/index-esm.d.mts
+          test ! -e dist/index-esm.cjs
+          test ! -e dist/index-esm.d.cts
+
+      - name: Verify root ESM TypeScript exports
+        run: |
+          cat > .root-exports-smoke.mts <<'TS'
+          import request, { FormData } from "sync-request-curl";
+          import type { Options, Response } from "sync-request-curl";
+
+          const form = new FormData();
+          const options: Options = { form };
+          const attachedFormData: typeof FormData = request.FormData;
+          const response: Response = request("POST", "https://example.com", options);
+          void attachedFormData;
+          void response;
+          TS
+          pnpm exec tsc --ignoreConfig --noEmit --strict --module NodeNext --moduleResolution NodeNext --target ES2022 --types node .root-exports-smoke.mts
+          rm .root-exports-smoke.mts
+
+      - name: Upload runtime compatibility fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-compat-linux-x64-gnu
+          path: |
+            dist
+            prebuilds/sync_request_curl_native.linux-x64-gnu.node
+          if-no-files-found: error
+
+  runtime-compat:
+    needs: build-runtime-compat
+    strategy:
+      fail-fast: true
+      matrix:
+        node-version:
+          - 16.17.0
+          - 18.0.0
+          - 20.0.0
+          - 22.0.0
+          - 24.0.0
+          - 26.0.0
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Enable pnpm via corepack
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Set up install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Download runtime compatibility fixture
+        uses: actions/download-artifact@v4
+        with:
+          name: runtime-compat-linux-x64-gnu
+          path: .
+
+      - name: Install runtime dependencies
+        run: pnpm install --prod --frozen-lockfile --ignore-scripts
+
+      - name: Set up runtime Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Smoke test CommonJS and ESM
+        env:
+          SYNC_REQUEST_CURL_NATIVE_PATH: ${{ github.workspace }}/prebuilds/sync_request_curl_native.linux-x64-gnu.node
+        run: |
+          python3 -m http.server 18765 --bind 127.0.0.1 >/tmp/sync-request-curl-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          sleep 1
+
+          node <<'NODE'
+          const { Blob } = require("node:buffer");
+          const request = require("sync-request-curl");
+          const { FormData } = require("sync-request-curl/types");
+          const { CurlError } = require("sync-request-curl/errors");
+          if (typeof request !== "function") throw new Error("CommonJS default export is not callable");
+          if (typeof FormData !== "function") throw new Error("CommonJS types entry does not expose FormData");
+          if (request.FormData !== FormData) throw new Error("CommonJS request.FormData does not match the exported FormData constructor");
+          const form = new request.FormData();
+          form.append("blob", new Blob(["runtime compatibility"]), "runtime.txt");
+          if (new CurlError(60, "TLS failure").code !== 60) throw new Error("CommonJS errors entry does not preserve CurlError code");
+          const response = request("GET", "http://127.0.0.1:18765/");
+          if (response.statusCode !== 200) throw new Error(`Unexpected CommonJS status: ${response.statusCode}`);
+          NODE
+
+          node --input-type=module <<'NODE'
+          import { Blob } from "node:buffer";
+          import request, { FormData } from "sync-request-curl";
+          import { CurlError } from "sync-request-curl/errors";
+          if (typeof request !== "function") throw new Error("ESM default export is not callable");
+          if (typeof FormData !== "function") throw new Error("ESM root entry does not expose FormData");
+          if (request.FormData !== FormData) throw new Error("ESM request.FormData does not match the exported FormData constructor");
+          const form = new request.FormData();
+          form.append("blob", new Blob(["runtime compatibility"]), "runtime.txt");
+          if (new CurlError(60, "TLS failure").code !== 60) throw new Error("ESM errors entry does not preserve CurlError code");
+          const response = request("GET", "http://127.0.0.1:18765/");
+          if (response.statusCode !== 200) throw new Error(`Unexpected ESM status: ${response.statusCode}`);
+          NODE
+
+  test-musl:
+    needs: native
+    strategy:
+      matrix:
+        node-version:
+          - '24'
+          - '26'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+
+      - name: Download Alpine native addon
+        uses: actions/download-artifact@v4
+        with:
+          name: native-alpine-latest
+          path: prebuilds
+
+      - name: Test on Alpine
+        run: node scripts/linux-prebuild.ts --libc=musl --mode=test --node=${{ matrix.node-version }}

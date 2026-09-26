@@ -1,104 +1,50 @@
-import type { IncomingHttpHeaders } from "http";
+import type * as v from "valibot";
 
-export interface CurlOption {
-  readonly HTTPHEADER: 1;
-  readonly PROXY: 2;
-  readonly PROXYUSERPWD: 3;
-  readonly USERAGENT: 4;
-  readonly REFERER: 5;
-  readonly CAINFO: 6;
-  readonly INTERFACE: 7;
-  readonly TCP_KEEPALIVE: 9;
-}
+export { FormData } from "#/form-data";
 
-export type CurlOptionValue = CurlOption[keyof CurlOption];
-export type CurlOptionInput = string | string[] | number | boolean;
+import type {
+  bufferEncodingSchema,
+  httpVerbInputSchema,
+  jsonLikeSchema,
+  optionsSchema,
+  responseDataSchema,
+  uppercaseHttpVerbSchema,
+} from "#/validation";
 
-export interface Easy {
-  readonly isOpen: boolean;
-  setOpt(option: CurlOptionValue, value: CurlOptionInput): void;
-  close(): void;
-}
+export type { FormDataEntry } from "#/form-data";
+export type {
+  RetryDelayFunction,
+  RetryFunction,
+  RetryResponse,
+} from "#/validation";
 
-// biome-ignore lint/suspicious/noExplicitAny: to match sync-request input type
-export type CustomJsonType = any;
+/**
+ * Values accepted for JSON request bodies.
+ *
+ * This intentionally follows practical `JSON.stringify()` inputs rather than
+ * only strict JSON syntax. `undefined` is allowed inside objects and arrays,
+ * and objects with `toJSON()` (for example `Date`) are supported.
+ */
+export type JsonLike = v.InferOutput<typeof jsonLikeSchema>;
 
-export type HttpVerb =
-  | "GET"
-  | "HEAD"
-  | "POST"
-  | "PUT"
-  | "DELETE"
-  | "CONNECT"
-  | "OPTIONS"
-  | "TRACE"
-  | "PATCH";
+export type UppercaseHttpVerb = v.InferOutput<typeof uppercaseHttpVerbSchema>;
 
-export type BufferEncoding =
-  | "ascii"
-  | "utf8"
-  | "utf-8"
-  | "utf16le"
-  | "ucs2"
-  | "ucs-2"
-  | "base64"
-  | "base64url"
-  | "latin1"
-  | "binary"
-  | "hex";
+export type HttpVerb = v.InferOutput<typeof httpVerbInputSchema>;
 
-export type HttpPostField =
-  | {
-      name: string;
-      contents: string;
-    }
-  | {
-      name: string;
-      file: string;
-      type?: string;
-      filename?: string;
-    };
+export type BufferEncoding = v.InferOutput<typeof bufferEncodingSchema>;
 
-export type SetEasyOptionCallback = (
-  curl: Easy,
-  curlOption: CurlOption,
-) => void;
+export type Options = v.InferOutput<typeof optionsSchema>;
 
-export interface Options {
-  headers?: IncomingHttpHeaders;
-  qs?: { [key: string]: CustomJsonType };
-
-  // You should only specify one of these.
-  // They are processed in the order listed below.
-  //
-  // When no json, body or formdata is provided, Content-Length = 0
-  // will be set in the headers.
-  json?: CustomJsonType;
-  body?: string | Buffer;
-  formData?: HttpPostField[];
-
-  timeout?: number;
-  followRedirects?: boolean;
-  maxRedirects?: number;
-
-  insecure?: boolean;
-  debug?: boolean;
-  setEasyOptions?: SetEasyOptionCallback;
-}
-
-// Infer type `string` if encoding is specified, otherwise `Buffer`.
 export type GetBody = {
   <Encoding extends BufferEncoding>(encoding: Encoding): string;
-  (encoding?: undefined): Buffer;
+  (): Buffer;
 };
 
-export type GetJSON = <T = CustomJsonType>(encoding?: BufferEncoding) => T;
+export type GetJSON = <T = unknown>(encoding?: BufferEncoding) => T;
 
-export interface Response {
-  statusCode: number;
-  headers: IncomingHttpHeaders;
-  url: string;
-  body: string | Buffer;
+type ResponseData = v.InferOutput<typeof responseDataSchema>;
+
+export type Response = ResponseData & {
   getBody: GetBody;
   getJSON: GetJSON;
-}
+};

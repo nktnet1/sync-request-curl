@@ -1,9 +1,31 @@
+import * as v from "valibot";
+import type { BufferEncoding, Response } from "#/types";
+
+const requestErrorCodeSchema = v.picklist([
+  "ERR_INVALID_URL",
+  "ENOTFOUND",
+  "ETIMEDOUT",
+  "ERR_TOO_MANY_REDIRECTS",
+  "ERR_REQUEST_FAILED",
+] as const);
+
+export type RequestErrorCode = v.InferOutput<typeof requestErrorCodeSchema>;
+
+const curlErrorCodeSchema = v.pipe(
+  v.number(),
+  v.integer(),
+  v.minValue(1),
+  v.maxValue(101),
+);
+
 export class CurlError extends Error {
   // https://curl.se/libcurl/c/libcurl-errors.html
   code: number;
+
   constructor(code: number, message: string) {
     super(message);
-    if (code < 1 || code > 101) {
+    const parsedCode = v.safeParse(curlErrorCodeSchema, code);
+    if (!parsedCode.success) {
       throw new Error(`
         CurlError code must be between 1 and 101. Given: ${code}.
 
@@ -11,7 +33,57 @@ export class CurlError extends Error {
           - https://curl.se/libcurl/c/libcurl-errors.html
       `);
     }
-    this.code = code;
+    this.code = parsedCode.output;
     Object.setPrototypeOf(this, CurlError.prototype);
   }
 }
+
+export class RequestError extends Error {
+  readonly code: RequestErrorCode;
+
+  constructor(
+    code: RequestErrorCode,
+    message: string,
+    options?: { cause?: unknown },
+  ) {
+    super(message);
+    if (options && "cause" in options) {
+      Object.defineProperty(this, "cause", {
+        value: options.cause,
+        configurable: true,
+        writable: true,
+      });
+    }
+    this.name = "RequestError";
+    this.code = v.parse(requestErrorCodeSchema, code);
+  }
+}
+
+export class ResponseError extends Error {
+  readonly statusCode: number;
+  readonly headers: Response["headers"];
+  readonly body: Buffer;
+
+  constructor(
+    statusCode: number,
+    headers: Response["headers"],
+    body: Buffer,
+    encoding?: BufferEncoding,
+  ) {
+    super(
+      `Server responded with status code ${statusCode}:\n${body.toString(encoding)}`,
+    );
+    this.name = "ResponseError";
+    this.statusCode = statusCode;
+    this.headers = headers;
+    this.body = body;
+  }
+}
+
+export const throwForTransportError = (code: number, message: string): void => {
+  if (code === 0) {
+    return;
+  }
+
+  throw new CurlError(code, `Request failed: ${message}`);
+};

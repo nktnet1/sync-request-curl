@@ -15,14 +15,18 @@ if (process.platform !== "linux") {
     "Native dependency verification currently runs on Linux builds only",
   );
 }
-if (!values.file || !existsSync(values.file)) {
+
+const file = values.file;
+if (!file || !existsSync(file)) {
   throw new Error("--file must point to a built native addon");
 }
-if (values.libc !== "gnu" && values.libc !== "musl") {
+
+const libc = values.libc;
+if (libc !== "gnu" && libc !== "musl") {
   throw new Error("--libc must be either gnu or musl");
 }
 
-const dynamicSection = run("readelf", ["-d", values.file], { capture: true });
+const dynamicSection = run("readelf", ["-d", file], { capture: true });
 const dependencies = Array.from(
   dynamicSection.matchAll(/\(NEEDED\).*Shared library: \[([^\]]+)\]/g),
   (match) => match[1],
@@ -52,19 +56,28 @@ if (unexpected.length > 0) {
 }
 
 const parseVersion = (value: string): [number, number] => {
-  const [major, minor] = value.split(".").map(Number);
+  const [majorText, minorText] = value.split(".");
+  const major = Number(majorText);
+  const minor = Number(minorText);
   if (!Number.isInteger(major) || !Number.isInteger(minor)) {
     throw new TypeError(`Invalid glibc version: ${value}`);
   }
   return [major, minor];
 };
 
-const isNewer = (left: [number, number], right: [number, number]): boolean =>
-  left[0] > right[0] || (left[0] === right[0] && left[1] > right[1]);
+const isNewer = (left: [number, number], right: [number, number]): boolean => {
+  const [leftMajor, leftMinor] = left;
+  const [rightMajor, rightMinor] = right;
+  return (
+    leftMajor > rightMajor ||
+    (leftMajor === rightMajor && leftMinor > rightMinor)
+  );
+};
 
-if (values.libc === "gnu" && values["glibc-max"]) {
-  const maximum = parseVersion(values["glibc-max"]);
-  const versionInfo = run("readelf", ["--version-info", values.file], {
+const maximumVersion = values["glibc-max"];
+if (libc === "gnu" && maximumVersion) {
+  const maximum = parseVersion(maximumVersion);
+  const versionInfo = run("readelf", ["--version-info", file], {
     capture: true,
   });
   const requiredVersions = Array.from(
@@ -81,5 +94,5 @@ if (values.libc === "gnu" && values["glibc-max"]) {
 }
 
 console.log(
-  `Verified native dependencies for ${values.file}: ${dependencies.join(", ") || "none"}`,
+  `Verified native dependencies for ${file}: ${dependencies.join(", ") || "none"}`,
 );
