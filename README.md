@@ -596,7 +596,8 @@ Append a text, `Buffer`, or `Blob` field.
 
 When `fileName` is supplied, its basename is used and the media type is
 inferred from the extension with an `application/octet-stream` fallback.
-Blob media types remain authoritative.
+Blob media types remain authoritative. Blob reads throw if the reader fails
+or does not finish within 30 seconds.
 
 ###### Parameters
 

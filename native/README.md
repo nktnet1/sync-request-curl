@@ -32,9 +32,10 @@ native/build/sync_request_curl_native.node
 
 `curl-sys` builds bundled libcurl with HTTP/2 enabled on Linux and Windows. Linux TLS
 uses vendored OpenSSL, Windows uses Schannel, and macOS links the system libcurl so
-certificate verification uses Apple's native trust configuration. zlib and the Linux
-GCC runtime are forced static in the prebuild path so Linux release binaries do not
-acquire accidental runtime dependencies on build-host libraries.
+certificate verification uses Apple's native trust configuration. zlib is forced
+static in the prebuild path. The Linux GCC unwinding runtime (`libgcc_s`) may
+remain dynamically linked; the dependency verifier permits this platform runtime
+while rejecting dynamically linked copies of the bundled native dependencies.
 
 ## Release prebuilds
 

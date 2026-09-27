@@ -21,6 +21,7 @@ export const canUseRequestCache = (
   return (
     !target.username &&
     !target.password &&
+    !hasRequestHeader(headers, "host") &&
     !hasRequestHeader(headers, "authorization") &&
     !hasRequestHeader(headers, "cookie") &&
     !hasRequestHeader(headers, "proxy-authorization") &&

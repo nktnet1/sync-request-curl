@@ -8,6 +8,24 @@ export const releaseAgentPool = (poolId: number): void => {
 
 const poolFinalizer = new FinalizationRegistry<number>(releaseAgentPool);
 
+const wrappedAgents = new WeakSet<Agent>();
+
+const wrapAgentDestroy = (agent: Agent): void => {
+  if (wrappedAgents.has(agent)) return;
+  const originalDestroy = agent.destroy;
+  agent.destroy = function (this: Agent): void {
+    const poolId = agentPoolIds.get(this);
+    agentPoolIds.delete(this);
+    poolFinalizer.unregister(this);
+    try {
+      if (poolId !== undefined) releaseAgentPool(poolId);
+    } finally {
+      originalDestroy.call(this);
+    }
+  };
+  wrappedAgents.add(agent);
+};
+
 const maximumNativePoolSize = 2_147_483_647;
 
 /**
@@ -57,8 +75,9 @@ export const getAgentPoolId = (agent?: Agent | boolean): number | undefined => {
     return existingPoolId;
   }
 
+  wrapAgentDestroy(agent);
   const poolId = native.createConnectionPool(maximumConnections);
   agentPoolIds.set(agent, poolId);
-  poolFinalizer.register(agent, poolId);
+  poolFinalizer.register(agent, poolId, agent);
   return poolId;
 };

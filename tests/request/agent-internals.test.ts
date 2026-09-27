@@ -67,3 +67,17 @@ describe("agent connection pools", () => {
     expect(releaseConnectionPool).toHaveBeenCalledWith(31);
   });
 });
+
+test("destroy releases the native pool once and supports subsequent reuse", () => {
+  createConnectionPool.mockReturnValueOnce(41).mockReturnValueOnce(42);
+  const agent = new Agent({ keepAlive: true });
+  const originalDestroy = vi.spyOn(agent, "destroy");
+  expect(getAgentPoolId(agent)).toBe(41);
+  agent.destroy();
+  agent.destroy();
+  expect(releaseConnectionPool.mock.calls).toEqual([[41]]);
+  expect(originalDestroy).toHaveBeenCalledTimes(2);
+  expect(getAgentPoolId(agent)).toBe(42);
+  agent.destroy();
+  expect(releaseConnectionPool.mock.calls).toEqual([[41], [42]]);
+});
