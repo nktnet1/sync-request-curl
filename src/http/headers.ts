@@ -175,6 +175,38 @@ const invalidHostHeaderArray = (): never => {
   throw error;
 };
 
+const formatRequestHeader = (name: string, value: string): string =>
+  value === "" ? `${name};` : `${name}: ${value}`;
+
+const serializeRequestHeaderArray = (
+  name: string,
+  normalizedName: string,
+  values: string[],
+): string[] => {
+  if (normalizedName === "host") {
+    invalidHostHeaderArray();
+  }
+
+  for (const value of values) {
+    validateHeaderValue(name, value);
+  }
+
+  if (normalizedName === "cookie") {
+    return values.length === 0 ? [] : [`${name}: ${values.join("; ")}`];
+  }
+
+  return values.map((value) => formatRequestHeader(name, value));
+};
+
+const serializeRequestHeaderValue = (
+  name: string,
+  value: string | undefined,
+): string[] => {
+  // IncomingHttpHeaders permits undefined, but Node rejects it outbound.
+  validateHeaderValue(name, value as string);
+  return value === undefined ? [] : [formatRequestHeader(name, value)];
+};
+
 export const serializeRequestHeaders = (
   headers?: NonNullable<Options["headers"]>,
 ): string[] => {
@@ -186,34 +218,11 @@ export const serializeRequestHeaders = (
   for (const [name, value] of Object.entries(headers)) {
     validateHeaderName(name);
     const normalizedName = name.toLowerCase();
-
-    if (Array.isArray(value)) {
-      if (normalizedName === "host") {
-        invalidHostHeaderArray();
-      }
-
-      for (const item of value) {
-        validateHeaderValue(name, item);
-      }
-
-      if (normalizedName === "cookie") {
-        if (value.length > 0) {
-          serialized.push(`${name}: ${value.join("; ")}`);
-        }
-        continue;
-      }
-
-      for (const item of value) {
-        serialized.push(item === "" ? `${name};` : `${name}: ${item}`);
-      }
-      continue;
-    }
-
-    // IncomingHttpHeaders permits undefined, but Node rejects it outbound.
-    validateHeaderValue(name, value as string);
-    if (value !== undefined) {
-      serialized.push(value === "" ? `${name};` : `${name}: ${value}`);
-    }
+    serialized.push(
+      ...(Array.isArray(value)
+        ? serializeRequestHeaderArray(name, normalizedName, value)
+        : serializeRequestHeaderValue(name, value)),
+    );
   }
   return serialized;
 };

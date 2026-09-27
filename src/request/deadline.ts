@@ -17,9 +17,12 @@ export const createDeadline = (timeout = 0): (() => number) => {
   };
 };
 
-export const attemptTimeout = (timeout: number, remaining: number): number =>
-  remaining === 0
-    ? timeout
-    : timeout === 0
-      ? remaining
-      : Math.min(timeout, remaining);
+export const attemptTimeout = (timeout: number, remaining: number): number => {
+  if (remaining === 0) {
+    return timeout;
+  }
+  if (timeout === 0) {
+    return remaining;
+  }
+  return Math.min(timeout, remaining);
+};

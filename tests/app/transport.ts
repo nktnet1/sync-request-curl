@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { createServer, request } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
 import { connect } from "node:net";
+import { HOST, PORT, SERVER_URL, TLS_PORT } from "#tests/app/config";
 
 // Test-only self-signed certificate and key; never used outside local fixtures.
 export const tlsServer = createHttpsServer(
@@ -22,12 +23,22 @@ export const tlsServer = createHttpsServer(
 
 export const proxyServer = createServer((req, res) => {
   const target = new URL(req.url ?? "");
+  if (target.origin !== SERVER_URL) {
+    res.writeHead(403);
+    res.end();
+    return;
+  }
   const headers = { ...req.headers };
   const proxyAuth = headers["proxy-authorization"] ?? null;
   delete headers["proxy-authorization"];
   const upstream = request(
-    target,
-    { method: req.method, headers },
+    {
+      hostname: HOST,
+      port: PORT,
+      path: `${target.pathname}${target.search}`,
+      method: req.method,
+      headers,
+    },
     (incoming) => {
       res.writeHead(incoming.statusCode ?? 502, {
         ...incoming.headers,
@@ -44,7 +55,11 @@ export const proxyServer = createServer((req, res) => {
 });
 proxyServer.on("connect", (req, client, head) => {
   const target = new URL(`http://${req.url}`);
-  const upstream = connect(Number(target.port), target.hostname, () => {
+  if (target.hostname !== HOST || Number(target.port) !== TLS_PORT) {
+    client.end("HTTP/1.1 403 Forbidden\r\n\r\n");
+    return;
+  }
+  const upstream = connect(TLS_PORT, HOST, () => {
     client.write("HTTP/1.1 200 Connection established\r\n\r\n");
     upstream.write(head);
     client.pipe(upstream);

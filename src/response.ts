@@ -23,6 +23,8 @@ export const createResponse = ({
   headers,
   body,
 }: CreateResponseOptions): Response => {
+  let response: Response;
+
   const getBody = ((encoding?: BufferEncoding): string | Buffer => {
     if (response.statusCode >= 300) {
       throw new ResponseError(
@@ -56,7 +58,7 @@ export const createResponse = ({
     }
   };
 
-  const response: Response = {
+  response = {
     statusCode,
     headers,
     url: responseUrl,

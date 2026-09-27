@@ -77,16 +77,21 @@ const prepareFormDataEntry = (entry: FormDataEntry): PreparedFormDataEntry => {
       : basename(entry.fileName.replaceAll("\\", "/"));
 
   if (!(value instanceof Blob)) {
-    return {
+    const prepared = {
       key: entry.key,
       value,
       fileName,
-      ...(fileName === undefined
-        ? Buffer.isBuffer(value)
-          ? { contentType: "application/octet-stream" }
-          : {}
-        : { contentType: lookup(fileName) || "application/octet-stream" }),
     };
+    if (fileName !== undefined) {
+      return {
+        ...prepared,
+        contentType: lookup(fileName) || "application/octet-stream",
+      };
+    }
+    if (Buffer.isBuffer(value)) {
+      return { ...prepared, contentType: "application/octet-stream" };
+    }
+    return prepared;
   }
 
   return {
