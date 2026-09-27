@@ -1,32 +1,23 @@
 ## Differences from `sync-request`
 
-Version 5 targets the observable Node.js `sync-request` API while keeping the in-process libcurl transport. The detailed compatibility decisions and rationale are tracked in [ROADMAP.md](ROADMAP.md); the practical differences are summarised here.
+If you already use `sync-request`, most code should feel familiar. The main differences are the extra controls `sync-request-curl` provides and a few cases where its behaviour is more explicit.
 
-### Intentional additions
+### What `sync-request-curl` adds
 
-- `Response#getJSON()` is retained as a convenience helper.
-- `cache: "memory"` is available in addition to `sync-request`'s file-cache surface.
-- `retry` and `retryDelay` may be callbacks for synchronous policy decisions.
-- A real keep-alive Node `Agent` may be supplied for additive connection-pool reuse; the upstream-compatible boolean `agent` values remain accepted.
-- `overallTimeout` provides a complete-operation deadline in addition to the per-attempt `timeout` and inactivity `socketTimeout` controls.
-- Explicit high-level proxy, TLS, source binding, and TCP keepalive options replace the old node-libcurl-specific callback surface.
+- `Response#getJSON()` is available as a convenience helper.
+- `cache: "memory"` is available as an alternative to the file cache.
+- `retry` and `retryDelay` can be callbacks when you need to decide retry behaviour at runtime.
+- `agent` still accepts the boolean values supported by `sync-request`, and can also take a keep-alive Node `Agent` for connection reuse.
+- `overallTimeout` sets a deadline for the whole operation, alongside the per-attempt `timeout` and inactivity `socketTimeout` options.
+- Proxy, TLS, local network binding, and TCP keepalive have dedicated options instead of requiring low-level libcurl callbacks.
 
-### Intentional behavioural differences
+### Where behaviour differs
 
-- The package is Node-only; browser synchronous-XHR support is not a v5 target.
-- Explicit bodies on `GET`, `DELETE`, and `HEAD` remain supported, and falsy JSON values such as `false`, `0`, `""`, and `null` are valid payloads.
-- Invalid or ambiguous HTTP framing is rejected instead of forwarding known-bad `Content-Length` / `Transfer-Encoding` combinations.
-- Only absolute `http:` and `https:` targets are accepted. Ambient proxy environment variables are ignored; proxy routing is explicit through `proxy`.
-- Caller-supplied `Authorization` remains authoritative over URL credentials, and caller-supplied `Accept-Encoding` is preserved exactly.
-- Redirects preserve method and payload for 307/308, rather than reproducing the upstream wrapper bug that can rewrite body-bearing requests to GET.
-- Query merging preserves additional literal `?` and `#` delimiters that upstream can truncate while splitting URLs.
-- Cache handling intentionally keeps `no-store` precedence, updates `Age` on hits, isolates mutable cached headers, and treats recoverable cache read failures as misses instead of reproducing upstream cache quirks.
-- Where supported by the bundled/system libcurl, HTTPS requests may negotiate HTTP/2 instead of being forced to HTTP/1.1 solely for Node `http` parity.
-
-### Out of scope
-
-The synchronous buffered API does not attempt to expose lower-level asynchronous or stream-shaped internals that `sync-request` itself does not forward cleanly: stream request bodies, callback cache implementations and cache-policy hooks, `http-basic` duplex behaviour, `ignoreFailedInvalidation`, or the internal `fromCache` / `fromNotModified` flags.
-
-### Migrating from v4
-
-The public node-libcurl-style API has been removed. Replace `setEasyOptions`, `Easy`, and `CurlOption` with the high-level options documented above: `proxy` / `proxyAuth`, `rejectUnauthorized` / `caFile`, `localAddress` / `localInterface`, and `tcpKeepAlive`. Replace the old `formData` / `HttpPostField` request shape with `FormData` passed through `form`. `CurlError` remains available for raw libcurl transport failures.
+- Request bodies are allowed on `GET`, `DELETE`, and `HEAD`, and falsy JSON values such as `false`, `0`, `""`, and `null` are valid payloads.
+- Invalid HTTP framing is rejected rather than sending conflicting `Content-Length` and `Transfer-Encoding` headers.
+- Only absolute `http:` and `https:` URLs are accepted. Proxy environment variables are ignored; use the `proxy` option when proxying a request.
+- An explicit `Authorization` header takes precedence over credentials in the URL, and a caller-supplied `Accept-Encoding` header is left unchanged.
+- 307 and 308 redirects preserve the request method and body. `sync-request` can rewrite some body-bearing redirects to `GET`.
+- Query merging preserves additional literal `?` and `#` delimiters that `sync-request` can truncate while splitting URLs.
+- Cache handling is stricter: `no-store` takes precedence, `Age` is updated on cache hits, cached headers are isolated from mutation, and recoverable cache-read errors are treated as misses.
+- HTTPS requests can use HTTP/2 automatically when the available libcurl supports it.

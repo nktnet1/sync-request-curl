@@ -12,7 +12,7 @@ interface EchoResponse {
 }
 
 describe("sync-request Node.js compatibility", () => {
-  test("performs a basic synchronous GET and exposes the upstream response shape", () => {
+  test("performs a basic synchronous GET and exposes the sync-request response shape", () => {
     const response = request("get", `${SERVER_URL}/compat/echo`);
 
     expect(response.statusCode).toBe(200);
@@ -161,7 +161,7 @@ describe("sync-request Node.js compatibility", () => {
     expect(unresolved.url).toBe(`${SERVER_URL}/redirect/source`);
   });
 
-  test("getBody throws the upstream status error including the decoded body", () => {
+  test("getBody throws the sync-request status error including the decoded body", () => {
     const response = request("GET", `${SERVER_URL}/get`, {
       qs: { value: "echo" },
     });

@@ -144,8 +144,6 @@ const plainObjectSchema = v.custom<v.InferOutput<typeof recordSchema>>(
   "Expected a plain object",
 );
 
-// Preserve the `then-request`/`qs` compatibility contract locally so query
-// behaviour is stable across upstream dependency releases.
 export const appendQueryString = (
   url: string,
   query: Record<string, unknown>,

@@ -51,7 +51,7 @@ afterEach(() => {
 });
 
 describe("single request execution", () => {
-  test("exposes the upstream self-referencing default export", () => {
+  test("exposes the sync-request self-referencing default export", () => {
     expect(request.default).toBe(request);
     expect(request.default.FormData).toBe(request.FormData);
   });

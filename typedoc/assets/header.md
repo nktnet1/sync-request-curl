@@ -34,8 +34,6 @@
 
 Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but up to 20 times more quickly.
 
-Designed to run on NodeJS. It will not work in a browser.
-
 </div>
 
 ---
