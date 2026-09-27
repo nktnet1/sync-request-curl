@@ -4,6 +4,7 @@ import {
   getNativePackageName,
   isNativePlatformKey,
 } from "#/native/platform-key";
+import { getNativeTarget } from "#/native/platform-key-core";
 
 describe("native platform detection", () => {
   test("detects glibc and musl reports", () => {
@@ -47,5 +48,26 @@ describe("native platform detection", () => {
     expect(getNativePackageName("linux-x64-gnu")).toBe(
       "@nktnet/sync-request-curl-linux-x64-gnu",
     );
+  });
+
+  test("maps platform keys to native package targets", () => {
+    expect(getNativeTarget("darwin-arm64")).toEqual({
+      os: "darwin",
+      cpu: "arm64",
+    });
+    expect(getNativeTarget("linux-x64-gnu")).toEqual({
+      os: "linux",
+      cpu: "x64",
+      libc: "glibc",
+    });
+    expect(getNativeTarget("linux-arm64-musl")).toEqual({
+      os: "linux",
+      cpu: "arm64",
+      libc: "musl",
+    });
+    expect(getNativeTarget("win32-x64-msvc")).toEqual({
+      os: "win32",
+      cpu: "x64",
+    });
   });
 });
