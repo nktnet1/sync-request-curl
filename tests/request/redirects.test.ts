@@ -162,17 +162,20 @@ describe("Redirects", () => {
     });
   });
 
-  test.each([307, 308])("POST body is preserved after a %i redirect", (status) => {
-    const res = wrapperRequest(
-      "POST",
-      `${SERVER_URL}/redirect/method/${status}`,
-      { body: "payload" },
-    );
-    expect(res).toMatchObject({
-      code: 200,
-      json: { method: "POST", body: "payload" },
-    });
-  });
+  test.each([307, 308])(
+    "POST body is preserved after a %i redirect",
+    (status) => {
+      const res = wrapperRequest(
+        "POST",
+        `${SERVER_URL}/redirect/method/${status}`,
+        { body: "payload" },
+      );
+      expect(res).toMatchObject({
+        code: 200,
+        json: { method: "POST", body: "payload" },
+      });
+    },
+  );
 
   test.each(["same-origin", "cross-origin"])(
     "%s redirect drops custom headers by default",

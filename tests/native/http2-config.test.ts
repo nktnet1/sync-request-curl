@@ -13,14 +13,19 @@ const dependencySection = (target: string): string => {
 
   const bodyStart = start + marker.length;
   const nextSection = cargoToml.indexOf("\n[", bodyStart);
-  return cargoToml.slice(bodyStart, nextSection === -1 ? undefined : nextSection);
+  return cargoToml.slice(
+    bodyStart,
+    nextSection === -1 ? undefined : nextSection,
+  );
 };
 
 describe("native HTTP/2 build contract", () => {
   test("bundled non-macOS libcurl enables HTTP/2", () => {
     const section = dependencySection('cfg(not(target_os = "macos"))');
 
-    expect(section).toContain('features = ["http2", "ssl", "static-curl", "static-ssl"]');
+    expect(section).toContain(
+      'features = ["http2", "ssl", "static-curl", "static-ssl"]',
+    );
   });
 
   test("macOS delegates protocol support to the system libcurl", () => {

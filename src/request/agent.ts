@@ -38,9 +38,7 @@ const getMaximumConnections = (agent: Agent): number | undefined => {
   return Math.min(Math.floor(agent.maxTotalSockets), maximumNativePoolSize);
 };
 
-export const getAgentPoolId = (
-  agent?: Agent | boolean,
-): number | undefined => {
+export const getAgentPoolId = (agent?: Agent | boolean): number | undefined => {
   // sync-request exposes `agent?: boolean`. Node only assigns special runtime
   // meaning to `false`, but accepting `true` is required for source/runtime
   // compatibility with that public surface. Treat it like the default form: it
