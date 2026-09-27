@@ -181,7 +181,7 @@ describe("native binding loading", () => {
         packageRoot: join("", "package"),
         exists: () => false,
       }),
-    ).toThrow("node node_modules/sync-request-curl/native/build.mjs");
+    ).toThrow("npx --no-install sync-request-curl-build");
   });
 
   test("does not hide a broken local source build", () => {

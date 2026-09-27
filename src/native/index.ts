@@ -208,7 +208,7 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
   const platform = options.platform ?? process.platform;
   const arch = options.arch ?? process.arch;
   const sourceBuildHelp =
-    "Build from source with: node node_modules/sync-request-curl/native/build.mjs. " +
+    "Build from source with: npx --no-install sync-request-curl-build. " +
     "See the Compatibility section for prerequisites.";
   const platformKey =
     options.platformKey ??

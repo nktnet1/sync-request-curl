@@ -835,15 +835,19 @@ architecture has no prebuilt package, or you need a build for your local system,
 install normally and explicitly compile the installed package:
 
 ```sh
-npm install sync-request-curl
-node node_modules/sync-request-curl/native/build.mjs
+npm install sync-request-curl --omit=optional
+npx --no-install sync-request-curl-build
 ```
 
 Run this with the same Node.js architecture that will use the library. This works
 with installation scripts disabled and does not require node-gyp or development
-JavaScript dependencies. With a nonstandard package layout, locate the installed
-package using `require.resolve('sync-request-curl/package.json')`, then run
-`native/build.mjs` within that package. Rebuild after replacing or upgrading it.
+JavaScript dependencies. Run the build command from your application directory;
+there is no need to navigate into `node_modules`. `--no-install` prevents npx from downloading a
+separate package if the local command is missing. With pnpm, use
+`pnpm exec sync-request-curl-build`. Use `--help` to see the build prerequisites.
+`--omit=optional` skips all optional dependencies for that npm installation;
+omit that flag if you want them installed. Rebuild after replacing or upgrading
+the package. The command is explicit; installation still runs no build hook.
 
 Prerequisites:
 

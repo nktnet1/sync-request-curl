@@ -1,8 +1,25 @@
+#!/usr/bin/env node
 // Kept as plain JavaScript so the published source-build entry point runs on Node 16.17+.
 import { spawnSync } from "node:child_process";
 import { copyFileSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+const args = process.argv.slice(2);
+if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) {
+  console.log(
+    "Usage: sync-request-curl-build\n\n" +
+      "Build the installed sync-request-curl addon from its bundled Rust sources.\n" +
+      "Requires Rust 1.88+ and platform native build tools.\n" +
+      "Run using the same Node.js architecture as your application.\n" +
+      "Set CARGO_BUILD_TARGET to override the Rust target.",
+  );
+  process.exit(0);
+}
+if (args.length > 0) {
+  console.error("Unknown arguments. Use sync-request-curl-build --help.");
+  process.exit(1);
+}
 
 const nativeDir = dirname(fileURLToPath(import.meta.url));
 const root = dirname(nativeDir);

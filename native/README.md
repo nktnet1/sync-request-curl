@@ -45,7 +45,7 @@ compilers or lifecycle scripts. The main package also includes the exact Rust
 sources, Cargo.lock, and `build.mjs` for an explicit source build:
 
 ```sh
-node node_modules/sync-request-curl/native/build.mjs
+npx --no-install sync-request-curl-build
 ```
 
 See [Compatibility](../README.md#compatibility-source) for prerequisites, target

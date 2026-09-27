@@ -22,6 +22,9 @@
     "native/README.md",
     "rust-toolchain.toml"
   ],
+  "bin": {
+    "sync-request-curl-build": "./native/build.mjs"
+  },
   "scripts": {
     "start": "tsx tests/app/server",
     "dev": "tsx watch --include ./tests/app ./tests/app/server.ts",

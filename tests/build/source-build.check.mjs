@@ -5,7 +5,9 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
@@ -18,14 +20,30 @@ const source = fileURLToPath(
   new URL("../../native/build.mjs", import.meta.url),
 );
 
-for (const mode of ["success", "cargo-failure", "load-failure", "musl"]) {
+for (const mode of [
+  "success",
+  "cargo-failure",
+  "load-failure",
+  "musl",
+  "symlink",
+]) {
   test(`source builder: ${mode}`, async () => {
-    const root = mkdtempSync(join(tmpdir(), "curl-source-test-"));
+    // ESM resolves symlinks, including macOS /var -> /private/var.
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "curl-source-test-")));
     const native = join(root, "native");
     const output = join(native, "build", "sync_request_curl_native.node");
     mkdirSync(dirname(output), { recursive: true });
     writeFileSync(output, "previous addon");
     copyFileSync(source, join(native, "build.mjs"));
+    let entryDirectory = native;
+    if (mode === "symlink") {
+      entryDirectory = join(root, "native-link");
+      symlinkSync(
+        native,
+        entryDirectory,
+        process.platform === "win32" ? "junction" : "dir",
+      );
+    }
     const target =
       mode === "musl"
         ? "x86_64-unknown-linux-musl"
@@ -69,7 +87,9 @@ for (const mode of ["success", "cargo-failure", "load-failure", "musl"]) {
     };
     syncBuiltinESMExports();
     try {
-      const build = import(pathToFileURL(join(native, "build.mjs")).href);
+      const build = import(
+        pathToFileURL(join(entryDirectory, "build.mjs")).href
+      );
       if (mode.endsWith("failure")) {
         await assert.rejects(build, /failed/);
         assert.equal(readFileSync(output, "utf8"), "previous addon");
@@ -90,3 +110,25 @@ for (const mode of ["success", "cargo-failure", "load-failure", "musl"]) {
     }
   });
 }
+
+test("source builder CLI displays help without a compiler", () => {
+  const result = childProcess.spawnSync(process.execPath, [source, "--help"], {
+    encoding: "utf8",
+    env: { ...process.env, PATH: "" },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Usage: sync-request-curl-build/);
+});
+
+test("source builder CLI rejects unknown arguments before compiling", () => {
+  const result = childProcess.spawnSync(
+    process.execPath,
+    [source, "--unknown"],
+    {
+      encoding: "utf8",
+      env: { ...process.env, PATH: "" },
+    },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Unknown arguments/);
+});
