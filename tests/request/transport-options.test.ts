@@ -54,6 +54,21 @@ describe("transport option validation", () => {
     expect(options.proxyPassword).toBe("");
   });
 
+  test("clears URL credentials when an explicit empty username is supplied", () => {
+    expect(
+      prepareTransportOptions({
+        proxy: {
+          url: PROXY_URL.replace("://", "://old:secret@"),
+          username: "",
+        },
+      }),
+    ).toMatchObject({
+      proxy: `${PROXY_URL}/`,
+      proxyUsername: "",
+      proxyPassword: "",
+    });
+  });
+
   test.each([
     { proxy: { url: "socks5://localhost" } },
     { proxy: { url: "http://localhost/path" } },
@@ -132,7 +147,6 @@ describe("native transport controls", () => {
   test.each([
     [{ proxy: { url: PROXY_URL } }, "null"],
     [{ proxy: { url: PROXY_URL, username: "user" } }, "Basic dXNlcjo="],
-    [{ proxy: { url: PROXY_URL, username: "" } }, "Basic Og=="],
     [
       {
         proxy: {
@@ -160,6 +174,19 @@ describe("native transport controls", () => {
       expect(response.headers["x-proxy-auth"]).toBe(expectedProxyAuth);
     },
   );
+
+  test("allows libcurl to omit authentication for all-empty credentials", () => {
+    const response = request("GET", SERVER_URL, {
+      proxy: {
+        url: PROXY_URL.replace("://", "://old:secret@"),
+        username: "",
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    // libcurl builds differ on emitting Basic ':' when both fields are empty.
+    // Neither outcome may retain credentials from the URL.
+    expect(["null", "Basic Og=="]).toContain(response.headers["x-proxy-auth"]);
+  });
 
   test("tunnels HTTPS without passing proxy credentials to the origin", () => {
     const response = request("GET", TLS_URL, {

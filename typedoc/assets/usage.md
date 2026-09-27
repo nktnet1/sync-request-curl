@@ -112,3 +112,8 @@ used. An explicit username overrides both URL credentials; omitting `password`
 in that case sends an empty password, never the password from the URL.
 Proxy credentials apply only to the proxy hop. Ambient proxy variables remain
 ignored. The former `proxyAuth` option is rejected rather than silently ignored.
+
+When both effective credential fields are empty, libcurl may omit
+`Proxy-Authorization` or send an empty Basic credential pair, depending on the
+libcurl build. Do not rely on an all-empty pair to force an authentication header.
+A non-empty username with an omitted password still uses `username:` credentials.
