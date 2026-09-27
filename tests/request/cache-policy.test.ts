@@ -44,6 +44,15 @@ const storeFreshResponse = (url: string): void => {
   );
 };
 
+const prepareStaleResponse = (headers: Record<string, string | string[]>) => {
+  const url = cacheUrl();
+  storeFileCacheResponse(url, {}, 0, 0, response(url, headers));
+  return {
+    url,
+    lookup: prepareFileCacheLookup("GET", url, [], "file", 1),
+  };
+};
+
 const writeBucket = (
   url: string,
   entries: Array<Record<string, unknown>>,
@@ -260,20 +269,11 @@ describe("file cache policy", () => {
   });
 
   test("keeps processed cached metadata consistent during 304 revalidation", () => {
-    const url = cacheUrl();
-    storeFileCacheResponse(
-      url,
-      {},
-      0,
-      0,
-      response(url, {
-        "cache-control": "max-age=0",
-        "content-type": "application/json",
-        etag: '"v1"',
-      }),
-    );
-
-    const lookup = prepareFileCacheLookup("GET", url, [], "file", 1);
+    const { url, lookup } = prepareStaleResponse({
+      "cache-control": "max-age=0",
+      "content-type": "application/json",
+      etag: '"v1"',
+    });
     const refreshed = refreshFileCacheEntry(
       url,
       lookup,
@@ -296,20 +296,11 @@ describe("file cache policy", () => {
   });
 
   test("allows Content-Encoding revalidation when the cached body is still encoded", () => {
-    const url = cacheUrl();
-    storeFileCacheResponse(
-      url,
-      {},
-      0,
-      0,
-      response(url, {
-        "cache-control": "max-age=0",
-        "content-encoding": "br",
-        etag: '"v1"',
-      }),
-    );
-
-    const lookup = prepareFileCacheLookup("GET", url, [], "file", 1);
+    const { url, lookup } = prepareStaleResponse({
+      "cache-control": "max-age=0",
+      "content-encoding": "br",
+      etag: '"v1"',
+    });
     const refreshed = refreshFileCacheEntry(
       url,
       lookup,
@@ -325,19 +316,10 @@ describe("file cache policy", () => {
   });
 
   test("refreshes a stale entry through the file-cache compatibility wrapper", () => {
-    const url = cacheUrl();
-    storeFileCacheResponse(
-      url,
-      {},
-      0,
-      0,
-      response(url, {
-        "cache-control": "max-age=0",
-        etag: '"v1"',
-      }),
-    );
-
-    const lookup = prepareFileCacheLookup("GET", url, [], "file", 1);
+    const { url, lookup } = prepareStaleResponse({
+      "cache-control": "max-age=0",
+      etag: '"v1"',
+    });
     const refreshed = refreshFileCacheEntry(
       url,
       lookup,

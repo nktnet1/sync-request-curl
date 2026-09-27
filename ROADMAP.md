@@ -72,6 +72,14 @@ Replace useful capabilities that were previously reachable through
 
 ## Tests
 
+Maintenance rule: avoid copy/pasted test and callback boilerplate. When test
+cases share setup/assertions and differ only by inputs or expected values, use
+`test.for`/`test.each` or a focused local helper. When a shared diagnostic test
+fixture returns multiple fields, assert only the fields relevant to the behaviour
+under test unless exact response shape is itself the contract. Native FFI callbacks should
+centralise pointer/length validation, panic containment, and activity tracking
+in shared helpers rather than duplicating that unsafe boundary code.
+
 - [x] Port the applicable upstream `sync-request` Node.js behaviours into a
       focused public-API compatibility suite.
 - [x] Cover redirect-header allow-list behaviour for same-origin and
@@ -555,6 +563,21 @@ should be treated as the current baseline in future sessions:
   instance support. `agent: true` is accepted as the default transport form
   instead of being rejected by validation; `false` remains one-shot, and
   keep-alive Agent objects continue to identify dedicated native pools.
+
+- `v1.0.57-deduplicate-test-callback-boilerplate.patch` consolidates repeated
+  native callback safety boilerplate behind the shared callback helper and
+  replaces near-identical framing, compression, and cache tests with
+  data-driven cases or focused setup/assertion helpers. The Tests section now
+  records this as an ongoing maintenance rule so future coverage additions do
+  not reintroduce copy/paste clones.
+- `v1.0.58-test-fixture-assertion-scope.patch` keeps shared diagnostic fixtures
+  extensible by using partial object assertions when a test only owns a subset
+  of the fixture response fields; exact-shape assertions remain reserved for
+  tests where response shape itself is the contract.
+- `v1.0.59-empty-header-array-coverage.patch` covers empty string items inside
+  ordinary outbound header arrays, exercising the same `Header;` serialization
+  form already used for scalar empty values and restoring full branch coverage
+  for request-header serialization.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

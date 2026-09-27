@@ -29,9 +29,21 @@ describe("response compression", () => {
     });
   });
 
-  test("gzip false disables negotiation and automatic decompression", () => {
+  test.for([
+    {
+      title: "gzip false disables negotiation and automatic decompression",
+      headers: undefined,
+      acceptEncoding: null,
+    },
+    {
+      title: "gzip false still preserves an explicit accept-encoding header",
+      headers: { "Accept-Encoding": "gzip" },
+      acceptEncoding: "gzip",
+    },
+  ])("$title", ({ headers, acceptEncoding }) => {
     const response = request("GET", `${SERVER_URL}/compressed/gzip`, {
       gzip: false,
+      headers,
     });
     const decoded = JSON.parse(gunzipSync(response.body).toString("utf8"));
 
@@ -40,26 +52,9 @@ describe("response compression", () => {
       String(response.body.length),
     );
     expect(decoded).toStrictEqual({
-      acceptEncoding: null,
+      acceptEncoding,
       message: "Compressed response",
     });
     expect(() => response.getJSON()).toThrow();
-  });
-
-  test("gzip false still preserves an explicit accept-encoding header", () => {
-    const response = request("GET", `${SERVER_URL}/compressed/gzip`, {
-      gzip: false,
-      headers: { "Accept-Encoding": "gzip" },
-    });
-    const decoded = JSON.parse(gunzipSync(response.body).toString("utf8"));
-
-    expect(response.headers["content-encoding"]).toBe("gzip");
-    expect(response.headers["content-length"]).toBe(
-      String(response.body.length),
-    );
-    expect(decoded).toStrictEqual({
-      acceptEncoding: "gzip",
-      message: "Compressed response",
-    });
   });
 });

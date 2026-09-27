@@ -11,7 +11,7 @@ describe("HTTP method compatibility", () => {
     );
 
     expect(response.statusCode).toBe(200);
-    expect(response.getJSON()).toStrictEqual({ method: "PROPFIND" });
+    expect(response.getJSON()).toMatchObject({ method: "PROPFIND" });
   });
 });
 

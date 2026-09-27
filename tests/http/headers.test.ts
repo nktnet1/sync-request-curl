@@ -199,10 +199,10 @@ describe("parseResponseHeaders", () => {
   test("serializes ordinary arrays as repeated lines and empty values", () => {
     expect(
       serializeRequestHeaders({
-        "x-list": ["first", "second"],
+        "x-list": ["first", "", "second"],
         "x-empty": "",
       }),
-    ).toStrictEqual(["x-list: first", "x-list: second", "x-empty;"]);
+    ).toStrictEqual(["x-list: first", "x-list;", "x-list: second", "x-empty;"]);
   });
 
   test("joins Cookie arrays with semicolons like Node", () => {

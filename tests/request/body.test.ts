@@ -116,7 +116,7 @@ describe("Raw body content type", () => {
         body: "hello",
       });
 
-      expect(response.getJSON()).toStrictEqual({
+      expect(response.getJSON()).toMatchObject({
         contentType: null,
         contentLength: "5",
         transferEncoding: null,
@@ -129,7 +129,7 @@ describe("Raw body content type", () => {
       body: Buffer.from([0x00, 0x7f, 0x80, 0xff]),
     });
 
-    expect(response.getJSON()).toStrictEqual({
+    expect(response.getJSON()).toMatchObject({
       contentType: null,
       contentLength: "4",
       transferEncoding: null,
@@ -143,7 +143,7 @@ describe("Raw body content type", () => {
         body,
       });
 
-      expect(response.getJSON()).toStrictEqual({
+      expect(response.getJSON()).toMatchObject({
         contentType: null,
         contentLength: "0",
         transferEncoding: null,
@@ -157,7 +157,7 @@ describe("Raw body content type", () => {
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
 
-    expect(response.getJSON()).toStrictEqual({
+    expect(response.getJSON()).toMatchObject({
       contentType: "text/plain; charset=utf-8",
       contentLength: "5",
       transferEncoding: null,
@@ -169,7 +169,7 @@ describe("Raw body content type", () => {
       json: { hello: "world" },
     });
 
-    expect(response.getJSON()).toStrictEqual({
+    expect(response.getJSON()).toMatchObject({
       contentType: "application/json",
       contentLength: String(Buffer.byteLength('{"hello":"world"}')),
       transferEncoding: null,

@@ -86,68 +86,54 @@ describe("single request execution", () => {
     );
   });
 
-  test("surfaces captured framing errors before libcurl parser errors", () => {
+  test.for([
+    {
+      title: "surfaces captured framing errors before libcurl parser errors",
+      transportMessage: "Weird server reply",
+      headers: [
+        "HTTP/1.1 200 OK",
+        "Content-Length: 5",
+        "Content-Length: 6",
+        "",
+      ],
+      expectedError:
+        "Request failed: Invalid response framing: conflicting Content-Length values",
+    },
+    {
+      title:
+        "maps libcurl Content-Length parser failures using captured framing context",
+      transportMessage: "Invalid Content-Length: value",
+      headers: ["HTTP/1.1 200 OK", "Content-Length: 5"],
+      expectedError:
+        "Request failed: Invalid response framing: conflicting Content-Length values",
+    },
+    {
+      title: "maps an uncaptured invalid Content-Length parser failure",
+      transportMessage: "Invalid Content-Length: value",
+      headers: ["HTTP/1.1 200 OK"],
+      expectedError:
+        "Request failed: Invalid response framing: invalid Content-Length",
+    },
+    {
+      title:
+        "maps Content-Length parser failures when no status line was captured",
+      transportMessage: "Invalid Content-Length: value",
+      headers: ["Content-Length: 5"],
+      expectedError:
+        "Request failed: Invalid response framing: conflicting Content-Length values",
+    },
+  ])("$title", ({ transportMessage, headers, expectedError }) => {
     nativeRequest.mockReturnValueOnce(
       nativeResponse({
         transportCode: 8,
-        transportMessage: "Weird server reply",
-        headers: [
-          "HTTP/1.1 200 OK",
-          "Content-Length: 5",
-          "Content-Length: 6",
-          "",
-        ],
+        transportMessage,
+        headers,
         body: Buffer.alloc(0),
       }),
     );
 
     expect(() => performRequest("GET", "https://example.com/path", {})).toThrow(
-      "Request failed: Invalid response framing: conflicting Content-Length values",
-    );
-  });
-
-  test("maps libcurl Content-Length parser failures using captured framing context", () => {
-    nativeRequest.mockReturnValueOnce(
-      nativeResponse({
-        transportCode: 8,
-        transportMessage: "Invalid Content-Length: value",
-        headers: ["HTTP/1.1 200 OK", "Content-Length: 5"],
-        body: Buffer.alloc(0),
-      }),
-    );
-
-    expect(() => performRequest("GET", "https://example.com/path", {})).toThrow(
-      "Request failed: Invalid response framing: conflicting Content-Length values",
-    );
-  });
-
-  test("maps an uncaptured invalid Content-Length parser failure", () => {
-    nativeRequest.mockReturnValueOnce(
-      nativeResponse({
-        transportCode: 8,
-        transportMessage: "Invalid Content-Length: value",
-        headers: ["HTTP/1.1 200 OK"],
-        body: Buffer.alloc(0),
-      }),
-    );
-
-    expect(() => performRequest("GET", "https://example.com/path", {})).toThrow(
-      "Request failed: Invalid response framing: invalid Content-Length",
-    );
-  });
-
-  test("maps Content-Length parser failures when no status line was captured", () => {
-    nativeRequest.mockReturnValueOnce(
-      nativeResponse({
-        transportCode: 8,
-        transportMessage: "Invalid Content-Length: value",
-        headers: ["Content-Length: 5"],
-        body: Buffer.alloc(0),
-      }),
-    );
-
-    expect(() => performRequest("GET", "https://example.com/path", {})).toThrow(
-      "Request failed: Invalid response framing: conflicting Content-Length values",
+      expectedError,
     );
   });
 

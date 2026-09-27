@@ -395,7 +395,7 @@ fn handle_request_callback<F>(
   handle_chunk: F,
 ) -> usize
 where
-  F: FnOnce(&mut RequestState, &[u8]),
+  F: FnOnce(&mut RequestState, &[u8], usize) -> usize,
 {
   let Some(bytes) = size.checked_mul(count) else {
     return 0;
@@ -408,28 +408,22 @@ where
     let state = &mut *userdata.cast::<RequestState>();
     let chunk = std::slice::from_raw_parts(data.cast::<u8>(), bytes);
     state.mark_activity();
-    handle_chunk(state, chunk);
-    bytes
+    handle_chunk(state, chunk, bytes)
   }))
   .unwrap_or(0)
 }
 
-macro_rules! request_callback {
-  ($name:ident, $handle_chunk:expr) => {
-    extern "C" fn $name(
-      data: *mut c_char,
-      size: usize,
-      count: usize,
-      userdata: *mut c_void,
-    ) -> usize {
-      handle_request_callback(data, size, count, userdata, $handle_chunk)
-    }
-  };
+extern "C" fn write_callback(
+  data: *mut c_char,
+  size: usize,
+  count: usize,
+  userdata: *mut c_void,
+) -> usize {
+  handle_request_callback(data, size, count, userdata, |state, chunk, bytes| {
+    state.body.extend_from_slice(chunk);
+    bytes
+  })
 }
-
-request_callback!(write_callback, |state: &mut RequestState, chunk: &[u8]| {
-  state.body.extend_from_slice(chunk);
-});
 
 fn header_bytes_to_latin1(bytes: &[u8]) -> String {
   bytes.iter().map(|byte| char::from(*byte)).collect()
@@ -473,18 +467,8 @@ extern "C" fn header_callback(
   count: usize,
   userdata: *mut c_void,
 ) -> usize {
-  let Some(bytes) = size.checked_mul(count) else {
-    return 0;
-  };
-  if bytes == 0 {
-    return 0;
-  }
-
-  catch_unwind(AssertUnwindSafe(|| unsafe {
-    let state = &mut *userdata.cast::<RequestState>();
-    let chunk = std::slice::from_raw_parts(data.cast::<u8>(), bytes);
+  handle_request_callback(data, size, count, userdata, |state, chunk, bytes| {
     let line = trim_header_line(chunk);
-    state.mark_activity();
     state.headers.push(header_bytes_to_latin1(line));
 
     if let Some(status_code) = parse_http_status_code(line) {
@@ -502,8 +486,7 @@ extern "C" fn header_callback(
     }
 
     bytes
-  }))
-  .unwrap_or(0)
+  })
 }
 
 fn build_mime(

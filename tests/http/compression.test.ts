@@ -3,35 +3,36 @@ import { describe, expect, test } from "vitest";
 import { RequestError } from "#/errors";
 import { decompressResponseBody } from "#/http/compression";
 
+const expectSuccessfulDecompression = (
+  original: Buffer,
+  encoded: Buffer,
+  contentEncoding: string | string[],
+): void => {
+  const headers: Record<string, string | string[]> = {
+    "content-encoding": contentEncoding,
+    "content-length": String(encoded.length),
+  };
+
+  expect(decompressResponseBody(encoded, headers, true)).toStrictEqual(
+    original,
+  );
+  expect(headers["content-encoding"]).toBeUndefined();
+  expect(headers["content-length"]).toBeUndefined();
+};
+
 describe("response decompression", () => {
   test("decodes stacked supported content encodings in reverse order", () => {
     const original = Buffer.from("stacked response");
-    const encoded = deflateSync(gzipSync(original));
-    const headers = {
-      "content-encoding": "gzip, deflate",
-      "content-length": String(encoded.length),
-    };
-
-    expect(decompressResponseBody(encoded, headers, true)).toStrictEqual(
+    expectSuccessfulDecompression(
       original,
+      deflateSync(gzipSync(original)),
+      "gzip, deflate",
     );
-    expect(headers["content-encoding"]).toBeUndefined();
-    expect(headers["content-length"]).toBeUndefined();
   });
 
   test("decodes content encoding header arrays", () => {
     const original = Buffer.from("array encoding response");
-    const encoded = gzipSync(original);
-    const headers = {
-      "content-encoding": ["gzip"],
-      "content-length": String(encoded.length),
-    };
-
-    expect(decompressResponseBody(encoded, headers, true)).toStrictEqual(
-      original,
-    );
-    expect(headers["content-encoding"]).toBeUndefined();
-    expect(headers["content-length"]).toBeUndefined();
+    expectSuccessfulDecompression(original, gzipSync(original), ["gzip"]);
   });
 
   test("leaves unsupported content encodings untouched", () => {
