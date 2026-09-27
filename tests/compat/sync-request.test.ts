@@ -82,6 +82,16 @@ describe("sync-request Node.js compatibility", () => {
     expect(valueError?.code).toBe("ERR_INVALID_CHAR");
   });
 
+  test("matches Node Cookie array request serialization", () => {
+    const response = request("GET", `${SERVER_URL}/request/cookie`, {
+      headers: { Cookie: ["session=abc", "theme=dark"] },
+    });
+
+    expect(response.getJSON()).toStrictEqual({
+      cookie: "session=abc; theme=dark",
+    });
+  });
+
   test("passes caller headers and string bodies unchanged", () => {
     const response = request("POST", `${SERVER_URL}/compat/echo`, {
       headers: {

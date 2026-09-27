@@ -203,6 +203,10 @@ app.all("/request/headers", async (c) => {
   });
 });
 
+app.get("/request/cookie", (c) => {
+  return c.json({ cookie: c.req.header("cookie") ?? null });
+});
+
 app.post("/timeout", async (c) => {
   const body = v.parse(timeoutBodySchema, await c.req.json());
 

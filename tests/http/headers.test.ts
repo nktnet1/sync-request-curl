@@ -196,13 +196,30 @@ describe("parseResponseHeaders", () => {
     expect(headers["x-final"]).toBe("second");
   });
 
-  test("serializes arrays and empty values", () => {
+  test("serializes ordinary arrays as repeated lines and empty values", () => {
     expect(
       serializeRequestHeaders({
         "x-list": ["first", "second"],
         "x-empty": "",
       }),
     ).toStrictEqual(["x-list: first", "x-list: second", "x-empty;"]);
+  });
+
+  test("joins Cookie arrays with semicolons like Node", () => {
+    expect(
+      serializeRequestHeaders({
+        Cookie: ["session=abc", "theme=dark"],
+      }),
+    ).toStrictEqual(["Cookie: session=abc; theme=dark"]);
+    expect(serializeRequestHeaders({ Cookie: [] })).toStrictEqual([]);
+  });
+
+  test("rejects Host arrays like Node", () => {
+    const error = captureError(() =>
+      serializeRequestHeaders({ Host: ["example.com", "other.example"] }),
+    );
+
+    expect(error.code).toBe("ERR_INVALID_ARG_TYPE");
   });
 
   test("rejects invalid request header names like Node", () => {

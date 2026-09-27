@@ -210,6 +210,10 @@ not all necessarily desirable behaviours to copy.
       semantics instead of UTF-8 lossy decoding in the native header callback.
       Bytes in the HTTP `obs-text` range (`0x80`-`0xFF`) therefore survive
       round-tripping without replacement characters.
+- [x] Match Node's special outbound array handling for request headers:
+      ordinary arrays remain repeated field lines, `Cookie` arrays are joined
+      with `; `, empty arrays emit no field, and `Host` arrays fail with
+      `ERR_INVALID_ARG_TYPE` instead of producing duplicate Host fields.
 
 Intentional differences: do not reproduce `then-request`'s early rejection of a
 `body` on GET, DELETE, or HEAD. `sync-request-curl` passes explicit request
@@ -487,6 +491,10 @@ should be treated as the current baseline in future sessions:
   the native header callback with a lossless byte-to-Latin-1 mapping, matching
   Node's HTTP header string model for `obs-text` bytes and preventing `0x80`-
   `0xFF` response field values from being corrupted to replacement characters.
+- `v1.0.51-node-request-header-arrays.patch` matches Node's outbound array
+  serialization edge cases: Cookie arrays become one semicolon-delimited field,
+  ordinary arrays remain repeated fields, empty arrays emit nothing, and Host
+  arrays are rejected with Node's `ERR_INVALID_ARG_TYPE` contract.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

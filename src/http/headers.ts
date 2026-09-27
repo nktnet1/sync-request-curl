@@ -153,6 +153,14 @@ export const setContentLengthHeader = (
  * Converts Node-style request headers into the line format used by the native
  * transport.
  */
+const invalidHostHeaderArray = (): never => {
+  const error = new TypeError(
+    'The "options.headers.host" property must be of type string. Received an instance of Array',
+  ) as TypeError & { code?: string };
+  error.code = "ERR_INVALID_ARG_TYPE";
+  throw error;
+};
+
 export const serializeRequestHeaders = (
   headers?: NonNullable<Options["headers"]>,
 ): string[] => {
@@ -163,14 +171,34 @@ export const serializeRequestHeaders = (
   const serialized: string[] = [];
   for (const [name, value] of Object.entries(headers)) {
     validateHeaderName(name);
+    const normalizedName = name.toLowerCase();
 
-    const values = Array.isArray(value) ? value : [value];
-    for (const item of values) {
-      // IncomingHttpHeaders permits undefined, but Node rejects it outbound.
-      validateHeaderValue(name, item as string);
-      if (item !== undefined) {
+    if (Array.isArray(value)) {
+      if (normalizedName === "host") {
+        invalidHostHeaderArray();
+      }
+
+      for (const item of value) {
+        validateHeaderValue(name, item);
+      }
+
+      if (normalizedName === "cookie") {
+        if (value.length > 0) {
+          serialized.push(`${name}: ${value.join("; ")}`);
+        }
+        continue;
+      }
+
+      for (const item of value) {
         serialized.push(item === "" ? `${name};` : `${name}: ${item}`);
       }
+      continue;
+    }
+
+    // IncomingHttpHeaders permits undefined, but Node rejects it outbound.
+    validateHeaderValue(name, value as string);
+    if (value !== undefined) {
+      serialized.push(value === "" ? `${name};` : `${name}: ${value}`);
     }
   }
   return serialized;
