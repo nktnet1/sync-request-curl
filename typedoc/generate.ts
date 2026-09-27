@@ -96,28 +96,40 @@ const parseMarkdownHeading = (line: string): MarkdownHeading | undefined => {
   return title ? { level, title } : undefined;
 };
 
-const shiftMarkdownHeadings = (markdown: string, levels: number): string => {
+type ParsedMarkdownLine = {
+  line: string;
+  heading?: MarkdownHeading;
+};
+
+const parseMarkdownLines = (markdown: string): ParsedMarkdownLine[] => {
   let fence: FenceMarker | undefined;
-  const output: string[] = [];
+  const lines: ParsedMarkdownLine[] = [];
 
   for (const line of markdown.split("\n")) {
     const nextFence = updateFence(fence, line);
     if (nextFence !== fence) {
       fence = nextFence;
-      output.push(line);
+      lines.push({ line });
       continue;
     }
 
-    const heading = fence ? undefined : parseMarkdownHeading(line);
-    output.push(
+    lines.push({
+      line,
+      heading: fence ? undefined : parseMarkdownHeading(line),
+    });
+  }
+
+  return lines;
+};
+
+const shiftMarkdownHeadings = (markdown: string, levels: number): string =>
+  parseMarkdownLines(markdown)
+    .map(({ line, heading }) =>
       heading && heading.level <= 6 - levels
         ? `${"#".repeat(levels)}${line}`
         : line,
-    );
-  }
-
-  return output.join("\n");
-};
+    )
+    .join("\n");
 
 const stripMarkdownLinks = (value: string): string => {
   let output = "";
@@ -249,21 +261,12 @@ const numberAssetSection = (
   sectionNumber: number,
   sourceName: string,
 ): RenderedSection => {
-  let fence: FenceMarker | undefined;
   let mainAnchor: string | undefined;
   let subsectionNumber = 0;
   const output: string[] = [];
   const toc: TocEntry[] = [];
 
-  for (const line of markdown.split("\n")) {
-    const nextFence = updateFence(fence, line);
-    if (nextFence !== fence) {
-      fence = nextFence;
-      output.push(line);
-      continue;
-    }
-
-    const heading = fence ? undefined : parseMarkdownHeading(line);
+  for (const { line, heading } of parseMarkdownLines(markdown)) {
     if (!heading || (heading.level !== 2 && heading.level !== 3)) {
       output.push(line);
       continue;

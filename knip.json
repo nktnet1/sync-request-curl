@@ -2,6 +2,8 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
     "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
-    "scripts/verify-native-deps.ts"
-  ]
+    "scripts/verify-native-deps.ts",
+    "typedoc/api.ts"
+  ],
+  "ignoreDependencies": ["typedoc-plugin-no-inherit", "typedoc-plugin-valibot"]
 }

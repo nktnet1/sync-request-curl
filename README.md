@@ -187,34 +187,7 @@ response.
 | ------ | ------ | ------ |
 | `method` | `string` | Valid HTTP method token. Matching is case-insensitive. |
 | `url` | `string` \| `URL` | Absolute `http:` or `https:` URL, provided as a string or `URL`. |
-| `options` | \{ `proxy?`: `string`; `proxyAuth?`: \{ `username`: `string`; `password`: `string`; \}; `rejectUnauthorized?`: `boolean`; `caFile?`: `string`; `localAddress?`: `string`; `localInterface?`: `string`; `tcpKeepAlive?`: \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; \}; `cacheNamespace?`: `string`; `headers?`: \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \}; `qs?`: \{ \[`key`: `string`\]: `unknown`; \}; `json?`: `JsonLikeValue`; `body?`: `string` \| `Buffer`\<`ArrayBufferLike`\>; `form?`: [`FormData`](#formdata); `timeout?`: `number`; `overallTimeout?`: `number`; `socketTimeout?`: `number`; `followRedirects?`: `boolean`; `maxRedirects?`: `number`; `allowRedirectHeaders?`: `string`[]; `gzip?`: `boolean`; `cache?`: `"file"` \| `"memory"`; `agent?`: `boolean` \| `Agent`; `retry?`: `boolean` \| [`RetryFunction`](#retryfunction); `retryDelay?`: `number` \| [`RetryDelayFunction`](#retrydelayfunction); `maxRetries?`: `number`; \} | Request, transport, redirect, retry, and cache options. |
-| `options.proxy?` | `string` | Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. |
-| `options.proxyAuth?` | \{ `username`: `string`; `password`: `string`; \} | Basic proxy credentials. Requires `proxy` and overrides credentials in its URL. |
-| `options.proxyAuth.username` | `string` | Proxy username. |
-| `options.proxyAuth.password` | `string` | Proxy password. |
-| `options.rejectUnauthorized?` | `boolean` | Verify the origin certificate chain and hostname. Defaults to `true`. |
-| `options.caFile?` | `string` | PEM CA bundle path for origin TLS verification. |
-| `options.localAddress?` | `string` | Source IPv4/IPv6 address. Hostnames are rejected. |
-| `options.localInterface?` | `string` | Source interface name. Mutually exclusive with `localAddress`. |
-| `options.tcpKeepAlive?` | \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; \} | Enable TCP keepalive, optionally with idle and interval controls. |
-| `options.cacheNamespace?` | `string` | Private cache identity. Defaults to `process.cwd()`. |
-| `options.headers?` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Node-style request headers. |
-| `options.qs?` | \{ \[`key`: `string`\]: `unknown`; \} | Query values merged with any existing query string. |
-| `options.json?` | `JsonLikeValue` | JSON-compatible request body. Adds `application/json` when needed. |
-| `options.body?` | `string` \| `Buffer`\<`ArrayBufferLike`\> | Raw string or `Buffer` request body. |
-| `options.form?` | [`FormData`](#formdata) | Synchronous multipart/form-data body. |
-| `options.timeout?` | `number` | Per-network-attempt timeout in milliseconds. `0` disables it. |
-| `options.overallTimeout?` | `number` | Complete-operation deadline in milliseconds. `0` disables it. |
-| `options.socketTimeout?` | `number` | Socket inactivity timeout in milliseconds. `0` disables it. |
-| `options.followRedirects?` | `boolean` | Follow redirects automatically. Defaults to `true`. |
-| `options.maxRedirects?` | `number` | Maximum redirects to follow. Negative or non-finite values mean no limit. |
-| `options.allowRedirectHeaders?` | `string`[] | Caller headers allowed to be forwarded to redirect hops. |
-| `options.gzip?` | `boolean` | Transparently decompress gzip/deflate responses. Defaults to enabled. |
-| `options.cache?` | `"file"` \| `"memory"` | Enable the private HTTP-aware cache in file or memory storage. |
-| `options.agent?` | `boolean` \| `Agent` | `sync-request` boolean agent option, or a keep-alive Node `Agent`. |
-| `options.retry?` | `boolean` \| [`RetryFunction`](#retryfunction) | Retry GET requests, or provide a callback to decide per attempt. |
-| `options.retryDelay?` | `number` \| [`RetryDelayFunction`](#retrydelayfunction) | Retry delay in milliseconds, or a callback returning the delay. |
-| `options.maxRetries?` | `number` | Maximum retry count. Defaults to 5 when retries are enabled. |
+| `options` | [`Options`](#options) | Request, transport, redirect, retry, and cache options. |
 
 ##### Returns
 
