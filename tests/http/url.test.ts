@@ -311,6 +311,36 @@ describe("appendQueryString", () => {
     expect(({} as { polluted?: string }).polluted).toBeUndefined();
   });
 
+  test("merges object-first array conflicts without losing either value", () => {
+    expect(
+      appendQueryString(
+        "https://example.com/path?mixed%5Bname%5D=first&mixed%5B0%5D=second&scalar=first&scalar%5B%5D=second",
+        {},
+      ),
+    ).toBe(
+      "https://example.com/path?mixed%5B0%5D=second&mixed%5Bname%5D=first&scalar%5B0%5D=first&scalar%5B1%5D=second",
+    );
+  });
+
+  test("serializes hostile constructor fields without invoking them", () => {
+    expect(
+      appendQueryString("https://example.com/path", {
+        value: { constructor: { isBuffer: false }, safe: "kept" },
+      }),
+    ).toBe(
+      "https://example.com/path?value%5Bconstructor%5D%5BisBuffer%5D=false&value%5Bsafe%5D=kept",
+    );
+  });
+
+  test("rejects circular query values deterministically", () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+
+    expect(() =>
+      appendQueryString("https://example.com/path", { circular }),
+    ).toThrow("Cyclic object value");
+  });
+
   test("skips nested undefined values and supports bigint values", () => {
     const nullPrototype: Record<string, unknown> = Object.create(null);
     nullPrototype.value = "kept";

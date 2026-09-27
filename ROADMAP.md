@@ -795,6 +795,12 @@ should be treated as the current baseline in future sessions:
   common web, document, archive, font, image, audio, and video formats. Unknown
   extensions continue to use `application/octet-stream`, and Blob-provided MIME
   metadata remains authoritative.
+- `v1.0.75-internal-query-codec.patch` replaces the `qs` runtime dependency
+  with an owned compatibility codec. The parser keeps the established depth,
+  parameter, array-index, malformed-escape, conflict-merge, and prototype-key
+  behaviour covered by the request suite, while the serializer preserves
+  indexed brackets and RFC3986 encoding without invoking attacker-controlled
+  `constructor.isBuffer` properties.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

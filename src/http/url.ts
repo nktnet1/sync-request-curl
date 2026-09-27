@@ -1,7 +1,7 @@
 import { domainToASCII, URL } from "node:url";
-import qs from "qs";
 import * as v from "valibot";
 import { CurlError } from "#/errors";
+import { parseQueryString, stringifyQuery } from "#/http/query-string";
 
 const hasNonAscii = (value: string): boolean => {
   for (let i = 0; i < value.length; i += 1) {
@@ -144,9 +144,8 @@ const plainObjectSchema = v.custom<v.InferOutput<typeof recordSchema>>(
   "Expected a plain object",
 );
 
-// `then-request` delegates `options.qs` to `qs` with its default parser and
-// serializer options. Use the same library directly so parsing, merging,
-// encoding, depth limits, and array handling stay aligned upstream.
+// Preserve the `then-request`/`qs` compatibility contract locally so query
+// behaviour is stable across upstream dependency releases.
 export const appendQueryString = (
   url: string,
   query: Record<string, unknown>,
@@ -163,10 +162,10 @@ export const appendQueryString = (
     queryIndex === -1 ? "" : withoutFragment.slice(queryIndex + 1);
   const merged: Record<string, unknown> = Object.assign(
     Object.create(null),
-    qs.parse(existingQuery),
+    parseQueryString(existingQuery),
     parsedQuery,
   );
-  const serialised = qs.stringify(merged);
+  const serialised = stringifyQuery(merged);
   const queryString = serialised ? `?${serialised}` : "";
 
   return `${base}${queryString}${fragment}`;
