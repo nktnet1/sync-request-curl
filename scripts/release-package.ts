@@ -50,7 +50,7 @@ export const createMainPackageManifest = (
 ): Record<string, unknown> => {
   const manifest: Record<string, unknown> = {
     ...packageJson,
-    files: ["dist"],
+    files: ["dist", "native", "rust-toolchain.toml"],
     optionalDependencies,
   };
 

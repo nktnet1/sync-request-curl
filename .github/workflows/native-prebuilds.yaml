@@ -43,7 +43,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
-          key: native-prebuild-v1-${{ matrix.platform }}-${{ hashFiles('native/**', 'rust-toolchain.toml', 'scripts/*.ts') }}
+          key: native-prebuild-v1-${{ matrix.platform }}-${{ hashFiles('native/**', 'rust-toolchain.toml', 'scripts/*.ts', 'src/native/platform-key-core.ts') }}
 
       - name: Build Linux prebuild
         if: steps.native-cache.outputs.cache-hit != 'true'
@@ -85,7 +85,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
-          key: native-prebuild-v1-${{ matrix.platform }}-${{ hashFiles('native/**', 'rust-toolchain.toml', 'scripts/*.ts') }}
+          key: native-prebuild-v1-${{ matrix.platform }}-${{ hashFiles('native/**', 'rust-toolchain.toml', 'scripts/*.ts', 'src/native/platform-key-core.ts') }}
 
       - name: Set up Rust
         if: steps.native-cache.outputs.cache-hit != 'true'
@@ -109,10 +109,33 @@ jobs:
           path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
           if-no-files-found: error
 
+  build-windows-x86:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          architecture: x86
+      - name: Set up Rust and x86 target
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal --no-self-update
+          rustup target add i686-pc-windows-msvc --toolchain 1.88.0
+      - name: Build and verify with 32-bit Node.js
+        run: node native/build.mjs
+      - name: Stage native addon
+        run: Copy-Item native/build/sync_request_curl_native.node prebuilds/sync_request_curl_native.win32-ia32-msvc.node
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-win32-ia32-msvc
+          path: prebuilds/sync_request_curl_native.win32-ia32-msvc.node
+          if-no-files-found: error
+
   collect:
     needs:
       - build-linux
       - build-desktop
+      - build-windows-x86
     runs-on: ubuntu-24.04
 
     steps:
@@ -197,7 +220,7 @@ jobs:
             npm pack "$package_dir" --pack-destination release-tarballs --ignore-scripts
           done
           npm pack .release/main --pack-destination release-tarballs --ignore-scripts
-          test "$(find release-tarballs -maxdepth 1 -name '*.tgz' -type f | wc -l)" -eq 9
+          test "$(find release-tarballs -maxdepth 1 -name '*.tgz' -type f | wc -l)" -eq 10
 
       - name: Upload release packages
         uses: actions/upload-artifact@v4

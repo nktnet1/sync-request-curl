@@ -68,7 +68,7 @@ jobs:
             test "$PACKAGE_VERSION" = "$EXPECTED_VERSION"
           done
 
-          test "$PACKAGE_COUNT" -eq 9
+          test "$PACKAGE_COUNT" -eq 10
 
       - name: Publish native packages with trusted publishing
         run: |

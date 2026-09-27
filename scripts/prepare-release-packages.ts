@@ -48,6 +48,24 @@ const prepareMainPackage = (): void => {
   mkdirSync(mainOutput, { recursive: true });
   cpSync(join(root, "dist"), join(mainOutput, "dist"), { recursive: true });
   cpSync(join(root, "README.md"), join(mainOutput, "README.md"));
+  const nativeSource = join(mainOutput, "native");
+  mkdirSync(nativeSource, { recursive: true });
+  for (const file of [
+    "Cargo.toml",
+    "Cargo.lock",
+    "build.rs",
+    "build.mjs",
+    "README.md",
+    "src",
+  ]) {
+    cpSync(join(root, "native", file), join(nativeSource, file), {
+      recursive: true,
+    });
+  }
+  cpSync(
+    join(root, "rust-toolchain.toml"),
+    join(mainOutput, "rust-toolchain.toml"),
+  );
   copyCommonFiles(mainOutput);
   writeJson(
     join(mainOutput, "package.json"),

@@ -70,6 +70,8 @@ type FileExists = (path: string) => boolean;
 export interface NativeLoadOptions {
   explicitPath?: string;
   platformKey?: NativePlatformKey;
+  platform?: NodeJS.Platform;
+  arch?: string;
   packageRoot?: string;
   exists?: FileExists;
   requireNative?: NativeRequire;
@@ -189,22 +191,40 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
     return requireNative(explicitPath);
   }
 
-  const platformKey = options.platformKey ?? getPlatformKey();
   const currentPackageRoot =
     options.packageRoot ?? findPackageRoot(moduleDirectory);
   const localBuildDirectory = join(currentPackageRoot, "native", "build");
   const prebuildDirectory = join(currentPackageRoot, "prebuilds");
   const localBinding = loadFirstExisting(
-    [
-      join(localBuildDirectory, "sync_request_curl_native.node"),
-      join(prebuildDirectory, `sync_request_curl_native.${platformKey}.node`),
-    ],
+    [join(localBuildDirectory, "sync_request_curl_native.node")],
     options.exists,
     requireNative,
   );
 
   if (localBinding) {
     return localBinding;
+  }
+
+  const platform = options.platform ?? process.platform;
+  const arch = options.arch ?? process.arch;
+  const sourceBuildHelp =
+    "Build from source with: node node_modules/sync-request-curl/native/build.mjs. " +
+    "See the Compatibility section for prerequisites.";
+  const platformKey =
+    options.platformKey ??
+    resolveNativePlatformKey(platform, arch, getLinuxLibc());
+  if (!platformKey) {
+    throw new Error(
+      `sync-request-curl does not provide a native binary for ${platform}-${arch}. ${sourceBuildHelp}`,
+    );
+  }
+  const prebuiltBinding = loadFirstExisting(
+    [join(prebuildDirectory, `sync_request_curl_native.${platformKey}.node`)],
+    options.exists,
+    requireNative,
+  );
+  if (prebuiltBinding) {
+    return prebuiltBinding;
   }
 
   const nativePackageName = getNativePackageName(platformKey);
@@ -218,7 +238,7 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
 
   throw new Error(
     `Unable to load the sync-request-curl native binary for ${platformKey}. ` +
-      `The optional package ${nativePackageName} is missing. Reinstall sync-request-curl with optional dependencies enabled.`,
+      `The optional package ${nativePackageName} is missing. Reinstall sync-request-curl with optional dependencies enabled. ${sourceBuildHelp}`,
   );
 };
 
