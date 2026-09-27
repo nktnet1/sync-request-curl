@@ -40,12 +40,17 @@ acquire accidental runtime dependencies on build-host libraries.
 
 See [the prebuilds README](../prebuilds/README.md) for the release matrix and CI details.
 
-Package consumers never compile this directory. Release CI publishes each generated
-`.node` file in a platform-specific optional npm package, so installation does
-not require Rust, a C/C++ compiler, CMake, vcpkg, node-gyp, or lifecycle-script
-approval.
+Package consumers normally use platform-specific optional npm packages without
+compilers or lifecycle scripts. The main package also includes the exact Rust
+sources, Cargo.lock, and `build.mjs` for an explicit source build:
 
-All repository automation under `scripts/` is TypeScript and runs directly in
-Node.js. Local development and release automation use Node.js 24.14+ or 26+;
-`scripts/` is not included in the npm package and does not change the published
-library runtime requirement of Node.js 16.17.0 or newer.
+```sh
+npx --no-install sync-request-curl-build
+```
+
+See [Compatibility](../README.md#compatibility-source) for prerequisites, target
+selection, and the distinction between prebuilt and best-effort source targets.
+`build.mjs` runs on Node.js 16.17+ without npm dependencies, uses `cargo --locked`,
+and load-checks the addon in a child Node.js process before replacing local output.
+The repository's TypeScript wrapper adds the `--if-needed` freshness check.
+All other repository automation under `scripts/` requires Node.js 24.14+ or 26+.

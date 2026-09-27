@@ -6,6 +6,7 @@ export const supportedPlatformKeys = [
   "linux-x64-gnu",
   "linux-x64-musl",
   "win32-arm64-msvc",
+  "win32-ia32-msvc",
   "win32-x64-msvc",
 ] as const;
 
@@ -16,7 +17,7 @@ export type LinuxLibc = (typeof supportedLinuxLibcs)[number];
 
 export interface NativeTarget {
   readonly os: "darwin" | "linux" | "win32";
-  readonly cpu: "arm64" | "x64";
+  readonly cpu: "arm64" | "x64" | "ia32";
   readonly libc?: "glibc" | "musl";
 }
 
@@ -28,6 +29,7 @@ const nativeTargets: Record<NativePlatformKey, NativeTarget> = {
   "linux-x64-gnu": { os: "linux", cpu: "x64", libc: "glibc" },
   "linux-x64-musl": { os: "linux", cpu: "x64", libc: "musl" },
   "win32-arm64-msvc": { os: "win32", cpu: "arm64" },
+  "win32-ia32-msvc": { os: "win32", cpu: "ia32" },
   "win32-x64-msvc": { os: "win32", cpu: "x64" },
 };
 
@@ -65,6 +67,10 @@ export function resolveNativePlatformKey(
   arch: string,
   linuxLibc: LinuxLibc,
 ): NativePlatformKey | undefined {
+  if (platform === "win32" && arch === "ia32") {
+    return "win32-ia32-msvc";
+  }
+
   if (arch !== "x64" && arch !== "arm64") {
     return undefined;
   }

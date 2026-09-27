@@ -13,7 +13,7 @@ import type {
 
 export type { FormDataEntry } from "#/form-data";
 export type {
-  ProxyAuth,
+  ProxyOptions,
   RetryDelayFunction,
   RetryFunction,
   RetryResponse,

@@ -21,7 +21,7 @@ import type {
   HttpVerb,
   JsonLike,
   Options,
-  ProxyAuth,
+  ProxyOptions,
   Response,
   UppercaseHttpVerb,
 } from "#/types";
@@ -32,7 +32,7 @@ import {
   incomingHttpHeadersSchema,
   type jsonLikeSchema,
   optionsSchema,
-  type proxyAuthSchema,
+  type proxySchema,
   requestUrlSchema,
   type responseDataSchema,
   uppercaseHttpVerbSchema,
@@ -58,8 +58,8 @@ describe("schema-derived types", () => {
     expectTypeOf<BufferEncoding>().toEqualTypeOf<
       v.InferOutput<typeof bufferEncodingSchema>
     >();
-    expectTypeOf<ProxyAuth>().toEqualTypeOf<
-      v.InferOutput<typeof proxyAuthSchema>
+    expectTypeOf<ProxyOptions>().toEqualTypeOf<
+      v.InferOutput<typeof proxySchema>
     >();
     expectTypeOf<Options>().toEqualTypeOf<
       v.InferOutput<typeof optionsSchema>
@@ -160,6 +160,45 @@ describe("runtime validation", () => {
     ).toBe(false);
     expect(
       v.safeParse(incomingHttpHeadersSchema, { "x-invalid": 123 }).success,
+    ).toBe(false);
+  });
+});
+
+describe("proxy object validation", () => {
+  test.each([
+    { url: "http://localhost:8080" },
+    { url: "http://localhost:8080", username: "user" },
+    { url: "http://localhost:8080", username: "user", password: "secret" },
+    { url: "http://localhost:8080", username: "", password: "" },
+    { url: "http://localhost:8080", username: "", password: "secret" },
+  ])("accepts proxy configuration %j", (proxy) => {
+    expect(v.is(optionsSchema, { proxy })).toBe(true);
+  });
+
+  test.each([
+    "http://localhost:8080",
+    null,
+    {},
+    { url: "" },
+    { url: "http://localhost:8080", password: "secret" },
+    { url: "http://localhost:8080", password: "" },
+    { url: "http://localhost:8080", username: 123 },
+    { url: "http://localhost:8080", username: "user", password: null },
+    { url: "http://localhost:8080", username: "bad\0" },
+    { url: "http://localhost:8080", username: "user", password: "bad\0" },
+  ])("rejects invalid proxy configuration %j", (proxy) => {
+    expect(v.is(optionsSchema, { proxy })).toBe(false);
+  });
+
+  test("rejects legacy authentication instead of silently sending an unauthenticated request", () => {
+    expect(
+      v.is(optionsSchema, { proxyAuth: { username: "u", password: "p" } }),
+    ).toBe(false);
+    expect(
+      v.is(optionsSchema, {
+        proxy: { url: "http://localhost:8080" },
+        proxyAuth: { username: "u", password: "p" },
+      }),
     ).toBe(false);
   });
 });

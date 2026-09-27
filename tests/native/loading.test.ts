@@ -150,6 +150,57 @@ describe("native binding loading", () => {
     expect(requireNative).toHaveBeenCalledWith(localBuild);
   });
 
+  test("loads a source build on an unlisted architecture", () => {
+    const binding = fakeBinding();
+    const root = join("", "package");
+    const local = join(
+      root,
+      "native",
+      "build",
+      "sync_request_curl_native.node",
+    );
+    const resolveNative = vi.fn();
+    expect(
+      loadBinding({
+        platform: "linux",
+        arch: "riscv64",
+        packageRoot: root,
+        exists: (candidate) => candidate === local,
+        requireNative: () => binding,
+        resolveNative,
+      }),
+    ).toBe(binding);
+    expect(resolveNative).not.toHaveBeenCalled();
+  });
+
+  test("explains source builds for an unlisted architecture", () => {
+    expect(() =>
+      loadBinding({
+        platform: "linux",
+        arch: "riscv64",
+        packageRoot: join("", "package"),
+        exists: () => false,
+      }),
+    ).toThrow("npx --no-install sync-request-curl-build");
+  });
+
+  test("does not hide a broken local source build", () => {
+    const resolveNative = vi.fn();
+    expect(() =>
+      loadBinding({
+        platform: "linux",
+        arch: "riscv64",
+        packageRoot: join("", "package"),
+        exists: () => true,
+        requireNative: () => {
+          throw new Error("wrong architecture");
+        },
+        resolveNative,
+      }),
+    ).toThrow("wrong architecture");
+    expect(resolveNative).not.toHaveBeenCalled();
+  });
+
   test("loads the matching prebuild when local outputs are missing", () => {
     const binding = fakeBinding();
     const requireNative = vi.fn(() => binding);

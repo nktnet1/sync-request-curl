@@ -13,11 +13,22 @@
   },
   "version": "5.0.0",
   "files": [
-    "dist"
+    "dist",
+    "native/src",
+    "native/Cargo.toml",
+    "native/Cargo.lock",
+    "native/build.rs",
+    "native/build.mjs",
+    "native/README.md",
+    "rust-toolchain.toml"
   ],
+  "bin": {
+    "sync-request-curl-build": "./native/build.mjs"
+  },
   "scripts": {
     "start": "tsx tests/app/server",
     "dev": "tsx watch --include ./tests/app ./tests/app/server.ts",
+    "test:source-build": "node --test tests/build/*.check.mjs",
     "test": "pnpm build:worker && node scripts/build-native.ts --if-needed && vitest run",
     "tc": "pnpm build:worker && node scripts/build-native.ts --if-needed && vitest run --coverage",
     "lint": "biome lint",
