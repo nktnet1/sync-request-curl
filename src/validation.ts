@@ -27,15 +27,17 @@ export const incomingHttpHeadersSchema = v.custom<
 );
 
 /**
- * Basic credentials for an explicit HTTP/HTTPS proxy.
+ * An explicit HTTP/HTTPS proxy and optional Basic credentials.
  *
  * @group Request
  */
-export interface ProxyAuth {
-  /** Proxy username. */
-  username: string;
-  /** Proxy password. */
-  password: string;
+export interface ProxyOptions {
+  /** HTTP/HTTPS proxy origin URL. May contain URL-encoded credentials. */
+  url: string;
+  /** Overrides both URL credentials. An omitted password becomes an empty string. */
+  username?: string;
+  /** Proxy password. Requires an explicit username; defaults to an empty string. */
+  password?: string;
 }
 
 /**
@@ -113,29 +115,27 @@ const keepAliveSecondsSchema = v.pipe(
   v.maxValue(2_147_483_647),
 );
 
-const proxyAuthObjectSchema = v.object({
-  /** Proxy username. */
-  username: v.pipe(
-    v.string(),
-    v.check((value) => !value.includes("\0")),
-  ),
-  /** Proxy password. */
-  password: v.pipe(
-    v.string(),
-    v.check((value) => !value.includes("\0")),
-  ),
+const proxyCredentialSchema = v.pipe(
+  v.string(),
+  v.check((value) => !value.includes("\0")),
+);
+
+const proxyObjectSchema = v.object({
+  url: nativeStringSchema,
+  username: v.optional(proxyCredentialSchema),
+  password: v.optional(proxyCredentialSchema),
 });
 
-export const proxyAuthSchema = v.custom<ProxyAuth>(
-  (input) => v.is(proxyAuthObjectSchema, input),
-  "Invalid proxy credentials",
+export const proxySchema = v.custom<ProxyOptions>(
+  (input) =>
+    v.is(proxyObjectSchema, input) &&
+    (input.password === undefined || input.username !== undefined),
+  "Invalid proxy configuration: password requires username",
 );
 
 const optionsObjectSchema = v.object({
   /** Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. */
-  proxy: v.optional(nativeStringSchema),
-  /** Basic proxy credentials. Requires `proxy` and overrides credentials in its URL. */
-  proxyAuth: v.optional(proxyAuthSchema),
+  proxy: v.optional(proxySchema),
   /** Verify the origin certificate chain and hostname. Defaults to `true`. */
   rejectUnauthorized: v.optional(v.boolean()),
   /** PEM CA bundle path for origin TLS verification. */
@@ -210,7 +210,10 @@ const optionsObjectSchema = v.object({
 export const optionsSchema = v.custom<
   v.InferOutput<typeof optionsObjectSchema>
 >(
-  (input) => !Array.isArray(input) && v.is(optionsObjectSchema, input),
+  (input) =>
+    !Array.isArray(input) &&
+    v.is(optionsObjectSchema, input) &&
+    !("proxyAuth" in input),
   "Invalid request options",
 );
 

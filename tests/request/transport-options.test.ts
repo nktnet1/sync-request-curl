@@ -29,29 +29,39 @@ describe("transport option validation", () => {
   ])(
     "only configures URL proxy credentials when supplied: $proxy",
     ({ proxy, username, password }) => {
-      const options = prepareTransportOptions({ proxy });
+      const options = prepareTransportOptions({ proxy: { url: proxy } });
       expect(options.proxyUsername).toBe(username);
       expect(options.proxyPassword).toBe(password);
     },
   );
 
+  test.each([
+    { url: PROXY_URL, username: "user" },
+    { url: PROXY_URL.replace("://", "://old:secret@"), username: "user" },
+  ])("uses an empty password for an explicit username %j", (proxy) => {
+    expect(prepareTransportOptions({ proxy })).toMatchObject({
+      proxy: `${PROXY_URL}/`,
+      proxyUsername: "user",
+      proxyPassword: "",
+    });
+  });
+
   test("preserves explicitly requested empty proxy credentials", () => {
     const options = prepareTransportOptions({
-      proxy: PROXY_URL,
-      proxyAuth: { username: "", password: "" },
+      proxy: { url: PROXY_URL, username: "", password: "" },
     });
     expect(options.proxyUsername).toBe("");
     expect(options.proxyPassword).toBe("");
   });
 
   test.each([
-    { proxy: "socks5://localhost" },
-    { proxy: "http://localhost/path" },
-    { proxy: "http://localhost/?x=1" },
-    { proxy: "http://localhost/#fragment" },
-    { proxy: "http://u%00:p@localhost" },
-    { proxy: "http://u:p%00@localhost" },
-    { proxyAuth: { username: "u", password: "p" } },
+    { proxy: { url: "socks5://localhost" } },
+    { proxy: { url: "http://localhost/path" } },
+    { proxy: { url: "http://localhost/?x=1" } },
+    { proxy: { url: "http://localhost/#fragment" } },
+    { proxy: { url: "http://u%00:p@localhost" } },
+    { proxy: { url: "http://u:p%00@localhost" } },
+    { proxy: { url: PROXY_URL, password: "p" } },
     { localAddress: "localhost" },
     { localAddress: "127.0.0.1", localInterface: "lo" },
   ])("rejects unsupported transport configuration %j", (options) => {
@@ -61,8 +71,11 @@ describe("transport option validation", () => {
   test("maps explicit controls and lets separate proxy credentials take precedence", () => {
     expect(
       prepareTransportOptions({
-        proxy: "https://url-user:url-pass@localhost:8080",
-        proxyAuth: { username: "explicit", password: "secret" },
+        proxy: {
+          url: "https://url-user:url-pass@localhost:8080",
+          username: "explicit",
+          password: "secret",
+        },
         rejectUnauthorized: false,
         caFile,
         localInterface: "lo",
@@ -94,8 +107,8 @@ describe("transport option validation", () => {
 
   test.each([
     { caFile: "bad\0path" },
-    { proxyAuth: { username: "bad\0", password: "" } },
-    { proxyAuth: { username: "", password: "bad\0" } },
+    { proxy: { url: PROXY_URL, username: "bad\0", password: "" } },
+    { proxy: { url: PROXY_URL, username: "", password: "bad\0" } },
     { tcpKeepAlive: { idleSeconds: 0 } },
     { tcpKeepAlive: { intervalSeconds: 1.5 } },
   ])("rejects invalid public option %j", (options) => {
@@ -117,15 +130,25 @@ describe("native transport controls", () => {
   });
 
   test.each([
-    [{ proxy: PROXY_URL }, "null"],
+    [{ proxy: { url: PROXY_URL } }, "null"],
+    [{ proxy: { url: PROXY_URL, username: "user" } }, "Basic dXNlcjo="],
+    [{ proxy: { url: PROXY_URL, username: "" } }, "Basic Og=="],
     [
-      { proxy: PROXY_URL.replace("://", "://user:p%40ss@") },
+      {
+        proxy: {
+          url: PROXY_URL.replace("://", "://old:secret@"),
+          username: "user",
+        },
+      },
+      "Basic dXNlcjo=",
+    ],
+    [
+      { proxy: { url: PROXY_URL.replace("://", "://user:p%40ss@") } },
       "Basic dXNlcjpwQHNz",
     ],
     [
       {
-        proxy: PROXY_URL,
-        proxyAuth: { username: "user", password: "secret" },
+        proxy: { url: PROXY_URL, username: "user", password: "secret" },
       },
       "Basic dXNlcjpzZWNyZXQ=",
     ],
@@ -140,8 +163,7 @@ describe("native transport controls", () => {
 
   test("tunnels HTTPS without passing proxy credentials to the origin", () => {
     const response = request("GET", TLS_URL, {
-      proxy: PROXY_URL,
-      proxyAuth: { username: "user", password: "secret" },
+      proxy: { url: PROXY_URL, username: "user", password: "secret" },
       caFile,
     });
     expect(response.getJSON()).toMatchObject({ proxyAuthorization: null });

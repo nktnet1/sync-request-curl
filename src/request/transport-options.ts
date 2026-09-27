@@ -7,19 +7,21 @@ interface PreparedProxyOptions {
   proxyPassword?: string;
 }
 
-const prepareProxyOptions = (proxyUrl?: string): PreparedProxyOptions => {
-  if (proxyUrl === undefined) {
+const prepareProxyOptions = (
+  proxy?: Options["proxy"],
+): PreparedProxyOptions => {
+  if (proxy === undefined) {
     return { proxy: "" };
   }
 
-  const url = new URL(proxyUrl);
+  const url = new URL(proxy.url);
   if (
     !["http:", "https:"].includes(url.protocol) ||
     url.pathname !== "/" ||
     url.search ||
     url.hash
   ) {
-    throw new TypeError("proxy must be an HTTP(S) origin URL");
+    throw new TypeError("proxy.url must be an HTTP(S) origin URL");
   }
 
   let proxyUsername: string | undefined;
@@ -34,26 +36,17 @@ const prepareProxyOptions = (proxyUrl?: string): PreparedProxyOptions => {
     }
   }
 
+  if (proxy.password !== undefined && proxy.username === undefined) {
+    throw new TypeError("proxy.password requires proxy.username");
+  }
+  if (proxy.username !== undefined) {
+    proxyUsername = proxy.username;
+    proxyPassword = proxy.password ?? "";
+  }
+
   url.username = "";
   url.password = "";
   return { proxy: url.href, proxyUsername, proxyPassword };
-};
-
-const applyExplicitProxyAuth = (
-  proxyOptions: PreparedProxyOptions,
-  proxyAuth: Options["proxyAuth"],
-): PreparedProxyOptions => {
-  if (proxyAuth === undefined) {
-    return proxyOptions;
-  }
-  if (!proxyOptions.proxy) {
-    throw new TypeError("proxyAuth requires proxy");
-  }
-  return {
-    ...proxyOptions,
-    proxyUsername: proxyAuth.username,
-    proxyPassword: proxyAuth.password,
-  };
 };
 
 const validateLocalBinding = (options: Options): void => {
@@ -80,9 +73,8 @@ const getNetworkInterface = (options: Options): string | undefined => {
 
 /** Validate portable transport controls before cache lookup or native I/O. */
 export const prepareTransportOptions = (options: Options) => {
-  const { proxy, proxyUsername, proxyPassword } = applyExplicitProxyAuth(
-    prepareProxyOptions(options.proxy),
-    options.proxyAuth,
+  const { proxy, proxyUsername, proxyPassword } = prepareProxyOptions(
+    options.proxy,
   );
   validateLocalBinding(options);
   const keepAlive = options.tcpKeepAlive;

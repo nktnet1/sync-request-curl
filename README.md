@@ -40,6 +40,7 @@ Make synchronous web requests similar to [sync-request](https://github.com/Forbe
 
 - [1. Installation](#installation)
 - [2. Usage](#usage)
+  - [2.1. Proxy configuration](#usage-proxy-configuration)
 - [3. API reference](#api-reference)
 - [4. Differences from `sync-request`](#differences-from-sync-request)
   - [4.1. What `sync-request-curl` adds](#differences-from-sync-request-what-sync-request-curl-adds)
@@ -49,6 +50,7 @@ Make synchronous web requests similar to [sync-request](https://github.com/Forbe
   - [6.1. Windows](#compatibility-windows)
   - [6.2. macOS](#compatibility-macos)
   - [6.3. Linux](#compatibility-linux)
+  - [6.4. Building from source](#compatibility-building-from-source)
 - [7. Caveats](#caveats)
 
 <a id="installation"></a>
@@ -139,8 +141,8 @@ Using a proxy URL (Note: replace with your own proxy details)
 import request from 'sync-request-curl';
 
 const res = request('GET', 'https://ipinfo.io/json', {
-  proxy: 'http://your-proxy-url:port',
-  proxyAuth: {
+  proxy: {
+    url: 'http://your-proxy-url:port',
     username: 'proxyUsername',
     password: 'proxyPassword',
   },
@@ -154,6 +156,26 @@ console.log(jsonBody);
 </details>
 
 <br/>
+
+<a id="usage-proxy-configuration"></a>
+### 2.1. Proxy configuration
+
+Use `proxy: { url, username?, password? }` instead of the former `proxy` string
+and separate `proxyAuth` option. `url` is required. Both credential fields can be
+omitted for an unauthenticated proxy. A username alone uses an empty password;
+`password` requires an explicit `username` (which may be an empty string).
+
+```ts
+request('GET', 'https://example.com', {
+  proxy: { url: 'http://localhost:8080', username: 'user' },
+});
+```
+
+Without an explicit username, credentials embedded in `url` are decoded and
+used. An explicit username overrides both URL credentials; omitting `password`
+in that case sends an empty password, never the password from the URL.
+Proxy credentials apply only to the proxy hop. Ambient proxy variables remain
+ignored. The former `proxyAuth` option is rejected rather than silently ignored.
 
 <a id="api-reference"></a>
 ## 3. API reference
@@ -218,8 +240,7 @@ uppercase before transport.
 
 ```ts
 type Options = {
-  proxy?: string;
-  proxyAuth?: ProxyAuth;
+  proxy?: ProxyOptions;
   rejectUnauthorized?: boolean;
   caFile?: string;
   localAddress?: string;
@@ -263,8 +284,7 @@ supplied.
 
 | Name | Type | Description |
 | ------ | ------ | ------ |
-| <a id="property-proxy"></a> `proxy?` | `string` | Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. |
-| <a id="property-proxyauth"></a> `proxyAuth?` | [`ProxyAuth`](#proxyauth) | Basic proxy credentials. Requires `proxy` and overrides credentials in its URL. |
+| <a id="property-proxy"></a> `proxy?` | [`ProxyOptions`](#proxyoptions) | Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. |
 | <a id="property-rejectunauthorized"></a> `rejectUnauthorized?` | `boolean` | Verify the origin certificate chain and hostname. Defaults to `true`. |
 | <a id="property-cafile"></a> `caFile?` | `string` | PEM CA bundle path for origin TLS verification. |
 | <a id="property-localaddress"></a> `localAddress?` | `string` | Source IPv4/IPv6 address. Hostnames are rejected. |
@@ -291,16 +311,17 @@ supplied.
 
 ***
 
-#### ProxyAuth
+#### ProxyOptions
 
-Basic credentials for an explicit HTTP/HTTPS proxy.
+An explicit HTTP/HTTPS proxy and optional Basic credentials.
 
 ##### Properties
 
 | Property | Type | Description |
 | ------ | ------ | ------ |
-| <a id="property-username"></a> `username` | `string` | Proxy username. |
-| <a id="property-password"></a> `password` | `string` | Proxy password. |
+| <a id="property-url-1"></a> `url` | `string` | HTTP/HTTPS proxy origin URL. May contain URL-encoded credentials. |
+| <a id="property-username"></a> `username?` | `string` | Overrides both URL credentials. An omitted password becomes an empty string. |
+| <a id="property-password"></a> `password?` | `string` | Proxy password. Requires an explicit username; defaults to an empty string. |
 
 ***
 
@@ -351,7 +372,7 @@ Read the response body as a `Buffer`.
 | ------ | ------ | ------ |
 | <a id="property-statuscode-2"></a> `statusCode` | `number` | HTTP response status code. |
 | <a id="property-headers-3"></a> `headers` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Node-style response headers with lowercase keys. |
-| <a id="property-url-1"></a> `url` | `string` | Final effective URL for the completed attempt. |
+| <a id="property-url-2"></a> `url` | `string` | Final effective URL for the completed attempt. |
 | <a id="property-body-3"></a> `body` | `Buffer` | Buffered response body. |
 
 ***
@@ -780,14 +801,14 @@ If you already use `sync-request`, most code should feel familiar. The main diff
 
 `sync-request-curl` supports Node.js 16.17.0 and newer at runtime. The native addon targets Node-API v8, so a prebuilt addon is tied to its operating system, CPU architecture, and C runtime, but not to a specific Node.js major version. The same prebuilt binary can be reused by Node.js releases that support Node-API v8.
 
-Repository build and release automation runs on newer Node.js versions independently of the published runtime requirement. Package consumers do not execute those TypeScript build scripts or compile the native addon.
+Repository build and release automation runs on newer Node.js versions independently of the published runtime requirement. The optional source-build entry point is plain JavaScript and runs on Node.js 16.17.0 or newer.
 
-The published package does not download or compile native code during installation. Each release declares platform-specific optional packages, so the package manager installs only the native binary compatible with the current operating system, CPU architecture, and Linux C runtime. If optional dependencies are disabled or a matching package is unavailable, loading fails with an explicit error instead of falling back to `node-gyp`.
+The published package does not download or compile native code during installation. Each release declares platform-specific optional packages, so the package manager installs only the native binary compatible with the current operating system, CPU architecture, and Linux C runtime. If optional dependencies are disabled or a matching package is unavailable, loading fails with an explicit error with instructions for an explicit source build. Compilation is never triggered by importing the library.
 
 <a id="compatibility-windows"></a>
 ### 6.1. Windows
 
-Prebuilt addons are prepared for x64 and arm64 Windows. No Visual Studio, Python, Rust, CMake, vcpkg, or node-gyp installation is required by package consumers.
+Prebuilt addons are prepared for x64, arm64, and x86 (`ia32`) Windows. The x86 addon is built and load-checked with 32-bit Node.js 22; use a Node.js release that provides an x86 runtime. No Visual Studio, Python, Rust, CMake, vcpkg, or node-gyp installation is required by package consumers.
 
 Requests may still fail with Libcurl Error 60 (`CURLE_PEER_FAILED_VERIFICATION`) when the peer certificate cannot be verified. `rejectUnauthorized: false` disables origin certificate and hostname verification and should only be used when that trade-off is intentional.
 
@@ -800,6 +821,78 @@ Prebuilt addons are prepared for Apple Silicon (`arm64`) and Intel (`x64`) macOS
 ### 6.3. Linux
 
 Prebuilt addons are prepared for both glibc and musl on x64 and arm64 Linux. This covers the common Debian, Ubuntu, Arch, and Alpine variants without compiling native code during installation. GNU/Linux release binaries are built against a GLIBC 2.31 baseline, while Alpine binaries are built and tested in a musl environment.
+
+<a id="compatibility-building-from-source"></a>
+### 6.4. Building from source
+
+The npm package includes the Rust addon sources and Cargo lockfile. If your
+architecture has no prebuilt package, or you need a build for your local system,
+install normally and explicitly compile the installed package:
+
+```sh
+npm install sync-request-curl
+node node_modules/sync-request-curl/native/build.mjs
+```
+
+Run this with the same Node.js architecture that will use the library. This works
+with installation scripts disabled and does not require node-gyp or development
+JavaScript dependencies. With a nonstandard package layout, locate the installed
+package using `require.resolve('sync-request-curl/package.json')`, then run
+`native/build.mjs` within that package. Rebuild after replacing or upgrading it.
+
+Prerequisites:
+
+- Rust 1.88 or newer and Cargo (rustup uses the included pinned toolchain).
+- Linux/other Unix: a C/C++ compiler, make, Perl, and pkg-config; install your
+  distribution's development tools and CA certificates.
+- macOS: Xcode Command Line Tools; the addon uses system libcurl.
+- Windows: Visual Studio C++ Build Tools and Windows SDK for the target CPU.
+  For x86, also install `rustup target add i686-pc-windows-msvc`.
+- Access to the locked Cargo dependencies, or an already populated Cargo cache.
+
+Linux builds bundle libcurl, HTTP/2, and OpenSSL. musl builds disable Rust's
+static CRT mode so Node.js can load the shared addon. Source builds inherit the
+local system's compatibility baseline, not the release prebuilds' GLIBC baseline.
+
+The source builder does not restrict CPU architectures to the prebuilt matrix.
+Additional Linux architectures (for example ARMv7, ppc64, s390x, and riscv64) and
+other Unix platforms are best-effort: they need compatible Node.js, Rust, and
+native dependencies and are not covered by release CI. A source-build route is
+not a guarantee that every upstream dependency supports every target.
+
+`CARGO_BUILD_TARGET` can select a Rust target when the Rust host differs from
+Node.js (for example an ARMv7 ABI). Install that target and configure its C/linker
+toolchain yourself. The builder must run on the destination system with matching
+Node.js: it verifies the addon before installing it and is not a general-purpose
+cross-compilation command. Windows defaults to the MSVC target matching Node.js.
+
+The loader prefers `native/build/sync_request_curl_native.node` before detecting
+prebuilt targets, including on unlisted architectures. For an externally managed
+build, set `SYNC_REQUEST_CURL_NATIVE_PATH` to its absolute `.node` path. Invalid
+local or explicitly selected binaries fail visibly rather than silently loading
+a different binary. Normal prebuilt installations still require no build tools.
+
+For repository development (Node.js 24.14+ or 26+), use:
+
+```sh
+pnpm build:native
+pnpm test:source-build
+pnpm test
+```
+
+`build:native` explicitly invokes Cargo even when a prebuild exists. The
+source-build checks test orchestration and failure handling with mocked compiler
+processes; `pnpm test` exercises the real addon, preferring the local build.
+The build itself validates addon loading before installing the output. For a
+standalone load check after compilation:
+
+```sh
+node scripts/verify-native-load.ts --file=native/build/sync_request_curl_native.node
+```
+
+For an installed package, run the source-build command shown above, then import
+`sync-request-curl` normally. No environment override is needed. Keep the build
+on the machine, architecture, and C runtime that will execute your application.
 
 <a id="caveats"></a>
 ## 7. Caveats

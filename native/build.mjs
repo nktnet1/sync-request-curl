@@ -74,12 +74,12 @@ run(
   ],
   env,
 );
-const library =
-  process.platform === "win32"
-    ? "sync_request_curl_native.dll"
-    : process.platform === "darwin"
-      ? "libsync_request_curl_native.dylib"
-      : "libsync_request_curl_native.so";
+let library = "libsync_request_curl_native.so";
+if (process.platform === "win32") {
+  library = "sync_request_curl_native.dll";
+} else if (process.platform === "darwin") {
+  library = "libsync_request_curl_native.dylib";
+}
 mkdirSync(buildDir, { recursive: true });
 const temporary = join(
   buildDir,

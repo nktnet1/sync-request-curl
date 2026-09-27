@@ -50,12 +50,12 @@ for (const mode of ["success", "cargo-failure", "load-failure", "musl"]) {
           );
         }
         if (mode === "cargo-failure") return { status: 1 };
-        const name =
-          process.platform === "win32"
-            ? "sync_request_curl_native.dll"
-            : process.platform === "darwin"
-              ? "libsync_request_curl_native.dylib"
-              : "libsync_request_curl_native.so";
+        let name = "libsync_request_curl_native.so";
+        if (process.platform === "win32") {
+          name = "sync_request_curl_native.dll";
+        } else if (process.platform === "darwin") {
+          name = "libsync_request_curl_native.dylib";
+        }
         const artifact = join(native, "target", target, "release", name);
         mkdirSync(dirname(artifact), { recursive: true });
         writeFileSync(artifact, "new addon");
