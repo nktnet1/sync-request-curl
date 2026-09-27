@@ -242,6 +242,12 @@ empty response body. This avoids libcurl's `CURLOPT_NOBODY` suppressing request
 content or its body-capable request mode waiting for response bytes that a HEAD
 server does not send.
 
+HTTP/2 over HTTPS is an intentional transport enhancement rather than a
+strict Node `http` parity target. Bundled non-macOS native builds enable
+libcurl's HTTP/2 feature; libcurl may negotiate HTTP/2 via TLS/ALPN and fall
+back to HTTP/1.1. macOS uses the system libcurl, so HTTP/2 availability follows
+the system library. Do not force HTTP/1.1 solely to mimic `http-basic`.
+
 ## TypeDoc
 
 Keep `README.md` at the pre-v5 develop version until the public API and
@@ -503,6 +509,10 @@ should be treated as the current baseline in future sessions:
   adding `Accept: */*`. An absent Accept field now stays absent, matching Node
   and RFC 9110's no-preference semantics, while explicit and explicitly empty
   caller values remain untouched.
+- `v1.0.53-http2-transport-contract.patch` records HTTP/2 as an intentional
+  native transport enhancement and adds a build-configuration regression test:
+  bundled non-macOS libcurl builds keep the `http2` feature enabled, while
+  macOS continues to use the system libcurl and its available protocol support.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are
