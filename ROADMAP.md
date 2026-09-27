@@ -51,7 +51,9 @@ layer.
       upstream-style root named public types while preserving direct callable
       CommonJS `require("sync-request-curl")`.
 - [x] Match `then-request` query parsing/merging/stringifying semantics for
-      `qs`, including nested values and RFC3986 byte encoding.
+      `qs`, including nested values and RFC3986 byte encoding, while preserving
+      additional literal `?` and `#` delimiters that upstream accidentally
+      truncates during URL splitting.
 
 ## Additional transport-neutral features
 
@@ -254,6 +256,12 @@ Redirect method handling intentionally fixes an upstream `http-basic` bug: its
 redirect wrapper can turn body-bearing requests into GET even for 307/308.
 `sync-request-curl` preserves both method and payload for 307/308, while keeping
 the defined POST-to-GET behaviour for 301/302 and GET conversion for 303.
+
+Query handling also intentionally fixes an upstream `then-request` URL-splitting
+bug. Upstream destructures `url.split("?")` and reconstructs only the first
+fragment component, which can truncate additional literal `?` or `#`
+delimiters. `sync-request-curl` splits only on the first query and fragment
+boundaries, then preserves the complete remaining query value/fragment.
 
 ## TypeDoc
 
@@ -524,6 +532,10 @@ should be treated as the current baseline in future sessions:
   redirect behaviour that differs from upstream `http-basic`: 307 and 308 keep
   both a body-bearing request's method and payload instead of converting it to
   GET.
+- `v1.0.55-query-delimiter-regression.patch` documents and locks in the
+  intentional fix for `then-request`'s delimiter-splitting bug: additional
+  literal `?` bytes remain part of the existing query value and the complete
+  fragment, including additional `#` delimiters, is preserved.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

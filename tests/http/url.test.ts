@@ -193,6 +193,25 @@ describe("appendQueryString", () => {
     );
   });
 
+  test("preserves additional question marks inside an existing query value", () => {
+    expect(
+      appendQueryString(
+        "https://example.com/path?value=one?two=three#section",
+        { added: "four" },
+      ),
+    ).toBe(
+      "https://example.com/path?value=one%3Ftwo%3Dthree&added=four#section",
+    );
+  });
+
+  test("preserves additional fragment delimiters verbatim", () => {
+    expect(
+      appendQueryString("https://example.com/path?value=one#first#second", {
+        added: "two",
+      }),
+    ).toBe("https://example.com/path?value=one&added=two#first#second");
+  });
+
   test("compacts parsed sparse arrays and keeps indexes above the qs array limit as object keys", () => {
     const url = appendQueryString(
       "https://example.com/path?a%5B1%5D=b&a%5B15%5D=c&large%5B100%5D=x&mixed%5B0%5D=first&mixed%5Bname%5D=second",
