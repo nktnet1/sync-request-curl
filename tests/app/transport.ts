@@ -40,10 +40,8 @@ export const proxyServer = createServer((req, res) => {
       headers,
     },
     (incoming) => {
-      res.writeHead(incoming.statusCode ?? 502, {
-        ...incoming.headers,
-        "x-proxy-auth": String(proxyAuth),
-      });
+      res.setHeader("x-proxy-auth", String(proxyAuth));
+      res.writeHead(incoming.statusCode ?? 502);
       incoming.pipe(res);
     },
   );

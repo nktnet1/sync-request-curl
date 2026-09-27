@@ -198,13 +198,20 @@ const serializeRequestHeaderArray = (
   return values.map((value) => formatRequestHeader(name, value));
 };
 
+function validateRequestHeaderValue(
+  name: string,
+  value: string | undefined,
+): asserts value is string {
+  // IncomingHttpHeaders permits undefined, but Node rejects it outbound.
+  validateHeaderValue(name, value as string);
+}
+
 const serializeRequestHeaderValue = (
   name: string,
   value: string | undefined,
 ): string[] => {
-  // IncomingHttpHeaders permits undefined, but Node rejects it outbound.
-  validateHeaderValue(name, value as string);
-  return value === undefined ? [] : [formatRequestHeader(name, value)];
+  validateRequestHeaderValue(name, value);
+  return [formatRequestHeader(name, value)];
 };
 
 export const serializeRequestHeaders = (
