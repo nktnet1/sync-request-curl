@@ -285,6 +285,140 @@ executed by libcurl, but that does not justify removing or narrowing the
 `sync-request` boolean API. No wrapper library can bridge a live Node Agent's
 socket lifecycle into libcurl more faithfully than this manual mapping.
 
+## Source audit (2026-09-27)
+
+Baseline: bundle commit `1615fb3`, including patches through v1.0.59. Compared
+against the attached `sync-request`, `then-request`, and `http-basic` source
+ZIPs, in that priority order. Browser implementations are outside scope. A
+checked item below is implemented; an unchecked item remains open. The older
+"substantially covered" assessment is not a claim of complete drop-in parity.
+
+### 1. Observable through `sync-request` (highest priority)
+
+- [x] **CommonJS default alias.** Upstream `sync-request/src/index.ts` sets
+  `module.exports.default = request`. Restore this self-reference, including
+  its TypeScript shape and built-package CI assertion. Callable `require()`
+  and `request.FormData` alone were insufficient for `.default` consumers.
+- [x] **URL validation with redirects disabled.** The early return in
+  `src/request/index.ts` bypassed protocol validation. Validate the prepared
+  URL before any cache lookup or transport regardless of `followRedirects`.
+  This closes non-HTTP protocol access rather than adopting libcurl's broader
+  protocol surface. Upstream `http-basic` rejects these protocols too.
+- [x] **Redirect payload headers.** On a method rewrite, remove payload
+  metadata and framing even when present in `allowRedirectHeaders`. Previously
+  a permitted old Content-Length caused the redirected empty GET to fail
+  validation; other permitted fields described a payload no longer sent.
+  Upstream `http-basic/src/index.ts` also blindly forwards allowed fields.
+  Follow RFC 9110 section 15.4; retain headers on method-preserving redirects.
+- [x] **Cache decoding mode.** Stored responses were already decoded, but
+  lookup ignored `gzip`. A hit could violate either `gzip: false` or default
+  decompression, even with identical Accept-Encoding headers. Partition entries
+  by decoding mode in both cache backends, including revalidation/replacement;
+  invalidation still removes all modes. Old disk entries without that metadata
+  are discarded as cache misses. Upstream caches below its decompression
+  wrapper; copying the option names did not reproduce that ordering.
+- [x] **Cached Age.** Generate current Age on fresh cache hits using the existing
+  age calculation; never modify the stored header while doing so. The attached
+  upstream returns old headers unchanged. This intentionally fixes that bug
+  (RFC 9111 sections 4 and 4.2.3).
+- [ ] **Runtime sentinel values — decision required.** Upstream README documents
+  `timeout: false`, `socketTimeout: false`, and `allowRedirectHeaders: null`;
+  the effective runtime tolerates them but our schema rejects them. The upstream
+  TypeScript surface is narrower. Decide whether to normalise these documented
+  runtime sentinels without widening the declared API, as already done for null
+  options. Do not broadly accept arbitrary invalid option types.
+- [ ] **Retry timeout contract — decision required.** `performRequestWithRetry`
+  passes the same timeout to each attempt and excludes retry sleeps, while the
+  redirect loop describes its timeout as overall. The existing test explicitly
+  expects a fresh per-attempt allowance. Choose a true deadline including retry
+  delays, or document per-attempt semantics and define interaction with redirects.
+  Neither is imposed by HTTP; do not silently change this established test.
+- [ ] **Cache privacy boundary — decision required (high impact).** File entries
+  are shared by OS uid, keyed by URL/Vary; memory entries are process-global.
+  Authorization/Cookie do not isolate callers unless the server emits Vary.
+  A private single-user cache and a shared HTTP cache have different rules.
+  Choose an explicit private cache identity/isolation model, or shared-cache
+  semantics for private, Authorization, and s-maxage (RFC 9111 sections 3/3.5).
+  Changing between these models without a decision would be an opinionated API
+  change. The attached upstream is also not a safe reference for this boundary.
+- [ ] **304 validity and storage revocation.** `refreshCacheEntry` accepts any
+  304 for its selected stale entry without comparing returned validators. A
+  refreshed no-store or Vary:* response fails `canStoreResponse`, leaving the
+  previous entry available for subsequent lookup. Validate the selected stored
+  response before reusing its body and remove superseded non-storable entries;
+  do not copy upstream's unconditional `304 && cachedResponse` reuse.
+- [ ] **Cache key canonicalisation.** The raw prepared URL includes fragments;
+  GET `/resource#one` and an unsafe request to `/resource#two` therefore address
+  different buckets despite reaching the same HTTP resource. Canonicalise the
+  target used for cache lookup/invalidation without changing the public response
+  URL. Include credentials, default ports, and equivalent URL spellings in the
+  design rather than blindly applying the upstream raw-string key.
+- [ ] **Request transfer coding.** Validation currently only rejects
+  Content-Length plus Transfer-Encoding. It does not ensure a declared transfer
+  coding is actually applied to the buffered bytes or validate chunked ordering.
+  Restrict to supported framing or implement the requested coding; Node accepting
+  a field value does not make incorrectly encoded wire content conformant.
+- [ ] **Multipart metadata parity.** `sync-request` forwards fileName into
+  `then-request`'s `form-data`, whereas native MIME construction delegates media
+  type inference and filename handling to libcurl. Add wire-level cases for
+  extension-based media types, unnamed Buffers, and path-bearing filenames;
+  this is a verification gap, not a proven claim of identical wire output.
+
+### 2. Additive `then-request` compatibility
+
+- [x] **Memory-cache ownership.** Deep-copy header arrays on storage, refresh,
+  and retrieval. Previously mutating a returned response could change a future
+  hit's headers/freshness, unlike the isolated synchronous worker response.
+  Preserve mutable public response objects without sharing internal cache state.
+- [ ] **URL credentials versus explicit Authorization — decision required.**
+  `http-basic` overwrites explicit Authorization with URL Basic credentials.
+  This implementation delegates URL credentials to libcurl, leaving the explicit
+  header in place. Decide precedence and test percent-encoded userinfo; do not
+  overwrite an intentional caller header merely to imitate upstream.
+- [ ] **Caller Accept-Encoding — document retained difference.** Upstream appends
+  gzip/deflate even to an explicit preference; our preparation respects the
+  caller's header. Keep the current behaviour rather than undermining explicit
+  negotiation preferences (including q=0), and test this through the public API.
+- [ ] **Response mutability contract — decision required.** The upstream README's
+  getBody implementation reads `this.statusCode`, `this.headers`, and `this.body`.
+  Our closure captures initial values, so property reassignment does not affect
+  getBody/getJSON. Decide whether mutable response properties should drive helpers;
+  changing this also changes behaviour of detached method calls.
+
+### 3. `http-basic` internals: differences, not additional public API targets
+
+- [x] **Do not reproduce option loss in wrappers.** Upstream's gzip wrapper omits
+  socketTimeout, maxRedirects, and cache policy hooks; redirect/cache/retry wrappers
+  also lose socketTimeout. Existing local orchestration retains these options.
+  This means functional socketTimeout/maxRedirects are intentional bug fixes,
+  not failures to match the upstream defaults with gzip enabled.
+- [x] **Do not reproduce validator/no-store precedence bugs.** Upstream
+  `cache-utils.canCache` returns true for ETag/Last-Modified before consulting
+  no-store, and its 301/308 handling can treat redirects as permanently fresh.
+  Keep local no-store precedence and explicit freshness requirements. A heuristic
+  freshness policy, if desired, is a separate optional choice, not a requirement
+  to cache permanent redirects forever.
+- [ ] **Cache read errors — decision required.** Upstream warns and fetches from
+  origin after a read error. Local code throws for non-ENOENT read failures but
+  warns on write failures. Choose consistent fail-open or fail-closed handling;
+  ordinary cache failure is not an HTTP standards question.
+- [x] **Lower-level-only options remain out of scope.** `duplex` and
+  `ignoreFailedInvalidation` exist in http-basic but then-request does not forward
+  them. Likewise fromCache/fromNotModified flags are lost when then-request
+  rebuilds the response. Their absence is not a sync-request feature gap.
+
+Standards references for this audit:
+[RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html),
+[RFC 9111](https://www.rfc-editor.org/rfc/rfc9111.html), and
+[RFC 9112](https://www.rfc-editor.org/rfc/rfc9112.html).
+No upstream source code was fetched online.
+
+Incremental patch: `v1.0.60-upstream-parity-audit.patch`. This patch addresses the
+checked new fixes above; unchecked findings and decisions are not claimed fixed.
+Validation: 76 focused tests passed, TypeScript and Biome checks passed, and the
+package build passed. Built CommonJS/ESM exports were smoke-tested with a stub
+transport. Full native/platform integration suites were not run in this audit.
+
 ## TypeDoc
 
 Keep `README.md` at the pre-v5 develop version until the public API and

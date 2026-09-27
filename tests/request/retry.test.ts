@@ -1,3 +1,4 @@
+import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 const { nativeRequest } = vi.hoisted(() => ({
@@ -10,7 +11,7 @@ vi.mock("#/native/index", () => ({
   },
 }));
 
-import request from "#/request/index";
+import request from "#/index";
 import { performRequest } from "#/request/perform";
 import type { RetryResponse } from "#/types";
 
@@ -49,6 +50,25 @@ afterEach(() => {
 });
 
 describe("single request execution", () => {
+  test("exposes the upstream self-referencing default export", () => {
+    expect(request.default).toBe(request);
+    expect(request.default.FormData).toBe(request.FormData);
+  });
+
+  test.each([true, false])(
+    "validates the URL before transport with followRedirects=%s",
+    (followRedirects) => {
+      for (const url of [
+        "file:///etc/hosts",
+        "ftp://example.com/file",
+        "example.com",
+      ]) {
+        expect(() => request("GET", url, { followRedirects })).toThrow();
+      }
+      expect(nativeRequest).not.toHaveBeenCalled();
+    },
+  );
+
   test("falls back to the prepared URL when native effectiveUrl is null", () => {
     nativeRequest.mockReturnValueOnce({
       transportCode: 0,
@@ -431,6 +451,33 @@ describe("request retries", () => {
 });
 
 describe("retry orchestration", () => {
+  test.each([true, false])(
+    "cache isolates gzip modes when the first request uses gzip=%s",
+    (gzip) => {
+      const url = `https://example.com/cache-gzip-${gzip}`;
+      const encoded = gzipSync("decoded");
+      nativeRequest.mockReturnValue(
+        nativeResponse({
+          effectiveUrl: url,
+          headers: ["Content-Encoding: gzip", "Cache-Control: max-age=60"],
+          body: encoded,
+        }),
+      );
+      for (const mode of [gzip, !gzip, gzip, !gzip]) {
+        const result = request("GET", url, {
+          cache: "memory",
+          gzip: mode,
+          headers: { "Accept-Encoding": "gzip" },
+        });
+        expect(result.body).toEqual(mode ? Buffer.from("decoded") : encoded);
+        expect(result.headers["content-encoding"]).toBe(
+          mode ? undefined : "gzip",
+        );
+      }
+      expect(nativeRequest).toHaveBeenCalledTimes(2);
+    },
+  );
+
   test("retries an origin response before storing a cacheable error", () => {
     const url = "https://example.com/retry-cacheable-error";
     nativeRequest.mockReturnValue(

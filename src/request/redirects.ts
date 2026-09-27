@@ -24,9 +24,27 @@ const withoutPayload = (options: Options): Options => ({
   form: undefined,
 });
 
+// RFC 9110 section 15.4: a method rewrite must discard payload metadata,
+// even when the caller allowed these fields through redirects.
+const payloadHeaderNames = new Set([
+  "content-encoding",
+  "content-language",
+  "content-location",
+  "content-type",
+  "content-length",
+  "digest",
+  "content-digest",
+  "repr-digest",
+  "last-modified",
+  "transfer-encoding",
+  "trailer",
+  "expect",
+]);
+
 const getRedirectHeaders = (
   headers: IncomingHttpHeaders | undefined,
   allowRedirectHeaders: string[] | undefined,
+  methodChanged: boolean,
 ): IncomingHttpHeaders | undefined => {
   if (!headers || !allowRedirectHeaders || allowRedirectHeaders.length === 0) {
     return undefined;
@@ -35,8 +53,10 @@ const getRedirectHeaders = (
   const allowedNames = new Set(
     allowRedirectHeaders.map((name) => name.toLowerCase()),
   );
-  const entries = Object.entries(headers).filter(([name]) =>
-    allowedNames.has(name.toLowerCase()),
+  const entries = Object.entries(headers).filter(
+    ([name]) =>
+      allowedNames.has(name.toLowerCase()) &&
+      !(methodChanged && payloadHeaderNames.has(name.toLowerCase())),
   );
   return entries.length > 0
     ? v.parse(incomingHttpHeadersSchema, Object.fromEntries(entries))
@@ -49,7 +69,11 @@ export const getRedirectOptions = (
 ): Options => ({
   ...(methodChanged ? withoutPayload(options) : options),
   qs: undefined,
-  headers: getRedirectHeaders(options.headers, options.allowRedirectHeaders),
+  headers: getRedirectHeaders(
+    options.headers,
+    options.allowRedirectHeaders,
+    methodChanged,
+  ),
 });
 
 export const getRemainingTimeout = (

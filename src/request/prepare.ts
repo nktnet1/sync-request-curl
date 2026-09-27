@@ -10,7 +10,11 @@ import {
   setRequestHeader,
   validateRequestFraming,
 } from "#/http/headers";
-import { appendQueryString, normalizeUrlHostname } from "#/http/url";
+import {
+  appendQueryString,
+  assertSupportedHttpUrl,
+  normalizeUrlHostname,
+} from "#/http/url";
 import type { NativeRequestOptions } from "#/native/index";
 import type { Options, UppercaseHttpVerb } from "#/types";
 
@@ -113,6 +117,7 @@ const preparePayload = (
 
 const prepareUrl = (url: string, options: Options): string => {
   const withQuery = options.qs ? appendQueryString(url, options.qs) : url;
+  assertSupportedHttpUrl(withQuery);
   return normalizeUrlHostname(withQuery);
 };
 

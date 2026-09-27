@@ -161,6 +161,7 @@ export const performRequest = (
     prepared.headers,
     options.cache,
     requestTimestamp,
+    options.gzip !== false,
   );
 
   if (cacheLookup.useCachedResponse && cacheLookup.entry) {
@@ -208,6 +209,7 @@ export const performRequest = (
         responseUrl: result.response.url,
       },
       options.cache,
+      options.gzip !== false,
     );
   } else if (
     options.cache &&

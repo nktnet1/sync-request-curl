@@ -8,8 +8,10 @@ import {
 import { afterEach, describe, expect, test } from "vitest";
 import {
   getCachedRedirectUrl,
+  getCachedResponse,
   prepareFileCacheLookup,
   refreshFileCacheEntry,
+  storeCacheResponse,
   storeFileCacheResponse,
 } from "#/request/cache";
 import { fileCacheDirectory, getCachePath } from "#/request/cache-path";
@@ -73,6 +75,42 @@ afterEach(() => {
 });
 
 describe("file cache policy", () => {
+  test.each(["file", "memory"] as const)(
+    "%s cache calculates Age without exposing mutable stored headers",
+    (cache) => {
+      const url = cacheUrl();
+      const original = response(url, {
+        "cache-control": "max-age=60",
+        age: "10",
+        "set-cookie": ["session=original"],
+      });
+      storeCacheResponse(url, {}, 0, 2_000, original, cache);
+      original.headers["cache-control"] = "no-store";
+      original.headers["set-cookie"] = ["session=changed"];
+
+      const lookup = prepareFileCacheLookup("GET", url, [], cache, 5_000);
+      expect(lookup.useCachedResponse).toBe(true);
+      if (!lookup.entry) throw new Error("Missing cache entry");
+      const first = getCachedResponse(lookup.entry, 5_000);
+      expect(first.headers.age).toBe("15");
+      expect(first.headers["set-cookie"]).toEqual(["session=original"]);
+      first.headers["cache-control"] = "no-store";
+      const cookies = first.headers["set-cookie"];
+      if (!Array.isArray(cookies)) throw new Error("Missing cookie array");
+      cookies.push("session=mutated");
+      first.body.fill(0);
+
+      const second = getCachedResponse(lookup.entry, 6_000);
+      expect(second.headers).toMatchObject({
+        age: "16",
+        "cache-control": "max-age=60",
+        "set-cookie": ["session=original"],
+      });
+      expect(second.body.toString()).toBe("cached");
+      expect(lookup.entry.headers.age).toBe("10");
+    },
+  );
+
   test("ignores malformed request headers and accumulates duplicate values", () => {
     const lookup = prepareFileCacheLookup(
       "GET",

@@ -10,6 +10,7 @@ import type { Options, Response } from "#/types";
 import { incomingHttpHeadersSchema } from "#/validation";
 
 const cacheEntrySchema = v.object({
+  decompress: v.boolean(),
   statusCode: v.pipe(v.number(), v.integer()),
   headers: incomingHttpHeadersSchema,
   body: v.string(),
@@ -45,6 +46,15 @@ export interface CacheableResponse {
   body: Buffer;
   responseUrl: string;
 }
+
+// Responses exposed to callers must never share mutable headers with entries.
+const copyHeaders = (headers: Response["headers"]): Response["headers"] =>
+  Object.fromEntries(
+    Object.entries(headers).map(([name, value]) => [
+      name,
+      Array.isArray(value) ? [...value] : value,
+    ]),
+  );
 
 const defaultCacheableStatusCodes = new Set([
   200, 203, 204, 300, 301, 308, 404, 405, 410, 414, 501,
@@ -390,6 +400,7 @@ export const prepareCacheLookup = (
   headers: string[],
   cache: CacheMode | undefined,
   now = Date.now(),
+  decompress = true,
 ): CacheLookup => {
   const requestHeaders = normalizeRequestHeaders(headers);
   const requestCacheControl = getRequestCacheControl(requestHeaders);
@@ -407,8 +418,10 @@ export const prepareCacheLookup = (
     return base;
   }
 
-  const entry = readCacheEntries(url, cache).find((candidate) =>
-    requestMatchesEntry(candidate, requestHeaders),
+  const entry = readCacheEntries(url, cache).find(
+    (candidate) =>
+      candidate.decompress === decompress &&
+      requestMatchesEntry(candidate, requestHeaders),
   );
   if (!entry) {
     return base;
@@ -484,14 +497,16 @@ export const storeCacheResponse = (
   responseTimestamp: number,
   response: CacheableResponse,
   cache: CacheMode,
+  decompress = true,
 ): void => {
   if (!canStoreResponse(response)) {
     return;
   }
 
   const entry: CacheEntry = {
+    decompress,
     statusCode: response.statusCode,
-    headers: response.headers,
+    headers: copyHeaders(response.headers),
     body: response.body.toString("base64"),
     responseUrl: response.responseUrl,
     requestHeaders,
@@ -501,6 +516,9 @@ export const storeCacheResponse = (
   const varyNames = getVaryNames(entry);
   const existingEntries = readCacheEntries(url, cache);
   const retainedEntries = existingEntries.filter((existing) => {
+    if (existing.decompress !== decompress) {
+      return true;
+    }
     const existingVaryNames = getVaryNames(existing);
     if (existingVaryNames.length !== varyNames.length) {
       return true;
@@ -538,7 +556,7 @@ const mergeRevalidationHeaders = (
   cached: Response["headers"],
   revalidated: Response["headers"],
 ): Response["headers"] => {
-  const merged = { ...cached };
+  const merged = copyHeaders(cached);
   const cachedWasDecoded = cached["content-encoding"] === undefined;
 
   for (const [name, value] of Object.entries(revalidated)) {
@@ -555,7 +573,7 @@ const mergeRevalidationHeaders = (
       continue;
     }
 
-    merged[name] = value;
+    merged[name] = Array.isArray(value) ? [...value] : value;
   }
 
   return merged;
@@ -586,6 +604,7 @@ export const refreshCacheEntry = (
     responseTimestamp,
     response,
     cache,
+    entry.decompress,
   );
   return response;
 };
@@ -600,9 +619,13 @@ export const refreshFileCacheEntry = (
 
 export const getCachedResponse = (
   entry: NonNullable<CacheLookup["entry"]>,
+  now = Date.now(),
 ): CacheableResponse => ({
   statusCode: entry.statusCode,
-  headers: entry.headers,
+  headers: {
+    ...copyHeaders(entry.headers),
+    age: String(Math.floor(getCurrentAge(entry, now) / 1_000)),
+  },
   body: Buffer.from(entry.body, "base64"),
   responseUrl: entry.responseUrl,
 });

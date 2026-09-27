@@ -259,6 +259,7 @@ jobs:
           const { CurlError } = require("sync-request-curl/errors");
           if (typeof request !== "function") throw new Error("CommonJS default export is not callable");
           if (typeof FormData !== "function") throw new Error("CommonJS types entry does not expose FormData");
+          if (request.default !== request) throw new Error("CommonJS request.default must reference request");
           if (request.FormData !== FormData) throw new Error("CommonJS request.FormData does not match the exported FormData constructor");
           const form = new request.FormData();
           form.append("blob", new Blob(["runtime compatibility"]), "runtime.txt");
