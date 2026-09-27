@@ -801,6 +801,9 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   let has_content_type = request_headers
     .iter()
     .any(|header| header_name_matches(header, "content-type"));
+  let has_accept = request_headers
+    .iter()
+    .any(|header| header_name_matches(header, "accept"));
   let no_body = options.no_body.unwrap_or(false);
 
   let easy = EasyHandle::new()?;
@@ -901,6 +904,13 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
       break;
     }
   }
+  // libcurl otherwise invents Accept: */*. Absence of Accept has distinct
+  // HTTP semantics (no declared media-type preference), and Node does not add
+  // this header, so suppress the transport default unless the caller supplied it.
+  if code == CURLE_OK && !has_accept {
+    code = headers.append("Accept:");
+  }
+
   // CURLOPT_POSTFIELDS otherwise invents application/x-www-form-urlencoded.
   // A raw body has no implied media type, so suppress libcurl's generated
   // Content-Type unless the caller (or JSON preparation) supplied one.

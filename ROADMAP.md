@@ -214,6 +214,10 @@ not all necessarily desirable behaviours to copy.
       ordinary arrays remain repeated field lines, `Cookie` arrays are joined
       with `; `, empty arrays emit no field, and `Host` arrays fail with
       `ERR_INVALID_ARG_TYPE` instead of producing duplicate Host fields.
+- [x] Suppress libcurl's implicit `Accept: */*` request header when the caller
+      did not provide `Accept`. RFC 9110 gives absence its own semantics (no
+      declared media-type preference), and Node's HTTP client does not invent
+      the field. Explicit and explicitly empty caller values are preserved.
 
 Intentional differences: do not reproduce `then-request`'s early rejection of a
 `body` on GET, DELETE, or HEAD. `sync-request-curl` passes explicit request
@@ -495,6 +499,10 @@ should be treated as the current baseline in future sessions:
   serialization edge cases: Cookie arrays become one semicolon-delimited field,
   ordinary arrays remain repeated fields, empty arrays emit nothing, and Host
   arrays are rejected with Node's `ERR_INVALID_ARG_TYPE` contract.
+- `v1.0.52-suppress-default-accept.patch` prevents libcurl from silently
+  adding `Accept: */*`. An absent Accept field now stays absent, matching Node
+  and RFC 9110's no-preference semantics, while explicit and explicitly empty
+  caller values remain untouched.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

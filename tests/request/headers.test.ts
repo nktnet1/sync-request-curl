@@ -74,6 +74,30 @@ describe("Correctly set content-length", () => {
   });
 });
 
+describe("Transport request headers", () => {
+  test("does not invent an Accept header", () => {
+    const response = request("GET", `${SERVER_URL}/request/headers`);
+
+    expect(response.getJSON()).toMatchObject({ accept: null });
+  });
+
+  test("preserves an explicit Accept header", () => {
+    const response = request("GET", `${SERVER_URL}/request/headers`, {
+      headers: { Accept: "application/json" },
+    });
+
+    expect(response.getJSON()).toMatchObject({ accept: "application/json" });
+  });
+
+  test("preserves an explicitly empty Accept header", () => {
+    const response = request("GET", `${SERVER_URL}/request/headers`, {
+      headers: { Accept: "" },
+    });
+
+    expect(response.getJSON()).toMatchObject({ accept: "" });
+  });
+});
+
 describe("Generated request headers", () => {
   test("JSON preserves caller content type and matching content-length", () => {
     const json = { message: "hi" };

@@ -197,6 +197,7 @@ app.post("/content/length", async (c) => {
 app.all("/request/headers", async (c) => {
   await c.req.arrayBuffer();
   return c.json({
+    accept: c.req.header("accept") ?? null,
     contentType: c.req.header("content-type") ?? null,
     contentLength: c.req.header("content-length") ?? null,
     transferEncoding: c.req.header("transfer-encoding") ?? null,
