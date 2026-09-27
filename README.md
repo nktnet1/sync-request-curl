@@ -34,8 +34,6 @@
 
 Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but up to 20 times more quickly.
 
-Uses a small in-process Node-API binding to libcurl for performance instead of spawning child processes like sync-request. The published package selects a platform-specific optional native package and does not run install or postinstall scripts.
-
 Designed to run on NodeJS. It will not work in a browser.
 
 [![Try with Replit](https://replit.com/badge?caption=Try%20with%20Replit)](https://replit.com/@nktnet1/sync-request-curl-example#index.js)
@@ -66,13 +64,8 @@ Designed to run on NodeJS. It will not work in a browser.
 npm install sync-request-curl
 ```
 
-No compiler, Python, CMake, node-gyp, or install-script approval is required when installing a published release. The package manager installs the matching platform-specific native package rather than every release binary. Please refer to the [compatibility](#compatibility) section for the platforms that have prebuilt binaries.
-
 <a id="usage"></a>
 ## 2. Usage
-
-> [!TIP]
-> Starting from `sync-request-curl@3.2.0`, you can replace `JSON.parse(res.body.toString())` with `res.getJSON()`.
 
 Try with [Replit](https://replit.com/@nktnet1/sync-request-curl-example#index.js).
 
@@ -195,33 +188,33 @@ response.
 | `method` | `string` | Valid HTTP method token. Matching is case-insensitive. |
 | `url` | `string` \| `URL` | Absolute `http:` or `https:` URL, provided as a string or `URL`. |
 | `options` | \{ `proxy?`: `string`; `proxyAuth?`: \{ `username`: `string`; `password`: `string`; \}; `rejectUnauthorized?`: `boolean`; `caFile?`: `string`; `localAddress?`: `string`; `localInterface?`: `string`; `tcpKeepAlive?`: \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; \}; `cacheNamespace?`: `string`; `headers?`: \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \}; `qs?`: \{ \[`key`: `string`\]: `unknown`; \}; `json?`: `JsonLikeValue`; `body?`: `string` \| `Buffer`\<`ArrayBufferLike`\>; `form?`: [`FormData`](#formdata); `timeout?`: `number`; `overallTimeout?`: `number`; `socketTimeout?`: `number`; `followRedirects?`: `boolean`; `maxRedirects?`: `number`; `allowRedirectHeaders?`: `string`[]; `gzip?`: `boolean`; `cache?`: `"file"` \| `"memory"`; `agent?`: `boolean` \| `Agent`; `retry?`: `boolean` \| [`RetryFunction`](#retryfunction); `retryDelay?`: `number` \| [`RetryDelayFunction`](#retrydelayfunction); `maxRetries?`: `number`; \} | Request, transport, redirect, retry, and cache options. |
-| `options.proxy?` | `string` | - |
-| `options.proxyAuth?` | \{ `username`: `string`; `password`: `string`; \} | - |
-| `options.proxyAuth.username` | `string` | - |
-| `options.proxyAuth.password` | `string` | - |
-| `options.rejectUnauthorized?` | `boolean` | - |
-| `options.caFile?` | `string` | - |
-| `options.localAddress?` | `string` | - |
-| `options.localInterface?` | `string` | - |
-| `options.tcpKeepAlive?` | \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; \} | - |
-| `options.cacheNamespace?` | `string` | - |
-| `options.headers?` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | - |
-| `options.qs?` | \{ \[`key`: `string`\]: `unknown`; \} | - |
-| `options.json?` | `JsonLikeValue` | - |
-| `options.body?` | `string` \| `Buffer`\<`ArrayBufferLike`\> | - |
-| `options.form?` | [`FormData`](#formdata) | - |
-| `options.timeout?` | `number` | - |
-| `options.overallTimeout?` | `number` | - |
-| `options.socketTimeout?` | `number` | - |
-| `options.followRedirects?` | `boolean` | - |
-| `options.maxRedirects?` | `number` | - |
-| `options.allowRedirectHeaders?` | `string`[] | - |
-| `options.gzip?` | `boolean` | - |
-| `options.cache?` | `"file"` \| `"memory"` | - |
-| `options.agent?` | `boolean` \| `Agent` | - |
-| `options.retry?` | `boolean` \| [`RetryFunction`](#retryfunction) | - |
-| `options.retryDelay?` | `number` \| [`RetryDelayFunction`](#retrydelayfunction) | - |
-| `options.maxRetries?` | `number` | - |
+| `options.proxy?` | `string` | Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. |
+| `options.proxyAuth?` | \{ `username`: `string`; `password`: `string`; \} | Basic proxy credentials. Requires `proxy` and overrides credentials in its URL. |
+| `options.proxyAuth.username` | `string` | Proxy username. |
+| `options.proxyAuth.password` | `string` | Proxy password. |
+| `options.rejectUnauthorized?` | `boolean` | Verify the origin certificate chain and hostname. Defaults to `true`. |
+| `options.caFile?` | `string` | PEM CA bundle path for origin TLS verification. |
+| `options.localAddress?` | `string` | Source IPv4/IPv6 address. Hostnames are rejected. |
+| `options.localInterface?` | `string` | Source interface name. Mutually exclusive with `localAddress`. |
+| `options.tcpKeepAlive?` | \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; \} | Enable TCP keepalive, optionally with idle and interval controls. |
+| `options.cacheNamespace?` | `string` | Private cache identity. Defaults to `process.cwd()`. |
+| `options.headers?` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Node-style request headers. |
+| `options.qs?` | \{ \[`key`: `string`\]: `unknown`; \} | Query values merged with any existing query string. |
+| `options.json?` | `JsonLikeValue` | JSON-compatible request body. Adds `application/json` when needed. |
+| `options.body?` | `string` \| `Buffer`\<`ArrayBufferLike`\> | Raw string or `Buffer` request body. |
+| `options.form?` | [`FormData`](#formdata) | Synchronous multipart/form-data body. |
+| `options.timeout?` | `number` | Per-network-attempt timeout in milliseconds. `0` disables it. |
+| `options.overallTimeout?` | `number` | Complete-operation deadline in milliseconds. `0` disables it. |
+| `options.socketTimeout?` | `number` | Socket inactivity timeout in milliseconds. `0` disables it. |
+| `options.followRedirects?` | `boolean` | Follow redirects automatically. Defaults to `true`. |
+| `options.maxRedirects?` | `number` | Maximum redirects to follow. Negative or non-finite values mean no limit. |
+| `options.allowRedirectHeaders?` | `string`[] | Caller headers allowed to be forwarded to redirect hops. |
+| `options.gzip?` | `boolean` | Transparently decompress gzip/deflate responses. Defaults to enabled. |
+| `options.cache?` | `"file"` \| `"memory"` | Enable the private HTTP-aware cache in file or memory storage. |
+| `options.agent?` | `boolean` \| `Agent` | `sync-request` boolean agent option, or a keep-alive Node `Agent`. |
+| `options.retry?` | `boolean` \| [`RetryFunction`](#retryfunction) | Retry GET requests, or provide a callback to decide per attempt. |
+| `options.retryDelay?` | `number` \| [`RetryDelayFunction`](#retrydelayfunction) | Retry delay in milliseconds, or a callback returning the delay. |
+| `options.maxRetries?` | `number` | Maximum retry count. Defaults to 5 when retries are enabled. |
 
 ##### Returns
 
@@ -234,7 +227,7 @@ The buffered response after redirects and retries complete.
 #### JsonLike
 
 ```ts
-type JsonLike = v.InferOutput<typeof jsonLikeSchema>;
+type JsonLike = JsonLikeValue;
 ```
 
 Values accepted for JSON request bodies.
@@ -245,20 +238,10 @@ and objects with `toJSON()` (for example `Date`) are supported.
 
 ***
 
-#### UppercaseHttpVerb
-
-```ts
-type UppercaseHttpVerb = v.InferOutput<typeof uppercaseHttpVerbSchema>;
-```
-
-Uppercase HTTP method token used internally after request normalisation.
-
-***
-
 #### HttpVerb
 
 ```ts
-type HttpVerb = v.InferOutput<typeof httpVerbInputSchema>;
+type HttpVerb = string;
 ```
 
 Any valid HTTP method token. Input is case-insensitive and is normalised to
@@ -269,7 +252,7 @@ uppercase before transport.
 #### Options
 
 ```ts
-type Options = v.InferOutput<typeof optionsSchema>;
+type Options = object;
 ```
 
 Options accepted by `request`.
@@ -277,53 +260,37 @@ Options accepted by `request`.
 Payload precedence is `form`, then `json`, then `body` when more than one is
 supplied.
 
-- `headers`: Node-style request headers. Header names and values are validated
-  before transport.
-- `qs`: Query values merged with any existing query string using bracket
-  notation for nested objects and arrays. `undefined` values are omitted,
-  `null` becomes an empty value, `Date` becomes ISO text, `Buffer` uses UTF-8,
-  and cyclic objects throw `RangeError`.
-- `json`: JSON-compatible value. A missing `Content-Type` is filled with
-  `application/json`.
-- `body`: Raw `string` or `Buffer` payload. No media type is invented.
-- `form`: Synchronous `FormData` multipart payload.
-- `timeout`: Per-network-attempt timeout in milliseconds. `0` or omission
-  disables it. The budget resets for retries and redirect hops.
-- `overallTimeout`: Monotonic deadline in milliseconds for the complete
-  synchronous call, including retries, redirects, and retry delays. `0` or
-  omission disables it.
-- `socketTimeout`: Inactivity timeout in milliseconds. `0` or omission
-  disables it.
-- `followRedirects`: Follow redirects automatically. Defaults to `true`.
-- `maxRedirects`: Maximum redirects to follow. Omitted, non-finite, or
-  negative values mean no limit.
-- `allowRedirectHeaders`: Case-insensitive allow-list of caller headers that
-  may be forwarded to the next redirect hop. Payload headers are still
-  removed when the redirect changes the method.
-- `gzip`: Transparent gzip/deflate response decompression. Defaults to
-  enabled; `false` preserves the encoded response.
-- `cache`: Enable the HTTP-aware private cache using either `"file"` or
-  `"memory"` storage.
-- `cacheNamespace`: Private cache identity. Defaults to `process.cwd()`.
-- `agent`: `sync-request` compatible boolean agent option, or a keep-alive
-  Node `Agent` instance for additive connection-pool reuse.
-- `retry`: Retry GET requests on transport failures and HTTP errors when
-  `true`, or use a callback to decide per attempt.
-- `retryDelay`: Delay between retries in milliseconds, or a callback that
-  returns the delay. Defaults to 200 ms when retries are enabled.
-- `maxRetries`: Maximum retry count. Defaults to 5 when retries are enabled.
-- `proxy`: Explicit HTTP/HTTPS proxy origin URL. Ambient proxy environment
-  variables are not used.
-- `proxyAuth`: Basic proxy credentials. Requires `proxy` and overrides
-  credentials embedded in the proxy URL.
-- `rejectUnauthorized`: Verify the origin certificate chain and hostname.
-  Defaults to `true`.
-- `caFile`: PEM CA bundle path for origin TLS verification.
-- `localAddress`: Source IPv4/IPv6 address. Hostnames are rejected.
-- `localInterface`: Source interface name. Mutually exclusive with
-  `localAddress`.
-- `tcpKeepAlive`: Enable TCP keepalive, optionally with positive integer
-  `idleSeconds` and `intervalSeconds` values.
+##### Type Declaration
+
+| Name | Type | Description |
+| ------ | ------ | ------ |
+| <a id="property-proxy"></a> `proxy?` | `string` | Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. |
+| <a id="property-proxyauth"></a> `proxyAuth?` | `object` | Basic proxy credentials. Requires `proxy` and overrides credentials in its URL. |
+| `proxyAuth.username` | `string` | Proxy username. |
+| `proxyAuth.password` | `string` | Proxy password. |
+| <a id="property-rejectunauthorized"></a> `rejectUnauthorized?` | `boolean` | Verify the origin certificate chain and hostname. Defaults to `true`. |
+| <a id="property-cafile"></a> `caFile?` | `string` | PEM CA bundle path for origin TLS verification. |
+| <a id="property-localaddress"></a> `localAddress?` | `string` | Source IPv4/IPv6 address. Hostnames are rejected. |
+| <a id="property-localinterface"></a> `localInterface?` | `string` | Source interface name. Mutually exclusive with `localAddress`. |
+| <a id="property-tcpkeepalive"></a> `tcpKeepAlive?` | \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; \} | Enable TCP keepalive, optionally with idle and interval controls. |
+| <a id="property-cachenamespace"></a> `cacheNamespace?` | `string` | Private cache identity. Defaults to `process.cwd()`. |
+| <a id="property-headers-1"></a> `headers?` | `object` | Node-style request headers. |
+| <a id="property-qs"></a> `qs?` | `object` | Query values merged with any existing query string. |
+| <a id="property-json"></a> `json?` | `JsonLikeValue` | JSON-compatible request body. Adds `application/json` when needed. |
+| <a id="property-body-1"></a> `body?` | `string` \| `Buffer`\<`ArrayBufferLike`\> | Raw string or `Buffer` request body. |
+| <a id="property-form"></a> `form?` | [`FormData`](#formdata) | Synchronous multipart/form-data body. |
+| <a id="property-timeout"></a> `timeout?` | `number` | Per-network-attempt timeout in milliseconds. `0` disables it. |
+| <a id="property-overalltimeout"></a> `overallTimeout?` | `number` | Complete-operation deadline in milliseconds. `0` disables it. |
+| <a id="property-sockettimeout"></a> `socketTimeout?` | `number` | Socket inactivity timeout in milliseconds. `0` disables it. |
+| <a id="property-followredirects"></a> `followRedirects?` | `boolean` | Follow redirects automatically. Defaults to `true`. |
+| <a id="property-maxredirects"></a> `maxRedirects?` | `number` | Maximum redirects to follow. Negative or non-finite values mean no limit. |
+| <a id="property-allowredirectheaders"></a> `allowRedirectHeaders?` | `string`[] | Caller headers allowed to be forwarded to redirect hops. |
+| <a id="property-gzip"></a> `gzip?` | `boolean` | Transparently decompress gzip/deflate responses. Defaults to enabled. |
+| <a id="property-cache"></a> `cache?` | `"file"` \| `"memory"` | Enable the private HTTP-aware cache in file or memory storage. |
+| <a id="property-agent"></a> `agent?` | `boolean` \| `Agent` | `sync-request` boolean agent option, or a keep-alive Node `Agent`. |
+| <a id="property-retry"></a> `retry?` | `boolean` \| [`RetryFunction`](#retryfunction) | Retry GET requests, or provide a callback to decide per attempt. |
+| <a id="property-retrydelay"></a> `retryDelay?` | `number` \| [`RetryDelayFunction`](#retrydelayfunction) | Retry delay in milliseconds, or a callback returning the delay. |
+| <a id="property-maxretries"></a> `maxRetries?` | `number` | Maximum retry count. Defaults to 5 when retries are enabled. |
 
 ***
 
@@ -344,6 +311,8 @@ callbacks receive this buffered response before the next attempt begins.
 getBody(encoding): string;
 ```
 
+Read the response body as a string using the requested encoding.
+
 ###### Parameters
 
 | Parameter | Type |
@@ -360,18 +329,20 @@ getBody(encoding): string;
 getBody(): Buffer;
 ```
 
+Read the response body as a `Buffer`.
+
 ###### Returns
 
 `Buffer`
 
 ##### Properties
 
-| Property | Type |
-| ------ | ------ |
-| <a id="property-statuscode-1"></a> `statusCode` | `number` |
-| <a id="property-headers-1"></a> `headers` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} |
-| <a id="property-url"></a> `url` | `string` |
-| <a id="property-body-1"></a> `body` | `Buffer` |
+| Property | Type | Description |
+| ------ | ------ | ------ |
+| <a id="property-statuscode-1"></a> `statusCode` | `number` | HTTP response status code. |
+| <a id="property-headers-2"></a> `headers` | `object` | Node-style response headers with lowercase keys. |
+| <a id="property-url"></a> `url` | `string` | Final effective URL for the completed attempt. |
+| <a id="property-body-2"></a> `body` | `Buffer` | Buffered response body. |
 
 ***
 
@@ -426,7 +397,18 @@ Return the delay in milliseconds before the next retry.
 #### BufferEncoding
 
 ```ts
-type BufferEncoding = v.InferOutput<typeof bufferEncodingSchema>;
+type BufferEncoding =
+  | "base64"
+  | "ascii"
+  | "utf8"
+  | "utf-8"
+  | "utf16le"
+  | "ucs2"
+  | "ucs-2"
+  | "base64url"
+  | "latin1"
+  | "binary"
+  | "hex";
 ```
 
 Buffer encodings accepted by response body helpers.
@@ -513,44 +495,38 @@ it only throws if the body cannot be parsed as JSON.
 #### Response
 
 ```ts
-type Response = ResponseData & {
-  getBody: GetBody;
-  getJSON: GetJSON;
-};
+type Response = ResponseData & object;
 ```
 
 Buffered synchronous response returned by `request`.
 
-- `statusCode`: HTTP response status code.
-- `headers`: Node-style response headers with lowercase keys.
-- `url`: Final effective URL after query handling and redirects.
-- `body`: Mutable response body `Buffer`.
-- `getBody`: Reads the response's current public body and status.
-- `getJSON`: Parses the response's current public body as JSON.
-
-The helper methods intentionally observe later mutations to the public
-response object rather than a hidden immutable snapshot.
+Helper methods observe later mutations to the public response object rather
+than a hidden immutable snapshot.
 
 ##### Type Declaration
 
-| Name | Type |
-| ------ | ------ |
-| `getBody` | [`GetBody`](#getbody) |
-| `getJSON` | [`GetJSON`](#getjson) |
+| Name | Type | Description |
+| ------ | ------ | ------ |
+| `getBody` | [`GetBody`](#getbody) | Read the response body and throw `ResponseError` for HTTP status >= 300. |
+| `getJSON` | [`GetJSON`](#getjson) | Parse the response body as JSON without applying HTTP status handling. |
 
 ### Multipart
 
 #### FormDataEntry
 
 ```ts
-type FormDataEntry = v.InferOutput<typeof formDataEntrySchema>;
+type FormDataEntry = object;
 ```
 
 One multipart entry accepted by `FormData`.
 
-`key` is the multipart field name. `value` may be text, a `Buffer`, or a
-`Blob`. `fileName` is optional; path components are stripped before the
-multipart request is sent.
+##### Type Declaration
+
+| Name | Type | Default value | Description |
+| ------ | ------ | ------ | ------ |
+| <a id="property-key"></a> `key` | `string` | `metadataSchema` | Multipart field name. |
+| <a id="property-value"></a> `value` | `string` \| `Buffer`\<`ArrayBufferLike`\> \| `Blob` | - | Text, `Buffer`, or `Blob` field value. |
+| <a id="property-filename"></a> `fileName?` | `string` | - | Optional file name. Path components are stripped before sending. |
 
 ***
 
@@ -607,7 +583,12 @@ Blob media types remain authoritative.
 #### RequestErrorCode
 
 ```ts
-type RequestErrorCode = v.InferOutput<typeof requestErrorCodeSchema>;
+type RequestErrorCode =
+  | "ERR_INVALID_URL"
+  | "ENOTFOUND"
+  | "ETIMEDOUT"
+  | "ERR_TOO_MANY_REDIRECTS"
+  | "ERR_REQUEST_FAILED";
 ```
 
 Stable transport-neutral error codes emitted by the TypeScript request layer.
@@ -650,112 +631,11 @@ new CurlError(code, message): CurlError;
 Error.constructor
 ```
 
-##### Methods
-
-###### captureStackTrace()
-
-```ts
-static captureStackTrace(targetObject, constructorOpt?): void;
-```
-
-Creates a `.stack` property on `targetObject`, which when accessed returns
-a string representing the location in the code at which
-`Error.captureStackTrace()` was called.
-
-```js
-const myObject = {};
-Error.captureStackTrace(myObject);
-myObject.stack;  // Similar to `new Error().stack`
-```
-
-The first line of the trace will be prefixed with
-`${myObject.name}: ${myObject.message}`.
-
-The optional `constructorOpt` argument accepts a function. If given, all frames
-above `constructorOpt`, including `constructorOpt`, will be omitted from the
-generated stack trace.
-
-The `constructorOpt` argument is useful for hiding implementation
-details of error generation from the user. For instance:
-
-```js
-function a() {
-  b();
-}
-
-function b() {
-  c();
-}
-
-function c() {
-  // Create an error without stack trace to avoid calculating the stack trace twice.
-  const { stackTraceLimit } = Error;
-  Error.stackTraceLimit = 0;
-  const error = new Error();
-  Error.stackTraceLimit = stackTraceLimit;
-
-  // Capture the stack trace above function b
-  Error.captureStackTrace(error, b); // Neither function c, nor b is included in the stack trace
-  throw error;
-}
-
-a();
-```
-
-###### Parameters
-
-| Parameter | Type |
-| ------ | ------ |
-| `targetObject` | `object` |
-| `constructorOpt?` | `Function` |
-
-###### Returns
-
-`void`
-
-###### Inherited from
-
-```ts
-Error.captureStackTrace
-```
-
-###### prepareStackTrace()
-
-```ts
-static prepareStackTrace(err, stackTraces): any;
-```
-
-###### Parameters
-
-| Parameter | Type |
-| ------ | ------ |
-| `err` | `Error` |
-| `stackTraces` | `CallSite`[] |
-
-###### Returns
-
-`any`
-
-###### See
-
-https://v8.dev/docs/stack-trace-api#customizing-stack-traces
-
-###### Inherited from
-
-```ts
-Error.prepareStackTrace
-```
-
 ##### Properties
 
-| Property | Modifier | Type | Description | Inherited from |
-| ------ | ------ | ------ | ------ | ------ |
-| <a id="property-stacktracelimit"></a> `stackTraceLimit` | `static` | `number` | The `Error.stackTraceLimit` property specifies the number of stack frames collected by a stack trace (whether generated by `new Error().stack` or `Error.captureStackTrace(obj)`). The default value is `10` but may be set to any valid JavaScript number. Changes will affect any stack trace captured _after_ the value has been changed. If set to a non-number value, or set to a negative number, stack traces will not capture any frames. | `Error.stackTraceLimit` |
-| <a id="property-code"></a> `code` | `public` | `number` | - | - |
-| <a id="property-cause"></a> `cause?` | `public` | `unknown` | - | `Error.cause` |
-| <a id="property-name"></a> `name` | `public` | `string` | - | `Error.name` |
-| <a id="property-message"></a> `message` | `public` | `string` | - | `Error.message` |
-| <a id="property-stack"></a> `stack?` | `public` | `string` | - | `Error.stack` |
+| Property | Type | Description |
+| ------ | ------ | ------ |
+| <a id="property-code"></a> `code` | `number` | Numeric libcurl error code. |
 
 ***
 
@@ -798,112 +678,11 @@ new RequestError(
 Error.constructor
 ```
 
-##### Methods
-
-###### captureStackTrace()
-
-```ts
-static captureStackTrace(targetObject, constructorOpt?): void;
-```
-
-Creates a `.stack` property on `targetObject`, which when accessed returns
-a string representing the location in the code at which
-`Error.captureStackTrace()` was called.
-
-```js
-const myObject = {};
-Error.captureStackTrace(myObject);
-myObject.stack;  // Similar to `new Error().stack`
-```
-
-The first line of the trace will be prefixed with
-`${myObject.name}: ${myObject.message}`.
-
-The optional `constructorOpt` argument accepts a function. If given, all frames
-above `constructorOpt`, including `constructorOpt`, will be omitted from the
-generated stack trace.
-
-The `constructorOpt` argument is useful for hiding implementation
-details of error generation from the user. For instance:
-
-```js
-function a() {
-  b();
-}
-
-function b() {
-  c();
-}
-
-function c() {
-  // Create an error without stack trace to avoid calculating the stack trace twice.
-  const { stackTraceLimit } = Error;
-  Error.stackTraceLimit = 0;
-  const error = new Error();
-  Error.stackTraceLimit = stackTraceLimit;
-
-  // Capture the stack trace above function b
-  Error.captureStackTrace(error, b); // Neither function c, nor b is included in the stack trace
-  throw error;
-}
-
-a();
-```
-
-###### Parameters
-
-| Parameter | Type |
-| ------ | ------ |
-| `targetObject` | `object` |
-| `constructorOpt?` | `Function` |
-
-###### Returns
-
-`void`
-
-###### Inherited from
-
-```ts
-Error.captureStackTrace
-```
-
-###### prepareStackTrace()
-
-```ts
-static prepareStackTrace(err, stackTraces): any;
-```
-
-###### Parameters
-
-| Parameter | Type |
-| ------ | ------ |
-| `err` | `Error` |
-| `stackTraces` | `CallSite`[] |
-
-###### Returns
-
-`any`
-
-###### See
-
-https://v8.dev/docs/stack-trace-api#customizing-stack-traces
-
-###### Inherited from
-
-```ts
-Error.prepareStackTrace
-```
-
 ##### Properties
 
-| Property | Modifier | Type | Description | Inherited from |
-| ------ | ------ | ------ | ------ | ------ |
-| <a id="property-stacktracelimit-1"></a> `stackTraceLimit` | `static` | `number` | The `Error.stackTraceLimit` property specifies the number of stack frames collected by a stack trace (whether generated by `new Error().stack` or `Error.captureStackTrace(obj)`). The default value is `10` but may be set to any valid JavaScript number. Changes will affect any stack trace captured _after_ the value has been changed. If set to a non-number value, or set to a negative number, stack traces will not capture any frames. | `Error.stackTraceLimit` |
-| <a id="property-code-1"></a> `code` | `readonly` | \| `"ERR_INVALID_URL"` \| `"ENOTFOUND"` \| `"ETIMEDOUT"` \| `"ERR_TOO_MANY_REDIRECTS"` \| `"ERR_REQUEST_FAILED"` | - | - |
-| <a id="property-cause-1"></a> `cause?` | `public` | `unknown` | - | `Error.cause` |
-| <a id="property-name-1"></a> `name` | `public` | `string` | - | `Error.name` |
-| <a id="property-message-1"></a> `message` | `public` | `string` | - | `Error.message` |
-| <a id="property-stack-1"></a> `stack?` | `public` | `string` | - | `Error.stack` |
+| Property | Modifier | Type | Description |
+| ------ | ------ | ------ | ------ |
+| <a id="property-code-1"></a> `code` | `readonly` | \| `"ERR_INVALID_URL"` \| `"ENOTFOUND"` \| `"ETIMEDOUT"` \| `"ERR_TOO_MANY_REDIRECTS"` \| `"ERR_REQUEST_FAILED"` | Stable transport-neutral request error code. |
 
 ***
 
@@ -950,114 +729,13 @@ new ResponseError(
 Error.constructor
 ```
 
-##### Methods
-
-###### captureStackTrace()
-
-```ts
-static captureStackTrace(targetObject, constructorOpt?): void;
-```
-
-Creates a `.stack` property on `targetObject`, which when accessed returns
-a string representing the location in the code at which
-`Error.captureStackTrace()` was called.
-
-```js
-const myObject = {};
-Error.captureStackTrace(myObject);
-myObject.stack;  // Similar to `new Error().stack`
-```
-
-The first line of the trace will be prefixed with
-`${myObject.name}: ${myObject.message}`.
-
-The optional `constructorOpt` argument accepts a function. If given, all frames
-above `constructorOpt`, including `constructorOpt`, will be omitted from the
-generated stack trace.
-
-The `constructorOpt` argument is useful for hiding implementation
-details of error generation from the user. For instance:
-
-```js
-function a() {
-  b();
-}
-
-function b() {
-  c();
-}
-
-function c() {
-  // Create an error without stack trace to avoid calculating the stack trace twice.
-  const { stackTraceLimit } = Error;
-  Error.stackTraceLimit = 0;
-  const error = new Error();
-  Error.stackTraceLimit = stackTraceLimit;
-
-  // Capture the stack trace above function b
-  Error.captureStackTrace(error, b); // Neither function c, nor b is included in the stack trace
-  throw error;
-}
-
-a();
-```
-
-###### Parameters
-
-| Parameter | Type |
-| ------ | ------ |
-| `targetObject` | `object` |
-| `constructorOpt?` | `Function` |
-
-###### Returns
-
-`void`
-
-###### Inherited from
-
-```ts
-Error.captureStackTrace
-```
-
-###### prepareStackTrace()
-
-```ts
-static prepareStackTrace(err, stackTraces): any;
-```
-
-###### Parameters
-
-| Parameter | Type |
-| ------ | ------ |
-| `err` | `Error` |
-| `stackTraces` | `CallSite`[] |
-
-###### Returns
-
-`any`
-
-###### See
-
-https://v8.dev/docs/stack-trace-api#customizing-stack-traces
-
-###### Inherited from
-
-```ts
-Error.prepareStackTrace
-```
-
 ##### Properties
 
-| Property | Modifier | Type | Description | Inherited from |
-| ------ | ------ | ------ | ------ | ------ |
-| <a id="property-stacktracelimit-2"></a> `stackTraceLimit` | `static` | `number` | The `Error.stackTraceLimit` property specifies the number of stack frames collected by a stack trace (whether generated by `new Error().stack` or `Error.captureStackTrace(obj)`). The default value is `10` but may be set to any valid JavaScript number. Changes will affect any stack trace captured _after_ the value has been changed. If set to a non-number value, or set to a negative number, stack traces will not capture any frames. | `Error.stackTraceLimit` |
-| <a id="property-statuscode"></a> `statusCode` | `readonly` | `number` | - | - |
-| <a id="property-headers"></a> `headers` | `readonly` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | - | - |
-| <a id="property-body"></a> `body` | `readonly` | `Buffer` | - | - |
-| <a id="property-cause-2"></a> `cause?` | `public` | `unknown` | - | `Error.cause` |
-| <a id="property-name-2"></a> `name` | `public` | `string` | - | `Error.name` |
-| <a id="property-message-2"></a> `message` | `public` | `string` | - | `Error.message` |
-| <a id="property-stack-2"></a> `stack?` | `public` | `string` | - | `Error.stack` |
+| Property | Modifier | Type | Description |
+| ------ | ------ | ------ | ------ |
+| <a id="property-statuscode"></a> `statusCode` | `readonly` | `number` | HTTP status code that caused the error. |
+| <a id="property-headers"></a> `headers` | `readonly` | `object` | Response headers returned by the server. |
+| <a id="property-body"></a> `body` | `readonly` | `Buffer` | Buffered response body returned by the server. |
 
 <a id="differences-from-sync-request"></a>
 ## 4. Differences from `sync-request`

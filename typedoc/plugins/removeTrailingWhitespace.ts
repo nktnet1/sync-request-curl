@@ -8,6 +8,9 @@ export function removeTrailingWhitespace(app: Application): void {
   const markdownApp = app as MarkdownApplication;
 
   markdownApp.renderer.on(MarkdownPageEvent.END, (page) => {
-    page.contents = page.contents.replace(/[ \t]+$/gm, "");
+    page.contents = page.contents
+      .split("\n")
+      .map((line) => line.trimEnd())
+      .join("\n");
   });
 }

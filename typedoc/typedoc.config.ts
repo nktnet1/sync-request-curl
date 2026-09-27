@@ -42,7 +42,8 @@ const config = {
   groupOrder: ["Request", "Response", "Multipart", "Errors", "*"],
   groupReferencesByType: true,
   jsDocCompatibility: true,
-  blockTags: [...OptionDefaults.blockTags, "@level"],
+  blockTags: [...OptionDefaults.blockTags, "@level", "@noInheritDoc"],
+  notRenderedTags: [...OptionDefaults.notRenderedTags, "@noInheritDoc"],
   sort: ["source-order"],
 } satisfies TypeDocOptions & PluginOptions;
 

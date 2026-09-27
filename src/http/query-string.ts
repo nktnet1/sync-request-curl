@@ -244,7 +244,7 @@ const primitiveToString = (value: unknown): string | undefined => {
     case "boolean":
     case "symbol":
     case "function":
-      return String(value);
+      return value.toString();
     default:
       return undefined;
   }
