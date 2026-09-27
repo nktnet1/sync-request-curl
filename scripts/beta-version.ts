@@ -1,5 +1,5 @@
-const stableVersion = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
-const betaVersion = /^(\d+\.\d+\.\d+)-beta\.(0|[1-9][0-9]*)$/;
+const stableVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+const betaVersion = /^(\d+\.\d+\.\d+)-beta\.(0|[1-9]\d*)$/;
 
 /** Select a beta above the manifest, registry versions, and existing Git tags. */
 export const nextBetaVersion = (
