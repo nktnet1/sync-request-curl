@@ -233,7 +233,8 @@ const primitiveToString = (value: unknown): string | undefined => {
     return value.toISOString();
   }
   if (Buffer.isBuffer(value)) {
-    return value.toString("utf8");
+    const buffer: Buffer = value;
+    return buffer.toString("utf8");
   }
 
   switch (typeof value) {

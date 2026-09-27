@@ -33,7 +33,7 @@ const removeLeadingUnionPipe = (contents: string): string => {
       continue;
     }
 
-    const pipeIndex = returnLine.indexOf("\\|");
+    const pipeIndex = returnLine.indexOf(String.raw`\|`);
     if (pipeIndex === -1 || returnLine.slice(0, pipeIndex).trim() !== "") {
       continue;
     }
