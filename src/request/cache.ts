@@ -472,8 +472,6 @@ export const prepareCacheLookup = (
   };
 };
 
-export const prepareFileCacheLookup = prepareCacheLookup;
-
 const responseForbidsStorage = (headers: Response["headers"]): boolean =>
   parseCacheControl(getHeaderValue(headers, "cache-control")).has("no-store") ||
   getHeaderValue(headers, "set-cookie") !== undefined ||

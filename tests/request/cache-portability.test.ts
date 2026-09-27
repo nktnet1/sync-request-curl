@@ -22,8 +22,8 @@ describe("file cache portability", () => {
     });
     vi.resetModules();
 
-    const { prepareFileCacheLookup } = await import("#/request/cache");
-    const lookup = prepareFileCacheLookup(
+    const { prepareCacheLookup } = await import("#/request/cache");
+    const lookup = prepareCacheLookup(
       "GET",
       `https://cache.test/no-getuid-${process.pid}-${Date.now()}`,
       [],

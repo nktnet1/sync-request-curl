@@ -11,7 +11,6 @@ import {
 export const nativePlatformKeySchema = v.picklist(platformKeys);
 export const linuxLibcSchema = v.picklist(supportedLinuxLibcs);
 
-export const supportedPlatformKeys = nativePlatformKeySchema.options;
 export type NativePlatformKey = v.InferOutput<typeof nativePlatformKeySchema>;
 export type LinuxLibc = v.InferOutput<typeof linuxLibcSchema>;
 

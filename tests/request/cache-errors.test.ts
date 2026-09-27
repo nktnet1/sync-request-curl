@@ -11,7 +11,7 @@ vi.mock("node:fs", () => fsMock);
 
 import {
   invalidateFileCache,
-  prepareFileCacheLookup,
+  prepareCacheLookup,
   storeFileCacheResponse,
 } from "#/request/cache";
 
@@ -35,7 +35,7 @@ describe("file cache filesystem failures", () => {
       throw fsError("permission denied", "EACCES");
     });
 
-    const lookup = prepareFileCacheLookup(
+    const lookup = prepareCacheLookup(
       "GET",
       "https://cache.test/read-error",
       [],
@@ -85,7 +85,7 @@ describe("file cache non-Error failures", () => {
       throw nonError("read failed");
     });
 
-    const lookup = prepareFileCacheLookup(
+    const lookup = prepareCacheLookup(
       "GET",
       "https://cache.test/read-non-error",
       [],
@@ -135,8 +135,7 @@ test("a failed cleanup of a malformed cache file still permits an origin fetch",
     throw new Error("denied");
   });
   expect(
-    prepareFileCacheLookup("GET", "https://cache.test/broken", [], "file")
-      .entry,
+    prepareCacheLookup("GET", "https://cache.test/broken", [], "file").entry,
   ).toBeUndefined();
   expect(console.warn).toHaveBeenCalledWith(
     "Error removing invalid cache entry: Error: denied",

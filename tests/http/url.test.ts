@@ -311,6 +311,17 @@ describe("appendQueryString", () => {
     expect(({} as { polluted?: string }).polluted).toBeUndefined();
   });
 
+  test("merges repeated nested object keys into an array", () => {
+    expect(
+      appendQueryString(
+        "https://example.com/path?object%5Bkey%5D=one&object%5Bkey%5D=two",
+        {},
+      ),
+    ).toBe(
+      "https://example.com/path?object%5Bkey%5D%5B0%5D=one&object%5Bkey%5D%5B1%5D=two",
+    );
+  });
+
   test("merges object-first array conflicts without losing either value", () => {
     expect(
       appendQueryString(
