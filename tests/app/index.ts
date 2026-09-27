@@ -407,6 +407,7 @@ app.all("/compat/echo", async (c) => {
     search: url.search,
     contentType: c.req.header("content-type") ?? null,
     customHeader: c.req.header("x-compat-value") ?? null,
+    headers: c.req.header(),
     body: body.toString("utf8"),
     bodyHex: body.toString("hex"),
   });

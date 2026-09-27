@@ -1,6 +1,5 @@
 import type { IncomingHttpHeaders } from "node:http";
 import * as v from "valibot";
-import { RequestError } from "#/errors";
 import type { Options, UppercaseHttpVerb } from "#/types";
 import { incomingHttpHeadersSchema } from "#/validation";
 
@@ -75,14 +74,3 @@ export const getRedirectOptions = (
     methodChanged,
   ),
 });
-
-export const getRemainingTimeout = (
-  timeout: number,
-  startedAt: number,
-): number => {
-  const remaining = timeout - (Date.now() - startedAt);
-  if (remaining <= 0) {
-    throw new RequestError("ETIMEDOUT", "Request failed: Operation timed out");
-  }
-  return remaining;
-};

@@ -171,3 +171,31 @@ describe("memory cache", () => {
     });
   });
 });
+
+test.for(["file", "memory"] as const)(
+  "%s isolates namespaces and bypasses personalized requests",
+  (cache) => {
+    const url = cacheUrl("/cache/fresh");
+    const fetch = (cacheNamespace: string, headers?: Record<string, string>) =>
+      request("GET", url, { cache, cacheNamespace, headers }).getJSON();
+    expect(fetch("a")).toEqual({ hits: 1 });
+    expect(fetch("b")).toEqual({ hits: 2 });
+    expect(fetch("a")).toEqual({ hits: 1 });
+    expect(fetch("a", { Authorization: "Bearer one" })).toEqual({ hits: 3 });
+    expect(fetch("a", { Authorization: "Bearer two" })).toEqual({ hits: 4 });
+    expect(fetch("a", { Cookie: "user=one" })).toEqual({ hits: 5 });
+    expect(fetch("a")).toEqual({ hits: 1 });
+  },
+);
+
+test("unsafe requests invalidate fragment variants of the same resource", () => {
+  const url = cacheUrl("/cache/mutable");
+  const first = request("GET", `${url}#one`, { cache: "memory" }).getJSON();
+  request("POST", `${url}#two`, {
+    cache: "memory",
+    json: { value: "updated" },
+  });
+  expect(
+    request("GET", `${url}#one`, { cache: "memory" }).getJSON(),
+  ).not.toEqual(first);
+});

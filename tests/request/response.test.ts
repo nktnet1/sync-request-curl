@@ -100,3 +100,20 @@ describe("v3.2.0 getJSON method", () => {
     expect(() => res.getJSON()).toThrow(Error);
   });
 });
+
+test("response helpers observe reassigned public properties and remain detachable", () => {
+  const response = request("GET", SERVER_URL);
+  response.body = Buffer.from('{"updated":true}');
+  expect(response.getJSON()).toEqual({ updated: true });
+  const getBody = response.getBody;
+  expect(getBody("utf8")).toBe('{"updated":true}');
+  response.statusCode = 400;
+  response.headers = { "x-updated": "yes" };
+  expect(getBody).toThrow(
+    expect.objectContaining({
+      statusCode: 400,
+      headers: { "x-updated": "yes" },
+      body: response.body,
+    }),
+  );
+});

@@ -82,20 +82,20 @@ describe("file cache policy", () => {
       const original = response(url, {
         "cache-control": "max-age=60",
         age: "10",
-        "set-cookie": ["session=original"],
+        "x-array": ["session=original"],
       });
       storeCacheResponse(url, {}, 0, 2_000, original, cache);
       original.headers["cache-control"] = "no-store";
-      original.headers["set-cookie"] = ["session=changed"];
+      original.headers["x-array"] = ["session=changed"];
 
       const lookup = prepareFileCacheLookup("GET", url, [], cache, 5_000);
       expect(lookup.useCachedResponse).toBe(true);
       if (!lookup.entry) throw new Error("Missing cache entry");
       const first = getCachedResponse(lookup.entry, 5_000);
       expect(first.headers.age).toBe("15");
-      expect(first.headers["set-cookie"]).toEqual(["session=original"]);
+      expect(first.headers["x-array"]).toEqual(["session=original"]);
       first.headers["cache-control"] = "no-store";
-      const cookies = first.headers["set-cookie"];
+      const cookies = first.headers["x-array"];
       if (!Array.isArray(cookies)) throw new Error("Missing cookie array");
       cookies.push("session=mutated");
       first.body.fill(0);
@@ -104,7 +104,7 @@ describe("file cache policy", () => {
       expect(second.headers).toMatchObject({
         age: "16",
         "cache-control": "max-age=60",
-        "set-cookie": ["session=original"],
+        "x-array": ["session=original"],
       });
       expect(second.body.toString()).toBe("cached");
       expect(lookup.entry.headers.age).toBe("10");
@@ -424,6 +424,7 @@ describe("file cache policy", () => {
     const url = cacheUrl();
     writeBucket(url, [
       {
+        decompress: true,
         statusCode: 200,
         headers: { vary: "*", "cache-control": "max-age=3600" },
         body: Buffer.from("cached").toString("base64"),
@@ -494,4 +495,84 @@ describe("file cache policy", () => {
     };
     expect(bucket.entries).toHaveLength(3);
   });
+});
+
+describe("cache revalidation integrity", () => {
+  test.each([
+    { etag: '"different"' },
+    { etag: 'W/"different"' },
+    { "last-modified": "Wed, 21 Oct 2015 07:28:00 GMT" },
+  ])("rejects conflicting 304 validators %j", (headers) => {
+    const { url, lookup } = prepareStaleResponse({
+      "cache-control": "max-age=0",
+      etag: '"original"',
+    });
+    expect(() => refreshFileCacheEntry(url, lookup, headers, 2)).toThrow(
+      "304 validator",
+    );
+    expect(
+      prepareFileCacheLookup("GET", url, [], "file", 3).entry,
+    ).toBeUndefined();
+  });
+
+  test("accepts a weak matching tag and copies updated header arrays", () => {
+    const { url, lookup } = prepareStaleResponse({
+      "cache-control": "max-age=0",
+      etag: '"original"',
+    });
+    const values = ["one", "two"];
+    const refreshed = refreshFileCacheEntry(
+      url,
+      lookup,
+      { etag: 'W/"original"', "x-values": values },
+      2,
+    );
+    values.push("mutated");
+    expect(refreshed?.headers["x-values"]).toEqual(["one", "two"]);
+  });
+
+  test("rejects an unsolicited weak tag when validating by date", () => {
+    const { url, lookup } = prepareStaleResponse({
+      "cache-control": "max-age=0",
+      "last-modified": "Wed, 21 Oct 2015 07:28:00 GMT",
+    });
+    expect(() =>
+      refreshFileCacheEntry(url, lookup, { etag: 'W/"new"' }, 2),
+    ).toThrow("304 validator");
+  });
+
+  test.each([
+    { "cache-control": "no-store" },
+    { vary: "*" },
+    { "set-cookie": "session=secret" },
+  ])(
+    "revokes stored entries when a 304 changes storage policy %j",
+    (headers) => {
+      const { url, lookup } = prepareStaleResponse({
+        "cache-control": "max-age=0",
+        etag: '"original"',
+      });
+      expect(
+        refreshFileCacheEntry(url, lookup, headers, 2)?.body.toString(),
+      ).toBe("cached");
+      expect(
+        prepareFileCacheLookup("GET", url, [], "file", 3).entry,
+      ).toBeUndefined();
+    },
+  );
+});
+
+test("an origin no-store response replaces a previously reusable entry", () => {
+  const url = cacheUrl();
+  storeFreshResponse(url);
+  storeFileCacheResponse(
+    url,
+    {},
+    1,
+    1,
+    response(url, { "cache-control": "no-store" }),
+  );
+  expect(
+    prepareFileCacheLookup("GET", url, [], "file", 2).entry,
+  ).toBeUndefined();
 });

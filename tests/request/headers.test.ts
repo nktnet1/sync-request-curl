@@ -289,3 +289,22 @@ describe("Generated request headers", () => {
     );
   });
 });
+
+test("explicit Authorization wins over URL credentials", () => {
+  const url = `${SERVER_URL.replace("://", "://user:p%40ss@")}/compat/echo`;
+  const response = request("GET", url, {
+    headers: { Authorization: "Bearer explicit" },
+  });
+  expect(response.getJSON()).toMatchObject({
+    headers: { authorization: "Bearer explicit" },
+  });
+});
+
+test("explicit Accept-Encoding is not expanded by gzip defaults", () => {
+  const response = request("GET", `${SERVER_URL}/compat/echo`, {
+    headers: { "Accept-Encoding": "identity, gzip;q=0" },
+  });
+  expect(response.getJSON()).toMatchObject({
+    headers: { "accept-encoding": "identity, gzip;q=0" },
+  });
+});

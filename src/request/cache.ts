@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import * as v from "valibot";
+import { RequestError } from "#/errors";
 import {
   hasRequestHeader,
   parseRequestHeaderLine,
@@ -321,9 +322,10 @@ const readFileCacheEntries = (url: string): CacheEntry[] => {
     if (isNotFoundError(error)) {
       return [];
     }
-    throw new Error(
+    console.warn(
       `Error reading from cache: ${error instanceof Error ? error.message : String(error)}`,
     );
+    return [];
   }
 
   try {
@@ -336,7 +338,12 @@ const readFileCacheEntries = (url: string): CacheEntry[] => {
     // A partial/stale file should behave like a cache miss, not break requests.
   }
 
-  rmSync(getCachePath(url), { force: true });
+  // Failed cleanup must not turn an optional cache into a request failure.
+  try {
+    rmSync(getCachePath(url), { force: true });
+  } catch (error) {
+    console.warn(`Error removing invalid cache entry: ${String(error)}`);
+  }
   return [];
 };
 
@@ -467,18 +474,16 @@ export const prepareCacheLookup = (
 
 export const prepareFileCacheLookup = prepareCacheLookup;
 
+const responseForbidsStorage = (headers: Response["headers"]): boolean =>
+  parseCacheControl(getHeaderValue(headers, "cache-control")).has("no-store") ||
+  getHeaderValue(headers, "set-cookie") !== undefined ||
+  getVaryNamesFromHeaders(headers).includes("*");
+
 const canStoreResponse = (response: CacheableResponse): boolean => {
+  if (responseForbidsStorage(response.headers)) return false;
   const cacheControl = parseCacheControl(
     getHeaderValue(response.headers, "cache-control"),
   );
-  if (cacheControl.has("no-store")) {
-    return false;
-  }
-
-  const varyNames = getVaryNamesFromHeaders(response.headers);
-  if (varyNames.includes("*")) {
-    return false;
-  }
 
   if (defaultCacheableStatusCodes.has(response.statusCode)) {
     return true;
@@ -500,6 +505,7 @@ export const storeCacheResponse = (
   decompress = true,
 ): void => {
   if (!canStoreResponse(response)) {
+    if (responseForbidsStorage(response.headers)) invalidateCache(url, cache);
     return;
   }
 
@@ -591,12 +597,38 @@ export const refreshCacheEntry = (
     return undefined;
   }
 
+  const receivedTag = getHeaderValue(responseHeaders, "etag");
+  const storedTag = getHeaderValue(entry.headers, "etag");
+  const receivedDate = getHeaderValue(responseHeaders, "last-modified");
+  const storedDate = getHeaderValue(entry.headers, "last-modified");
+  const mismatchedTag =
+    receivedTag !== undefined &&
+    (receivedTag.startsWith("W/")
+      ? receivedTag.slice(2) !== storedTag?.replace(/^W\//, "")
+      : receivedTag !== storedTag);
+  if (
+    mismatchedTag ||
+    (receivedTag === undefined &&
+      receivedDate !== undefined &&
+      receivedDate !== storedDate)
+  ) {
+    invalidateCache(url, cache);
+    throw new RequestError(
+      "ERR_REQUEST_FAILED",
+      "Request failed: 304 validator does not match cached response",
+    );
+  }
+
   const response: CacheableResponse = {
     statusCode: entry.statusCode,
     headers: mergeRevalidationHeaders(entry.headers, responseHeaders),
     body: Buffer.from(entry.body, "base64"),
     responseUrl: entry.responseUrl,
   };
+  if (!canStoreResponse(response)) {
+    invalidateCache(url, cache);
+    return response;
+  }
   storeCacheResponse(
     url,
     lookup.requestHeaders,

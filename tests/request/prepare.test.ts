@@ -113,3 +113,18 @@ describe("request preparation", () => {
     ).toContain("accept-encoding: identity");
   });
 });
+
+test.each([
+  "gzip",
+  "gzip, chunked",
+  "chunked, chunked",
+  "",
+  ["chunked", "chunked"],
+])("rejects transfer coding it cannot correctly encode: %j", (value) => {
+  expect(() =>
+    prepareRequest("https://example.com", {
+      headers: { "Transfer-Encoding": value },
+      body: "payload",
+    }),
+  ).toThrow("only a single chunked Transfer-Encoding is supported");
+});

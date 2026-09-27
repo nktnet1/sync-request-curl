@@ -35,7 +35,7 @@ layer.
 - [x] Add `retry`, `retryDelay`, and `maxRetries` with `sync-request`
       compatible defaults and retry conditions.
 - [x] Add `socketTimeout` as an inactivity timeout. Keep it distinct from the
-      existing overall `timeout` deadline.
+      per-attempt `timeout` and optional `overallTimeout` deadline.
 - [x] Preserve `sync-request`'s `agent?: boolean` API while retaining additive
       `then-request`-style `Agent` instance support. Boolean `true` remains
       accepted for drop-in source/runtime compatibility, `false` keeps one-shot
@@ -63,10 +63,10 @@ layer.
 Replace useful capabilities that were previously reachable through
 `setEasyOptions` with explicit high-level options where appropriate:
 
-- [ ] Proxy URL and proxy authentication.
-- [ ] TLS verification and custom CA configuration.
-- [ ] Local interface/address binding.
-- [ ] TCP keepalive configuration.
+- [x] Proxy URL and proxy authentication (`proxy`, `proxyAuth`).
+- [x] TLS verification and custom CA configuration (`rejectUnauthorized`, `caFile`).
+- [x] Local interface/address binding (`localInterface`, `localAddress`).
+- [x] TCP keepalive configuration (`tcpKeepAlive`).
 - [x] Use `CurlError` with the raw numeric libcurl code for native transport
       failures; keep `RequestError` for errors created by the TypeScript layer.
 
@@ -128,8 +128,8 @@ each redirect hop: redirect handling wraps cache lookup/storage, cache wraps
 retry, and retry wraps the native transport. Fresh cache hits therefore bypass
 retry callbacks, cacheable error responses are only stored after retries finish,
 and a failure on a later redirect hop retries that hop instead of replaying the
-redirect chain. The existing TypeScript overall-timeout budget across redirects
-is retained rather than copying `http-basic` timeout quirks.
+redirect chain. `timeout` now applies independently to each network attempt/hop; optional
+`overallTimeout` shares a monotonic deadline across the complete operation.
 
 ### Remaining strict Node.js parity findings
 
@@ -203,7 +203,7 @@ not all necessarily desirable behaviours to copy.
       `CurlError` code 3 rather than leaking Node's `TypeError` from `new URL()`.
 - [x] Disable libcurl's ambient proxy-environment discovery. Requests do not
       implicitly inherit `http_proxy`, `HTTPS_PROXY`, `ALL_PROXY`, or related
-      variables; proxy routing remains an explicit future high-level option.
+      variables. Proxy routing is controlled only by the explicit `proxy` option.
 - [x] Enforce HTTP method semantics that the generic libcurl custom-method path
       cannot model safely: reject CONNECT because the buffered API cannot expose
       its tunnel, reject non-empty TRACE content, and require `Content-Type` for
@@ -321,48 +321,48 @@ checked item below is implemented; an unchecked item remains open. The older
   age calculation; never modify the stored header while doing so. The attached
   upstream returns old headers unchanged. This intentionally fixes that bug
   (RFC 9111 sections 4 and 4.2.3).
-- [ ] **Runtime sentinel values — decision required.** Upstream README documents
-  `timeout: false`, `socketTimeout: false`, and `allowRedirectHeaders: null`;
-  the effective runtime tolerates them but our schema rejects them. The upstream
-  TypeScript surface is narrower. Decide whether to normalise these documented
-  runtime sentinels without widening the declared API, as already done for null
-  options. Do not broadly accept arbitrary invalid option types.
-- [ ] **Retry timeout contract — decision required.** `performRequestWithRetry`
-  passes the same timeout to each attempt and excludes retry sleeps, while the
-  redirect loop describes its timeout as overall. The existing test explicitly
-  expects a fresh per-attempt allowance. Choose a true deadline including retry
-  delays, or document per-attempt semantics and define interaction with redirects.
-  Neither is imposed by HTTP; do not silently change this established test.
-- [ ] **Cache privacy boundary — decision required (high impact).** File entries
-  are shared by OS uid, keyed by URL/Vary; memory entries are process-global.
-  Authorization/Cookie do not isolate callers unless the server emits Vary.
-  A private single-user cache and a shared HTTP cache have different rules.
-  Choose an explicit private cache identity/isolation model, or shared-cache
-  semantics for private, Authorization, and s-maxage (RFC 9111 sections 3/3.5).
-  Changing between these models without a decision would be an opinionated API
-  change. The attached upstream is also not a safe reference for this boundary.
-- [ ] **304 validity and storage revocation.** `refreshCacheEntry` accepts any
-  304 for its selected stale entry without comparing returned validators. A
-  refreshed no-store or Vary:* response fails `canStoreResponse`, leaving the
-  previous entry available for subsequent lookup. Validate the selected stored
-  response before reusing its body and remove superseded non-storable entries;
-  do not copy upstream's unconditional `304 && cachedResponse` reuse.
-- [ ] **Cache key canonicalisation.** The raw prepared URL includes fragments;
-  GET `/resource#one` and an unsafe request to `/resource#two` therefore address
-  different buckets despite reaching the same HTTP resource. Canonicalise the
-  target used for cache lookup/invalidation without changing the public response
-  URL. Include credentials, default ports, and equivalent URL spellings in the
-  design rather than blindly applying the upstream raw-string key.
-- [ ] **Request transfer coding.** Validation currently only rejects
-  Content-Length plus Transfer-Encoding. It does not ensure a declared transfer
-  coding is actually applied to the buffered bytes or validate chunked ordering.
-  Restrict to supported framing or implement the requested coding; Node accepting
-  a field value does not make incorrectly encoded wire content conformant.
-- [ ] **Multipart metadata parity.** `sync-request` forwards fileName into
-  `then-request`'s `form-data`, whereas native MIME construction delegates media
-  type inference and filename handling to libcurl. Add wire-level cases for
-  extension-based media types, unnamed Buffers, and path-bearing filenames;
-  this is a verification gap, not a proven claim of identical wire output.
+- [x] **Runtime sentinel values.** Normalise documented runtime `timeout: false`,
+  `socketTimeout: false`, and `allowRedirectHeaders: null` to omitted values.
+  Keep the upstream narrower declared types; schema validation remains strict.
+  Reject array/non-object options rather than accepting accidental coercions.
+
+- [x] **Retry timeout contract.** `timeout` is per network attempt, including a
+  new allowance for each retry and redirect hop. Add `overallTimeout` for a
+  monotonic complete-operation deadline, including retry delays; see details below.
+
+- [x] **Cache privacy boundary.** Choose a conservative private application cache:
+  namespace by working directory (or explicit `cacheNamespace`), canonical HTTP
+  target, Vary, and decoding mode. Bypass requests with Authorization, Cookie,
+  Proxy-Authorization, URL credentials, explicit payloads, or custom transport
+  settings. Do not store Set-Cookie responses. Private responses may be cached;
+  shared-cache s-maxage semantics do not apply. Custom application authentication
+  headers still require correct Vary or a distinct application namespace.
+
+- [x] **304 validity and storage revocation.** Reject and invalidate entries when
+  a returned ETag/Last-Modified contradicts the selected cached representation.
+  Weak returned tags use weak comparison; strong returned tags require exact
+  equality. A 304 without replacement validators may still validate the request's
+  selected entry. Remove entries when refresh introduces no-store, Vary:*, or
+  Set-Cookie. Return the validated body for that request without retaining it.
+
+- [x] **Cache key canonicalisation.** Canonicalise hostname/default port/path
+  using URL, remove fragments and userinfo from the cache key, and namespace the
+  key by application. Credential-bearing requests bypass lookup/storage, while
+  successful unsafe requests invalidate all variants of the canonical target.
+
+- [x] **Request transfer coding.** Only a single chunked Transfer-Encoding is
+  accepted; unsupported chains, duplicate declarations, and empty values fail
+  before transport. Preserve the existing rejection of Content-Length together
+  with Transfer-Encoding. Do not claim an encoding that was never applied.
+
+- [x] **Multipart metadata parity.** Use `mime-types` 2.x (compatible with the
+  Node 16.17 runtime floor) for filename media types and octet-stream fallback.
+  Unnamed Buffers remain fields with octet-stream media type; Blob MIME metadata
+  remains authoritative.
+  Strip POSIX/Windows directory components from filenames and reject NUL/CR/LF
+  in multipart metadata rather than passing malformed headers to native code.
+  Wire tests cover named text files, unknown extensions, unnamed Buffers, and
+  path-bearing filenames.
 
 ### 2. Additive `then-request` compatibility
 
@@ -370,20 +370,19 @@ checked item below is implemented; an unchecked item remains open. The older
   and retrieval. Previously mutating a returned response could change a future
   hit's headers/freshness, unlike the isolated synchronous worker response.
   Preserve mutable public response objects without sharing internal cache state.
-- [ ] **URL credentials versus explicit Authorization — decision required.**
-  `http-basic` overwrites explicit Authorization with URL Basic credentials.
-  This implementation delegates URL credentials to libcurl, leaving the explicit
-  header in place. Decide precedence and test percent-encoded userinfo; do not
-  overwrite an intentional caller header merely to imitate upstream.
-- [ ] **Caller Accept-Encoding — document retained difference.** Upstream appends
-  gzip/deflate even to an explicit preference; our preparation respects the
-  caller's header. Keep the current behaviour rather than undermining explicit
-  negotiation preferences (including q=0), and test this through the public API.
-- [ ] **Response mutability contract — decision required.** The upstream README's
-  getBody implementation reads `this.statusCode`, `this.headers`, and `this.body`.
-  Our closure captures initial values, so property reassignment does not affect
-  getBody/getJSON. Decide whether mutable response properties should drive helpers;
-  changing this also changes behaviour of detached method calls.
+- [x] **URL credentials versus explicit Authorization.** Keep the explicit
+  Authorization header authoritative, consistent with caller intent, rather than
+  copying http-basic's overwrite. Cover percent-encoded URL credentials with an
+  explicit caller Authorization field through the native public API.
+
+- [x] **Caller Accept-Encoding.** Preserve caller negotiation, including q=0,
+  rather than appending gzip/deflate as upstream does. Public-API wire coverage
+  verifies the exact supplied value.
+
+- [x] **Response mutability contract.** getBody/getJSON now read the response's
+  current public body/status/headers. Keep detached helper calls working through
+  a closure over that response object; do not share its mutable headers with cache
+  entries. getJSON retains its existing ability to parse error-status bodies.
 
 ### 3. `http-basic` internals: differences, not additional public API targets
 
@@ -398,10 +397,11 @@ checked item below is implemented; an unchecked item remains open. The older
   Keep local no-store precedence and explicit freshness requirements. A heuristic
   freshness policy, if desired, is a separate optional choice, not a requirement
   to cache permanent redirects forever.
-- [ ] **Cache read errors — decision required.** Upstream warns and fetches from
-  origin after a read error. Local code throws for non-ENOENT read failures but
-  warns on write failures. Choose consistent fail-open or fail-closed handling;
-  ordinary cache failure is not an HTTP standards question.
+- [x] **Cache read errors.** Warn and fetch from origin for read failures and
+  failed cleanup of malformed files. Writes continue to warn on failure.
+  Invalidation failures still throw so a successful mutation cannot silently
+  leave stale cached state reusable.
+
 - [x] **Lower-level-only options remain out of scope.** `duplex` and
   `ignoreFailedInvalidation` exist in http-basic but then-request does not forward
   them. Likewise fromCache/fromNotModified flags are lost when then-request
@@ -413,11 +413,89 @@ Standards references for this audit:
 [RFC 9112](https://www.rfc-editor.org/rfc/rfc9112.html).
 No upstream source code was fetched online.
 
-Incremental patch: `v1.0.60-upstream-parity-audit.patch`. This patch addresses the
-checked new fixes above; unchecked findings and decisions are not claimed fixed.
-Validation: 76 focused tests passed, TypeScript and Biome checks passed, and the
-package build passed. Built CommonJS/ESM exports were smoke-tested with a stub
-transport. Full native/platform integration suites were not run in this audit.
+Initial patch: `v1.0.60-upstream-parity-audit.patch` implemented the first six
+new fixes and recorded the remaining findings. At that point 76 focused tests,
+TypeScript, Biome, and the package build passed; native integration was not run.
+The completion below supersedes those initial validation limits and pending items.
+
+## Transport controls and completion (v1.0.61)
+
+The user authorised best-practice choices for unspecified/incorrect upstream
+behaviour. These decisions supersede the pending choices in the initial audit.
+
+| Option | Contract |
+| --- | --- |
+| `timeout` | Milliseconds for one network attempt; resets for retries and redirect hops. Zero/omitted disables it. |
+| `overallTimeout` | Milliseconds for the complete call, including redirects, retries, sleeps, and synchronous processing. Zero/omitted disables it. |
+| `proxy` | Explicit HTTP/HTTPS proxy origin URL. URL-encoded credentials are accepted. Paths, queries, fragments, and other schemes are rejected. |
+| `proxyAuth` | `{ username, password }` for Basic proxy authentication; requires proxy and overrides URL credentials. |
+| `rejectUnauthorized` | Defaults to true; verifies both the origin certificate chain and hostname. False is an explicit opt-out. |
+| `caFile` | PEM CA bundle file for the origin, replacing default bundle/directory trust where supported by the TLS backend. Does not alter HTTPS proxy trust. |
+| `localAddress` | Source IPv4/IPv6 address. Hostnames are rejected to avoid extra blocking resolution. |
+| `localInterface` | Source interface name, mutually exclusive with localAddress; platform/libcurl support required (not available by name on Windows). |
+| `tcpKeepAlive` | Boolean or `{ idleSeconds?, intervalSeconds? }`. Object enables probing; values are positive integer seconds. Defaults to disabled; independent of HTTP Agent connection reuse. |
+| `cacheNamespace` | Private application cache identity; defaults to process.cwd(). Supply distinct namespaces for separate application identities using custom authentication. |
+
+Overall deadlines use `performance.now()`, not event-loop timers. Native
+attempts receive the smaller of their own timeout and the remaining overall
+budget; retry sleeps are similarly capped. Deadline checks surround blocking
+work. Synchronous JavaScript callbacks, filesystem calls, decompression, and any
+blocking platform resolver cannot be forcibly interrupted; expiry is reported
+when control returns. Consequently this is a cooperative deadline, not a hard
+process watchdog. Fractional millisecond native timeouts round up; timeout values
+are bounded to the portable signed-32-bit millisecond range.
+
+Proxy environment variables, including NO_PROXY, cannot override explicit
+routing. Proxy credentials are configured separately from origin headers; HTTPS
+origins use CONNECT tunnels. HTTPS proxies retain their own default certificate
+verification; origin rejectUnauthorized/caFile do not weaken proxy verification.
+Custom transport settings use one-shot connections to prevent reuse of sockets
+established under a different routing/trust/keepalive policy. Ordinary keep-alive
+Agents still use the existing pools. TCP probe timing is operating-system
+controlled and is not an HTTP request timeout or an Agent keep-alive lifetime.
+
+Cache isolation is deliberately conservative rather than claiming shared-cache
+support. Cookies and credentials are not written into new cache entries. TLS
+verification opt-outs/custom trust cannot populate a cache later used by default
+verified requests. No-store responses, validator mismatches, and refreshed
+non-storable entries do not become reusable data. The new application key format
+also makes older unnamespaced entries unreachable; they are disposable cache
+files, not migrated application data.
+
+Validation completed: `pnpm tc` passes 475 tests (one opt-in external-network
+test skipped), with 100% statements, branches, functions, and lines, including
+cache.ts. Biome, TypeScript, the native build, and the package build pass.
+Built ESM/CommonJS exports, native loading, and multipart construction also pass
+a Node 16.17.0 smoke check.
+
+The full `pnpm tc` gate now enforces 100% statements, branches, functions, and
+lines for the existing TypeScript source coverage scope. This is not a claim of
+100% Rust coverage or every-platform execution. Local integration fixtures use
+an explicitly test-only self-signed certificate/private key to exercise TLS,
+proxying, tunnelling, binding, and native socket controls without internet calls.
+The fixture certificate is not production trust material.
+
+Incremental patch: `v1.0.61-transport-options-and-full-coverage.patch`, based on
+v1.0.60. Generated files and lockfiles remain unchanged. `package.json` adds
+mime-types and its TypeScript declarations; lockfile regeneration remains the
+consumer's responsibility under the project instructions.
+
+## Unauthenticated proxy correction (v1.0.62)
+
+Proxy URLs without credentials now leave the native proxy username/password
+unset instead of passing empty strings. Some libcurl builds (as reported on
+macOS) interpret empty credentials as a request to send `Proxy-Authorization:
+Basic Og==`, authenticating with `:`. An unauthenticated proxy must receive no
+automatically generated authentication header. Explicit `proxyAuth` remains
+authoritative, including intentionally empty credentials. Username-only and
+password-only URL credentials remain supported.
+
+Regression tests check the native option values independently of libcurl's
+platform behaviour; the existing wire-level no-auth assertion remains intact.
+Linux validation: `pnpm tc` passes 479 tests (one skipped) with 100% statements,
+branches, functions, and lines; TypeScript and the changed-file Biome check pass.
+macOS execution remains to be confirmed on a macOS host.
+Incremental patch: `v1.0.62-proxy-empty-credentials.patch`, based on v1.0.61.
 
 ## TypeDoc
 

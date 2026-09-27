@@ -1,3 +1,4 @@
+import { performance } from "node:perf_hooks";
 import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -283,11 +284,11 @@ describe("request retries", () => {
     expect(response.statusCode).toBe(200);
     expect(nativeRequest).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ timeout: 75 }),
+      expect.objectContaining({ timeout: 100 }),
     );
     expect(nativeRequest).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ timeout: 75 }),
+      expect.objectContaining({ timeout: 100 }),
     );
   });
 
@@ -570,4 +571,102 @@ describe("retry orchestration", () => {
       targetUrl,
     ]);
   });
+});
+
+describe("overall deadline and legacy options", () => {
+  test("caps retry sleep at the shared overall deadline", () => {
+    let now = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    nativeRequest.mockImplementation(() => {
+      now += 5;
+      return nativeResponse({ statusCode: 503 });
+    });
+    const wait = vi
+      .spyOn(Atomics, "wait")
+      .mockImplementation((_a, _i, _v, delay) => {
+        now += Number(delay);
+        return "timed-out";
+      });
+    expect(() =>
+      request("GET", "https://example.com", {
+        overallTimeout: 20,
+        timeout: 100,
+        retry: true,
+        retryDelay: 200,
+      }),
+    ).toThrow("Overall timeout exceeded");
+    expect(nativeRequest).toHaveBeenCalledOnce();
+    expect(nativeRequest.mock.calls[0]?.[0].timeout).toBe(20);
+    expect(wait.mock.calls[0]?.[3]).toBe(15);
+  });
+
+  test("shares the deadline across redirect hops", () => {
+    let now = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    nativeRequest
+      .mockImplementationOnce(() => {
+        now = 10;
+        return nativeResponse({
+          statusCode: 302,
+          redirectUrl: "https://example.com/next",
+        });
+      })
+      .mockImplementationOnce(() => {
+        now = 15;
+        return nativeResponse();
+      });
+    expect(
+      request("GET", "https://example.com", { overallTimeout: 40 }).statusCode,
+    ).toBe(200);
+    expect(
+      nativeRequest.mock.calls.map(([options]) => options.timeout),
+    ).toEqual([40, 30]);
+  });
+
+  test("checks a deadline with redirects disabled after synchronous work completes", () => {
+    let now = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    nativeRequest.mockImplementation(() => {
+      now = 20;
+      return nativeResponse();
+    });
+    expect(() =>
+      request("GET", "https://example.com", {
+        overallTimeout: 10,
+        followRedirects: false,
+      }),
+    ).toThrow("Overall timeout exceeded");
+  });
+
+  test("normalizes documented runtime sentinel values", () => {
+    nativeRequest.mockReturnValue(nativeResponse());
+    expect(
+      Reflect.apply(request, undefined, [
+        "GET",
+        "https://example.com",
+        {
+          timeout: false,
+          socketTimeout: false,
+          allowRedirectHeaders: null,
+        },
+      ]).statusCode,
+    ).toBe(200);
+    expect(nativeRequest.mock.calls[0]?.[0]).toMatchObject({
+      timeout: 0,
+      socketTimeout: 0,
+    });
+  });
+
+  test.for([false, 1, "invalid", []].map((options) => ({ options })))(
+    "rejects invalid options %j",
+    ({ options }) => {
+      expect(() =>
+        Reflect.apply(request, undefined, [
+          "GET",
+          "https://example.com",
+          options,
+        ]),
+      ).toThrow("Invalid request options");
+    },
+  );
 });

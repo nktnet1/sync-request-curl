@@ -2,12 +2,9 @@ import { URL } from "node:url";
 import * as v from "valibot";
 import { RequestError } from "#/errors";
 import { assertSupportedHttpUrl } from "#/http/url";
+import { createDeadline } from "#/request/deadline";
 import { performRequest } from "#/request/perform";
-import {
-  getRedirectMethod,
-  getRedirectOptions,
-  getRemainingTimeout,
-} from "#/request/redirects";
+import { getRedirectMethod, getRedirectOptions } from "#/request/redirects";
 import type { HttpVerb, Options, Response, UppercaseHttpVerb } from "#/types";
 import { httpVerbSchema, optionsSchema, requestUrlSchema } from "#/validation";
 
@@ -29,13 +26,17 @@ const performRequestAttempt = (
   originalMethod: UppercaseHttpVerb,
   originalUrl: string,
   originalOptions: Options,
+  remaining: () => number,
 ): Response => {
   if (originalOptions.followRedirects === false) {
-    return performRequest(originalMethod, originalUrl, originalOptions)
-      .response;
+    return performRequest(
+      originalMethod,
+      originalUrl,
+      originalOptions,
+      remaining,
+    ).response;
   }
 
-  const startedAt = Date.now();
   const redirectLimit = getRedirectLimit(originalOptions.maxRedirects);
   let currentMethod = originalMethod;
   let currentUrl = originalUrl;
@@ -44,17 +45,11 @@ const performRequestAttempt = (
   for (let redirectsFollowed = 0; ; redirectsFollowed += 1) {
     assertSupportedHttpUrl(currentUrl);
 
-    if (originalOptions.timeout && originalOptions.timeout > 0) {
-      currentOptions = {
-        ...currentOptions,
-        timeout: getRemainingTimeout(originalOptions.timeout, startedAt),
-      };
-    }
-
     const { response, redirectUrl } = performRequest(
       currentMethod,
       currentUrl,
       currentOptions,
+      remaining,
     );
     if (!redirectUrl) {
       return response;
@@ -79,6 +74,20 @@ const performRequestAttempt = (
   }
 };
 
+const normalizeLegacyOptions = (options: unknown): unknown => {
+  if (options == null) return {};
+  if (typeof options !== "object" || Array.isArray(options)) return options;
+  return Object.fromEntries(
+    Object.entries(options).map(([name, value]) => [
+      name,
+      ((name === "timeout" || name === "socketTimeout") && value === false) ||
+      (name === "allowRedirectHeaders" && value === null)
+        ? undefined
+        : value,
+    ]),
+  );
+};
+
 const request = (
   method: HttpVerb,
   url: string | URL,
@@ -86,9 +95,20 @@ const request = (
 ): Response => {
   const originalMethod = normalizeMethod(method);
   const originalUrl = v.parse(requestUrlSchema, url);
-  const originalOptions = v.parse(optionsSchema, options ?? {});
+  const originalOptions = v.parse(
+    optionsSchema,
+    normalizeLegacyOptions(options),
+  );
 
-  return performRequestAttempt(originalMethod, originalUrl, originalOptions);
+  const remaining = createDeadline(originalOptions.overallTimeout);
+  const response = performRequestAttempt(
+    originalMethod,
+    originalUrl,
+    originalOptions,
+    remaining,
+  );
+  remaining();
+  return response;
 };
 
 export default request;

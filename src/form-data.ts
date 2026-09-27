@@ -1,11 +1,22 @@
 import { Blob } from "node:buffer";
+import { basename } from "node:path";
 import { Worker } from "node:worker_threads";
+import { lookup } from "mime-types";
 import * as v from "valibot";
 
+const metadataSchema = v.pipe(
+  v.string(),
+  v.check(
+    (value) =>
+      !["\0", "\r", "\n"].some((character) => value.includes(character)),
+    "Multipart metadata cannot contain NUL, CR, or LF",
+  ),
+);
+
 export const formDataEntrySchema = v.object({
-  key: v.string(),
+  key: metadataSchema,
   value: v.union([v.string(), v.instance(Buffer), v.instance(Blob)]),
-  fileName: v.optional(v.string()),
+  fileName: v.optional(metadataSchema),
 });
 
 export type FormDataEntry = v.InferOutput<typeof formDataEntrySchema>;
@@ -60,19 +71,32 @@ const getBlobFileName = (blob: Blob): string => {
 
 const prepareFormDataEntry = (entry: FormDataEntry): PreparedFormDataEntry => {
   const value = entry.value;
+  const fileName =
+    entry.fileName === undefined
+      ? undefined
+      : basename(entry.fileName.replaceAll("\\", "/"));
 
   if (!(value instanceof Blob)) {
     return {
       key: entry.key,
       value,
-      fileName: entry.fileName,
+      fileName,
+      ...(fileName === undefined
+        ? Buffer.isBuffer(value)
+          ? { contentType: "application/octet-stream" }
+          : {}
+        : { contentType: lookup(fileName) || "application/octet-stream" }),
     };
   }
 
   return {
     key: entry.key,
     value: blobToBufferSync(value),
-    fileName: entry.fileName ?? getBlobFileName(value),
+    fileName:
+      fileName ??
+      basename(
+        v.parse(metadataSchema, getBlobFileName(value)).replaceAll("\\", "/"),
+      ),
     contentType: value.type || "application/octet-stream",
   };
 };

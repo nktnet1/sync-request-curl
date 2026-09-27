@@ -1,3 +1,4 @@
+import { performance } from "node:perf_hooks";
 import { describe, expect, test, vi } from "vitest";
 import request from "#/index";
 import { SERVER_URL } from "#tests/app/config";
@@ -66,7 +67,7 @@ describe("Redirects", () => {
 
   test("Manual redirects use the remaining overall timeout", () => {
     const dateNow = vi
-      .spyOn(Date, "now")
+      .spyOn(performance, "now")
       .mockReturnValueOnce(0)
       .mockReturnValueOnce(0)
       .mockReturnValueOnce(1001);
@@ -75,7 +76,7 @@ describe("Redirects", () => {
       expect(() =>
         request("GET", `${SERVER_URL}/redirect/source`, {
           headers: { "x-test": "value" },
-          timeout: 1000,
+          overallTimeout: 1000,
         }),
       ).toThrow(Error);
     } finally {

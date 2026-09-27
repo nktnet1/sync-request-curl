@@ -82,6 +82,20 @@ const invalidRequestFraming = (message: string): never => {
 };
 
 export const validateRequestFraming = (headers: string[]): void => {
+  const transferCodings = headers.flatMap((header) => {
+    const parsed = parseRequestHeaderLine(header);
+    return parsed?.name === "transfer-encoding"
+      ? [parsed.value.toLowerCase()]
+      : [];
+  });
+  if (
+    transferCodings.length > 0 &&
+    (transferCodings.length !== 1 || transferCodings[0] !== "chunked")
+  ) {
+    invalidRequestFraming(
+      "only a single chunked Transfer-Encoding is supported",
+    );
+  }
   if (
     hasRequestHeader(headers, "content-length") &&
     hasRequestHeader(headers, "transfer-encoding")

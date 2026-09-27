@@ -5,14 +5,17 @@ import {
   FRAMING_SERVER_URL,
   HOST,
   PORT,
+  PROXY_PORT,
   SERVER_URL,
+  TLS_PORT,
 } from "#tests/app/config";
 import app from "#tests/app/index";
+import { proxyServer, tlsServer } from "#tests/app/transport";
 
 let listeningServers = 0;
 const markServerReady = (): void => {
   listeningServers += 1;
-  if (listeningServers === 2) {
+  if (listeningServers === 4) {
     process.send?.("sync-request-curl:test-server-ready");
   }
 };
@@ -79,7 +82,12 @@ framingServer.listen(FRAMING_PORT, HOST, () => {
   markServerReady();
 });
 
+tlsServer.listen(TLS_PORT, HOST, markServerReady);
+proxyServer.listen(PROXY_PORT, HOST, markServerReady);
+
 const shutdown = (): void => {
+  tlsServer.close();
+  proxyServer.close();
   server.close();
   framingServer.close(() => {
     console.log("Shutting down test servers gracefully.");

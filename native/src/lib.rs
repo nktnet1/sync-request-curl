@@ -44,6 +44,9 @@ unsafe extern "C" {
   fn curl_mime_type(part: *mut CurlMimePart, mimetype: *const c_char) -> CURLcode;
 }
 
+// Public libcurl ABI value; curl-sys leaves this constant commented out.
+const CURLE_NOT_BUILT_IN: CURLcode = 4;
+
 const CURLOPT_MIMEPOST: CURLoption = CURLOPTTYPE_OBJECTPOINT + 269;
 static CURL_INIT: OnceLock<CURLcode> = OnceLock::new();
 static CONNECTION_POOLS: OnceLock<Mutex<HashMap<i64, Arc<Mutex<MultiHandle>>>>> =
@@ -191,6 +194,23 @@ pub struct NativeRequestOptions {
   pub body: Option<Either<String, Buffer>>,
   pub form: Option<Vec<NativeFormDataEntry>>,
   pub timeout: Option<i64>,
+  pub proxy: Option<String>,
+  #[napi(js_name = "proxyUsername")]
+  pub proxy_username: Option<String>,
+  #[napi(js_name = "proxyPassword")]
+  pub proxy_password: Option<String>,
+  #[napi(js_name = "rejectUnauthorized")]
+  pub reject_unauthorized: Option<bool>,
+  #[napi(js_name = "caFile")]
+  pub ca_file: Option<String>,
+  #[napi(js_name = "networkInterface")]
+  pub network_interface: Option<String>,
+  #[napi(js_name = "tcpKeepAlive")]
+  pub tcp_keep_alive: Option<bool>,
+  #[napi(js_name = "tcpKeepIdle")]
+  pub tcp_keep_idle: Option<i64>,
+  #[napi(js_name = "tcpKeepInterval")]
+  pub tcp_keep_interval: Option<i64>,
   #[napi(js_name = "socketTimeout")]
   pub socket_timeout: Option<i64>,
   #[napi(js_name = "noBody")]
@@ -825,7 +845,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     set_string_option(
       curl,
       curl_sys::CURLOPT_PROXY,
-      Some(""),
+      Some(options.proxy.as_deref().unwrap_or("")),
       &mut keepalive,
       true,
     ),
@@ -878,7 +898,49 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_HEADERDATA, state_pointer)
   });
-  keep_first_error(&mut code, configure_default_ca(curl, &mut keepalive));
+  if options.ca_file.is_none() {
+    keep_first_error(&mut code, configure_default_ca(curl, &mut keepalive));
+  } else {
+    // An explicit bundle replaces default directory trust as well.
+    let capath_code = unsafe {
+      curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_CAPATH, ptr::null::<c_char>())
+    };
+    // Backends without CA-directory support have no directory to clear.
+    if capath_code != CURLE_NOT_BUILT_IN {
+      keep_first_error(&mut code, capath_code);
+    }
+  }
+  // Explicit routing also overrides NO_PROXY; ambient proxy configuration is
+  // never consulted. Separate credentials are only used for the proxy hop.
+  for (option, value) in [
+    (curl_sys::CURLOPT_NOPROXY, Some("")),
+    (curl_sys::CURLOPT_PROXYUSERNAME, options.proxy_username.as_deref()),
+    (curl_sys::CURLOPT_PROXYPASSWORD, options.proxy_password.as_deref()),
+    (curl_sys::CURLOPT_CAINFO, options.ca_file.as_deref()),
+    (curl_sys::CURLOPT_INTERFACE, options.network_interface.as_deref()),
+  ] {
+    keep_first_error(
+      &mut code,
+      set_string_option(curl, option, value, &mut keepalive, true),
+    );
+  }
+  let verify = options.reject_unauthorized.unwrap_or(true);
+  for (option, value) in [
+    (curl_sys::CURLOPT_SSL_VERIFYPEER, Some(if verify { 1 } else { 0 })),
+    (curl_sys::CURLOPT_SSL_VERIFYHOST, Some(if verify { 2 } else { 0 })),
+    (
+      curl_sys::CURLOPT_TCP_KEEPALIVE,
+      Some(if options.tcp_keep_alive.unwrap_or(false) { 1 } else { 0 }),
+    ),
+    (curl_sys::CURLOPT_TCP_KEEPIDLE, options.tcp_keep_idle),
+    (curl_sys::CURLOPT_TCP_KEEPINTVL, options.tcp_keep_interval),
+  ] {
+    if let Some(value) = value {
+      keep_first_error(&mut code, unsafe {
+        curl_sys::curl_easy_setopt(curl, option, value as c_long)
+      });
+    }
+  }
 
   for header in request_headers {
     let next = headers.append(&header);

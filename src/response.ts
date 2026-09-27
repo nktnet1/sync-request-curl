@@ -24,15 +24,20 @@ export const createResponse = ({
   body,
 }: CreateResponseOptions): Response => {
   const getBody = ((encoding?: BufferEncoding): string | Buffer => {
-    if (statusCode >= 300) {
-      throw new ResponseError(statusCode, headers, body, encoding);
+    if (response.statusCode >= 300) {
+      throw new ResponseError(
+        response.statusCode,
+        response.headers,
+        response.body,
+        encoding,
+      );
     }
-    return encoding ? body.toString(encoding) : body;
+    return encoding ? response.body.toString(encoding) : response.body;
   }) as GetBody;
 
   const getJSON = <T = unknown>(encoding?: BufferEncoding): T => {
     try {
-      return JSON.parse(body.toString(encoding));
+      return JSON.parse(response.body.toString(encoding));
     } catch (error) {
       const message =
         error instanceof Error
@@ -40,7 +45,7 @@ export const createResponse = ({
           : `Non-Error thrown while parsing JSON (${typeof error})`;
       const parseError = new Error(
         `The response body for ${method} ${requestUrl} could not be parsed as JSON.\n\n` +
-          `Body:\n${body.toString(encoding)}\n\nJSON parse error:\n${message}`,
+          `Body:\n${response.body.toString(encoding)}\n\nJSON parse error:\n${message}`,
       );
       Object.defineProperty(parseError, "cause", {
         value: error,
@@ -51,7 +56,7 @@ export const createResponse = ({
     }
   };
 
-  return {
+  const response: Response = {
     statusCode,
     headers,
     url: responseUrl,
@@ -59,4 +64,5 @@ export const createResponse = ({
     getBody,
     getJSON,
   };
+  return response;
 };

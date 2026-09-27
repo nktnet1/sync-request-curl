@@ -18,3 +18,8 @@ export const FRAMING_PORT = v.parse(
 export const HOST = v.parse(v.string(), process.env.IP ?? "127.0.0.1");
 export const SERVER_URL = `http://${HOST}:${PORT}`;
 export const FRAMING_SERVER_URL = `http://${HOST}:${FRAMING_PORT}`;
+
+export const TLS_PORT = PORT + 2;
+export const PROXY_PORT = PORT + 3;
+export const TLS_URL = `https://${HOST}:${TLS_PORT}`;
+export const PROXY_URL = `http://${HOST}:${PROXY_PORT}`;

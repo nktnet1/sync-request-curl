@@ -70,3 +70,48 @@ describe("multipart/form-data", () => {
     );
   });
 });
+
+test.each(["/private/path/report.txt", "C:\\private\\report.txt"])(
+  "multipart filenames do not disclose local paths: %s",
+  (fileName) => {
+    const form = new FormData();
+    form.append("file", Buffer.from("hello"), fileName);
+    expect(upload(form)).toMatchObject([
+      {
+        name: "file",
+        file: { name: "report.txt", type: "text/plain", size: 5 },
+      },
+    ]);
+  },
+);
+
+test.each(["\0", "\r", "\n"])(
+  "rejects multipart header control character %j",
+  (character) => {
+    const form = new FormData();
+    expect(() => form.append(`key${character}`, "value")).toThrow();
+    expect(() => form.append("key", "value", `file${character}.txt`)).toThrow();
+  },
+);
+
+test("unnamed Buffers remain fields and unknown file types are octet streams", () => {
+  const form = new FormData();
+  form.append("field", Buffer.from("hello"));
+  form.append("file", Buffer.from("hello"), "data.unknown-extension");
+  const wire = request("POST", `${SERVER_URL}/compat/echo`, { form }).getJSON<{
+    body: string;
+  }>();
+  expect(wire.body).toContain(
+    'name="field"\r\nContent-Type: application/octet-stream\r\n',
+  );
+  expect(upload(form)).toMatchObject([
+    { name: "field", content: "hello" },
+    {
+      name: "file",
+      file: {
+        name: "data.unknown-extension",
+        type: "application/octet-stream",
+      },
+    },
+  ]);
+});

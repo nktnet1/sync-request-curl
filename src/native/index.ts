@@ -22,6 +22,15 @@ export const nativeRequestOptionsSchema = v.object({
   timeout: v.number(),
   socketTimeout: v.number(),
   noBody: v.boolean(),
+  proxy: v.optional(v.string()),
+  proxyUsername: v.optional(v.string()),
+  proxyPassword: v.optional(v.string()),
+  rejectUnauthorized: v.optional(v.boolean()),
+  caFile: v.optional(v.string()),
+  networkInterface: v.optional(v.string()),
+  tcpKeepAlive: v.optional(v.boolean()),
+  tcpKeepIdle: v.optional(v.number()),
+  tcpKeepInterval: v.optional(v.number()),
   connectionPoolId: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
 });
 

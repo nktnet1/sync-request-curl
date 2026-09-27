@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 const fsMock = vi.hoisted(() => ({
   mkdirSync: vi.fn(),
@@ -23,8 +23,11 @@ const nonError = (message: string): { toString: () => string } => ({
 });
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
 });
+
+afterEach(() => vi.restoreAllMocks());
 
 describe("file cache filesystem failures", () => {
   test("reports non-ENOENT cache read failures", () => {
@@ -32,15 +35,17 @@ describe("file cache filesystem failures", () => {
       throw fsError("permission denied", "EACCES");
     });
 
-    expect(() =>
-      prepareFileCacheLookup(
-        "GET",
-        "https://cache.test/read-error",
-        [],
-        "file",
-        0,
-      ),
-    ).toThrowError("Error reading from cache: permission denied");
+    const lookup = prepareFileCacheLookup(
+      "GET",
+      "https://cache.test/read-error",
+      [],
+      "file",
+      0,
+    );
+    expect(lookup.entry).toBeUndefined();
+    expect(console.warn).toHaveBeenCalledWith(
+      "Error reading from cache: permission denied",
+    );
   });
 
   test("warns and continues when a cache write fails", () => {
@@ -80,15 +85,17 @@ describe("file cache non-Error failures", () => {
       throw nonError("read failed");
     });
 
-    expect(() =>
-      prepareFileCacheLookup(
-        "GET",
-        "https://cache.test/read-non-error",
-        [],
-        "file",
-        0,
-      ),
-    ).toThrowError("Error reading from cache: read failed");
+    const lookup = prepareFileCacheLookup(
+      "GET",
+      "https://cache.test/read-non-error",
+      [],
+      "file",
+      0,
+    );
+    expect(lookup.entry).toBeUndefined();
+    expect(console.warn).toHaveBeenCalledWith(
+      "Error reading from cache: read failed",
+    );
   });
 
   test("stringifies non-Error cache write failures", () => {
@@ -120,4 +127,18 @@ describe("file cache non-Error failures", () => {
       invalidateFileCache("https://cache.test/invalidate-non-error"),
     ).toThrowError("Error invalidating cache: invalidate failed");
   });
+});
+
+test("a failed cleanup of a malformed cache file still permits an origin fetch", () => {
+  fsMock.readFileSync.mockReturnValue("{");
+  fsMock.rmSync.mockImplementation(() => {
+    throw new Error("denied");
+  });
+  expect(
+    prepareFileCacheLookup("GET", "https://cache.test/broken", [], "file")
+      .entry,
+  ).toBeUndefined();
+  expect(console.warn).toHaveBeenCalledWith(
+    "Error removing invalid cache entry: Error: denied",
+  );
 });

@@ -61,14 +61,64 @@ const retryDelayFunctionSchema = v.custom<RetryDelayFunction>(
 // This schema carries the public input type without eagerly invoking toJSON().
 export const jsonLikeSchema = v.custom<JsonLikeValue>(() => true);
 
+const nativeStringSchema = v.pipe(
+  v.string(),
+  v.minLength(1),
+  v.check((value) => !value.includes("\0")),
+);
+const keepAliveSecondsSchema = v.pipe(
+  v.number(),
+  v.integer(),
+  v.minValue(1),
+  v.maxValue(2_147_483_647),
+);
+
 const optionsObjectSchema = v.object({
+  /** Explicit HTTP/HTTPS proxy URL. Environment proxy settings are ignored. */
+  proxy: v.optional(nativeStringSchema),
+  proxyAuth: v.optional(
+    v.object({
+      username: v.pipe(
+        v.string(),
+        v.check((value) => !value.includes("\0")),
+      ),
+      password: v.pipe(
+        v.string(),
+        v.check((value) => !value.includes("\0")),
+      ),
+    }),
+  ),
+  /** Verify certificate chains and hostnames. Defaults to true. */
+  rejectUnauthorized: v.optional(v.boolean()),
+  /** PEM CA bundle path for origin TLS verification. */
+  caFile: v.optional(nativeStringSchema),
+  localAddress: v.optional(nativeStringSchema),
+  localInterface: v.optional(nativeStringSchema),
+  tcpKeepAlive: v.optional(
+    v.union([
+      v.boolean(),
+      v.object({
+        idleSeconds: v.optional(keepAliveSecondsSchema),
+        intervalSeconds: v.optional(keepAliveSecondsSchema),
+      }),
+    ]),
+  ),
+  /** Private application cache namespace. Defaults to the working directory. */
+  cacheNamespace: v.optional(v.string()),
   headers: v.optional(incomingHttpHeadersSchema),
   qs: v.optional(v.record(v.string(), v.unknown())),
   json: v.optional(jsonLikeSchema),
   body: v.optional(v.union([v.string(), v.instance(Buffer)])),
   form: v.optional(v.instance(FormData)),
-  timeout: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),
-  socketTimeout: v.optional(v.pipe(v.number(), v.finite(), v.minValue(0))),
+  timeout: v.optional(
+    v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(2_147_483_647)),
+  ),
+  overallTimeout: v.optional(
+    v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(2_147_483_647)),
+  ),
+  socketTimeout: v.optional(
+    v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(2_147_483_647)),
+  ),
   followRedirects: v.optional(v.boolean()),
   maxRedirects: v.optional(v.number()),
   allowRedirectHeaders: v.optional(v.array(v.string())),
@@ -89,7 +139,10 @@ const optionsObjectSchema = v.object({
 
 export const optionsSchema = v.custom<
   v.InferOutput<typeof optionsObjectSchema>
->((input) => v.is(optionsObjectSchema, input), "Invalid request options");
+>(
+  (input) => !Array.isArray(input) && v.is(optionsObjectSchema, input),
+  "Invalid request options",
+);
 
 const httpMethodTokenSchema = v.pipe(
   v.string(),
