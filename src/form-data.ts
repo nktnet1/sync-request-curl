@@ -1,5 +1,7 @@
 import { Blob } from "node:buffer";
 import { basename } from "node:path";
+import { performance } from "node:perf_hooks";
+import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import * as v from "valibot";
 import { lookupMimeType } from "#/http/mime-type";
@@ -48,6 +50,20 @@ const blobReaderWorkerUrl = new URL(
   import.meta.url,
 );
 
+// A bootstrap catches missing/broken worker assets before the reader can signal.
+// Do not inherit CLI loaders or --input-type into this plain CommonJS worker.
+const blobReaderBootstrap = `
+  const { workerData } = require("node:worker_threads");
+  try {
+    require(workerData.readerPath);
+  } catch {
+    const state = new Int32Array(workerData.state);
+    Atomics.store(state, 0, -1);
+    Atomics.notify(state, 0);
+  }
+`;
+const blobReadTimeoutMs = 30_000;
+
 const blobToBufferSync = (blob: Blob): Buffer => {
   if (blob.size === 0) {
     return Buffer.alloc(0);
@@ -56,21 +72,42 @@ const blobToBufferSync = (blob: Blob): Buffer => {
   const data = new SharedArrayBuffer(blob.size);
   const stateBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
   const state = new Int32Array(stateBuffer);
-  const worker = new Worker(blobReaderWorkerUrl, {
-    workerData: { blob, data, state: stateBuffer },
+  const worker = new Worker(blobReaderBootstrap, {
+    eval: true,
+    execArgv: [],
+    workerData: {
+      blob,
+      data,
+      state: stateBuffer,
+      readerPath: fileURLToPath(blobReaderWorkerUrl),
+    },
   });
+  // Startup errors arrive asynchronously, while this thread waits synchronously.
+  // The bounded wait reports failure; consume the later event to avoid an
+  // additional uncaught exception after the caller has handled that failure.
+  worker.on("error", () => {});
   worker.unref();
 
-  while (Atomics.load(state, 0) === 0) {
-    Atomics.wait(state, 0, 0);
-  }
+  try {
+    const deadline = performance.now() + blobReadTimeoutMs;
+    while (Atomics.load(state, 0) === 0) {
+      const remaining = deadline - performance.now();
+      if (
+        remaining <= 0 ||
+        (Atomics.wait(state, 0, 0, remaining) === "timed-out" &&
+          Atomics.load(state, 0) === 0)
+      ) {
+        throw new TypeError("Timed out synchronously reading Blob data");
+      }
+    }
 
-  const result = Atomics.load(state, 0);
-  if (result !== 1) {
-    throw new TypeError("Unable to synchronously read Blob data");
+    if (Atomics.load(state, 0) !== 1) {
+      throw new TypeError("Unable to synchronously read Blob data");
+    }
+    return Buffer.from(new Uint8Array(data));
+  } finally {
+    void worker.terminate().catch(() => {});
   }
-
-  return Buffer.from(new Uint8Array(data));
 };
 
 const getBlobFileName = (blob: Blob): string => {
@@ -143,7 +180,8 @@ export class FormData {
    *
    * When `fileName` is supplied, its basename is used and the media type is
    * inferred from the extension with an `application/octet-stream` fallback.
-   * Blob media types remain authoritative.
+   * Blob media types remain authoritative. Blob reads throw if the reader fails
+   * or does not finish within 30 seconds.
    */
   append(key: string, value: string | Buffer | Blob, fileName?: string): void {
     const entry = v.parse(formDataEntrySchema, { key, value, fileName });

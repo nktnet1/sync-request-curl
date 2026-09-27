@@ -48,6 +48,8 @@ unsafe extern "C" {
 const CURLE_NOT_BUILT_IN: CURLcode = 4;
 
 const CURLOPT_MIMEPOST: CURLoption = CURLOPTTYPE_OBJECTPOINT + 269;
+// Public long-option ABI value, available since libcurl 7.54.0.
+const CURLOPT_SUPPRESS_CONNECT_HEADERS: CURLoption = 265;
 static CURL_INIT: OnceLock<CURLcode> = OnceLock::new();
 static CONNECTION_POOLS: OnceLock<Mutex<HashMap<i64, Arc<Mutex<MultiHandle>>>>> =
   OnceLock::new();
@@ -680,7 +682,10 @@ fn read_multi_result(multi: *mut CURLM, curl: *mut CURL) -> CURLcode {
 
     let message = unsafe { &*message };
     if message.msg == curl_sys::CURLMSG_DONE && message.easy_handle == curl {
-      return message.data as CURLcode;
+      // curl-sys represents the C union as a pointer-sized field. Read the
+      // CURLcode at the field's address, not the pointer's numeric value:
+      // on big-endian 64-bit hosts those occupy different halves of the slot.
+      return unsafe { ptr::addr_of!(message.data).cast::<CURLcode>().read() };
     }
   }
 }
@@ -927,6 +932,11 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
       set_string_option(curl, option, value, &mut keepalive, true),
     );
   }
+  // CONNECT headers belong to the proxy, not the origin. In particular, they
+  // must not trigger the HEAD-with-payload early-stop callback.
+  keep_first_error(&mut code, unsafe {
+    curl_sys::curl_easy_setopt(curl, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1 as c_long)
+  });
   let verify = options.reject_unauthorized.unwrap_or(true);
   for (option, value) in [
     (curl_sys::CURLOPT_SSL_VERIFYPEER, Some(if verify { 1 } else { 0 })),

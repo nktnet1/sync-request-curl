@@ -14,11 +14,13 @@ test("cache targets ignore fragments, credentials, and default ports", () => {
 test.each([
   { url: "http://user@example.com", headers: [], options: {} },
   { url: "http://:pass@example.com", headers: [], options: {} },
-  ...["Authorization", "Cookie", "Proxy-Authorization"].map((name) => ({
-    url: "http://example.com",
-    headers: [`${name}: secret`],
-    options: {},
-  })),
+  ...["Authorization", "Cookie", "Proxy-Authorization", "Host", "hOsT"].map(
+    (name) => ({
+      url: "http://example.com",
+      headers: [`${name}: secret`],
+      options: {},
+    }),
+  ),
   ...[{ body: "" }, { json: null }, { form: {} }, { caFile: "/ca.pem" }].map(
     (options) => ({
       url: "http://example.com",

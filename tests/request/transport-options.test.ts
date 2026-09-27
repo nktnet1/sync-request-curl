@@ -237,3 +237,14 @@ describe("native transport controls", () => {
     },
   );
 });
+
+test("HEAD with a payload through an HTTPS tunnel returns origin headers", () => {
+  const response = request("HEAD", TLS_URL, {
+    body: "payload",
+    proxy: { url: PROXY_URL },
+    caFile,
+  });
+  expect(response.statusCode).toBe(200);
+  expect(response.headers["content-type"]).toContain("application/json");
+  expect(response.body.length).toBe(0);
+});
