@@ -36,8 +36,6 @@ Make synchronous web requests similar to [sync-request](https://github.com/Forbe
 
 Designed to run on NodeJS. It will not work in a browser.
 
-[![Try with Replit](https://replit.com/badge?caption=Try%20with%20Replit)](https://replit.com/@nktnet1/sync-request-curl-example#index.js)
-
 </div>
 
 ---

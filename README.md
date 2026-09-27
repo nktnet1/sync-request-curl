@@ -36,8 +36,6 @@ Make synchronous web requests similar to [sync-request](https://github.com/Forbe
 
 Designed to run on NodeJS. It will not work in a browser.
 
-[![Try with Replit](https://replit.com/badge?caption=Try%20with%20Replit)](https://replit.com/@nktnet1/sync-request-curl-example#index.js)
-
 </div>
 
 ---
@@ -66,8 +64,6 @@ npm install sync-request-curl
 
 <a id="usage"></a>
 ## 2. Usage
-
-Try with [Replit](https://replit.com/@nktnet1/sync-request-curl-example#index.js).
 
 ```typescript
 request(method, url, options);
@@ -222,6 +218,19 @@ uppercase before transport.
 
 ***
 
+#### ProxyAuth
+
+Basic credentials for an explicit HTTP/HTTPS proxy.
+
+##### Properties
+
+| Property | Type | Description |
+| ------ | ------ | ------ |
+| <a id="property-username"></a> `username` | `string` | Proxy username. |
+| <a id="property-password"></a> `password` | `string` | Proxy password. |
+
+***
+
 #### Options
 
 Options accepted by `request`.
@@ -234,9 +243,7 @@ supplied.
 | Property | Type | Description |
 | ------ | ------ | ------ |
 | <a id="property-proxy"></a> `proxy?` | `string` | Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. |
-| <a id="property-proxyauth"></a> `proxyAuth?` | \{ `username`: `string`; `password`: `string`; \} | Basic proxy credentials. Requires `proxy` and overrides credentials in its URL. |
-| `proxyAuth.username` | `string` | Proxy username. |
-| `proxyAuth.password` | `string` | Proxy password. |
+| <a id="property-proxyauth"></a> `proxyAuth?` | [`ProxyAuth`](#proxyauth) | Basic proxy credentials. Requires `proxy` and overrides credentials in its URL. |
 | <a id="property-rejectunauthorized"></a> `rejectUnauthorized?` | `boolean` | Verify the origin certificate chain and hostname. Defaults to `true`. |
 | <a id="property-cafile"></a> `caFile?` | `string` | PEM CA bundle path for origin TLS verification. |
 | <a id="property-localaddress"></a> `localAddress?` | `string` | Source IPv4/IPv6 address. Hostnames are rejected. |

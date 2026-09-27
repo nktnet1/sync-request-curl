@@ -50,6 +50,19 @@ export type HttpVerb = v.InferOutput<typeof httpVerbInputSchema>;
  */
 export type BufferEncoding = v.InferOutput<typeof bufferEncodingSchema>;
 
+/**
+ * Basic credentials for an explicit HTTP/HTTPS proxy.
+ *
+ * @group Request
+ * @preventExpand
+ */
+export interface ProxyAuth {
+  /** Proxy username. */
+  username: string;
+  /** Proxy password. */
+  password: string;
+}
+
 // Keep this as a named interface rather than a Valibot InferOutput alias.
 // typedoc-plugin-valibot expands InferOutput aliases at reference sites; the
 // schema-derived type equality assertion in tests/validation.test.ts guards drift.
@@ -60,17 +73,13 @@ export type BufferEncoding = v.InferOutput<typeof bufferEncodingSchema>;
  * supplied.
  *
  * @group Request
+ * @preventExpand
  */
 export interface Options {
   /** Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. */
   proxy?: string;
   /** Basic proxy credentials. Requires `proxy` and overrides credentials in its URL. */
-  proxyAuth?: {
-    /** Proxy username. */
-    username: string;
-    /** Proxy password. */
-    password: string;
-  };
+  proxyAuth?: ProxyAuth;
   /** Verify the origin certificate chain and hostname. Defaults to `true`. */
   rejectUnauthorized?: boolean;
   /** PEM CA bundle path for origin TLS verification. */

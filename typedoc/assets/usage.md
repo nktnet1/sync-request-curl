@@ -1,7 +1,5 @@
 ## Usage
 
-Try with [Replit](https://replit.com/@nktnet1/sync-request-curl-example#index.js).
-
 ```typescript
 request(method, url, options);
 ```
