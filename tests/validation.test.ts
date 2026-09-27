@@ -21,6 +21,7 @@ import type {
   HttpVerb,
   JsonLike,
   Options,
+  ProxyAuth,
   Response,
   UppercaseHttpVerb,
 } from "#/types";
@@ -31,6 +32,7 @@ import {
   incomingHttpHeadersSchema,
   type jsonLikeSchema,
   optionsSchema,
+  type proxyAuthSchema,
   requestUrlSchema,
   type responseDataSchema,
   uppercaseHttpVerbSchema,
@@ -55,6 +57,9 @@ describe("schema-derived types", () => {
     >();
     expectTypeOf<BufferEncoding>().toEqualTypeOf<
       v.InferOutput<typeof bufferEncodingSchema>
+    >();
+    expectTypeOf<ProxyAuth>().toEqualTypeOf<
+      v.InferOutput<typeof proxyAuthSchema>
     >();
     expectTypeOf<Options>().toEqualTypeOf<
       v.InferOutput<typeof optionsSchema>

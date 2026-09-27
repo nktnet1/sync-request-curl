@@ -41,6 +41,8 @@ type RenderedSection = {
 
 const DUPLICATE_COMMENT_WARNING =
   "has multiple declarations with a comment. An arbitrary comment will be used";
+const OPTIONS_PARAMETER_ROW_PREFIX = "| `options` |";
+const OPTIONS_REFERENCE = "[`Options`](#options)";
 
 const readAsset = (name: string): string =>
   readFileSync(resolve(assetsDirectory, name), "utf8").trim();
@@ -350,6 +352,18 @@ const buildReadme = (api: string): string => {
   ].join("\n\n")}\n`;
 };
 
+const assertOptionsParameterReference = (api: string): void => {
+  const optionsRow = api
+    .split("\n")
+    .find((line) => line.startsWith(OPTIONS_PARAMETER_ROW_PREFIX));
+
+  if (!optionsRow?.includes(OPTIONS_REFERENCE)) {
+    throw new Error(
+      "TypeDoc expanded request options instead of linking to the Options section",
+    );
+  }
+};
+
 const suppressKnownTypeDocWarnings = (app: Application): void => {
   type WarnArguments = Parameters<typeof app.logger.warn>;
   const warn = app.logger.warn.bind(app.logger);
@@ -385,6 +399,7 @@ try {
     resolve(outputDirectory, "README.md"),
     "utf8",
   );
+  assertOptionsParameterReference(generatedApi);
   const nextReadme = buildReadme(generatedApi);
 
   if (checkOnly) {

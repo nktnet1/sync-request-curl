@@ -1,7 +1,4 @@
 ---
 exclude_paths:
-  # Documentation is maintained separately from source analysis.
-  - "README.md"
-  - "native/README.md"
-  - "prebuilds/README.md"
+  - "**/*.md"
   - "typedoc/assets/**"

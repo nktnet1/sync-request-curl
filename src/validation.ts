@@ -27,6 +27,18 @@ export const incomingHttpHeadersSchema = v.custom<
 );
 
 /**
+ * Basic credentials for an explicit HTTP/HTTPS proxy.
+ *
+ * @group Request
+ */
+export interface ProxyAuth {
+  /** Proxy username. */
+  username: string;
+  /** Proxy password. */
+  password: string;
+}
+
+/**
  * Response shape passed to retry policy callbacks.
  *
  * `getBody()` follows the same status handling as a normal response. Retry
@@ -101,24 +113,29 @@ const keepAliveSecondsSchema = v.pipe(
   v.maxValue(2_147_483_647),
 );
 
+const proxyAuthObjectSchema = v.object({
+  /** Proxy username. */
+  username: v.pipe(
+    v.string(),
+    v.check((value) => !value.includes("\0")),
+  ),
+  /** Proxy password. */
+  password: v.pipe(
+    v.string(),
+    v.check((value) => !value.includes("\0")),
+  ),
+});
+
+export const proxyAuthSchema = v.custom<ProxyAuth>(
+  (input) => v.is(proxyAuthObjectSchema, input),
+  "Invalid proxy credentials",
+);
+
 const optionsObjectSchema = v.object({
   /** Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. */
   proxy: v.optional(nativeStringSchema),
   /** Basic proxy credentials. Requires `proxy` and overrides credentials in its URL. */
-  proxyAuth: v.optional(
-    v.object({
-      /** Proxy username. */
-      username: v.pipe(
-        v.string(),
-        v.check((value) => !value.includes("\0")),
-      ),
-      /** Proxy password. */
-      password: v.pipe(
-        v.string(),
-        v.check((value) => !value.includes("\0")),
-      ),
-    }),
-  ),
+  proxyAuth: v.optional(proxyAuthSchema),
   /** Verify the origin certificate chain and hostname. Defaults to `true`. */
   rejectUnauthorized: v.optional(v.boolean()),
   /** PEM CA bundle path for origin TLS verification. */

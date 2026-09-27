@@ -3,9 +3,11 @@ import {
   type PluginOptions,
   load as typedocPluginMarkdown,
 } from "typedoc-plugin-markdown";
+import { preserveOptionsReference } from "#typedoc/plugins/preserveOptionsReference";
 import { removeEmptyTypeParameterLists } from "#typedoc/plugins/removeEmptyTypeParameterLists";
 import { removeLeadingReturnUnionPipe } from "#typedoc/plugins/removeLeadingReturnUnionPipe";
 import { removeTrailingWhitespace } from "#typedoc/plugins/removeTrailingWhitespace";
+import { removeTypeAliasPropertyDefaults } from "#typedoc/plugins/removeTypeAliasPropertyDefaults";
 
 const config = {
   plugin: [
@@ -13,6 +15,8 @@ const config = {
     "typedoc-plugin-no-inherit",
     typedocPluginMarkdown,
     removeEmptyTypeParameterLists,
+    preserveOptionsReference,
+    removeTypeAliasPropertyDefaults,
     removeLeadingReturnUnionPipe,
     removeTrailingWhitespace,
   ],
