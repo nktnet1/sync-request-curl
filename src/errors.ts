@@ -30,8 +30,10 @@ const curlErrorCodeSchema = v.pipe(
  * `sync-request-curl` releases and maps to libcurl's documented error codes.
  *
  * @group Errors
+ * @noInheritDoc
  */
 export class CurlError extends Error {
+  /** Numeric libcurl error code. */
   // https://curl.se/libcurl/c/libcurl-errors.html
   code: number;
 
@@ -55,8 +57,10 @@ export class CurlError extends Error {
  * Transport-neutral request failure created by the TypeScript request layer.
  *
  * @group Errors
+ * @noInheritDoc
  */
 export class RequestError extends Error {
+  /** Stable transport-neutral request error code. */
   readonly code: RequestErrorCode;
 
   constructor(
@@ -84,10 +88,14 @@ export class RequestError extends Error {
  * the error object.
  *
  * @group Errors
+ * @noInheritDoc
  */
 export class ResponseError extends Error {
+  /** HTTP status code that caused the error. */
   readonly statusCode: number;
+  /** Response headers returned by the server. */
   readonly headers: Response["headers"];
+  /** Buffered response body returned by the server. */
   readonly body: Buffer;
 
   constructor(

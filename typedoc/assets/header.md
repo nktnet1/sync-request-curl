@@ -34,8 +34,6 @@
 
 Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but up to 20 times more quickly.
 
-Uses a small in-process Node-API binding to libcurl for performance instead of spawning child processes like sync-request. The published package selects a platform-specific optional native package and does not run install or postinstall scripts.
-
 Designed to run on NodeJS. It will not work in a browser.
 
 [![Try with Replit](https://replit.com/badge?caption=Try%20with%20Replit)](https://replit.com/@nktnet1/sync-request-curl-example#index.js)

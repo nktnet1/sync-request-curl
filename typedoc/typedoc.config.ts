@@ -9,6 +9,8 @@ import { removeTrailingWhitespace } from "#typedoc/plugins/removeTrailingWhitesp
 
 const config = {
   plugin: [
+    "typedoc-plugin-valibot",
+    "typedoc-plugin-no-inherit",
     typedocPluginMarkdown,
     removeEmptyTypeParameterLists,
     removeLeadingReturnUnionPipe,
@@ -33,8 +35,8 @@ const config = {
   typeDeclarationFormat: "table",
   classPropertiesFormat: "table",
   propertyMembersFormat: "table",
-  typeAliasPropertiesFormat: "table",
-  expandObjects: true,
+  typeAliasPropertiesFormat: "list",
+  expandObjects: false,
   useCodeBlocks: true,
   categorizeByGroup: false,
   groupOrder: ["Request", "Response", "Multipart", "Errors", "*"],

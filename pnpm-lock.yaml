@@ -206,6 +206,12 @@ importers:
       typedoc-plugin-markdown:
         specifier: ^4.13.1
         version: 4.13.1(typedoc@0.28.20(typescript@6.0.3))
+      typedoc-plugin-no-inherit:
+        specifier: ^1.6.1
+        version: 1.6.1(typedoc@0.28.20(typescript@6.0.3))
+      typedoc-plugin-valibot:
+        specifier: ^1.0.2
+        version: 1.0.2(typedoc@0.28.20(typescript@6.0.3))
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -1294,6 +1300,16 @@ packages:
     peerDependencies:
       typedoc: 0.28.x
 
+  typedoc-plugin-no-inherit@1.6.1:
+    resolution: {integrity: sha512-+qf0RkO5YR9kUBBS1HqzzDOsWOnLcXTtGL0f2ia4jDQAjGrtF0+po/0R8k3UNtBqyDzL273aaV3FIGHEX+U/tg==}
+    peerDependencies:
+      typedoc: 0.26.x || 0.27.x || 0.28.x
+
+  typedoc-plugin-valibot@1.0.2:
+    resolution: {integrity: sha512-PTzEEPq4MM9KBV6i/7v3nBstSUpqJGNKViFZCgIQyPc1T35essUCZbAWKa/020feDbtReJ1y5gEWv0LnNx53CQ==}
+    peerDependencies:
+      typedoc: 0.23.x || 0.24.x || 0.25.x || 0.26.x || 0.27.x || 0.28.x
+
   typedoc@0.28.20:
     resolution: {integrity: sha512-uSKqkh8Cr48vllnEy+jdaAgOeR6Y+QCBW7usgUsKj7gJEfR7stw9U/fE49LBnj2tPRKPY0c0EBJSWe9Appmplg==}
     engines: {node: '>= 18', pnpm: '>= 10'}
@@ -2205,6 +2221,14 @@ snapshots:
       fsevents: 2.3.3
 
   typedoc-plugin-markdown@4.13.1(typedoc@0.28.20(typescript@6.0.3)):
+    dependencies:
+      typedoc: 0.28.20(typescript@6.0.3)
+
+  typedoc-plugin-no-inherit@1.6.1(typedoc@0.28.20(typescript@6.0.3)):
+    dependencies:
+      typedoc: 0.28.20(typescript@6.0.3)
+
+  typedoc-plugin-valibot@1.0.2(typedoc@0.28.20(typescript@6.0.3)):
     dependencies:
       typedoc: 0.28.20(typescript@6.0.3)
 

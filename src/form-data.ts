@@ -14,17 +14,16 @@ const metadataSchema = v.pipe(
 );
 
 export const formDataEntrySchema = v.object({
+  /** Multipart field name. */
   key: metadataSchema,
+  /** Text, `Buffer`, or `Blob` field value. */
   value: v.union([v.string(), v.instance(Buffer), v.instance(Blob)]),
+  /** Optional file name. Path components are stripped before sending. */
   fileName: v.optional(metadataSchema),
 });
 
 /**
  * One multipart entry accepted by `FormData`.
- *
- * `key` is the multipart field name. `value` may be text, a `Buffer`, or a
- * `Blob`. `fileName` is optional; path components are stripped before the
- * multipart request is sent.
  *
  * @group Multipart
  */

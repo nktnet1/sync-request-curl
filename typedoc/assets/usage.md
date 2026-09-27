@@ -1,8 +1,5 @@
 ## Usage
 
-> [!TIP]
-> Starting from `sync-request-curl@3.2.0`, you can replace `JSON.parse(res.body.toString())` with `res.getJSON()`.
-
 Try with [Replit](https://replit.com/@nktnet1/sync-request-curl-example#index.js).
 
 ```typescript

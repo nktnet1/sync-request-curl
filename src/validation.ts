@@ -35,11 +35,17 @@ export const incomingHttpHeadersSchema = v.custom<
  * @group Request
  */
 export interface RetryResponse {
+  /** HTTP response status code. */
   statusCode: number;
+  /** Node-style response headers with lowercase keys. */
   headers: v.InferOutput<typeof incomingHttpHeadersSchema>;
+  /** Final effective URL for the completed attempt. */
   url: string;
+  /** Buffered response body. */
   body: Buffer;
+  /** Read the response body as a string using the requested encoding. */
   getBody(encoding: BufferEncoding): string;
+  /** Read the response body as a `Buffer`. */
   getBody(): Buffer;
 }
 
@@ -96,60 +102,89 @@ const keepAliveSecondsSchema = v.pipe(
 );
 
 const optionsObjectSchema = v.object({
+  /** Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. */
   proxy: v.optional(nativeStringSchema),
+  /** Basic proxy credentials. Requires `proxy` and overrides credentials in its URL. */
   proxyAuth: v.optional(
     v.object({
+      /** Proxy username. */
       username: v.pipe(
         v.string(),
         v.check((value) => !value.includes("\0")),
       ),
+      /** Proxy password. */
       password: v.pipe(
         v.string(),
         v.check((value) => !value.includes("\0")),
       ),
     }),
   ),
+  /** Verify the origin certificate chain and hostname. Defaults to `true`. */
   rejectUnauthorized: v.optional(v.boolean()),
+  /** PEM CA bundle path for origin TLS verification. */
   caFile: v.optional(nativeStringSchema),
+  /** Source IPv4/IPv6 address. Hostnames are rejected. */
   localAddress: v.optional(nativeStringSchema),
+  /** Source interface name. Mutually exclusive with `localAddress`. */
   localInterface: v.optional(nativeStringSchema),
+  /** Enable TCP keepalive, optionally with idle and interval controls. */
   tcpKeepAlive: v.optional(
     v.union([
       v.boolean(),
       v.object({
+        /** Idle time in seconds before keepalive probes begin. */
         idleSeconds: v.optional(keepAliveSecondsSchema),
+        /** Interval in seconds between keepalive probes. */
         intervalSeconds: v.optional(keepAliveSecondsSchema),
       }),
     ]),
   ),
+  /** Private cache identity. Defaults to `process.cwd()`. */
   cacheNamespace: v.optional(v.string()),
+  /** Node-style request headers. */
   headers: v.optional(incomingHttpHeadersSchema),
+  /** Query values merged with any existing query string. */
   qs: v.optional(v.record(v.string(), v.unknown())),
+  /** JSON-compatible request body. Adds `application/json` when needed. */
   json: v.optional(jsonLikeSchema),
+  /** Raw string or `Buffer` request body. */
   body: v.optional(v.union([v.string(), v.instance(Buffer)])),
+  /** Synchronous multipart/form-data body. */
   form: v.optional(v.instance(FormData)),
+  /** Per-network-attempt timeout in milliseconds. `0` disables it. */
   timeout: v.optional(
     v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(2_147_483_647)),
   ),
+  /** Complete-operation deadline in milliseconds. `0` disables it. */
   overallTimeout: v.optional(
     v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(2_147_483_647)),
   ),
+  /** Socket inactivity timeout in milliseconds. `0` disables it. */
   socketTimeout: v.optional(
     v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(2_147_483_647)),
   ),
+  /** Follow redirects automatically. Defaults to `true`. */
   followRedirects: v.optional(v.boolean()),
+  /** Maximum redirects to follow. Negative or non-finite values mean no limit. */
   maxRedirects: v.optional(v.number()),
+  /** Caller headers allowed to be forwarded to redirect hops. */
   allowRedirectHeaders: v.optional(v.array(v.string())),
+  /** Transparently decompress gzip/deflate responses. Defaults to enabled. */
   gzip: v.optional(v.boolean()),
+  /** Enable the private HTTP-aware cache in file or memory storage. */
   cache: v.optional(v.picklist(["file", "memory"])),
+  /** `sync-request` boolean agent option, or a keep-alive Node `Agent`. */
   agent: v.optional(v.union([v.boolean(), v.instance(Agent)])),
+  /** Retry GET requests, or provide a callback to decide per attempt. */
   retry: v.optional(v.union([v.boolean(), retryFunctionSchema])),
+  /** Retry delay in milliseconds, or a callback returning the delay. */
   retryDelay: v.optional(
     v.union([
       v.pipe(v.number(), v.finite(), v.minValue(0)),
       retryDelayFunctionSchema,
     ]),
   ),
+  /** Maximum retry count. Defaults to 5 when retries are enabled. */
   maxRetries: v.optional(
     v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0)),
   ),
@@ -197,9 +232,13 @@ export const bufferEncodingSchema = v.picklist([
 ]);
 
 export const responseDataSchema = v.object({
+  /** HTTP response status code. */
   statusCode: v.number(),
+  /** Node-style response headers with lowercase keys. */
   headers: incomingHttpHeadersSchema,
+  /** Final effective URL after query handling and redirects. */
   url: v.string(),
+  /** Mutable buffered response body. */
   body: v.instance(Buffer),
 });
 
