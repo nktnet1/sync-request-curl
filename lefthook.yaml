@@ -1,5 +1,18 @@
 pre-commit:
   commands:
+    docs:
+      glob:
+        - "README.md"
+        - "package.json"
+        - "tsconfig.json"
+        - "src/*.ts"
+        - "src/**/*.ts"
+        - "typedoc/*.ts"
+        - "typedoc/**/*.ts"
+        - "typedoc/assets/*.md"
+      run: >
+        pnpm docs:gen
+        && git add README.md
     typecheck:
       glob: "*.{ts,cts,mts}"
       run: >
