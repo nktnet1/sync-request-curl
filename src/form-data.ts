@@ -1,8 +1,8 @@
 import { Blob } from "node:buffer";
 import { basename } from "node:path";
 import { Worker } from "node:worker_threads";
-import { lookup } from "mime-types";
 import * as v from "valibot";
+import { lookupMimeType } from "#/http/mime-type";
 
 const metadataSchema = v.pipe(
   v.string(),
@@ -85,7 +85,7 @@ const prepareFormDataEntry = (entry: FormDataEntry): PreparedFormDataEntry => {
     if (fileName !== undefined) {
       return {
         ...prepared,
-        contentType: lookup(fileName) || "application/octet-stream",
+        contentType: lookupMimeType(fileName) ?? "application/octet-stream",
       };
     }
     if (Buffer.isBuffer(value)) {

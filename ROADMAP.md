@@ -355,10 +355,10 @@ checked item below is implemented; an unchecked item remains open. The older
   before transport. Preserve the existing rejection of Content-Length together
   with Transfer-Encoding. Do not claim an encoding that was never applied.
 
-- [x] **Multipart metadata parity.** Use `mime-types` 2.x (compatible with the
-  Node 16.17 runtime floor) for filename media types and octet-stream fallback.
-  Unnamed Buffers remain fields with octet-stream media type; Blob MIME metadata
-  remains authoritative.
+- [x] **Multipart metadata parity.** Use the owned MIME extension lookup for
+  filename media types with an octet-stream fallback, avoiding runtime reliance
+  on upstream MIME database packages. Unnamed Buffers remain fields with
+  octet-stream media type; Blob MIME metadata remains authoritative.
   Strip POSIX/Windows directory components from filenames and reject NUL/CR/LF
   in multipart metadata rather than passing malformed headers to native code.
   Wire tests cover named text files, unknown extensions, unnamed Buffers, and
@@ -790,6 +790,11 @@ should be treated as the current baseline in future sessions:
   ordinary outbound header arrays, exercising the same `Header;` serialization
   form already used for scalar empty values and restoring full branch coverage
   for request-header serialization.
+- `v1.0.74-internal-mime-types.patch` replaces the `mime-types` runtime
+  dependency with an owned, case-insensitive filename-extension lookup covering
+  common web, document, archive, font, image, audio, and video formats. Unknown
+  extensions continue to use `application/octet-stream`, and Blob-provided MIME
+  metadata remains authoritative.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are
