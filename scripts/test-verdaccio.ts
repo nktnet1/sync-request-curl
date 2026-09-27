@@ -22,16 +22,11 @@ import { parseArgs, styleText } from "node:util";
 import { getNativePackageName } from "#/native/platform-key-core";
 import { getCurrentPlatformKey } from "#scripts/native-platform";
 import { canRun, run } from "#scripts/process";
-
-interface PackageJson extends Record<string, unknown> {
-  name: string;
-  version: string;
-  description?: string;
-  repository?: unknown;
-  license?: string;
-  author?: unknown;
-  engines?: Record<string, string>;
-}
+import {
+  createMainPackageManifest,
+  createNativePackageManifest,
+  parseReleasePackageJson,
+} from "#scripts/release-package";
 
 interface PackResult {
   filename: string;
@@ -42,9 +37,9 @@ const STARTUP_TIMEOUT_MS = 120_000;
 const root = resolve(import.meta.dirname, "..");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
-const packageJson = JSON.parse(
+const packageJson = parseReleasePackageJson(
   readFileSync(join(root, "package.json"), "utf8"),
-) as PackageJson;
+);
 const platform = getCurrentPlatformKey();
 const nativePackageName = getNativePackageName(platform);
 const nativeBinary = join(
@@ -120,23 +115,6 @@ const reservePort = (): Promise<number> =>
     });
   });
 
-const currentTarget = (): Record<string, unknown> => {
-  if (process.arch !== "x64" && process.arch !== "arm64") {
-    throw new Error(`Unsupported native architecture: ${process.arch}`);
-  }
-
-  const target: Record<string, unknown> = {
-    os: [process.platform],
-    cpu: [process.arch],
-  };
-  if (platform.endsWith("-gnu")) {
-    target.libc = "glibc";
-  } else if (platform.endsWith("-musl")) {
-    target.libc = "musl";
-  }
-  return target;
-};
-
 const stagePackages = (): void => {
   if (!existsSync(join(root, "dist"))) {
     throw new Error("Missing dist/. The JavaScript build did not complete.");
@@ -155,18 +133,12 @@ const stagePackages = (): void => {
   cpSync(join(root, "README.md"), join(mainPackageRoot, "README.md"));
   cpSync(join(root, "LICENSE"), join(mainPackageRoot, "LICENSE"));
 
-  const mainManifest: Record<string, unknown> = {
-    ...packageJson,
-    files: ["dist"],
-    optionalDependencies: {
+  writeJson(
+    join(mainPackageRoot, "package.json"),
+    createMainPackageManifest(packageJson, {
       [nativePackageName]: packageJson.version,
-    },
-  };
-  delete mainManifest.devDependencies;
-  delete mainManifest.imports;
-  delete mainManifest.packageManager;
-  delete mainManifest.scripts;
-  writeJson(join(mainPackageRoot, "package.json"), mainManifest);
+    }),
+  );
 
   cpSync(
     nativeBinary,
@@ -179,19 +151,10 @@ const stagePackages = (): void => {
       `Platform-specific native binary for \`${packageJson.name}\` (${platform}). ` +
       `Install \`${packageJson.name}\` instead of depending on this package directly.\n`,
   );
-  writeJson(join(nativePackageRoot, "package.json"), {
-    name: nativePackageName,
-    version: packageJson.version,
-    description: `Native Node-API binary for ${packageJson.name} (${platform}).`,
-    repository: packageJson.repository,
-    license: packageJson.license,
-    author: packageJson.author,
-    engines: packageJson.engines,
-    ...currentTarget(),
-    main: "./sync_request_curl_native.node",
-    files: ["sync_request_curl_native.node"],
-    publishConfig: { access: "public" },
-  });
+  writeJson(
+    join(nativePackageRoot, "package.json"),
+    createNativePackageManifest(packageJson, platform),
+  );
 };
 
 const createVerdaccioConfig = (): void => {
@@ -270,9 +233,8 @@ const waitForVerdaccio = async (registry: string): Promise<void> => {
       const log = existsSync(verdaccioLog)
         ? readFileSync(verdaccioLog, "utf8").trim()
         : "";
-      throw new Error(
-        `Verdaccio exited before becoming ready${log ? `:\n${log}` : ""}`,
-      );
+      const logSuffix = log ? `:\n${log}` : "";
+      throw new Error(`Verdaccio exited before becoming ready${logSuffix}`);
     }
 
     try {
@@ -501,11 +463,13 @@ const verifyCleanInstall = async (
   detail(accent(serverUrl));
   success("Local HTTP server is ready");
 
+  const smokeUrl = `${serverUrl}/smoke`;
+
   stage("Sending a CommonJS request through the freshly installed package");
   const commonJsSmoke = [
     `const request = require(${JSON.stringify(packageJson.name)});`,
     'if (typeof request !== "function") throw new TypeError("Expected CommonJS export to be a function");',
-    `const response = request("GET", ${JSON.stringify(`${serverUrl}/smoke`)}, { headers: { "x-smoke-client": "commonjs" } });`,
+    `const response = request("GET", ${JSON.stringify(smokeUrl)}, { headers: { "x-smoke-client": "commonjs" } });`,
     'if (response.statusCode !== 200) throw new Error("Expected status 200, received " + response.statusCode);',
     'if (response.headers["x-smoke-test"] !== "ok") throw new Error("Missing x-smoke-test response header");',
     'const body = JSON.parse(response.getBody("utf8"));',
@@ -518,7 +482,7 @@ const verifyCleanInstall = async (
   const esmSmoke = [
     `import request from ${JSON.stringify(packageJson.name)};`,
     'if (typeof request !== "function") throw new TypeError("Expected ESM export to be a function");',
-    `const response = request("GET", ${JSON.stringify(`${serverUrl}/smoke`)}, { headers: { "x-smoke-client": "esm" } });`,
+    `const response = request("GET", ${JSON.stringify(smokeUrl)}, { headers: { "x-smoke-client": "esm" } });`,
     'if (response.statusCode !== 200) throw new Error("Expected status 200, received " + response.statusCode);',
     'if (response.headers["x-smoke-test"] !== "ok") throw new Error("Missing x-smoke-test response header");',
     'const body = JSON.parse(response.getBody("utf8"));',
@@ -534,7 +498,7 @@ const verifyCleanInstall = async (
 const stopChildProcess = async (
   child: ChildProcess | undefined,
 ): Promise<void> => {
-  if (!child || child.exitCode !== null) {
+  if (child?.exitCode !== null) {
     return;
   }
   const exited = once(child, "exit").then(() => true);
@@ -574,18 +538,18 @@ const main = async (): Promise<void> => {
 
   const port = await reservePort();
   const registry = `http://127.0.0.1:${port}`;
+  const mainPackageSpec = `${packageJson.name}@${packageJson.version}`;
+  const nativePackageSpec = `${nativePackageName}@${packageJson.version}`;
   createVerdaccioConfig();
 
-  stage(
-    `Building ${accent(`${packageJson.name}@${packageJson.version}`)} for ${accent(platform)}`,
-  );
+  stage(`Building ${accent(mainPackageSpec)} for ${accent(platform)}`);
   run(pnpmCommand, ["build"], { cwd: root });
   run(pnpmCommand, ["build:native"], { cwd: root });
   success("JavaScript and current-platform native builds completed");
 
   stage("Staging the main package and current-platform optional dependency");
   stagePackages();
-  success(`${accent(`${nativePackageName}@${packageJson.version}`)} staged`);
+  success(`${accent(nativePackageSpec)} staged`);
 
   stage(
     `Starting disposable Verdaccio ${accent(values["verdaccio-version"] ?? VERDACCIO_VERSION)}`,
@@ -625,21 +589,19 @@ const main = async (): Promise<void> => {
     ],
     { cwd: root, env: npmEnv },
   );
-  success(`${accent(`${nativePackageName}@${packageJson.version}`)} published`);
+  success(`${accent(nativePackageSpec)} published`);
 
-  stage(`Publishing ${accent(`${packageJson.name}@${packageJson.version}`)}`);
+  stage(`Publishing ${accent(mainPackageSpec)}`);
   run(
     npmCommand,
     ["publish", mainTarball, "--registry", registry, "--ignore-scripts"],
     { cwd: root, env: npmEnv },
   );
-  success(`${accent(`${packageJson.name}@${packageJson.version}`)} published`);
+  success(`${accent(mainPackageSpec)} published`);
 
   stage("Verifying published optional-dependency metadata");
   verifyPublishedMetadata(registry, npmEnv);
-  success(
-    `Main package points to ${accent(`${nativePackageName}@${packageJson.version}`)}`,
-  );
+  success(`Main package points to ${accent(nativePackageSpec)}`);
 
   await verifyCleanInstall(registry, npmEnv);
 

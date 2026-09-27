@@ -12,7 +12,9 @@ import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import {
   getNativePackageName,
+  getNativeTarget,
   type NativePlatformKey,
+  type NativeTarget,
   supportedPlatformKeys,
 } from "#/native/platform-key-core";
 import { getCurrentPlatformKey } from "#scripts/native-platform";
@@ -21,23 +23,6 @@ import { run } from "#scripts/process";
 interface PackageJson {
   version: string;
 }
-
-interface InstallTarget {
-  os: NodeJS.Platform;
-  cpu: "arm64" | "x64";
-  libc?: "glibc" | "musl";
-}
-
-const installTargets: Record<NativePlatformKey, InstallTarget> = {
-  "darwin-arm64": { os: "darwin", cpu: "arm64" },
-  "darwin-x64": { os: "darwin", cpu: "x64" },
-  "linux-arm64-gnu": { os: "linux", cpu: "arm64", libc: "glibc" },
-  "linux-arm64-musl": { os: "linux", cpu: "arm64", libc: "musl" },
-  "linux-x64-gnu": { os: "linux", cpu: "x64", libc: "glibc" },
-  "linux-x64-musl": { os: "linux", cpu: "x64", libc: "musl" },
-  "win32-arm64-msvc": { os: "win32", cpu: "arm64" },
-  "win32-x64-msvc": { os: "win32", cpu: "x64" },
-};
 
 const { values } = parseArgs({
   options: {
@@ -61,7 +46,7 @@ const temporaryRoot = mkdtempSync(
   join(tmpdir(), "sync-request-curl-registry-smoke-"),
 );
 
-const installPackage = (directory: string, target?: InstallTarget): void => {
+const installPackage = (directory: string, target?: NativeTarget): void => {
   writeFileSync(
     join(directory, "package.json"),
     `${JSON.stringify({ private: true }, null, 2)}\n`,
@@ -119,7 +104,7 @@ try {
     for (const platform of supportedPlatformKeys) {
       const directory = join(temporaryRoot, platform);
       mkdirSync(directory, { recursive: true });
-      installPackage(directory, installTargets[platform]);
+      installPackage(directory, getNativeTarget(platform));
       verifyNativeSelection(directory, platform);
       console.log(`Verified optional dependency selection for ${platform}`);
     }

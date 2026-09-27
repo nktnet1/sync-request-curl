@@ -14,6 +14,26 @@ export const supportedLinuxLibcs = ["gnu", "musl"] as const;
 export type NativePlatformKey = (typeof supportedPlatformKeys)[number];
 export type LinuxLibc = (typeof supportedLinuxLibcs)[number];
 
+export interface NativeTarget {
+  readonly os: "darwin" | "linux" | "win32";
+  readonly cpu: "arm64" | "x64";
+  readonly libc?: "glibc" | "musl";
+}
+
+const nativeTargets: Record<NativePlatformKey, NativeTarget> = {
+  "darwin-arm64": { os: "darwin", cpu: "arm64" },
+  "darwin-x64": { os: "darwin", cpu: "x64" },
+  "linux-arm64-gnu": { os: "linux", cpu: "arm64", libc: "glibc" },
+  "linux-arm64-musl": { os: "linux", cpu: "arm64", libc: "musl" },
+  "linux-x64-gnu": { os: "linux", cpu: "x64", libc: "glibc" },
+  "linux-x64-musl": { os: "linux", cpu: "x64", libc: "musl" },
+  "win32-arm64-msvc": { os: "win32", cpu: "arm64" },
+  "win32-x64-msvc": { os: "win32", cpu: "x64" },
+};
+
+export const getNativeTarget = (platform: NativePlatformKey): NativeTarget =>
+  nativeTargets[platform];
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 

@@ -433,17 +433,25 @@ where
   .unwrap_or(0)
 }
 
-extern "C" fn write_callback(
-  data: *mut c_char,
-  size: usize,
-  count: usize,
-  userdata: *mut c_void,
-) -> usize {
-  handle_request_callback(data, size, count, userdata, |state, chunk, bytes| {
-    state.body.extend_from_slice(chunk);
-    bytes
-  })
+macro_rules! define_request_callback {
+  ($name:ident, $handler:ident) => {
+    extern "C" fn $name(
+      data: *mut c_char,
+      size: usize,
+      count: usize,
+      userdata: *mut c_void,
+    ) -> usize {
+      handle_request_callback(data, size, count, userdata, $handler)
+    }
+  };
 }
+
+fn write_response_chunk(state: &mut RequestState, chunk: &[u8], bytes: usize) -> usize {
+  state.body.extend_from_slice(chunk);
+  bytes
+}
+
+define_request_callback!(write_callback, write_response_chunk);
 
 fn header_bytes_to_latin1(bytes: &[u8]) -> String {
   bytes.iter().map(|byte| char::from(*byte)).collect()
@@ -481,33 +489,28 @@ fn parse_http_status_code(line: &[u8]) -> Option<u16> {
   )
 }
 
-extern "C" fn header_callback(
-  data: *mut c_char,
-  size: usize,
-  count: usize,
-  userdata: *mut c_void,
-) -> usize {
-  handle_request_callback(data, size, count, userdata, |state, chunk, bytes| {
-    let line = trim_header_line(chunk);
-    state.headers.push(header_bytes_to_latin1(line));
+fn process_header_chunk(state: &mut RequestState, chunk: &[u8], bytes: usize) -> usize {
+  let line = trim_header_line(chunk);
+  state.headers.push(header_bytes_to_latin1(line));
 
-    if let Some(status_code) = parse_http_status_code(line) {
-      state.current_status_code = Some(status_code);
-    }
+  if let Some(status_code) = parse_http_status_code(line) {
+    state.current_status_code = Some(status_code);
+  }
 
-    if state.stop_after_final_headers
-      && line.is_empty()
-      && state
-        .current_status_code
-        .is_some_and(|status_code| !(100..200).contains(&status_code))
-    {
-      state.stopped_after_final_headers = true;
-      return 0;
-    }
+  if state.stop_after_final_headers
+    && line.is_empty()
+    && state
+      .current_status_code
+      .is_some_and(|status_code| !(100..200).contains(&status_code))
+  {
+    state.stopped_after_final_headers = true;
+    return 0;
+  }
 
-    bytes
-  })
+  bytes
 }
+
+define_request_callback!(header_callback, process_header_chunk);
 
 fn build_mime(
   curl: *mut CURL,
