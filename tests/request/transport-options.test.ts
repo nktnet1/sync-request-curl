@@ -117,18 +117,26 @@ describe("native transport controls", () => {
   });
 
   test.each([
-    { proxy: PROXY_URL },
-    { proxy: PROXY_URL.replace("://", "://user:p%40ss@") },
-    { proxy: PROXY_URL, proxyAuth: { username: "user", password: "p@ss" } },
-  ])("routes HTTP through an explicit proxy %j", (options) => {
-    const response = request("GET", SERVER_URL, options);
-    expect(response.statusCode).toBe(200);
-    expect(response.headers["x-proxy-auth"]).toBe(
-      options.proxy.includes("@") || options.proxyAuth
-        ? "Basic dXNlcjpwQHNz"
-        : "null",
-    );
-  });
+    [{ proxy: PROXY_URL }, "null"],
+    [
+      { proxy: PROXY_URL.replace("://", "://user:p%40ss@") },
+      "Basic dXNlcjpwQHNz",
+    ],
+    [
+      {
+        proxy: PROXY_URL,
+        proxyAuth: { username: "user", password: "secret" },
+      },
+      "Basic dXNlcjpzZWNyZXQ=",
+    ],
+  ])(
+    "routes HTTP through an explicit proxy %j",
+    (options, expectedProxyAuth) => {
+      const response = request("GET", SERVER_URL, options);
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["x-proxy-auth"]).toBe(expectedProxyAuth);
+    },
+  );
 
   test("tunnels HTTPS without passing proxy credentials to the origin", () => {
     const response = request("GET", TLS_URL, {
