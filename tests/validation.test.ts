@@ -59,6 +59,9 @@ describe("schema-derived types", () => {
     expectTypeOf<Options>().toEqualTypeOf<
       v.InferOutput<typeof optionsSchema>
     >();
+    expectTypeOf<Options["agent"]>().toEqualTypeOf<
+      boolean | Agent | undefined
+    >();
     expectTypeOf<NativeRequestOptions>().toEqualTypeOf<
       v.InferOutput<typeof nativeRequestOptionsSchema>
     >();
@@ -132,7 +135,7 @@ describe("runtime validation", () => {
     expect(v.safeParse(optionsSchema, { cache: "memory" }).success).toBe(true);
     expect(v.safeParse(optionsSchema, { cache: "custom" }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { agent: false }).success).toBe(true);
-    expect(v.safeParse(optionsSchema, { agent: true }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { agent: true }).success).toBe(true);
     expect(v.safeParse(optionsSchema, { agent: {} }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { retry: () => true }).success).toBe(
       true,

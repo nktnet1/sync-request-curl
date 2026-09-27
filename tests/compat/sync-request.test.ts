@@ -30,6 +30,14 @@ describe("sync-request Node.js compatibility", () => {
     expect(response.getJSON<EchoResponse>().method).toBe("GET");
   });
 
+  test("accepts sync-request's boolean agent option", () => {
+    const response = request("GET", `${SERVER_URL}/compat/echo`, {
+      agent: true,
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+
   test("matches then-request qs parsing, merging, and encoding", () => {
     const response = request(
       "GET",

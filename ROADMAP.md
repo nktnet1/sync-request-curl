@@ -36,8 +36,11 @@ layer.
       compatible defaults and retry conditions.
 - [x] Add `socketTimeout` as an inactivity timeout. Keep it distinct from the
       existing overall `timeout` deadline.
-- [x] Resolve `agent` compatibility with real cross-request connection reuse;
-      do not map it to TCP keepalive and call that equivalent.
+- [x] Preserve `sync-request`'s `agent?: boolean` API while retaining additive
+      `then-request`-style `Agent` instance support. Boolean `true` remains
+      accepted for drop-in source/runtime compatibility, `false` keeps one-shot
+      behaviour, and keep-alive Agent instances identify real cross-request
+      native connection pools rather than being mapped to TCP keepalive.
 - [x] Implement `cache: "file"` with correct HTTP cache semantics rather than
       a response-body-only disk cache.
 - [x] Add `Blob` multipart values where they can be supported synchronously
@@ -262,6 +265,17 @@ bug. Upstream destructures `url.split("?")` and reconstructs only the first
 fragment component, which can truncate additional literal `?` or `#`
 delimiters. `sync-request-curl` splits only on the first query and fragment
 boundaries, then preserves the complete remaining query value/fragment.
+
+Agent compatibility follows the actual synchronous public surface rather than
+narrowing it to current Node's runtime validation. `sync-request` declares
+`agent?: boolean`, so both boolean values remain accepted here; `true` maps to
+the default transport behaviour and `false` requests one-shot behaviour.
+Passing a real Node `Agent` remains an additive `then-request` compatibility
+feature: ordinary keep-alive Agents supply native pool identity and connection
+limit hints. Arbitrary custom socket hooks such as `createConnection` cannot be
+executed by libcurl, but that does not justify removing or narrowing the
+`sync-request` boolean API. No wrapper library can bridge a live Node Agent's
+socket lifecycle into libcurl more faithfully than this manual mapping.
 
 ## TypeDoc
 
@@ -536,6 +550,11 @@ should be treated as the current baseline in future sessions:
   intentional fix for `then-request`'s delimiter-splitting bug: additional
   literal `?` bytes remain part of the existing query value and the complete
   fragment, including additional `#` delimiters, is preserved.
+- `v1.0.56-agent-api-compatibility.patch` restores the full boolean Agent
+  surface declared by `sync-request` while keeping the additive Node `Agent`
+  instance support. `agent: true` is accepted as the default transport form
+  instead of being rejected by validation; `false` remains one-shot, and
+  keep-alive Agent objects continue to identify dedicated native pools.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are

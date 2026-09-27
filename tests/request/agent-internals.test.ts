@@ -24,6 +24,7 @@ describe("agent connection pools", () => {
   test("does not allocate a pool without a keep-alive agent", () => {
     expect(getAgentPoolId()).toBeUndefined();
     expect(getAgentPoolId(false)).toBeUndefined();
+    expect(getAgentPoolId(true)).toBeUndefined();
     expect(getAgentPoolId(new Agent())).toBeUndefined();
     expect(
       getAgentPoolId(new Agent({ keepAlive: true, maxFreeSockets: -1 })),

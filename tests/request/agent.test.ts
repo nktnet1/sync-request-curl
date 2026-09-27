@@ -3,12 +3,20 @@ import { describe, expect, test } from "vitest";
 import request from "#/index";
 import { SERVER_URL } from "#tests/app/config";
 
-const getConnectionId = (agent?: Agent | false): number =>
+const getConnectionId = (agent?: Agent | boolean): number =>
   request("GET", `${SERVER_URL}/connection/id`, { agent }).getJSON<{
     connectionId: number;
   }>().connectionId;
 
 describe("agent", () => {
+  test("accepts sync-request's boolean true agent option", () => {
+    const response = request("GET", `${SERVER_URL}/connection/id`, {
+      agent: true,
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+
   test("does not reuse connections when agent is omitted or false", () => {
     const firstWithoutAgent = getConnectionId();
     const secondWithoutAgent = getConnectionId();

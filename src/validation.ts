@@ -74,7 +74,7 @@ const optionsObjectSchema = v.object({
   allowRedirectHeaders: v.optional(v.array(v.string())),
   gzip: v.optional(v.boolean()),
   cache: v.optional(v.picklist(["file", "memory"])),
-  agent: v.optional(v.union([v.literal(false), v.instance(Agent)])),
+  agent: v.optional(v.union([v.boolean(), v.instance(Agent)])),
   retry: v.optional(v.union([v.boolean(), retryFunctionSchema])),
   retryDelay: v.optional(
     v.union([
