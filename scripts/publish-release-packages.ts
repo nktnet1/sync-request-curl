@@ -1,4 +1,4 @@
-import { readdirSync, statSync } from "node:fs";
+import { lstatSync, readdirSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { supportedPlatformKeys } from "#/native/platform-key-core";
@@ -6,7 +6,6 @@ import { run } from "#scripts/process";
 
 const { values } = parseArgs({
   options: {
-    directory: { type: "string", default: "release-packages" },
     registry: { type: "string" },
   },
 });
@@ -18,11 +17,11 @@ if (!registry) {
   );
 }
 
-const directory = resolve(values.directory);
+const directory = resolve(import.meta.dirname, "..", "release-packages");
 const tarballs = readdirSync(directory)
   .filter((entry) => entry.endsWith(".tgz"))
   .map((entry) => join(directory, entry))
-  .filter((path) => statSync(path).isFile());
+  .filter((path) => lstatSync(path).isFile());
 
 const nativeTarballs = tarballs
   .filter((path) => basename(path).startsWith("nktnet-sync-request-curl-"))

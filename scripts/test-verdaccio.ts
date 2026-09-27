@@ -79,23 +79,27 @@ let verdaccioLogFd: number | undefined;
 let smokeServerProcess: ChildProcess | undefined;
 let smokeServerOutput = "";
 
+const accent = (value: string): string => styleText("cyan", value);
+
 const stage = (message: string): void => {
-  console.log(styleText(["bold", "cyan"], `\n==> ${message}`));
+  console.log(
+    `\n${styleText(["bold", "cyan"], "==>")} ${styleText("bold", message)}`,
+  );
 };
 
 const success = (message: string): void => {
-  console.log(styleText(["bold", "green"], `    OK ${message}`));
+  console.log(`    ${styleText(["bold", "green"], "OK")} ${message}`);
 };
 
 const detail = (message: string): void => {
-  console.log(styleText("gray", `       ${message}`));
+  console.log(`       ${styleText("gray", "·")} ${message}`);
 };
 
 const writeJson = (path: string, value: unknown): void => {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 };
 
-const reservePort = async (): Promise<number> =>
+const reservePort = (): Promise<number> =>
   new Promise((resolvePort, reject) => {
     const server = createServer();
     server.once("error", reject);
@@ -490,11 +494,11 @@ const verifyCleanInstall = async (
   if (!existsSync(installedBinary) || statSync(installedBinary).size === 0) {
     throw new Error(`Missing installed native binary: ${installedBinary}`);
   }
-  success(`Installed ${nativePackageName} with its native binary`);
+  success(`Installed ${accent(nativePackageName)} with its native binary`);
 
   stage("Starting a local HTTP server for real request smoke tests");
   const serverUrl = await startSmokeServer();
-  detail(serverUrl);
+  detail(accent(serverUrl));
   success("Local HTTP server is ready");
 
   stage("Sending a CommonJS request through the freshly installed package");
@@ -502,10 +506,10 @@ const verifyCleanInstall = async (
     `const request = require(${JSON.stringify(packageJson.name)});`,
     'if (typeof request !== "function") throw new TypeError("Expected CommonJS export to be a function");',
     `const response = request("GET", ${JSON.stringify(`${serverUrl}/smoke`)}, { headers: { "x-smoke-client": "commonjs" } });`,
-    `if (response.statusCode !== 200) throw new Error(\`Expected status 200, received \${response.statusCode}\`);`,
+    'if (response.statusCode !== 200) throw new Error("Expected status 200, received " + response.statusCode);',
     'if (response.headers["x-smoke-test"] !== "ok") throw new Error("Missing x-smoke-test response header");',
     'const body = JSON.parse(response.getBody("utf8"));',
-    `if (body.ok !== true || body.method !== "GET" || body.client !== "commonjs") throw new Error(\`Unexpected response body: \${JSON.stringify(body)}\`);`,
+    'if (body.ok !== true || body.method !== "GET" || body.client !== "commonjs") throw new Error("Unexpected response body: " + JSON.stringify(body));',
   ].join("\n");
   run("node", ["-e", commonJsSmoke], { cwd: consumerRoot, env: npmEnv });
   success("CommonJS request returned the expected status, header, and body");
@@ -515,10 +519,10 @@ const verifyCleanInstall = async (
     `import request from ${JSON.stringify(packageJson.name)};`,
     'if (typeof request !== "function") throw new TypeError("Expected ESM export to be a function");',
     `const response = request("GET", ${JSON.stringify(`${serverUrl}/smoke`)}, { headers: { "x-smoke-client": "esm" } });`,
-    `if (response.statusCode !== 200) throw new Error(\`Expected status 200, received \${response.statusCode}\`);`,
+    'if (response.statusCode !== 200) throw new Error("Expected status 200, received " + response.statusCode);',
     'if (response.headers["x-smoke-test"] !== "ok") throw new Error("Missing x-smoke-test response header");',
     'const body = JSON.parse(response.getBody("utf8"));',
-    `if (body.ok !== true || body.method !== "GET" || body.client !== "esm") throw new Error(\`Unexpected response body: \${JSON.stringify(body)}\`);`,
+    'if (body.ok !== true || body.method !== "GET" || body.client !== "esm") throw new Error("Unexpected response body: " + JSON.stringify(body));',
   ].join("\n");
   run("node", ["--input-type=module", "-e", esmSmoke], {
     cwd: consumerRoot,
@@ -572,17 +576,21 @@ const main = async (): Promise<void> => {
   const registry = `http://127.0.0.1:${port}`;
   createVerdaccioConfig();
 
-  stage(`Building ${packageJson.name}@${packageJson.version} for ${platform}`);
+  stage(
+    `Building ${accent(`${packageJson.name}@${packageJson.version}`)} for ${accent(platform)}`,
+  );
   run(pnpmCommand, ["build"], { cwd: root });
   run(pnpmCommand, ["build:native"], { cwd: root });
   success("JavaScript and current-platform native builds completed");
 
   stage("Staging the main package and current-platform optional dependency");
   stagePackages();
-  success(`${nativePackageName}@${packageJson.version} staged`);
+  success(`${accent(`${nativePackageName}@${packageJson.version}`)} staged`);
 
-  stage(`Starting disposable Verdaccio ${values["verdaccio-version"]}`);
-  detail(registry);
+  stage(
+    `Starting disposable Verdaccio ${accent(values["verdaccio-version"] ?? VERDACCIO_VERSION)}`,
+  );
+  detail(accent(registry));
   startVerdaccio(registry);
   await waitForVerdaccio(registry);
   success("Verdaccio is ready");
@@ -599,11 +607,11 @@ const main = async (): Promise<void> => {
   stage("Packing release tarballs");
   const nativeTarball = packPackage(nativePackageRoot, npmEnv);
   const mainTarball = packPackage(mainPackageRoot, npmEnv);
-  detail(basename(nativeTarball));
-  detail(basename(mainTarball));
+  detail(accent(basename(nativeTarball)));
+  detail(accent(basename(mainTarball)));
   success("Release tarballs created");
 
-  stage(`Publishing ${nativePackageName} before the main package`);
+  stage(`Publishing ${accent(nativePackageName)} before the main package`);
   run(
     npmCommand,
     [
@@ -617,27 +625,26 @@ const main = async (): Promise<void> => {
     ],
     { cwd: root, env: npmEnv },
   );
-  success(`${nativePackageName}@${packageJson.version} published`);
+  success(`${accent(`${nativePackageName}@${packageJson.version}`)} published`);
 
-  stage(`Publishing ${packageJson.name}@${packageJson.version}`);
+  stage(`Publishing ${accent(`${packageJson.name}@${packageJson.version}`)}`);
   run(
     npmCommand,
     ["publish", mainTarball, "--registry", registry, "--ignore-scripts"],
     { cwd: root, env: npmEnv },
   );
-  success(`${packageJson.name}@${packageJson.version} published`);
+  success(`${accent(`${packageJson.name}@${packageJson.version}`)} published`);
 
   stage("Verifying published optional-dependency metadata");
   verifyPublishedMetadata(registry, npmEnv);
-  success(`Main package points to ${nativePackageName}@${packageJson.version}`);
+  success(
+    `Main package points to ${accent(`${nativePackageName}@${packageJson.version}`)}`,
+  );
 
   await verifyCleanInstall(registry, npmEnv);
 
   console.log(
-    styleText(
-      ["bold", "green"],
-      `\nPASS Verdaccio publish + request smoke test (${platform})`,
-    ),
+    `\n${styleText(["bold", "green"], "PASS")} ${styleText("bold", "Verdaccio publish + request smoke test")} (${accent(platform)})`,
   );
 };
 
@@ -656,10 +663,7 @@ try {
   await stopVerdaccio();
   if (values.keep) {
     console.log(
-      styleText(
-        "yellow",
-        `Kept Verdaccio smoke-test files at ${temporaryRoot}`,
-      ),
+      `${styleText(["bold", "yellow"], "KEPT")} Verdaccio smoke-test files at ${temporaryRoot}`,
     );
   } else {
     rmSync(temporaryRoot, { recursive: true, force: true });
