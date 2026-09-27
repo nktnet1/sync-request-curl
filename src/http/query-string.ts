@@ -19,7 +19,7 @@ const isProtectedKey = (key: string): boolean =>
   key === "__proto__" || objectPrototypeKeys.has(key);
 
 const decodeQueryComponent = (value: string): string => {
-  const normalized = value.replace(/\+/g, " ");
+  const normalized = value.replaceAll("+", " ");
   try {
     return decodeURIComponent(normalized);
   } catch {
@@ -33,20 +33,20 @@ const UNRESERVED =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
 
 const isUnreservedByte = (byte: number): boolean =>
-  UNRESERVED.includes(String.fromCharCode(byte));
+  UNRESERVED.includes(String.fromCodePoint(byte));
 
 const encodeQueryComponent = (value: string): string => {
   let encoded = "";
   for (const byte of textEncoder.encode(value)) {
     encoded += isUnreservedByte(byte)
-      ? String.fromCharCode(byte)
+      ? String.fromCodePoint(byte)
       : `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
   }
   return encoded;
 };
 
 const isArrayIndex = (key: string): boolean =>
-  /^[0-9]+$/.test(key) && Number(key) <= QUERY_ARRAY_INDEX_LIMIT;
+  /^\d+$/.test(key) && Number(key) <= QUERY_ARRAY_INDEX_LIMIT;
 
 const parseKeyPath = (key: string): string[] => {
   const firstBracket = key.indexOf("[");
@@ -233,12 +233,21 @@ const primitiveToString = (value: unknown): string | undefined => {
     return value.toISOString();
   }
   if (Buffer.isBuffer(value)) {
-    return value.toString();
+    return value.toString("utf8");
   }
-  if (typeof value === "object") {
-    return undefined;
+
+  switch (typeof value) {
+    case "string":
+      return value;
+    case "number":
+    case "bigint":
+    case "boolean":
+    case "symbol":
+    case "function":
+      return String(value);
+    default:
+      return undefined;
   }
-  return String(value);
 };
 
 const appendStringifiedValue = (
