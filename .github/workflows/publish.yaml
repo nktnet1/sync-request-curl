@@ -1,0 +1,98 @@
+name: Publish
+
+on:
+  workflow_run:
+    workflows:
+      - Native prebuilds
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download release packages
+        uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: release-packages
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Download release metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: release-metadata
+          path: release-metadata
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Verify release metadata and packages
+        env:
+          BUILD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          TAG="$(cat release-metadata/tag)"
+          SHA="$(cat release-metadata/sha)"
+
+          case "$TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "Invalid release tag: $TAG" >&2; exit 1 ;;
+          esac
+
+          test "$SHA" = "$BUILD_SHA"
+          EXPECTED_VERSION="${TAG#v}"
+          PACKAGE_COUNT=0
+
+          for package_tgz in release-packages/*.tgz; do
+            PACKAGE_COUNT=$((PACKAGE_COUNT + 1))
+            PACKAGE_VERSION="$(tar -xOf "$package_tgz" package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")"
+            test "$PACKAGE_VERSION" = "$EXPECTED_VERSION"
+          done
+
+          test "$PACKAGE_COUNT" -eq 9
+
+      - name: Publish native packages with trusted publishing
+        run: |
+          for package_tgz in release-packages/nktnet-sync-request-curl-*.tgz; do
+            PACKAGE_NAME="$(tar -xOf "$package_tgz" package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).name")"
+            PACKAGE_VERSION="$(tar -xOf "$package_tgz" package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")"
+
+            if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1; then
+              echo "$PACKAGE_NAME@$PACKAGE_VERSION already published; skipping"
+            else
+              npm publish "$package_tgz" --access public --ignore-scripts
+            fi
+          done
+
+      - name: Publish main package with trusted publishing
+        run: |
+          PACKAGE_TGZ="$(find release-packages -maxdepth 1 -name 'sync-request-curl-*.tgz' -type f -print -quit)"
+          test -n "$PACKAGE_TGZ"
+
+          PACKAGE_NAME="$(tar -xOf "$PACKAGE_TGZ" package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).name")"
+          PACKAGE_VERSION="$(tar -xOf "$PACKAGE_TGZ" package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")"
+
+          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1; then
+            echo "$PACKAGE_NAME@$PACKAGE_VERSION already published; skipping"
+          else
+            npm publish "$PACKAGE_TGZ" --ignore-scripts
+          fi

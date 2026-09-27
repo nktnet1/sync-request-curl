@@ -1,0 +1,207 @@
+name: Native prebuilds
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux-x64-gnu
+            libc: gnu
+          - runner: ubuntu-24.04
+            platform: linux-x64-musl
+            libc: musl
+          - runner: ubuntu-24.04-arm
+            platform: linux-arm64-gnu
+            libc: gnu
+          - runner: ubuntu-24.04-arm
+            platform: linux-arm64-musl
+            libc: musl
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+
+      - name: Restore cached native addon
+        id: native-cache
+        uses: actions/cache@v4
+        with:
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          key: native-prebuild-v1-${{ matrix.platform }}-${{ hashFiles('native/**', 'rust-toolchain.toml', 'scripts/*.ts') }}
+
+      - name: Build Linux prebuild
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        run: node scripts/linux-prebuild.ts --libc=${{ matrix.libc }} --mode=build
+
+      - name: Upload native addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-${{ matrix.platform }}
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          if-no-files-found: error
+
+  build-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            platform: darwin-x64
+          - runner: macos-15
+            platform: darwin-arm64
+          - runner: windows-2025
+            platform: win32-x64-msvc
+          - runner: windows-11-arm
+            platform: win32-arm64-msvc
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+
+      - name: Restore cached native addon
+        id: native-cache
+        uses: actions/cache@v4
+        with:
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          key: native-prebuild-v1-${{ matrix.platform }}-${{ hashFiles('native/**', 'rust-toolchain.toml', 'scripts/*.ts') }}
+
+      - name: Set up Rust
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        run: rustup toolchain install 1.88.0 --profile minimal --no-self-update
+
+      - name: Build native addon
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        run: node scripts/build-native.ts
+
+      - name: Stage native addon
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        run: node scripts/stage-native.ts --platform=${{ matrix.platform }}
+
+      - name: Verify native addon loads
+        run: node scripts/verify-native-load.ts --file=prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+
+      - name: Upload native addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-${{ matrix.platform }}
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          if-no-files-found: error
+
+  collect:
+    needs:
+      - build-linux
+      - build-desktop
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Download native addons
+        uses: actions/download-artifact@v4
+        with:
+          pattern: prebuild-*
+          path: prebuilds
+          merge-multiple: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+
+      - name: Verify release matrix
+        run: node scripts/verify-prebuilds.ts
+
+      - name: Upload release prebuilds
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-prebuilds
+          path: prebuilds/*.node
+          if-no-files-found: error
+
+      - name: Write release metadata
+        run: |
+          mkdir -p release-metadata
+          printf '%s\n' "$GITHUB_REF_NAME" > release-metadata/tag
+          printf '%s\n' "$GITHUB_SHA" > release-metadata/sha
+
+      - name: Upload release metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-metadata
+          path: release-metadata
+          if-no-files-found: error
+
+  package:
+    needs: collect
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Enable pnpm via corepack
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download release prebuilds
+        uses: actions/download-artifact@v4
+        with:
+          name: native-prebuilds
+          path: prebuilds
+
+      - name: Verify release matrix
+        run: node scripts/verify-prebuilds.ts
+
+      - name: Build JavaScript package
+        run: pnpm build
+
+      - name: Prepare release packages
+        run: pnpm prepare:release-packages
+
+      - name: Pack release packages
+        run: |
+          mkdir -p release-tarballs
+          for package_dir in .release/native/*; do
+            npm pack "$package_dir" --pack-destination release-tarballs --ignore-scripts
+          done
+          npm pack .release/main --pack-destination release-tarballs --ignore-scripts
+          test "$(find release-tarballs -maxdepth 1 -name '*.tgz' -type f | wc -l)" -eq 9
+
+      - name: Upload release packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-packages
+          path: release-tarballs/*.tgz
+          if-no-files-found: error

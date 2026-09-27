@@ -1,26 +1,28 @@
 import {
+  getLinuxLibcFromReport,
   type LinuxLibc,
   type NativePlatformKey,
   resolveNativePlatformKey,
-} from "#native-platform-key";
+} from "#/native/platform-key-core";
 
-export type { LinuxLibc, NativePlatformKey } from "#native-platform-key";
+export type {
+  LinuxLibc,
+  NativePlatformKey,
+} from "#/native/platform-key-core";
 export {
   isNativePlatformKey,
   supportedPlatformKeys,
-} from "#native-platform-key";
+} from "#/native/platform-key-core";
 
-export const getLinuxLibc = (): LinuxLibc => {
-  const report = process.report?.getReport() as
-    | { header?: { glibcVersionRuntime?: string } }
-    | undefined;
-  return report?.header?.glibcVersionRuntime ? "gnu" : "musl";
-};
+export const getLinuxLibc = (): LinuxLibc =>
+  getLinuxLibcFromReport(process.report?.getReport());
 
 export const getCurrentPlatformKey = (): NativePlatformKey => {
   const { platform, arch } = process;
   const platformKey = resolveNativePlatformKey(platform, arch, getLinuxLibc());
-  if (platformKey) return platformKey;
+  if (platformKey) {
+    return platformKey;
+  }
 
   throw new Error(`Unsupported native platform: ${platform}-${arch}`);
 };

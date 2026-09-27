@@ -1,104 +1,102 @@
-import type { IncomingHttpHeaders } from "http";
+import type * as v from "valibot";
 
-export interface CurlOption {
-  readonly HTTPHEADER: 1;
-  readonly PROXY: 2;
-  readonly PROXYUSERPWD: 3;
-  readonly USERAGENT: 4;
-  readonly REFERER: 5;
-  readonly CAINFO: 6;
-  readonly INTERFACE: 7;
-  readonly TCP_KEEPALIVE: 9;
-}
+export { FormData } from "#/form-data";
 
-export type CurlOptionValue = CurlOption[keyof CurlOption];
-export type CurlOptionInput = string | string[] | number | boolean;
+import type {
+  bufferEncodingSchema,
+  httpVerbInputSchema,
+  jsonLikeSchema,
+  optionsSchema,
+  responseDataSchema,
+  uppercaseHttpVerbSchema,
+} from "#/validation";
 
-export interface Easy {
-  readonly isOpen: boolean;
-  setOpt(option: CurlOptionValue, value: CurlOptionInput): void;
-  close(): void;
-}
+export type { FormDataEntry } from "#/form-data";
+export type {
+  ProxyAuth,
+  RetryDelayFunction,
+  RetryFunction,
+  RetryResponse,
+} from "#/validation";
 
-// biome-ignore lint/suspicious/noExplicitAny: to match sync-request input type
-export type CustomJsonType = any;
+/**
+ * Values accepted for JSON request bodies.
+ *
+ * This intentionally follows practical `JSON.stringify()` inputs rather than
+ * only strict JSON syntax. `undefined` is allowed inside objects and arrays,
+ * and objects with `toJSON()` (for example `Date`) are supported.
+ *
+ * @group Request
+ */
+export type JsonLike = v.InferOutput<typeof jsonLikeSchema>;
 
-export type HttpVerb =
-  | "GET"
-  | "HEAD"
-  | "POST"
-  | "PUT"
-  | "DELETE"
-  | "CONNECT"
-  | "OPTIONS"
-  | "TRACE"
-  | "PATCH";
+/** @internal */
+export type UppercaseHttpVerb = v.InferOutput<typeof uppercaseHttpVerbSchema>;
 
-export type BufferEncoding =
-  | "ascii"
-  | "utf8"
-  | "utf-8"
-  | "utf16le"
-  | "ucs2"
-  | "ucs-2"
-  | "base64"
-  | "base64url"
-  | "latin1"
-  | "binary"
-  | "hex";
+/**
+ * Any valid HTTP method token. Input is case-insensitive and is normalised to
+ * uppercase before transport.
+ *
+ * @group Request
+ */
+export type HttpVerb = v.InferOutput<typeof httpVerbInputSchema>;
 
-export type HttpPostField =
-  | {
-      name: string;
-      contents: string;
-    }
-  | {
-      name: string;
-      file: string;
-      type?: string;
-      filename?: string;
-    };
+/**
+ * Buffer encodings accepted by response body helpers.
+ *
+ * @group Response
+ */
+export type BufferEncoding = v.InferOutput<typeof bufferEncodingSchema>;
 
-export type SetEasyOptionCallback = (
-  curl: Easy,
-  curlOption: CurlOption,
-) => void;
+// Keep the public shape schema-derived. The TypeDoc integration restores the
+// request parameter to this named reflection after typedoc-plugin-valibot runs.
+/**
+ * Options accepted by `request`.
+ *
+ * Payload precedence is `form`, then `json`, then `body` when more than one is
+ * supplied.
+ *
+ * @group Request
+ */
+export type Options = v.InferOutput<typeof optionsSchema>;
 
-export interface Options {
-  headers?: IncomingHttpHeaders;
-  qs?: { [key: string]: CustomJsonType };
-
-  // You should only specify one of these.
-  // They are processed in the order listed below.
-  //
-  // When no json, body or formdata is provided, Content-Length = 0
-  // will be set in the headers.
-  json?: CustomJsonType;
-  body?: string | Buffer;
-  formData?: HttpPostField[];
-
-  timeout?: number;
-  followRedirects?: boolean;
-  maxRedirects?: number;
-
-  insecure?: boolean;
-  debug?: boolean;
-  setEasyOptions?: SetEasyOptionCallback;
-}
-
-// Infer type `string` if encoding is specified, otherwise `Buffer`.
+/**
+ * Read the current response body.
+ *
+ * Calling without an encoding returns the `Buffer`. Passing an encoding returns
+ * a string. A response with `statusCode >= 300` throws `ResponseError`.
+ *
+ * @group Response
+ */
 export type GetBody = {
   <Encoding extends BufferEncoding>(encoding: Encoding): string;
-  (encoding?: undefined): Buffer;
+  (): Buffer;
 };
 
-export type GetJSON = <T = CustomJsonType>(encoding?: BufferEncoding) => T;
+/**
+ * Parse the current response body as JSON.
+ *
+ * Unlike `GetBody`, this helper does not reject HTTP error status codes;
+ * it only throws if the body cannot be parsed as JSON.
+ *
+ * @group Response
+ */
+export type GetJSON = <T = unknown>(encoding?: BufferEncoding) => T;
 
-export interface Response {
-  statusCode: number;
-  headers: IncomingHttpHeaders;
-  url: string;
-  body: string | Buffer;
+type ResponseData = v.InferOutput<typeof responseDataSchema>;
+
+/**
+ * Buffered synchronous response returned by `request`.
+ *
+ * Helper methods observe later mutations to the public response object rather
+ * than a hidden immutable snapshot.
+ *
+ * @group Response
+ * @interface
+ */
+export type Response = ResponseData & {
+  /** Read the response body and throw `ResponseError` for HTTP status >= 300. */
   getBody: GetBody;
+  /** Parse the response body as JSON without applying HTTP status handling. */
   getJSON: GetJSON;
-}
+};

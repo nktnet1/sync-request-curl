@@ -1,10 +1,15 @@
 {
-  "include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "scripts/**/*.ts",
+    "typedoc/**/*.ts"
+  ],
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
     "declaration": true,
     "esModuleInterop": true,
-    "lib": ["es5", "es2015", "esnext", "dom"],
+    "lib": ["es2023", "dom"],
     "types": ["node"],
     "module": "esnext",
     "moduleResolution": "bundler",
@@ -13,6 +18,10 @@
     "sourceMap": true,
     "strict": true,
     "target": "es2022",
-    "erasableSyntaxOnly": true
+    "erasableSyntaxOnly": true,
+    "paths": {
+      "#/*": ["./src/*"],
+      "#tests/*": ["./tests/*"]
+    }
   }
 }

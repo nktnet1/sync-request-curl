@@ -2,21 +2,25 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { once } from "node:events";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { HOST as host, PORT as port } from "./app/config";
+import * as v from "valibot";
+import { HOST as host, PORT as port } from "#tests/app/config";
 
 const root = resolve(import.meta.dirname, "..");
 const serverUrl = `http://${host}:${port}`;
 const SERVER_READY_MESSAGE = "sync-request-curl:test-server-ready";
 const SERVER_START_TIMEOUT_MS = 5_000;
 const SERVER_STOP_TIMEOUT_MS = 5_000;
+const healthResponseSchema = v.object({ message: v.optional(v.string()) });
 
 let testServer: ChildProcess | undefined;
 
 const isServerReady = async (): Promise<boolean> => {
   try {
     const response = await fetch(serverUrl);
-    if (!response.ok) return false;
-    const body = (await response.json()) as { message?: string };
+    if (!response.ok) {
+      return false;
+    }
+    const body = v.parse(healthResponseSchema, await response.json());
     return body.message === "Hello, world!";
   } catch {
     return false;
@@ -27,8 +31,12 @@ const waitForServer = async (server: ChildProcess): Promise<void> => {
   await Promise.race([
     once(server, "message").then(([message]) => {
       if (message !== SERVER_READY_MESSAGE) {
+        const receivedMessage =
+          typeof message === "string"
+            ? message
+            : `non-string message (${typeof message})`;
         throw new Error(
-          `Unexpected test server IPC message: ${String(message)}`,
+          `Unexpected test server IPC message: ${receivedMessage}`,
         );
       }
     }),
@@ -54,19 +62,25 @@ const waitForExit = (server: ChildProcess): Promise<boolean> => {
 };
 
 const stopServer = async (server: ChildProcess): Promise<void> => {
-  if (server.exitCode !== null || server.signalCode !== null) return;
+  if (server.exitCode !== null || server.signalCode !== null) {
+    return;
+  }
   server.kill("SIGTERM");
-  if (await waitForExit(server)) return;
+  if (await waitForExit(server)) {
+    return;
+  }
 
   server.kill("SIGKILL");
   await once(server, "exit");
 };
 
 /**
- * Starts the local Hono server used by the HTTP integration tests.
+ * Starts the local servers used by the HTTP integration tests.
  */
 export async function setup(): Promise<void> {
-  if (await isServerReady()) return;
+  if (await isServerReady()) {
+    return;
+  }
 
   const server = spawn(
     process.execPath,
@@ -91,7 +105,9 @@ export async function setup(): Promise<void> {
  * Stops the local Hono server started by {@link setup}.
  */
 export async function teardown(): Promise<void> {
-  if (!testServer) return;
+  if (!testServer) {
+    return;
+  }
 
   const server = testServer;
   testServer = undefined;
