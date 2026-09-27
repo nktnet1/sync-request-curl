@@ -1,5 +1,10 @@
 {
-  "include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "scripts/**/*.ts",
+    "typedoc/**/*.ts"
+  ],
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
     "declaration": true,

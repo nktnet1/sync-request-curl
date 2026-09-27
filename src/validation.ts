@@ -26,6 +26,14 @@ export const incomingHttpHeadersSchema = v.custom<
   "Invalid HTTP headers",
 );
 
+/**
+ * Response shape passed to retry policy callbacks.
+ *
+ * `getBody()` follows the same status handling as a normal response. Retry
+ * callbacks receive this buffered response before the next attempt begins.
+ *
+ * @group Request
+ */
 export interface RetryResponse {
   statusCode: number;
   headers: v.InferOutput<typeof incomingHttpHeadersSchema>;
@@ -35,12 +43,26 @@ export interface RetryResponse {
   getBody(): Buffer;
 }
 
+/**
+ * Decide whether a GET request should be retried after an error or response.
+ *
+ * `attemptNumber` starts at 1 for the first completed attempt.
+ *
+ * @group Request
+ */
 export type RetryFunction = (
   error: Error | null,
   response: RetryResponse | undefined,
   attemptNumber: number,
 ) => boolean;
 
+/**
+ * Return the delay in milliseconds before the next retry.
+ *
+ * `attemptNumber` starts at 1 for the first completed attempt.
+ *
+ * @group Request
+ */
 export type RetryDelayFunction = (
   error: Error | null,
   response: RetryResponse | undefined,
@@ -74,7 +96,6 @@ const keepAliveSecondsSchema = v.pipe(
 );
 
 const optionsObjectSchema = v.object({
-  /** Explicit HTTP/HTTPS proxy URL. Environment proxy settings are ignored. */
   proxy: v.optional(nativeStringSchema),
   proxyAuth: v.optional(
     v.object({
@@ -88,9 +109,7 @@ const optionsObjectSchema = v.object({
       ),
     }),
   ),
-  /** Verify certificate chains and hostnames. Defaults to true. */
   rejectUnauthorized: v.optional(v.boolean()),
-  /** PEM CA bundle path for origin TLS verification. */
   caFile: v.optional(nativeStringSchema),
   localAddress: v.optional(nativeStringSchema),
   localInterface: v.optional(nativeStringSchema),
@@ -103,7 +122,6 @@ const optionsObjectSchema = v.object({
       }),
     ]),
   ),
-  /** Private application cache namespace. Defaults to the working directory. */
   cacheNamespace: v.optional(v.string()),
   headers: v.optional(incomingHttpHeadersSchema),
   qs: v.optional(v.record(v.string(), v.unknown())),

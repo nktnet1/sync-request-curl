@@ -4,7 +4,8 @@
   "imports": {
     "#/*": "./src/*.ts",
     "#scripts/*": "./scripts/*.ts",
-    "#tests/*": "./tests/*.ts"
+    "#tests/*": "./tests/*.ts",
+    "#typedoc/*": "./typedoc/*.ts"
   },
   "repository": {
     "type": "git",
@@ -36,7 +37,9 @@
     "prepare:release-packages": "node scripts/prepare-release-packages.ts",
     "publish:release-packages": "node scripts/publish-release-packages.ts",
     "smoke:release-registry": "node scripts/smoke-release-registry.ts",
-    "test:verdaccio": "node scripts/test-verdaccio.ts"
+    "test:verdaccio": "node scripts/test-verdaccio.ts",
+    "docs:gen": "tsx typedoc/generate.ts",
+    "docs:check": "tsx typedoc/generate.ts --check"
   },
   "keywords": [
     "sync",
@@ -68,7 +71,9 @@
     "lefthook": "2.1.14",
     "tsdown": "^0.23.0",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
+    "typedoc": "^0.28.20",
+    "typedoc-plugin-markdown": "^4.13.1",
+    "typescript": "^6.0.3",
     "vitest": "^5.0.1"
   },
   "packageManager": "pnpm@12.6.0",

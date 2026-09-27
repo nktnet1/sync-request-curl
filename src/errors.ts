@@ -9,6 +9,11 @@ const requestErrorCodeSchema = v.picklist([
   "ERR_REQUEST_FAILED",
 ] as const);
 
+/**
+ * Stable transport-neutral error codes emitted by the TypeScript request layer.
+ *
+ * @group Errors
+ */
 export type RequestErrorCode = v.InferOutput<typeof requestErrorCodeSchema>;
 
 const curlErrorCodeSchema = v.pipe(
@@ -18,6 +23,14 @@ const curlErrorCodeSchema = v.pipe(
   v.maxValue(101),
 );
 
+/**
+ * Raw libcurl transport failure.
+ *
+ * The numeric `code` is retained for compatibility with earlier
+ * `sync-request-curl` releases and maps to libcurl's documented error codes.
+ *
+ * @group Errors
+ */
 export class CurlError extends Error {
   // https://curl.se/libcurl/c/libcurl-errors.html
   code: number;
@@ -38,6 +51,11 @@ export class CurlError extends Error {
   }
 }
 
+/**
+ * Transport-neutral request failure created by the TypeScript request layer.
+ *
+ * @group Errors
+ */
 export class RequestError extends Error {
   readonly code: RequestErrorCode;
 
@@ -59,6 +77,14 @@ export class RequestError extends Error {
   }
 }
 
+/**
+ * HTTP status error thrown by `response.getBody()` for status codes >= 300.
+ *
+ * The status, headers, and body that produced the error remain available on
+ * the error object.
+ *
+ * @group Errors
+ */
 export class ResponseError extends Error {
   readonly statusCode: number;
   readonly headers: Response["headers"];
@@ -80,6 +106,7 @@ export class ResponseError extends Error {
   }
 }
 
+/** @internal */
 export const throwForTransportError = (code: number, message: string): void => {
   if (code === 0) {
     return;

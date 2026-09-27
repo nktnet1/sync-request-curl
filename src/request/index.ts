@@ -88,6 +88,16 @@ const normalizeLegacyOptions = (options: unknown): unknown => {
   );
 };
 
+/**
+ * Perform a synchronous HTTP(S) request and return the complete buffered
+ * response.
+ *
+ * @param method Valid HTTP method token. Matching is case-insensitive.
+ * @param url Absolute `http:` or `https:` URL, provided as a string or `URL`.
+ * @param options Request, transport, redirect, retry, and cache options.
+ * @returns The buffered response after redirects and retries complete.
+ * @group Request
+ */
 const request = (
   method: HttpVerb,
   url: string | URL,

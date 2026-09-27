@@ -19,6 +19,15 @@ export const formDataEntrySchema = v.object({
   fileName: v.optional(metadataSchema),
 });
 
+/**
+ * One multipart entry accepted by `FormData`.
+ *
+ * `key` is the multipart field name. `value` may be text, a `Buffer`, or a
+ * `Blob`. `fileName` is optional; path components are stripped before the
+ * multipart request is sent.
+ *
+ * @group Multipart
+ */
 export type FormDataEntry = v.InferOutput<typeof formDataEntrySchema>;
 
 export const preparedFormDataEntrySchema = v.object({
@@ -118,13 +127,24 @@ const getEntries = (form: FormData): PreparedFormDataEntry[] => {
 };
 
 /**
- * A synchronous multipart/form-data builder compatible with sync-request.
+ * Synchronous multipart/form-data builder compatible with `sync-request`.
+ *
+ * Pass an instance through the request `form` option.
+ *
+ * @group Multipart
  */
 export class FormData {
   constructor() {
     entries.set(this, []);
   }
 
+  /**
+   * Append a text, `Buffer`, or `Blob` field.
+   *
+   * When `fileName` is supplied, its basename is used and the media type is
+   * inferred from the extension with an `application/octet-stream` fallback.
+   * Blob media types remain authoritative.
+   */
   append(key: string, value: string | Buffer | Blob, fileName?: string): void {
     const entry = v.parse(formDataEntrySchema, { key, value, fileName });
     getEntries(this).push(prepareFormDataEntry(entry));

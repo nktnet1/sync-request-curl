@@ -499,32 +499,36 @@ Incremental patch: `v1.0.62-proxy-empty-credentials.patch`, based on v1.0.61.
 
 ## TypeDoc
 
-Keep `README.md` at the pre-v5 develop version until the public API and
-documentation generation are ready to be updated together. Track interim
-documentation decisions here instead of rewriting the README piecemeal.
+The ported TypeDoc setup now owns the complete generated `README.md`.
+Hand-written documentation lives under `typedoc/assets/`, while public API
+content comes from the exported source declarations and their JSDoc.
+`typedoc/generate.ts` renders the API to a temporary directory, combines it with
+the ordered assets, and writes the README from scratch; `README.md` is never
+used as a documentation source or template.
 
-Adopt the documentation-generation approach from `date-fns-holidays` while
-using this repository's own paths and metadata.
-
-- [ ] Add TypeDoc, `typedoc-plugin-markdown`, and `typedoc-plugin-remark`.
-- [ ] Add the Remark plugins used for GitHub links, generated headings, and
-      the table of contents.
-- [ ] Add `typedoc.json` and an `assets/BASE.md` documentation base.
-- [ ] Generate Markdown API documentation from `src/index.ts` and merge it into
-      the published README workflow.
-- [ ] Add JSDoc for public request options, response APIs, multipart APIs, and
+- [x] Use TypeDoc and `typedoc-plugin-markdown` with the repository-local
+      plugins under `typedoc/plugins`.
+- [x] Generate Markdown API documentation from a documentation-only public
+      entrypoint and assemble it into the published README.
+- [x] Add `pnpm docs:gen` generation and `pnpm docs:check` stale-output checking.
+- [x] Add JSDoc for public request options, response APIs, multipart APIs, and
       errors, including defaults and compatibility notes.
-- [ ] Document nested `qs` bracket serialization and unsupported query-value
-      behaviour with the rest of the generated request-option documentation.
-- [ ] Group generated API docs by request, response, multipart, and errors.
-- [ ] Add CI verification that generated documentation is committed and not
-      stale.
+- [x] Document nested `qs` bracket serialization and query-value behaviour with
+      the generated request-option documentation.
+- [x] Group generated API docs by request, response, multipart, and errors.
+- [x] Move the non-API README content into `typedoc/assets/` and generate the
+      complete README, including roadmap-derived `sync-request` differences and
+      v4 migration guidance.
+- [x] Generate README section numbering, stable anchors, and the table of
+      contents from the ordered documentation sections so they cannot drift.
+- [ ] Add CI verification that runs `pnpm docs:check` and rejects a stale
+      generated README.
 
 ## Release readiness
 
-- [ ] Document intentional Node-only differences from upstream
+- [x] Document intentional Node-only differences from upstream
       `sync-request`; browser synchronous-XHR support is not a v5 target.
-- [ ] Add a v4-to-v5 migration section for removed node-libcurl-specific APIs.
+- [x] Add a v4-to-v5 migration section for removed node-libcurl-specific APIs.
 - [ ] Verify package exports, declaration files, prebuild staging, and clean
       installation from a packed tarball.
 - [ ] Run the full Vitest, typecheck, lint, formatting, native, and prebuild
