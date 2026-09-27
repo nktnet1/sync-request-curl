@@ -246,5 +246,5 @@ test("HEAD with a payload through an HTTPS tunnel returns origin headers", () =>
   });
   expect(response.statusCode).toBe(200);
   expect(response.headers["content-type"]).toContain("application/json");
-  expect(response.body.length).toBe(0);
+  expect(response.body).toHaveLength(0);
 });

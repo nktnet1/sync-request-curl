@@ -85,7 +85,9 @@ const blobToBufferSync = (blob: Blob): Buffer => {
   // Startup errors arrive asynchronously, while this thread waits synchronously.
   // The bounded wait reports failure; consume the later event to avoid an
   // additional uncaught exception after the caller has handled that failure.
-  worker.on("error", () => {});
+  worker.on("error", () => {
+    // The synchronous wait has already reported the worker failure.
+  });
   worker.unref();
 
   try {
@@ -106,7 +108,9 @@ const blobToBufferSync = (blob: Blob): Buffer => {
     }
     return Buffer.from(new Uint8Array(data));
   } finally {
-    void worker.terminate().catch(() => {});
+    void worker.terminate().catch(() => {
+      // Cleanup failure must not replace the synchronous read result or error.
+    });
   }
 };
 
