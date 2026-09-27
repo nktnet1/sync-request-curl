@@ -58,7 +58,7 @@ export type BufferEncoding = v.InferOutput<typeof bufferEncodingSchema>;
  *
  * @group Request
  */
-export interface Options extends v.InferOutput<typeof optionsSchema> {}
+export type Options = v.InferOutput<typeof optionsSchema>;
 
 /**
  * Read the current response body.
