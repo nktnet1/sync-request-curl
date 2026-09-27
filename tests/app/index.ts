@@ -158,8 +158,12 @@ app.all("/redirect/method/307", (c) => {
   return c.redirect("/redirect/method/destination", 307);
 });
 
-app.all("/redirect/method/destination", (c) => {
-  return c.json({ method: c.req.method });
+app.all("/redirect/method/308", (c) => {
+  return c.redirect("/redirect/method/destination", 308);
+});
+
+app.all("/redirect/method/destination", async (c) => {
+  return c.json({ method: c.req.method, body: await c.req.text() });
 });
 
 app.get("/redirect/headers/same-origin", (c) => {

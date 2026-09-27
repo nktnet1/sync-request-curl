@@ -71,6 +71,8 @@ Replace useful capabilities that were previously reachable through
       focused public-API compatibility suite.
 - [x] Cover redirect-header allow-list behaviour for same-origin and
       cross-origin redirects.
+- [x] Cover 307/308 redirect preservation of both the original method and
+      buffered request payload.
 - [x] Cover compressed responses and `gzip: false`.
 - [x] Cover retry count, delay, HTTP error retries, and transport error retries.
 - [x] Cover `socketTimeout` with streaming responses that both remain active
@@ -247,6 +249,11 @@ strict Node `http` parity target. Bundled non-macOS native builds enable
 libcurl's HTTP/2 feature; libcurl may negotiate HTTP/2 via TLS/ALPN and fall
 back to HTTP/1.1. macOS uses the system libcurl, so HTTP/2 availability follows
 the system library. Do not force HTTP/1.1 solely to mimic `http-basic`.
+
+Redirect method handling intentionally fixes an upstream `http-basic` bug: its
+redirect wrapper can turn body-bearing requests into GET even for 307/308.
+`sync-request-curl` preserves both method and payload for 307/308, while keeping
+the defined POST-to-GET behaviour for 301/302 and GET conversion for 303.
 
 ## TypeDoc
 
@@ -513,6 +520,10 @@ should be treated as the current baseline in future sessions:
   native transport enhancement and adds a build-configuration regression test:
   bundled non-macOS libcurl builds keep the `http2` feature enabled, while
   macOS continues to use the system libcurl and its available protocol support.
+- `v1.0.54-redirect-307-308-regression.patch` locks in the standards-correct
+  redirect behaviour that differs from upstream `http-basic`: 307 and 308 keep
+  both a body-bearing request's method and payload instead of converting it to
+  GET.
 
 Do not replace these behaviours with a response-body-only cache or move retry
 and redirect orchestration into the native transport; those choices are
