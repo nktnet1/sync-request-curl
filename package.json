@@ -33,7 +33,10 @@
     "build:linux:gnu": "node scripts/linux-prebuild.ts --libc=gnu --mode=build",
     "build:linux:musl": "node scripts/linux-prebuild.ts --libc=musl --mode=build",
     "test:linux:musl": "node scripts/linux-prebuild.ts --libc=musl --mode=test",
-    "prepare:release-packages": "node scripts/prepare-release-packages.ts"
+    "prepare:release-packages": "node scripts/prepare-release-packages.ts",
+    "publish:release-packages": "node scripts/publish-release-packages.ts",
+    "smoke:release-registry": "node scripts/smoke-release-registry.ts",
+    "test:verdaccio": "node scripts/test-verdaccio.ts"
   },
   "keywords": [
     "sync",
