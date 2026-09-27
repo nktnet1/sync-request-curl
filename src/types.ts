@@ -54,6 +54,7 @@ export type BufferEncoding = v.InferOutput<typeof bufferEncodingSchema>;
  * supplied.
  *
  * @group Request
+ * @interface
  */
 export type Options = v.InferOutput<typeof optionsSchema>;
 
@@ -89,6 +90,7 @@ type ResponseData = v.InferOutput<typeof responseDataSchema>;
  * than a hidden immutable snapshot.
  *
  * @group Response
+ * @interface
  */
 export type Response = ResponseData & {
   /** Read the response body and throw `ResponseError` for HTTP status >= 300. */

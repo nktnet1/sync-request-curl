@@ -251,21 +251,17 @@ uppercase before transport.
 
 #### Options
 
-```ts
-type Options = object;
-```
-
 Options accepted by `request`.
 
 Payload precedence is `form`, then `json`, then `body` when more than one is
 supplied.
 
-##### Type Declaration
+##### Properties
 
-| Name | Type | Description |
+| Property | Type | Description |
 | ------ | ------ | ------ |
 | <a id="property-proxy"></a> `proxy?` | `string` | Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. |
-| <a id="property-proxyauth"></a> `proxyAuth?` | `object` | Basic proxy credentials. Requires `proxy` and overrides credentials in its URL. |
+| <a id="property-proxyauth"></a> `proxyAuth?` | \{ `username`: `string`; `password`: `string`; \} | Basic proxy credentials. Requires `proxy` and overrides credentials in its URL. |
 | `proxyAuth.username` | `string` | Proxy username. |
 | `proxyAuth.password` | `string` | Proxy password. |
 | <a id="property-rejectunauthorized"></a> `rejectUnauthorized?` | `boolean` | Verify the origin certificate chain and hostname. Defaults to `true`. |
@@ -274,8 +270,8 @@ supplied.
 | <a id="property-localinterface"></a> `localInterface?` | `string` | Source interface name. Mutually exclusive with `localAddress`. |
 | <a id="property-tcpkeepalive"></a> `tcpKeepAlive?` | \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; \} | Enable TCP keepalive, optionally with idle and interval controls. |
 | <a id="property-cachenamespace"></a> `cacheNamespace?` | `string` | Private cache identity. Defaults to `process.cwd()`. |
-| <a id="property-headers-1"></a> `headers?` | `object` | Node-style request headers. |
-| <a id="property-qs"></a> `qs?` | `object` | Query values merged with any existing query string. |
+| <a id="property-headers-1"></a> `headers?` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Node-style request headers. |
+| <a id="property-qs"></a> `qs?` | \{ \[`key`: `string`\]: `unknown`; \} | Query values merged with any existing query string. |
 | <a id="property-json"></a> `json?` | `JsonLikeValue` | JSON-compatible request body. Adds `application/json` when needed. |
 | <a id="property-body-1"></a> `body?` | `string` \| `Buffer`\<`ArrayBufferLike`\> | Raw string or `Buffer` request body. |
 | <a id="property-form"></a> `form?` | [`FormData`](#formdata) | Synchronous multipart/form-data body. |
@@ -339,10 +335,10 @@ Read the response body as a `Buffer`.
 
 | Property | Type | Description |
 | ------ | ------ | ------ |
-| <a id="property-statuscode-1"></a> `statusCode` | `number` | HTTP response status code. |
-| <a id="property-headers-2"></a> `headers` | `object` | Node-style response headers with lowercase keys. |
-| <a id="property-url"></a> `url` | `string` | Final effective URL for the completed attempt. |
-| <a id="property-body-2"></a> `body` | `Buffer` | Buffered response body. |
+| <a id="property-statuscode-2"></a> `statusCode` | `number` | HTTP response status code. |
+| <a id="property-headers-3"></a> `headers` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Node-style response headers with lowercase keys. |
+| <a id="property-url-1"></a> `url` | `string` | Final effective URL for the completed attempt. |
+| <a id="property-body-3"></a> `body` | `Buffer` | Buffered response body. |
 
 ***
 
@@ -494,39 +490,35 @@ it only throws if the body cannot be parsed as JSON.
 
 #### Response
 
-```ts
-type Response = ResponseData & object;
-```
-
 Buffered synchronous response returned by `request`.
 
 Helper methods observe later mutations to the public response object rather
 than a hidden immutable snapshot.
 
-##### Type Declaration
+##### Properties
 
-| Name | Type | Description |
-| ------ | ------ | ------ |
-| `getBody` | [`GetBody`](#getbody) | Read the response body and throw `ResponseError` for HTTP status >= 300. |
-| `getJSON` | [`GetJSON`](#getjson) | Parse the response body as JSON without applying HTTP status handling. |
+| Property | Type | Default value | Description |
+| ------ | ------ | ------ | ------ |
+| <a id="property-getbody"></a> `getBody` | [`GetBody`](#getbody) | `undefined` | Read the response body and throw `ResponseError` for HTTP status >= 300. |
+| <a id="property-getjson"></a> `getJSON` | [`GetJSON`](#getjson) | `undefined` | Parse the response body as JSON without applying HTTP status handling. |
+| <a id="property-statuscode-1"></a> `statusCode` | `number` | `undefined` | HTTP response status code. |
+| <a id="property-headers-2"></a> `headers` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | `incomingHttpHeadersSchema` | Node-style response headers with lowercase keys. |
+| <a id="property-url"></a> `url` | `string` | `undefined` | Final effective URL after query handling and redirects. |
+| <a id="property-body-2"></a> `body` | `Buffer`\<`ArrayBufferLike`\> | `undefined` | Mutable buffered response body. |
 
 ### Multipart
 
 #### FormDataEntry
 
-```ts
-type FormDataEntry = object;
-```
-
 One multipart entry accepted by `FormData`.
 
-##### Type Declaration
+##### Properties
 
-| Name | Type | Default value | Description |
+| Property | Type | Default value | Description |
 | ------ | ------ | ------ | ------ |
 | <a id="property-key"></a> `key` | `string` | `metadataSchema` | Multipart field name. |
-| <a id="property-value"></a> `value` | `string` \| `Buffer`\<`ArrayBufferLike`\> \| `Blob` | - | Text, `Buffer`, or `Blob` field value. |
-| <a id="property-filename"></a> `fileName?` | `string` | - | Optional file name. Path components are stripped before sending. |
+| <a id="property-value"></a> `value` | `string` \| `Buffer`\<`ArrayBufferLike`\> \| `Blob` | `undefined` | Text, `Buffer`, or `Blob` field value. |
+| <a id="property-filename"></a> `fileName?` | `string` | `undefined` | Optional file name. Path components are stripped before sending. |
 
 ***
 
@@ -734,7 +726,7 @@ Error.constructor
 | Property | Modifier | Type | Description |
 | ------ | ------ | ------ | ------ |
 | <a id="property-statuscode"></a> `statusCode` | `readonly` | `number` | HTTP status code that caused the error. |
-| <a id="property-headers"></a> `headers` | `readonly` | `object` | Response headers returned by the server. |
+| <a id="property-headers"></a> `headers` | `readonly` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Response headers returned by the server. |
 | <a id="property-body"></a> `body` | `readonly` | `Buffer` | Buffered response body returned by the server. |
 
 <a id="differences-from-sync-request"></a>

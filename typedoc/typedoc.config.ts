@@ -36,7 +36,7 @@ const config = {
   classPropertiesFormat: "table",
   propertyMembersFormat: "table",
   typeAliasPropertiesFormat: "list",
-  expandObjects: false,
+  expandObjects: true,
   useCodeBlocks: true,
   categorizeByGroup: false,
   groupOrder: ["Request", "Response", "Multipart", "Errors", "*"],

@@ -26,6 +26,7 @@ export const formDataEntrySchema = v.object({
  * One multipart entry accepted by `FormData`.
  *
  * @group Multipart
+ * @interface
  */
 export type FormDataEntry = v.InferOutput<typeof formDataEntrySchema>;
 
