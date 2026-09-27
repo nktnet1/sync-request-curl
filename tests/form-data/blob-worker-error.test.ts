@@ -47,19 +47,24 @@ describe("FormData Blob worker failures", () => {
     );
   });
 
-  test("consumes a late startup error after the synchronous timeout", async () => {
-    workerState.signalFailure = false;
-    workerState.emitStartupError = true;
-    vi.spyOn(Atomics, "wait").mockReturnValue("timed-out");
+  test.each([false, true])(
+    "bounds the wait and cleans up a worker (late startup error: %s)",
+    async (emitStartupError) => {
+      workerState.signalFailure = false;
+      workerState.emitStartupError = emitStartupError;
+      const wait = vi.spyOn(Atomics, "wait").mockReturnValue("timed-out");
 
-    expect(() => new FormData().append("blob", new Blob(["contents"]))).toThrow(
-      "Timed out synchronously reading Blob data",
-    );
-    expect(workerState.terminate).toHaveBeenCalledOnce();
+      expect(() =>
+        new FormData().append("blob", new Blob(["contents"])),
+      ).toThrow("Timed out synchronously reading Blob data");
+      expect(wait.mock.calls[0]?.[3]).toBeGreaterThan(0);
+      expect(wait.mock.calls[0]?.[3]).toBeLessThanOrEqual(30_000);
+      expect(workerState.terminate).toHaveBeenCalledOnce();
 
-    // An unhandled EventEmitter error would escape when the microtask runs.
-    await new Promise<void>((resolve) => queueMicrotask(resolve));
-  });
+      // An unhandled EventEmitter error would escape when the microtask runs.
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+    },
+  );
 
   test("consumes termination rejection without masking the read failure", async () => {
     workerState.terminate.mockRejectedValueOnce(
@@ -77,14 +82,3 @@ describe("FormData Blob worker failures", () => {
 });
 
 afterEach(() => vi.restoreAllMocks());
-
-test("bounds the wait and terminates a worker that never signals", () => {
-  workerState.signalFailure = false;
-  const wait = vi.spyOn(Atomics, "wait").mockReturnValue("timed-out");
-  expect(() => new FormData().append("blob", new Blob(["contents"]))).toThrow(
-    "Timed out synchronously reading Blob data",
-  );
-  expect(wait.mock.calls[0]?.[3]).toBeGreaterThan(0);
-  expect(wait.mock.calls[0]?.[3]).toBeLessThanOrEqual(30_000);
-  expect(workerState.terminate).toHaveBeenCalledOnce();
-});

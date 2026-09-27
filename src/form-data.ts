@@ -108,7 +108,7 @@ const blobToBufferSync = (blob: Blob): Buffer => {
     }
     return Buffer.from(new Uint8Array(data));
   } finally {
-    void worker.terminate().catch(() => {
+    worker.terminate().catch(() => {
       // Cleanup failure must not replace the synchronous read result or error.
     });
   }
