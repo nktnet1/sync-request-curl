@@ -3,8 +3,20 @@ import { URL } from "node:url";
 import * as v from "valibot";
 import { FormData } from "#/form-data";
 
-type JsonPrimitive = string | number | boolean | null;
-type NestedJsonLike = JsonLike | undefined | { toJSON(): NestedJsonLike };
+/** Primitive JSON values accepted in request bodies.
+ *
+ * @group Request
+ */
+export type JsonPrimitive = string | number | boolean | null;
+
+/** Values accepted when nested inside JSON request bodies.
+ *
+ * @group Request
+ */
+export type NestedJsonLike =
+  | JsonLike
+  | undefined
+  | { toJSON(): NestedJsonLike };
 
 /**
  * Values accepted for JSON request bodies.
@@ -20,6 +32,24 @@ export type JsonLike =
   | readonly NestedJsonLike[]
   | { [key: string]: NestedJsonLike }
   | { toJSON(): JsonLike };
+
+/**
+ * Buffer encodings accepted by response body helpers.
+ *
+ * @group Response
+ */
+export type BufferEncoding =
+  | "base64"
+  | "ascii"
+  | "utf8"
+  | "utf-8"
+  | "utf16le"
+  | "ucs2"
+  | "ucs-2"
+  | "base64url"
+  | "latin1"
+  | "binary"
+  | "hex";
 
 const headerValueSchema = v.union([
   v.string(),
@@ -259,7 +289,7 @@ export const bufferEncodingSchema = v.picklist([
   "latin1",
   "binary",
   "hex",
-]);
+] as const satisfies readonly BufferEncoding[]);
 
 export const responseDataSchema = v.object({
   /** HTTP response status code. */

@@ -3,39 +3,61 @@ import type * as v from "valibot";
 export { FormData } from "#/form-data";
 
 import type {
-  bufferEncodingSchema,
-  httpVerbInputSchema,
+  BufferEncoding,
+  JsonLike,
+  JsonPrimitive,
+  NestedJsonLike,
   optionsSchema,
+  ProxyOptions,
+  RetryDelayFunction,
+  RetryFunction,
+  RetryResponse,
   responseDataSchema,
   uppercaseHttpVerbSchema,
 } from "#/validation";
 
 export type { FormDataEntry } from "#/form-data";
 export type {
+  BufferEncoding,
   JsonLike,
+  JsonPrimitive,
+  NestedJsonLike,
   ProxyOptions,
   RetryDelayFunction,
   RetryFunction,
   RetryResponse,
-} from "#/validation";
+};
 
 /** @internal */
 export type UppercaseHttpVerb = v.InferOutput<typeof uppercaseHttpVerbSchema>;
 
 /**
- * Any valid HTTP method token. Input is case-insensitive and is normalised to
+ * Supported HTTP methods. Input is case-insensitive and is normalised to
  * uppercase before transport.
  *
  * @group Request
  */
-export type HttpVerb = v.InferOutput<typeof httpVerbInputSchema>;
-
-/**
- * Buffer encodings accepted by response body helpers.
- *
- * @group Response
- */
-export type BufferEncoding = v.InferOutput<typeof bufferEncodingSchema>;
+export type HttpVerb =
+  | "GET"
+  | "get"
+  | "HEAD"
+  | "head"
+  | "POST"
+  | "post"
+  | "PUT"
+  | "put"
+  | "DELETE"
+  | "delete"
+  | "CONNECT"
+  | "connect"
+  | "OPTIONS"
+  | "options"
+  | "TRACE"
+  | "trace"
+  | "PATCH"
+  | "patch"
+  | "PROPFIND"
+  | "propfind";
 
 // Keep the public shape schema-derived. The TypeDoc integration restores the
 // request parameter to this named reflection after typedoc-plugin-valibot runs.

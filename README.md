@@ -180,7 +180,7 @@ response.
 
 | Parameter | Type | Description |
 | ------ | ------ | ------ |
-| `method` | `string` | Valid HTTP method token. Matching is case-insensitive. |
+| `method` | [`HttpVerb`](#httpverb) | Supported HTTP method. Matching is case-insensitive. |
 | `url` | `string` \| `URL` | Absolute `http:` or `https:` URL, provided as a string or `URL`. |
 | `options` | [`Options`](#options) | Request, transport, redirect, retry, and cache options. |
 
@@ -195,10 +195,30 @@ The buffered response after redirects and retries complete.
 #### HttpVerb
 
 ```ts
-type HttpVerb = string;
+type HttpVerb =
+  | "GET"
+  | "get"
+  | "HEAD"
+  | "head"
+  | "POST"
+  | "post"
+  | "PUT"
+  | "put"
+  | "DELETE"
+  | "delete"
+  | "CONNECT"
+  | "connect"
+  | "OPTIONS"
+  | "options"
+  | "TRACE"
+  | "trace"
+  | "PATCH"
+  | "patch"
+  | "PROPFIND"
+  | "propfind";
 ```
 
-Any valid HTTP method token. Input is case-insensitive and is normalised to
+Supported HTTP methods. Input is case-insensitive and is normalised to
 uppercase before transport.
 
 ***
@@ -212,7 +232,7 @@ type Options = {
   caFile?: string;
   localAddress?: string;
   localInterface?: string;
-  tcpKeepAlive?:   | boolean
+  tcpKeepAlive?: boolean
      | {
      idleSeconds?: number;
      intervalSeconds?: number;
@@ -278,6 +298,31 @@ supplied.
 
 ***
 
+#### JsonPrimitive
+
+```ts
+type JsonPrimitive = string | number | boolean | null;
+```
+
+Primitive JSON values accepted in request bodies.
+
+***
+
+#### NestedJsonLike
+
+```ts
+type NestedJsonLike =
+  | JsonLike
+  | undefined
+  | {
+  toJSON: NestedJsonLike;
+};
+```
+
+Values accepted when nested inside JSON request bodies.
+
+***
+
 #### JsonLike
 
 ```ts
@@ -337,7 +382,7 @@ Read the response body as a string using the requested encoding.
 
 | Parameter | Type |
 | ------ | ------ |
-| `encoding` | `BufferEncoding` |
+| `encoding` | [`BufferEncoding`](#bufferencoding) |
 
 ###### Returns
 
@@ -414,32 +459,11 @@ Return the delay in milliseconds before the next retry.
 
 ### Response
 
-#### BufferEncoding
-
-```ts
-type BufferEncoding =
-  | "base64"
-  | "ascii"
-  | "utf8"
-  | "utf-8"
-  | "utf16le"
-  | "ucs2"
-  | "ucs-2"
-  | "base64url"
-  | "latin1"
-  | "binary"
-  | "hex";
-```
-
-Buffer encodings accepted by response body helpers.
-
-***
-
 #### GetBody
 
 ```ts
 type GetBody = {
-<Encoding>  (encoding): string;
+  <Encoding>(encoding): string;
   (): Buffer;
 };
 ```
@@ -459,7 +483,7 @@ a string. A response with `statusCode >= 300` throws `ResponseError`.
 
 | Type Parameter |
 | ------ |
-| `Encoding` *extends* \| `"base64"` \| `"ascii"` \| `"utf8"` \| `"utf-8"` \| `"utf16le"` \| `"ucs2"` \| `"ucs-2"` \| `"base64url"` \| `"latin1"` \| `"binary"` \| `"hex"` |
+| `Encoding` *extends* [`BufferEncoding`](#bufferencoding) |
 
 ###### Parameters
 
@@ -529,6 +553,27 @@ than a hidden immutable snapshot.
 | <a id="property-headers-2"></a> `headers` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Node-style response headers with lowercase keys. |
 | <a id="property-url"></a> `url` | `string` | Final effective URL after query handling and redirects. |
 | <a id="property-body-2"></a> `body` | `Buffer`\<`ArrayBufferLike`\> | Mutable buffered response body. |
+
+***
+
+#### BufferEncoding
+
+```ts
+type BufferEncoding =
+  | "base64"
+  | "ascii"
+  | "utf8"
+  | "utf-8"
+  | "utf16le"
+  | "ucs2"
+  | "ucs-2"
+  | "base64url"
+  | "latin1"
+  | "binary"
+  | "hex";
+```
+
+Buffer encodings accepted by response body helpers.
 
 ### Multipart
 
@@ -680,7 +725,7 @@ new RequestError(
 
 | Parameter | Type |
 | ------ | ------ |
-| `code` | \| `"ERR_INVALID_URL"` \| `"ENOTFOUND"` \| `"ETIMEDOUT"` \| `"ERR_TOO_MANY_REDIRECTS"` \| `"ERR_REQUEST_FAILED"` |
+| `code` | [`RequestErrorCode`](#requesterrorcode) |
 | `message` | `string` |
 | `options?` | \{ `cause?`: `unknown`; \} |
 | `options.cause?` | `unknown` |
@@ -699,7 +744,7 @@ Error.constructor
 
 | Property | Modifier | Type | Description |
 | ------ | ------ | ------ | ------ |
-| <a id="property-code-1"></a> `code` | `readonly` | \| `"ERR_INVALID_URL"` \| `"ENOTFOUND"` \| `"ETIMEDOUT"` \| `"ERR_TOO_MANY_REDIRECTS"` \| `"ERR_REQUEST_FAILED"` | Stable transport-neutral request error code. |
+| <a id="property-code-1"></a> `code` | `readonly` | [`RequestErrorCode`](#requesterrorcode) | Stable transport-neutral request error code. |
 
 ***
 
@@ -734,7 +779,7 @@ new ResponseError(
 | `statusCode` | `number` |
 | `headers` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} |
 | `body` | `Buffer` |
-| `encoding?` | \| `"base64"` \| `"ascii"` \| `"utf8"` \| `"utf-8"` \| `"utf16le"` \| `"ucs2"` \| `"ucs-2"` \| `"base64url"` \| `"latin1"` \| `"binary"` \| `"hex"` |
+| `encoding?` | [`BufferEncoding`](#bufferencoding) |
 
 ###### Returns
 

@@ -6,49 +6,70 @@ import {
 } from "typedoc";
 
 /**
- * typedoc-plugin-valibot expands schema-derived types at reference sites.
- * Keep the public request signature linked to the named Options reflection
- * while still allowing the Options section itself to be schema-derived.
+ * Keep request parameters linked to their named public type reflections.
+ * typedoc-plugin-valibot expands schema-derived types at reference sites, and
+ * TypeDoc may otherwise inline simple aliases such as HttpVerb.
  */
 export function preserveOptionsReference(app: Application): void {
   app.converter.on(Converter.EVENT_RESOLVE_END, (context) => {
     const { project } = context;
-    const optionsReflection = Object.values(project.reflections).find(
-      (reflection) =>
-        reflection.name === "Options" &&
-        reflection.isDeclaration() &&
-        !reflection.isReference() &&
-        reflection.kindOf([ReflectionKind.Interface, ReflectionKind.TypeAlias]),
+    const publicTypes = new Map(
+      ["HttpVerb", "Options"].map((name) => {
+        const reflection = Object.values(project.reflections).find(
+          (candidate) =>
+            candidate.name === name &&
+            candidate.isDeclaration() &&
+            !candidate.isReference() &&
+            candidate.kindOf([
+              ReflectionKind.Interface,
+              ReflectionKind.TypeAlias,
+            ]),
+        );
+        if (!reflection) {
+          throw new Error(
+            `TypeDoc could not find the public ${name} reflection`,
+          );
+        }
+        return [name, reflection] as const;
+      }),
     );
 
-    if (!optionsReflection) {
-      throw new Error("TypeDoc could not find the public Options reflection");
-    }
-
-    let preservedReferences = 0;
+    const requestParameters = new Map([
+      ["method", "HttpVerb"],
+      ["options", "Options"],
+    ] as const);
+    const preservedReferences = new Set<string>();
 
     for (const reflection of Object.values(project.reflections)) {
-      if (!reflection.isParameter() || reflection.name !== "options") {
+      if (!reflection.isParameter()) {
         continue;
       }
 
-      const signature = reflection.parent;
-      if (signature?.parent?.name !== "request") {
+      const typeName = requestParameters.get(
+        reflection.name as "method" | "options",
+      );
+      if (!typeName || reflection.parent?.parent?.name !== "request") {
         continue;
       }
 
+      const target = publicTypes.get(typeName);
+      if (!target) {
+        throw new Error(`TypeDoc could not resolve ${typeName}`);
+      }
       reflection.type = ReferenceType.createResolvedReference(
-        "Options",
-        optionsReflection,
+        typeName,
+        target,
         project,
       );
-      preservedReferences += 1;
+      preservedReferences.add(reflection.name);
     }
 
-    if (preservedReferences === 0) {
-      throw new Error(
-        "TypeDoc could not preserve the request options type reference",
-      );
+    for (const parameterName of requestParameters.keys()) {
+      if (!preservedReferences.has(parameterName)) {
+        throw new Error(
+          `TypeDoc could not preserve the request ${parameterName} type reference`,
+        );
+      }
     }
   });
 }
