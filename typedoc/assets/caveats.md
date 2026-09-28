@@ -5,8 +5,8 @@ synchronous requests in Node.js. It is also free from the sync-request bug
 which leaves an orphaned sync-rpc process, resulting in a [leaked handle being
 detected in Jest](https://github.com/ForbesLindesay/sync-request/issues/129).
 
-**sync-request-curl** was designed to work with UNIX-like systems for UNSW
-students enrolled in [COMP1531 Software Engineering
+**sync-request-curl** was initially designed to work with UNIX-like systems for
+UNSW students enrolled in [COMP1531 Software Engineering
 Fundamentals](https://webcms3.cse.unsw.edu.au/COMP1531/23T2/outline). The
 native distribution targets glibc- and musl-based Linux, Windows, and macOS on
 the architectures listed in the compatibility section.

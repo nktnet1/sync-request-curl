@@ -51,7 +51,7 @@ pnpm exec sync-request-curl-build
 yarn run sync-request-curl-build
 ```
 
-See [Compatibility](../README.md#compatibility-source) for prerequisites, target
+See [Compatibility](../README.md#compatibility) for prerequisites, target
 selection, and the distinction between prebuilt and best-effort source targets.
 `build.mjs` runs on Node.js 16.17+ without npm dependencies, uses `cargo --locked`,
 and load-checks the addon in a child Node.js process before replacing local output.
