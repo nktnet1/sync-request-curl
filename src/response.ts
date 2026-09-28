@@ -2,6 +2,7 @@ import { ResponseError } from "#/errors";
 import type {
   BufferEncoding,
   GetBody,
+  GetJSON,
   Response,
   UppercaseHttpVerb,
 } from "#/types";
@@ -42,7 +43,7 @@ export const createResponse = ({
     return encoding ? responseData.body.toString(encoding) : responseData.body;
   }) as GetBody;
 
-  const getJSON = <T = unknown>(encoding?: BufferEncoding): T => {
+  const getJSON: GetJSON = (encoding?: BufferEncoding) => {
     try {
       return JSON.parse(responseData.body.toString(encoding));
     } catch (error) {

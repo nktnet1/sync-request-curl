@@ -1,7 +1,27 @@
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import { createResponse } from "#/response";
 
 describe("response internals", () => {
+  test("preserves the v4 getJSON default and explicit result types", () => {
+    const response = createResponse({
+      method: "GET",
+      requestUrl: "https://example.com/request",
+      responseUrl: "https://example.com/response",
+      statusCode: 200,
+      headers: {},
+      body: Buffer.from('{"message":"hello"}'),
+    });
+
+    expectTypeOf(response.getJSON()).toBeAny();
+    expectTypeOf(response.getJSON("utf-8")).toBeAny();
+    expectTypeOf(response.getJSON(undefined)).toBeAny();
+    expectTypeOf(response.getJSON<unknown>()).toBeUnknown();
+    expectTypeOf(response.getJSON<{ message: string }>("utf-8")).toEqualTypeOf<{
+      message: string;
+    }>();
+    expect(response.getJSON("utf-8").message).toBe("hello");
+  });
+
   test("includes the decoded response body in getBody() status errors", () => {
     const response = createResponse({
       method: "GET",

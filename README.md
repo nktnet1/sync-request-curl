@@ -238,9 +238,7 @@ type Options = {
      intervalSeconds?: number;
    };
   cacheNamespace?: string;
-  headers?: {
-   [key: string]: string | string[] | undefined;
-  };
+  headers?: IncomingHttpHeaders;
   qs?: {
    [key: string]: unknown;
   };
@@ -278,7 +276,7 @@ supplied.
 | <a id="property-localinterface"></a> `localInterface?` | `string` | Source interface name. Mutually exclusive with `localAddress`. |
 | <a id="property-tcpkeepalive"></a> `tcpKeepAlive?` | \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; \} | Enable TCP keepalive, optionally with idle and interval controls. |
 | <a id="property-cachenamespace"></a> `cacheNamespace?` | `string` | Private cache identity. Defaults to `process.cwd()`. |
-| <a id="property-headers-1"></a> `headers?` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Node-style request headers. |
+| <a id="property-headers-1"></a> `headers?` | `IncomingHttpHeaders` | Node-style request headers. |
 | <a id="property-qs"></a> `qs?` | \{ \[`key`: `string`\]: `unknown`; \} | Query values merged with any existing query string. |
 | <a id="property-json"></a> `json?` | [`JsonLike`](#jsonlike) | JSON-compatible request body. Adds `application/json` when needed. |
 | <a id="property-body-1"></a> `body?` | `string` \| `Buffer`\<`ArrayBufferLike`\> | Raw string or `Buffer` request body. |
@@ -405,7 +403,7 @@ Read the response body as a `Buffer`.
 | Property | Type | Description |
 | ------ | ------ | ------ |
 | <a id="property-statuscode-2"></a> `statusCode` | `number` | HTTP response status code. |
-| <a id="property-headers-3"></a> `headers` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Node-style response headers with lowercase keys. |
+| <a id="property-headers-3"></a> `headers` | `IncomingHttpHeaders` | Node-style response headers with lowercase keys. |
 | <a id="property-url-2"></a> `url` | `string` | Final effective URL for the completed attempt. |
 | <a id="property-body-3"></a> `body` | `Buffer` | Buffered response body. |
 
@@ -517,12 +515,14 @@ Parse the current response body as JSON.
 
 Unlike `GetBody`, this helper does not reject HTTP error status codes.
 It only throws if the body cannot be parsed as JSON.
+Defaults to `any` for v4 compatibility. Pass an explicit type argument to
+describe the expected result; this does not perform runtime validation.
 
 ##### Type Parameters
 
 | Type Parameter | Default type |
 | ------ | ------ |
-| `T` | `unknown` |
+| `T` | `any` |
 
 ##### Parameters
 
@@ -550,7 +550,7 @@ than a hidden immutable snapshot.
 | <a id="property-getbody"></a> `getBody` | [`GetBody`](#getbody) | Read the response body and throw `ResponseError` for HTTP status >= 300. |
 | <a id="property-getjson"></a> `getJSON` | [`GetJSON`](#getjson) | Parse the response body as JSON without applying HTTP status handling. |
 | <a id="property-statuscode-1"></a> `statusCode` | `number` | HTTP response status code. |
-| <a id="property-headers-2"></a> `headers` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Node-style response headers with lowercase keys. |
+| <a id="property-headers-2"></a> `headers` | `IncomingHttpHeaders` | Node-style response headers with lowercase keys. |
 | <a id="property-url"></a> `url` | `string` | Final effective URL after query handling and redirects. |
 | <a id="property-body-2"></a> `body` | `Buffer`\<`ArrayBufferLike`\> | Mutable buffered response body. |
 
@@ -777,7 +777,7 @@ new ResponseError(
 | Parameter | Type |
 | ------ | ------ |
 | `statusCode` | `number` |
-| `headers` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} |
+| `headers` | `IncomingHttpHeaders` |
 | `body` | `Buffer` |
 | `encoding?` | [`BufferEncoding`](#bufferencoding) |
 
@@ -796,7 +796,7 @@ Error.constructor
 | Property | Modifier | Type | Description |
 | ------ | ------ | ------ | ------ |
 | <a id="property-statuscode"></a> `statusCode` | `readonly` | `number` | HTTP status code that caused the error. |
-| <a id="property-headers"></a> `headers` | `readonly` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Response headers returned by the server. |
+| <a id="property-headers"></a> `headers` | `readonly` | `IncomingHttpHeaders` | Response headers returned by the server. |
 | <a id="property-body"></a> `body` | `readonly` | `Buffer` | Buffered response body returned by the server. |
 
 <a id="differences-from-sync-request"></a>

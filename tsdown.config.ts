@@ -7,7 +7,7 @@ export default defineConfig([
       errors: "./src/errors.ts",
       types: "./src/types.ts",
     },
-    format: ["commonjs", "esm"],
+    format: "commonjs",
     platform: "node",
     outDir: "./dist",
     dts: true,
@@ -20,6 +20,8 @@ export default defineConfig([
   {
     entry: {
       "index-esm": "./src/index-esm.ts",
+      errors: "./src/errors.ts",
+      types: "./src/types.ts",
     },
     format: "esm",
     platform: "node",

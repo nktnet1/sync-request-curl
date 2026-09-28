@@ -82,10 +82,13 @@ export type GetBody = {
  *
  * Unlike `GetBody`, this helper does not reject HTTP error status codes.
  * It only throws if the body cannot be parsed as JSON.
+ * Defaults to `any` for v4 compatibility. Pass an explicit type argument to
+ * describe the expected result; this does not perform runtime validation.
  *
  * @group Response
  */
-export type GetJSON = <T = unknown>(encoding?: BufferEncoding) => T;
+// biome-ignore lint/suspicious/noExplicitAny: preserve the v4 getJSON default
+export type GetJSON = <T = any>(encoding?: BufferEncoding) => T;
 
 type ResponseData = v.InferOutput<typeof responseDataSchema>;
 

@@ -538,7 +538,7 @@ describe("cache revalidation integrity", () => {
   test.each([
     { "cache-control": "no-store" },
     { vary: "*" },
-    { "set-cookie": "session=secret" },
+    { "set-cookie": ["session=secret"] },
   ])(
     "revokes stored entries when a 304 changes storage policy %j",
     (headers) => {
