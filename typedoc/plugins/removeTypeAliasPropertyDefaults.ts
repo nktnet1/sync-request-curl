@@ -8,7 +8,10 @@ import {
 const hasNonRuntimePropertyContainer = (reflection: Reflection): boolean => {
   let parent = reflection.parent;
   while (parent) {
-    if (parent.kindOf(ReflectionKind.TypeAlias | ReflectionKind.Interface)) {
+    if (
+      parent.kindOf(ReflectionKind.TypeAlias) ||
+      parent.kindOf(ReflectionKind.Interface)
+    ) {
       return true;
     }
     parent = parent.parent;

@@ -1,8 +1,8 @@
-import { defineConfig } from "tsdown";
+import { defineConfig, type UserConfig } from "tsdown";
 
-const shared = {
-  format: "esm" as const,
-  platform: "node" as const,
+const shared: UserConfig = {
+  format: "esm",
+  platform: "node",
   target: "node16.17",
   fixedExtension: true,
   dts: false,
@@ -17,6 +17,7 @@ export default defineConfig([
     ...shared,
     entry: { build: "./native/build.ts" },
     outDir: "./native",
+    banner: "#!/usr/bin/env node",
   },
   {
     ...shared,

@@ -73,6 +73,6 @@ const shouldSkipIfNeededBuild = (): boolean => {
 };
 
 if (!shouldSkipIfNeededBuild()) {
-  run(process.execPath, [join(nativeDir, "build.mjs")], { cwd: root });
+  run(process.execPath, [join(nativeDir, "build.ts")], { cwd: root });
   console.log(`Built native addon: ${localOutput}`);
 }
