@@ -32,7 +32,7 @@
 
 ---
 
-Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but up to 20 times more quickly.
+A high-performance Node.js alternative to [sync-request](https://github.com/ForbesLindesay/sync-request) for making synchronous web requests.
 
 </div>
 

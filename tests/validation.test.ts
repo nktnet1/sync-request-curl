@@ -20,6 +20,8 @@ import type {
   BufferEncoding,
   HttpVerb,
   JsonLike,
+  JsonPrimitive,
+  NestedJsonLike,
   Options,
   ProxyOptions,
   Response,
@@ -38,7 +40,7 @@ import {
   uppercaseHttpVerbSchema,
 } from "#/validation";
 
-describe("schema-derived types", () => {
+describe("schema-aligned types", () => {
   test("keeps public data types tied to their schemas", () => {
     expectTypeOf<FormDataEntry>().toEqualTypeOf<
       v.InferOutput<typeof formDataEntrySchema>
@@ -46,15 +48,35 @@ describe("schema-derived types", () => {
     expectTypeOf<FormDataEntry["value"]>().toEqualTypeOf<
       string | Buffer | Blob
     >();
+    expectTypeOf<JsonPrimitive>().toEqualTypeOf<
+      string | number | boolean | null
+    >();
+    expectTypeOf<NestedJsonLike>().toMatchTypeOf<
+      JsonLike | undefined | { toJSON(): NestedJsonLike }
+    >();
     expectTypeOf<JsonLike>().toEqualTypeOf<
       v.InferOutput<typeof jsonLikeSchema>
     >();
     expectTypeOf<UppercaseHttpVerb>().toEqualTypeOf<
       v.InferOutput<typeof uppercaseHttpVerbSchema>
     >();
+    type StandardVerb =
+      | "GET"
+      | "HEAD"
+      | "POST"
+      | "PUT"
+      | "DELETE"
+      | "CONNECT"
+      | "OPTIONS"
+      | "TRACE"
+      | "PATCH"
+      | "PROPFIND";
     expectTypeOf<HttpVerb>().toEqualTypeOf<
-      v.InferOutput<typeof httpVerbInputSchema>
+      StandardVerb | Lowercase<StandardVerb>
     >();
+    expectTypeOf<
+      v.InferOutput<typeof httpVerbInputSchema>
+    >().toEqualTypeOf<string>();
     expectTypeOf<BufferEncoding>().toEqualTypeOf<
       v.InferOutput<typeof bufferEncodingSchema>
     >();

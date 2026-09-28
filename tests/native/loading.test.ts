@@ -181,7 +181,7 @@ describe("native binding loading", () => {
         packageRoot: join("", "package"),
         exists: () => false,
       }),
-    ).toThrow("npx --no-install sync-request-curl-build");
+    ).toThrow("npm exec sync-request-curl-build");
   });
 
   test("does not hide a broken local source build", () => {
@@ -264,11 +264,12 @@ describe("native binding loading", () => {
         "",
         "The optional package @nktnet/sync-request-curl-linux-arm64-musl is missing.",
         "",
-        "Install the prebuilt binary with:",
-        "  npm install sync-request-curl --include=optional",
+        "Reinstall sync-request-curl with optional dependencies enabled.",
         "",
-        "Alternatively, if optional dependencies were intentionally omitted, build from source with:",
-        "  npx --no-install sync-request-curl-build",
+        "Alternatively, if optional dependencies were intentionally omitted, build from source using your package manager:",
+        "  npm exec sync-request-curl-build",
+        "  pnpm exec sync-request-curl-build",
+        "  yarn run sync-request-curl-build",
         "",
         "See the Compatibility section for source-build prerequisites.",
       ].join("\n"),

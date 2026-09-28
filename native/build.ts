@@ -9,6 +9,59 @@ const targetDir = join(nativeDir, "target");
 const buildDir = join(nativeDir, "build");
 const output = join(buildDir, "sync_request_curl_native.node");
 
+type CurlSource = "bundled" | "system";
+
+type CliOptions = {
+  curlSource?: CurlSource;
+  help: boolean;
+};
+
+const usage = `Usage: sync-request-curl-build [--libcurl=system|bundled]
+
+Build the installed sync-request-curl addon from its bundled Rust sources.
+Requires Rust 1.88+ and platform native build tools.
+Run using the same Node.js architecture as your application.
+Set CARGO_BUILD_TARGET to override the Rust target.
+
+Options:
+  --libcurl=system    Link against a system-provided libcurl and fail if unavailable.
+  --libcurl=bundled   Build the libcurl bundled by curl-sys.
+
+Default: system libcurl for macOS targets. Bundled libcurl for other targets.`;
+
+const parseCliOptions = (args: readonly string[]): CliOptions => {
+  if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) {
+    return { help: true };
+  }
+
+  let curlSource: CurlSource | undefined;
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    let value: string | undefined;
+
+    if (argument === "--libcurl") {
+      value = args[index + 1];
+      index += 1;
+    } else if (argument?.startsWith("--libcurl=")) {
+      value = argument.slice("--libcurl=".length);
+    } else {
+      throw new Error(`Unknown argument: ${argument}. Use --help for usage.`);
+    }
+
+    if (value !== "system" && value !== "bundled") {
+      throw new Error(
+        `Invalid --libcurl value: ${value ?? "(missing)"}. Expected system or bundled.`,
+      );
+    }
+    if (curlSource !== undefined) {
+      throw new Error("--libcurl may only be specified once.");
+    }
+    curlSource = value;
+  }
+
+  return { curlSource, help: false };
+};
+
 const run = (
   command: string,
   args: readonly string[],
@@ -31,7 +84,7 @@ const run = (
   return result.stdout?.trim() || "";
 };
 
-const buildNative = (): void => {
+const buildNative = (requestedCurlSource?: CurlSource): void => {
   const host = run("rustc", ["-vV"], process.env, true)
     .split("\n")
     .find((line) => line.startsWith("host: "))
@@ -50,6 +103,8 @@ const buildNative = (): void => {
       "Unable to determine Rust target; set CARGO_BUILD_TARGET explicitly.",
     );
   }
+  const curlSource =
+    requestedCurlSource ?? (target.includes("apple") ? "system" : "bundled");
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     CARGO_TARGET_DIR: targetDir,
@@ -74,6 +129,9 @@ const buildNative = (): void => {
       "--manifest-path",
       join(nativeDir, "Cargo.toml"),
       "--release",
+      "--no-default-features",
+      "--features",
+      curlSource === "system" ? "system-curl" : "bundled-curl",
       "--target",
       target,
     ],
@@ -112,25 +170,13 @@ const buildNative = (): void => {
 };
 
 const main = (): void => {
-  const cliArgs = process.argv.slice(2);
-  if (
-    cliArgs.length === 1 &&
-    (cliArgs[0] === "--help" || cliArgs[0] === "-h")
-  ) {
-    console.log(
-      "Usage: sync-request-curl-build\n\n" +
-        "Build the installed sync-request-curl addon from its bundled Rust sources.\n" +
-        "Requires Rust 1.88+ and platform native build tools.\n" +
-        "Run using the same Node.js architecture as your application.\n" +
-        "Set CARGO_BUILD_TARGET to override the Rust target.",
-    );
+  const options = parseCliOptions(process.argv.slice(2));
+  if (options.help) {
+    console.log(usage);
     return;
   }
-  if (cliArgs.length > 0) {
-    throw new Error("Unknown arguments. Use sync-request-curl-build --help.");
-  }
 
-  buildNative();
+  buildNative(options.curlSource);
 };
 
 main();

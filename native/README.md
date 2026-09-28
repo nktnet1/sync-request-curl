@@ -37,6 +37,12 @@ static in the prebuild path. The Linux GCC unwinding runtime (`libgcc_s`) may
 remain dynamically linked; the dependency verifier permits this platform runtime
 while rejecting dynamically linked copies of the bundled native dependencies.
 
+The source builder accepts `--libcurl=system` and `--libcurl=bundled`. With no flag it
+keeps those platform defaults: system libcurl on macOS, bundled libcurl elsewhere.
+`--libcurl=system` fails if `curl-sys` cannot discover a system libcurl instead of
+allowing its normal bundled fallback. Both modes still use `curl-sys` for the Rust
+FFI bindings.
+
 ## Release prebuilds
 
 See [the prebuilds README](../prebuilds/README.md) for the release matrix and CI details.
@@ -45,11 +51,13 @@ Package consumers normally use platform-specific optional npm packages without
 compilers or lifecycle scripts. The main package also includes the exact Rust
 sources, Cargo.lock, and `build.mjs` for an explicit source build:
 
-```sh
-npx --no-install sync-request-curl-build
+```text
+npm exec --no -- sync-request-curl-build
+pnpm exec sync-request-curl-build
+yarn run sync-request-curl-build
 ```
 
-See [Compatibility](../README.md#compatibility-source) for prerequisites, target
+See [Compatibility](../README.md#compatibility) for prerequisites, target
 selection, and the distinction between prebuilt and best-effort source targets.
 `build.mjs` runs on Node.js 16.17+ without npm dependencies, uses `cargo --locked`,
 and load-checks the addon in a child Node.js process before replacing local output.

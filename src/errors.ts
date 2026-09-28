@@ -1,20 +1,25 @@
 import * as v from "valibot";
 import type { BufferEncoding, Response } from "#/types";
 
+/**
+ * Stable transport-neutral error codes emitted by the TypeScript request layer.
+ *
+ * @group Errors
+ */
+export type RequestErrorCode =
+  | "ERR_INVALID_URL"
+  | "ENOTFOUND"
+  | "ETIMEDOUT"
+  | "ERR_TOO_MANY_REDIRECTS"
+  | "ERR_REQUEST_FAILED";
+
 const requestErrorCodeSchema = v.picklist([
   "ERR_INVALID_URL",
   "ENOTFOUND",
   "ETIMEDOUT",
   "ERR_TOO_MANY_REDIRECTS",
   "ERR_REQUEST_FAILED",
-] as const);
-
-/**
- * Stable transport-neutral error codes emitted by the TypeScript request layer.
- *
- * @group Errors
- */
-export type RequestErrorCode = v.InferOutput<typeof requestErrorCodeSchema>;
+] as const satisfies readonly RequestErrorCode[]);
 
 const curlErrorCodeSchema = v.pipe(
   v.number(),

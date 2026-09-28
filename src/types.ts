@@ -3,9 +3,7 @@ import type * as v from "valibot";
 export { FormData } from "#/form-data";
 
 import type {
-  bufferEncodingSchema,
-  httpVerbInputSchema,
-  jsonLikeSchema,
+  BufferEncoding,
   optionsSchema,
   responseDataSchema,
   uppercaseHttpVerbSchema,
@@ -13,40 +11,46 @@ import type {
 
 export type { FormDataEntry } from "#/form-data";
 export type {
+  BufferEncoding,
+  JsonLike,
+  JsonPrimitive,
+  NestedJsonLike,
   ProxyOptions,
   RetryDelayFunction,
   RetryFunction,
   RetryResponse,
 } from "#/validation";
 
-/**
- * Values accepted for JSON request bodies.
- *
- * This intentionally follows practical `JSON.stringify()` inputs rather than
- * only strict JSON syntax. `undefined` is allowed inside objects and arrays,
- * and objects with `toJSON()` (for example `Date`) are supported.
- *
- * @group Request
- */
-export type JsonLike = v.InferOutput<typeof jsonLikeSchema>;
-
 /** @internal */
 export type UppercaseHttpVerb = v.InferOutput<typeof uppercaseHttpVerbSchema>;
 
 /**
- * Any valid HTTP method token. Input is case-insensitive and is normalised to
+ * Supported HTTP methods. Input is case-insensitive and is normalised to
  * uppercase before transport.
  *
  * @group Request
  */
-export type HttpVerb = v.InferOutput<typeof httpVerbInputSchema>;
-
-/**
- * Buffer encodings accepted by response body helpers.
- *
- * @group Response
- */
-export type BufferEncoding = v.InferOutput<typeof bufferEncodingSchema>;
+export type HttpVerb =
+  | "GET"
+  | "get"
+  | "HEAD"
+  | "head"
+  | "POST"
+  | "post"
+  | "PUT"
+  | "put"
+  | "DELETE"
+  | "delete"
+  | "CONNECT"
+  | "connect"
+  | "OPTIONS"
+  | "options"
+  | "TRACE"
+  | "trace"
+  | "PATCH"
+  | "patch"
+  | "PROPFIND"
+  | "propfind";
 
 // Keep the public shape schema-derived. The TypeDoc integration restores the
 // request parameter to this named reflection after typedoc-plugin-valibot runs.

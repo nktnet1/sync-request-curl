@@ -128,8 +128,10 @@ Run --publish from a clean checkout, not after an uncommitted preparation run.`)
   pnpm smoke:release-registry --registry=https://registry.npmjs.org --version=${version} --matrix
 
 Consumer prebuilt: npm install sync-request-curl@${version}
-Consumer source:   npm install sync-request-curl@${version} --omit=optional
-                   npx --no-install sync-request-curl-build`);
+Consumer source build (after installing without optional dependencies):
+  npm exec sync-request-curl-build
+  pnpm exec sync-request-curl-build
+  yarn run sync-request-curl-build`);
 };
 
 main();

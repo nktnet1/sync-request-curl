@@ -1,8 +1,9 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
     fsModuleCache: true,
+    exclude: [...configDefaults.exclude, "tests/typedoc/**"],
     globalSetup: ["./tests/globalSetup.ts"],
     coverage: {
       thresholds: {

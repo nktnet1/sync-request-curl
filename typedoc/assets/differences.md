@@ -1,9 +1,5 @@
 ## Differences from `sync-request`
 
-If you already use `sync-request`, most code should feel familiar. The main
-differences are the extra controls `sync-request-curl` provides and a few cases
-where its behaviour is more explicit.
-
 ### Additions
 
 - `Response#getJSON()` is available as a convenience helper.

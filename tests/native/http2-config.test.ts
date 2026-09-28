@@ -5,9 +5,13 @@ const cargoToml = readFileSync(
   new URL("../../native/Cargo.toml", import.meta.url),
   "utf8",
 );
+const buildRs = readFileSync(
+  new URL("../../native/build.rs", import.meta.url),
+  "utf8",
+);
 
-const dependencySection = (target: string): string => {
-  const marker = `[target.'${target}'.dependencies]`;
+const section = (name: string): string => {
+  const marker = `[${name}]`;
   const start = cargoToml.indexOf(marker);
   expect(start).toBeGreaterThanOrEqual(0);
 
@@ -19,19 +23,27 @@ const dependencySection = (target: string): string => {
   );
 };
 
-describe("native HTTP/2 build contract", () => {
-  test("bundled non-macOS libcurl enables HTTP/2", () => {
-    const section = dependencySection('cfg(not(target_os = "macos"))');
+describe("native libcurl build contract", () => {
+  test("bundled libcurl enables HTTP/2 and static TLS", () => {
+    const features = section("features");
 
-    expect(section).toContain(
-      'features = ["http2", "ssl", "static-curl", "static-ssl"]',
+    expect(features).toContain(
+      'bundled-curl = ["curl-sys/http2", "curl-sys/ssl", "curl-sys/static-curl", "curl-sys/static-ssl"]',
     );
   });
 
-  test("macOS delegates protocol support to the system libcurl", () => {
-    const section = dependencySection('cfg(target_os = "macos")');
+  test("system libcurl keeps macOS force-system support without enabling HTTP/2 features", () => {
+    const features = section("features");
+    const systemFeature = features
+      .split("\n")
+      .find((line) => line.startsWith("system-curl ="));
 
-    expect(section).toContain('features = ["force-system-lib-on-osx"]');
-    expect(section).not.toContain('"http2"');
+    expect(systemFeature).toContain('"curl-sys/force-system-lib-on-osx"');
+    expect(systemFeature).not.toContain('"curl-sys/http2"');
+  });
+
+  test("system mode rejects curl-sys bundled fallback", () => {
+    expect(buildRs).toContain('env::var_os("DEP_CURL_STATIC")');
+    expect(buildRs).toContain("system-curl was requested");
   });
 });

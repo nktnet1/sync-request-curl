@@ -3,6 +3,7 @@ import {
   type PluginOptions,
   load as typedocPluginMarkdown,
 } from "typedoc-plugin-markdown";
+import { normalizeTypeSignatureFormatting } from "#typedoc/plugins/normalizeTypeSignatureFormatting";
 import { preserveOptionsReference } from "#typedoc/plugins/preserveOptionsReference";
 import { removeEmptyTypeParameterLists } from "#typedoc/plugins/removeEmptyTypeParameterLists";
 import { removeLeadingReturnUnionPipe } from "#typedoc/plugins/removeLeadingReturnUnionPipe";
@@ -16,6 +17,7 @@ const config = {
     typedocPluginMarkdown,
     removeEmptyTypeParameterLists,
     preserveOptionsReference,
+    normalizeTypeSignatureFormatting,
     removeTypeAliasPropertyDefaults,
     removeLeadingReturnUnionPipe,
     removeTrailingWhitespace,

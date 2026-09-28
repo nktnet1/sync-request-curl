@@ -42,6 +42,8 @@ const mutableChildProcess = childProcess as {
 
 for (const mode of [
   "success",
+  "system",
+  "macos-default",
   "cargo-failure",
   "load-failure",
   "musl",
@@ -64,15 +66,22 @@ for (const mode of [
         process.platform === "win32" ? "junction" : "dir",
       );
     }
-    const target =
-      mode === "musl"
-        ? "x86_64-unknown-linux-musl"
-        : "x86_64-unknown-linux-gnu";
+    let target = "x86_64-unknown-linux-gnu";
+    if (mode === "musl") {
+      target = "x86_64-unknown-linux-musl";
+    } else if (mode === "macos-default") {
+      target = "x86_64-apple-darwin";
+    }
     const originalSpawn = childProcess.spawnSync;
     const originalTarget = process.env.CARGO_BUILD_TARGET;
     const originalFlags = process.env.CARGO_ENCODED_RUSTFLAGS;
+    const originalArgv = process.argv;
     process.env.CARGO_BUILD_TARGET = target;
     process.env.CARGO_ENCODED_RUSTFLAGS = "--cfg\x1ftest_build";
+    process.argv =
+      mode === "system"
+        ? [process.execPath, source, "--libcurl=system"]
+        : [process.execPath, source];
     const commands: string[] = [];
     const mockSpawn = (
       command: string,
@@ -85,6 +94,14 @@ for (const mode of [
       }
       if (command === "cargo") {
         assert.ok(args.includes("--locked"));
+        assert.ok(args.includes("--no-default-features"));
+        const features = args.at(args.indexOf("--features") + 1);
+        assert.equal(
+          features,
+          mode === "system" || mode === "macos-default"
+            ? "system-curl"
+            : "bundled-curl",
+        );
         assert.equal(args.at(-1), target);
         assert.equal(options?.env?.CARGO_TARGET_DIR, join(native, "target"));
         if (mode === "musl") {
@@ -134,6 +151,7 @@ for (const mode of [
     } finally {
       mutableChildProcess.spawnSync = originalSpawn;
       syncBuiltinESMExports();
+      process.argv = originalArgv;
       if (originalTarget === undefined) {
         delete process.env.CARGO_BUILD_TARGET;
       } else {
@@ -156,6 +174,9 @@ test("source builder CLI displays help without a compiler", () => {
   });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Usage: sync-request-curl-build/);
+  assert.match(result.stdout, /--libcurl=system/);
+  assert.match(result.stdout, /--libcurl=bundled/);
+  assert.match(result.stdout, /system libcurl for macOS targets/);
 });
 
 test("source builder CLI rejects unknown arguments before compiling", () => {
@@ -168,5 +189,18 @@ test("source builder CLI rejects unknown arguments before compiling", () => {
     },
   );
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /Unknown arguments/);
+  assert.match(result.stderr, /Unknown argument/);
+});
+
+test("source builder CLI rejects invalid curl sources before compiling", () => {
+  const result = childProcess.spawnSync(
+    process.execPath,
+    [source, "--libcurl=automatic"],
+    {
+      encoding: "utf8",
+      env: { ...process.env, PATH: "" },
+    },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Invalid --libcurl value/);
 });

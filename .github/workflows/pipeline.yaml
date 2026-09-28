@@ -140,6 +140,14 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == '24.x'
         run: pnpm typecheck
 
+      - name: Test documentation rendering
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '24.x'
+        run: pnpm test:docs
+
+      - name: Verify generated documentation
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '24.x'
+        run: pnpm docs:check
+
       - name: Build package
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == '24.x'
         run: pnpm build

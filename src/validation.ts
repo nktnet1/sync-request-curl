@@ -3,13 +3,53 @@ import { URL } from "node:url";
 import * as v from "valibot";
 import { FormData } from "#/form-data";
 
-type JsonPrimitive = string | number | boolean | null;
-type NestedJsonLike = JsonLikeValue | undefined | { toJSON(): NestedJsonLike };
-type JsonLikeValue =
+/** Primitive JSON values accepted in request bodies.
+ *
+ * @group Request
+ */
+export type JsonPrimitive = string | number | boolean | null;
+
+/** Values accepted when nested inside JSON request bodies.
+ *
+ * @group Request
+ */
+export type NestedJsonLike =
+  | JsonLike
+  | undefined
+  | { toJSON: () => NestedJsonLike };
+
+/**
+ * Values accepted for JSON request bodies.
+ *
+ * This intentionally follows practical `JSON.stringify()` inputs rather than
+ * only strict JSON syntax. `undefined` is allowed inside objects and arrays,
+ * and objects with `toJSON()` (for example `Date`) are supported.
+ *
+ * @group Request
+ */
+export type JsonLike =
   | JsonPrimitive
   | readonly NestedJsonLike[]
   | { [key: string]: NestedJsonLike }
-  | { toJSON(): JsonLikeValue };
+  | { toJSON: () => JsonLike };
+
+/**
+ * Buffer encodings accepted by response body helpers.
+ *
+ * @group Response
+ */
+export type BufferEncoding =
+  | "base64"
+  | "ascii"
+  | "utf8"
+  | "utf-8"
+  | "utf16le"
+  | "ucs2"
+  | "ucs-2"
+  | "base64url"
+  | "latin1"
+  | "binary"
+  | "hex";
 
 const headerValueSchema = v.union([
   v.string(),
@@ -101,7 +141,7 @@ const retryDelayFunctionSchema = v.custom<RetryDelayFunction>(
 
 // JSON serializability is validated by jsonBodySchema immediately before use.
 // This schema carries the public input type without eagerly invoking toJSON().
-export const jsonLikeSchema = v.custom<JsonLikeValue>(() => true);
+export const jsonLikeSchema = v.custom<JsonLike>(() => true);
 
 const nativeStringSchema = v.pipe(
   v.string(),
@@ -249,7 +289,7 @@ export const bufferEncodingSchema = v.picklist([
   "latin1",
   "binary",
   "hex",
-]);
+] as const satisfies readonly BufferEncoding[]);
 
 export const responseDataSchema = v.object({
   /** HTTP response status code. */

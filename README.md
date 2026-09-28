@@ -32,7 +32,7 @@
 
 ---
 
-Make synchronous web requests similar to [sync-request](https://github.com/ForbesLindesay/sync-request), but up to 20 times more quickly.
+A high-performance Node.js alternative to [sync-request](https://github.com/ForbesLindesay/sync-request) for making synchronous web requests.
 
 </div>
 
@@ -180,7 +180,7 @@ response.
 
 | Parameter | Type | Description |
 | ------ | ------ | ------ |
-| `method` | `string` | Valid HTTP method token. Matching is case-insensitive. |
+| `method` | [`HttpVerb`](#httpverb) | Supported HTTP method. Matching is case-insensitive. |
 | `url` | `string` \| `URL` | Absolute `http:` or `https:` URL, provided as a string or `URL`. |
 | `options` | [`Options`](#options) | Request, transport, redirect, retry, and cache options. |
 
@@ -192,27 +192,33 @@ The buffered response after redirects and retries complete.
 
 ***
 
-#### JsonLike
-
-```ts
-type JsonLike = JsonLikeValue;
-```
-
-Values accepted for JSON request bodies.
-
-This intentionally follows practical `JSON.stringify()` inputs rather than
-only strict JSON syntax. `undefined` is allowed inside objects and arrays,
-and objects with `toJSON()` (for example `Date`) are supported.
-
-***
-
 #### HttpVerb
 
 ```ts
-type HttpVerb = string;
+type HttpVerb =
+  | "GET"
+  | "get"
+  | "HEAD"
+  | "head"
+  | "POST"
+  | "post"
+  | "PUT"
+  | "put"
+  | "DELETE"
+  | "delete"
+  | "CONNECT"
+  | "connect"
+  | "OPTIONS"
+  | "options"
+  | "TRACE"
+  | "trace"
+  | "PATCH"
+  | "patch"
+  | "PROPFIND"
+  | "propfind";
 ```
 
-Any valid HTTP method token. Input is case-insensitive and is normalised to
+Supported HTTP methods. Input is case-insensitive and is normalised to
 uppercase before transport.
 
 ***
@@ -226,7 +232,7 @@ type Options = {
   caFile?: string;
   localAddress?: string;
   localInterface?: string;
-  tcpKeepAlive?:   | boolean
+  tcpKeepAlive?: boolean
      | {
      idleSeconds?: number;
      intervalSeconds?: number;
@@ -238,7 +244,7 @@ type Options = {
   qs?: {
    [key: string]: unknown;
   };
-  json?: JsonLikeValue;
+  json?: JsonLike;
   body?: string | Buffer<ArrayBufferLike>;
   form?: FormData;
   timeout?: number;
@@ -274,7 +280,7 @@ supplied.
 | <a id="property-cachenamespace"></a> `cacheNamespace?` | `string` | Private cache identity. Defaults to `process.cwd()`. |
 | <a id="property-headers-1"></a> `headers?` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Node-style request headers. |
 | <a id="property-qs"></a> `qs?` | \{ \[`key`: `string`\]: `unknown`; \} | Query values merged with any existing query string. |
-| <a id="property-json"></a> `json?` | `JsonLikeValue` | JSON-compatible request body. Adds `application/json` when needed. |
+| <a id="property-json"></a> `json?` | [`JsonLike`](#jsonlike) | JSON-compatible request body. Adds `application/json` when needed. |
 | <a id="property-body-1"></a> `body?` | `string` \| `Buffer`\<`ArrayBufferLike`\> | Raw string or `Buffer` request body. |
 | <a id="property-form"></a> `form?` | [`FormData`](#formdata) | Synchronous multipart/form-data body. |
 | <a id="property-timeout"></a> `timeout?` | `number` | Per-network-attempt timeout in milliseconds. `0` disables it. |
@@ -289,6 +295,53 @@ supplied.
 | <a id="property-retry"></a> `retry?` | `boolean` \| [`RetryFunction`](#retryfunction) | Retry GET requests, or provide a callback to decide per attempt. |
 | <a id="property-retrydelay"></a> `retryDelay?` | `number` \| [`RetryDelayFunction`](#retrydelayfunction) | Retry delay in milliseconds, or a callback returning the delay. |
 | <a id="property-maxretries"></a> `maxRetries?` | `number` | Maximum retry count. Defaults to 5 when retries are enabled. |
+
+***
+
+#### JsonPrimitive
+
+```ts
+type JsonPrimitive = string | number | boolean | null;
+```
+
+Primitive JSON values accepted in request bodies.
+
+***
+
+#### NestedJsonLike
+
+```ts
+type NestedJsonLike =
+  | JsonLike
+  | undefined
+  | {
+  toJSON: () => NestedJsonLike;
+};
+```
+
+Values accepted when nested inside JSON request bodies.
+
+***
+
+#### JsonLike
+
+```ts
+type JsonLike =
+  | JsonPrimitive
+  | readonly NestedJsonLike[]
+  | {
+[key: string]: NestedJsonLike;
+}
+  | {
+  toJSON: () => JsonLike;
+};
+```
+
+Values accepted for JSON request bodies.
+
+This intentionally follows practical `JSON.stringify()` inputs rather than
+only strict JSON syntax. `undefined` is allowed inside objects and arrays,
+and objects with `toJSON()` (for example `Date`) are supported.
 
 ***
 
@@ -329,7 +382,7 @@ Read the response body as a string using the requested encoding.
 
 | Parameter | Type |
 | ------ | ------ |
-| `encoding` | `BufferEncoding` |
+| `encoding` | [`BufferEncoding`](#bufferencoding) |
 
 ###### Returns
 
@@ -406,32 +459,11 @@ Return the delay in milliseconds before the next retry.
 
 ### Response
 
-#### BufferEncoding
-
-```ts
-type BufferEncoding =
-  | "base64"
-  | "ascii"
-  | "utf8"
-  | "utf-8"
-  | "utf16le"
-  | "ucs2"
-  | "ucs-2"
-  | "base64url"
-  | "latin1"
-  | "binary"
-  | "hex";
-```
-
-Buffer encodings accepted by response body helpers.
-
-***
-
 #### GetBody
 
 ```ts
 type GetBody = {
-<Encoding>  (encoding): string;
+  <Encoding>(encoding): string;
   (): Buffer;
 };
 ```
@@ -451,7 +483,7 @@ a string. A response with `statusCode >= 300` throws `ResponseError`.
 
 | Type Parameter |
 | ------ |
-| `Encoding` *extends* \| `"base64"` \| `"ascii"` \| `"utf8"` \| `"utf-8"` \| `"utf16le"` \| `"ucs2"` \| `"ucs-2"` \| `"base64url"` \| `"latin1"` \| `"binary"` \| `"hex"` |
+| `Encoding` *extends* [`BufferEncoding`](#bufferencoding) |
 
 ###### Parameters
 
@@ -521,6 +553,27 @@ than a hidden immutable snapshot.
 | <a id="property-headers-2"></a> `headers` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Node-style response headers with lowercase keys. |
 | <a id="property-url"></a> `url` | `string` | Final effective URL after query handling and redirects. |
 | <a id="property-body-2"></a> `body` | `Buffer`\<`ArrayBufferLike`\> | Mutable buffered response body. |
+
+***
+
+#### BufferEncoding
+
+```ts
+type BufferEncoding =
+  | "base64"
+  | "ascii"
+  | "utf8"
+  | "utf-8"
+  | "utf16le"
+  | "ucs2"
+  | "ucs-2"
+  | "base64url"
+  | "latin1"
+  | "binary"
+  | "hex";
+```
+
+Buffer encodings accepted by response body helpers.
 
 ### Multipart
 
@@ -672,7 +725,7 @@ new RequestError(
 
 | Parameter | Type |
 | ------ | ------ |
-| `code` | \| `"ERR_INVALID_URL"` \| `"ENOTFOUND"` \| `"ETIMEDOUT"` \| `"ERR_TOO_MANY_REDIRECTS"` \| `"ERR_REQUEST_FAILED"` |
+| `code` | [`RequestErrorCode`](#requesterrorcode) |
 | `message` | `string` |
 | `options?` | \{ `cause?`: `unknown`; \} |
 | `options.cause?` | `unknown` |
@@ -691,7 +744,7 @@ Error.constructor
 
 | Property | Modifier | Type | Description |
 | ------ | ------ | ------ | ------ |
-| <a id="property-code-1"></a> `code` | `readonly` | \| `"ERR_INVALID_URL"` \| `"ENOTFOUND"` \| `"ETIMEDOUT"` \| `"ERR_TOO_MANY_REDIRECTS"` \| `"ERR_REQUEST_FAILED"` | Stable transport-neutral request error code. |
+| <a id="property-code-1"></a> `code` | `readonly` | [`RequestErrorCode`](#requesterrorcode) | Stable transport-neutral request error code. |
 
 ***
 
@@ -726,7 +779,7 @@ new ResponseError(
 | `statusCode` | `number` |
 | `headers` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} |
 | `body` | `Buffer` |
-| `encoding?` | \| `"base64"` \| `"ascii"` \| `"utf8"` \| `"utf-8"` \| `"utf16le"` \| `"ucs2"` \| `"ucs-2"` \| `"base64url"` \| `"latin1"` \| `"binary"` \| `"hex"` |
+| `encoding?` | [`BufferEncoding`](#bufferencoding) |
 
 ###### Returns
 
@@ -748,10 +801,6 @@ Error.constructor
 
 <a id="differences-from-sync-request"></a>
 ## 4. Differences from `sync-request`
-
-If you already use `sync-request`, most code should feel familiar. The main
-differences are the extra controls `sync-request-curl` provides and a few cases
-where its behaviour is more explicit.
 
 <a id="differences-from-sync-request-additions"></a>
 ### 4.1. Additions
@@ -827,17 +876,36 @@ GNU/Linux release binaries require GLIBC 2.31 or newer.
 <a id="compatibility-building-from-source"></a>
 ### 6.4. Building from source
 
-If a prebuilt binary is unavailable for your platform, install the package
-without optional dependencies and build it explicitly:
+If a prebuilt binary is unavailable for your platform, or if optional
+dependencies were intentionally omitted, build the installed package explicitly
+using your package manager:
 
-```sh
-npm install sync-request-curl --omit=optional
-npx --no-install sync-request-curl-build
+```text
+npm exec --no -- sync-request-curl-build
+pnpm exec sync-request-curl-build
+yarn run sync-request-curl-build
 ```
 
-Run the build with the same Node.js architecture that will use the library.
-With pnpm, use `pnpm exec sync-request-curl-build`. Run
+Run the build with the same Node.js architecture that will use the library. Run
 `sync-request-curl-build --help` for the current prerequisites.
+
+Source builds keep the release defaults: macOS links the system libcurl, while
+Linux and Windows build the libcurl bundled by `curl-sys`. Override that choice
+explicitly when needed:
+
+```sh
+npm exec --no -- sync-request-curl-build --libcurl=system
+npm exec --no -- sync-request-curl-build --libcurl=bundled
+```
+
+`--libcurl=system` is strict: if `curl-sys` cannot discover a compatible system
+libcurl, the build fails instead of silently falling back to its bundled copy.
+On Unix systems, system discovery uses the platform libcurl or `pkg-config`.
+On Windows, `curl-sys` uses vcpkg. System builds inherit the capabilities and
+TLS behaviour of the selected libcurl. `--libcurl=bundled` uses the pinned libcurl
+shipped by `curl-sys` and retains the package's vendored build configuration.
+The flag selects the libcurl implementation. Both modes continue to use
+`curl-sys` as the Rust FFI layer.
 
 Source builds require:
 
@@ -867,8 +935,8 @@ synchronous requests in Node.js. It is also free from the sync-request bug
 which leaves an orphaned sync-rpc process, resulting in a [leaked handle being
 detected in Jest](https://github.com/ForbesLindesay/sync-request/issues/129).
 
-**sync-request-curl** was designed to work with UNIX-like systems for UNSW
-students enrolled in [COMP1531 Software Engineering
+**sync-request-curl** was initially designed to work with UNIX-like systems for
+UNSW students enrolled in [COMP1531 Software Engineering
 Fundamentals](https://webcms3.cse.unsw.edu.au/COMP1531/23T2/outline). The
 native distribution targets glibc- and musl-based Linux, Windows, and macOS on
 the architectures listed in the compatibility section.
