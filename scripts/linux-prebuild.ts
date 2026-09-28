@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -52,8 +52,8 @@ const nodeVersion = values.node ?? "24";
 if (libc !== "gnu" && libc !== "musl") {
   throw new Error("--libc must be either gnu or musl");
 }
-if (mode !== "build" && mode !== "test") {
-  throw new Error("--mode must be either build or test");
+if (mode !== "build" && mode !== "test" && mode !== "verify") {
+  throw new Error("--mode must be build, test, or verify");
 }
 
 type Architecture = "x64" | "arm64";
@@ -76,18 +76,30 @@ const runInContainer = (): void => {
     "--rm",
     "--volume",
     `${root}:/workspace`,
-    "--mount",
-    "type=volume,destination=/workspace/native/build",
-    "--mount",
-    "type=volume,destination=/workspace/native/target",
     "--workdir",
     "/workspace",
   ];
 
-  if (mode === "test") {
+  if (mode === "build") {
+    dockerArgs.push(
+      "--mount",
+      "type=volume,destination=/workspace/native/build",
+      "--mount",
+      "type=volume,destination=/workspace/native/target",
+    );
+  } else if (mode === "test") {
+    const pnpmStore = join(
+      homedir(),
+      ".cache",
+      "sync-request-curl",
+      "pnpm-store",
+    );
+    mkdirSync(pnpmStore, { recursive: true });
     dockerArgs.push(
       "--mount",
       "type=volume,destination=/workspace/node_modules",
+      "--volume",
+      `${pnpmStore}:/pnpm-store`,
     );
   }
 
@@ -136,6 +148,23 @@ const installBuildDependencies = (targetLibc: LinuxLibc): void => {
   ]);
 };
 
+const installVerifyDependencies = (targetLibc: LinuxLibc): void => {
+  if (targetLibc === "musl") {
+    run("apk", ["add", "--no-cache", "binutils"]);
+    return;
+  }
+
+  const aptArgs = getBullseyeAptArgs();
+  run("apt-get", [...aptArgs, "update"]);
+  run("apt-get", [
+    ...aptArgs,
+    "install",
+    "-y",
+    "--no-install-recommends",
+    "binutils",
+  ]);
+};
+
 const installRust = (): NodeJS.ProcessEnv => {
   const installer = join(tmpdir(), "rustup-init.sh");
   run("curl", [
@@ -164,23 +193,8 @@ const installRust = (): NodeJS.ProcessEnv => {
   };
 };
 
-const buildInsideContainer = (targetLibc: LinuxLibc): void => {
-  if (process.platform !== "linux" || getLinuxLibc() !== targetLibc) {
-    throw new Error(`Expected a ${targetLibc} Linux build container`);
-  }
-
-  installBuildDependencies(targetLibc);
-  const buildEnv = installRust();
-  run(process.execPath, ["scripts/build-native.ts"], {
-    cwd: root,
-    env: buildEnv,
-  });
-
+const verifyPrebuild = (targetLibc: LinuxLibc): void => {
   const platform = getPlatform(targetLibc);
-  run(process.execPath, ["scripts/stage-native.ts", `--platform=${platform}`], {
-    cwd: root,
-  });
-
   const prebuild = join(root, "prebuilds", getPrebuildFilename(platform));
   const verifyArgs = [
     "scripts/verify-native-deps.ts",
@@ -198,6 +212,33 @@ const buildInsideContainer = (targetLibc: LinuxLibc): void => {
   );
 };
 
+const buildInsideContainer = (targetLibc: LinuxLibc): void => {
+  if (process.platform !== "linux" || getLinuxLibc() !== targetLibc) {
+    throw new Error(`Expected a ${targetLibc} Linux build container`);
+  }
+
+  installBuildDependencies(targetLibc);
+  const buildEnv = installRust();
+  run(process.execPath, ["scripts/build-native.ts"], {
+    cwd: root,
+    env: buildEnv,
+  });
+
+  const platform = getPlatform(targetLibc);
+  run(process.execPath, ["scripts/stage-native.ts", `--platform=${platform}`], {
+    cwd: root,
+  });
+  verifyPrebuild(targetLibc);
+};
+
+const verifyInsideContainer = (targetLibc: LinuxLibc): void => {
+  if (process.platform !== "linux" || getLinuxLibc() !== targetLibc) {
+    throw new Error(`Expected a ${targetLibc} Linux verification container`);
+  }
+  installVerifyDependencies(targetLibc);
+  verifyPrebuild(targetLibc);
+};
+
 const testInsideContainer = (targetLibc: LinuxLibc): void => {
   if (process.platform !== "linux" || getLinuxLibc() !== targetLibc) {
     throw new Error(`Expected a ${targetLibc} Linux test container`);
@@ -210,7 +251,9 @@ const testInsideContainer = (targetLibc: LinuxLibc): void => {
   }
 
   run("npm", ["install", "--global", "pnpm@12.4.2"]);
-  run("pnpm", ["install", "--frozen-lockfile"], { cwd: root });
+  run("pnpm", ["install", "--frozen-lockfile", "--store-dir=/pnpm-store"], {
+    cwd: root,
+  });
   run("pnpm", ["test"], { cwd: root });
 };
 
@@ -218,6 +261,8 @@ if (!values.inside) {
   runInContainer();
 } else if (mode === "build") {
   buildInsideContainer(libc);
+} else if (mode === "verify") {
+  verifyInsideContainer(libc);
 } else {
   testInsideContainer(libc);
 }
