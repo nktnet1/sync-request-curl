@@ -45,27 +45,40 @@ jobs:
         with:
           node-version: 24.x
 
-      - name: Restore cached native addon
-        id: native-cache
+      - name: Restore cached Linux native addon
+        if: matrix.kind == 'linux'
+        id: native-linux-cache
         uses: actions/cache@v4
         with:
           path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
-          key: native-prebuild-v1-${{ matrix.platform }}-${{ hashFiles('native/**', 'rust-toolchain.toml', 'scripts/*.ts', 'src/native/platform-key-core.ts') }}
+          key: native-prebuild-v2-${{ matrix.platform }}-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml', 'native/build.rs', 'native/build.ts', 'native/src/**', 'rust-toolchain.toml', 'scripts/linux-prebuild.ts') }}
+
+      - name: Restore cached desktop native addon
+        if: matrix.kind == 'desktop'
+        id: native-desktop-cache
+        uses: actions/cache@v4
+        with:
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          key: native-prebuild-v2-${{ matrix.platform }}-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml', 'native/build.rs', 'native/build.ts', 'native/src/**', 'rust-toolchain.toml') }}
 
       - name: Build Linux prebuild
-        if: matrix.kind == 'linux' && steps.native-cache.outputs.cache-hit != 'true'
+        if: matrix.kind == 'linux' && steps.native-linux-cache.outputs.cache-hit != 'true'
         run: node scripts/linux-prebuild.ts --libc=${{ matrix.libc }} --mode=build
 
+      - name: Verify cached Linux prebuild
+        if: matrix.kind == 'linux' && steps.native-linux-cache.outputs.cache-hit == 'true'
+        run: node scripts/linux-prebuild.ts --libc=${{ matrix.libc }} --mode=verify
+
       - name: Set up Rust
-        if: matrix.kind == 'desktop' && steps.native-cache.outputs.cache-hit != 'true'
+        if: matrix.kind == 'desktop' && steps.native-desktop-cache.outputs.cache-hit != 'true'
         run: rustup toolchain install 1.88.0 --profile minimal --no-self-update
 
       - name: Build native addon
-        if: matrix.kind == 'desktop' && steps.native-cache.outputs.cache-hit != 'true'
+        if: matrix.kind == 'desktop' && steps.native-desktop-cache.outputs.cache-hit != 'true'
         run: node scripts/build-native.ts
 
       - name: Stage native addon
-        if: matrix.kind == 'desktop' && steps.native-cache.outputs.cache-hit != 'true'
+        if: matrix.kind == 'desktop' && steps.native-desktop-cache.outputs.cache-hit != 'true'
         run: node scripts/stage-native.ts --platform=${{ matrix.platform }}
 
       - name: Verify native addon loads
@@ -78,6 +91,7 @@ jobs:
           name: native-${{ matrix.artifact }}
           path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
           if-no-files-found: error
+          retention-days: 1
 
   test:
     needs: native
@@ -116,25 +130,25 @@ jobs:
           path: prebuilds
 
       - name: Run lint and format
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '24.x'
         run: pnpm check
 
       - name: Test source-build orchestration
         run: pnpm test:source-build
 
       - name: Run typecheck
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '24.x'
         run: pnpm typecheck
 
       - name: Build package
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '24.x'
         run: pnpm build
 
       - name: Run tests with coverage
         run: pnpm test --coverage
 
       - name: Upload coverage reports to Codecov
-        if: matrix.os == 'ubuntu-latest' && github.ref_name == 'main'
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '24.x' && github.ref_name == 'main'
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -203,6 +217,7 @@ jobs:
             dist
             prebuilds/sync_request_curl_native.linux-x64-gnu.node
           if-no-files-found: error
+          retention-days: 1
 
   runtime-compat:
     needs: build-runtime-compat
@@ -229,8 +244,6 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24.x
-          cache: "pnpm"
-          cache-dependency-path: pnpm-lock.yaml
 
       - name: Download runtime compatibility fixture
         uses: actions/download-artifact@v4
@@ -308,6 +321,14 @@ jobs:
         with:
           name: native-alpine-latest
           path: prebuilds
+
+      - name: Restore Alpine pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/sync-request-curl/pnpm-store
+          key: pnpm-musl-v1-node-${{ matrix.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-musl-v1-node-${{ matrix.node-version }}-
 
       - name: Test on Alpine
         run: node scripts/linux-prebuild.ts --libc=musl --mode=test --node=${{ matrix.node-version }}

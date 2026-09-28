@@ -43,11 +43,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
-          key: native-prebuild-v1-${{ matrix.platform }}-${{ hashFiles('native/**', 'rust-toolchain.toml', 'scripts/*.ts', 'src/native/platform-key-core.ts') }}
+          key: native-prebuild-v2-${{ matrix.platform }}-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml', 'native/build.rs', 'native/build.ts', 'native/src/**', 'rust-toolchain.toml', 'scripts/linux-prebuild.ts') }}
 
       - name: Build Linux prebuild
         if: steps.native-cache.outputs.cache-hit != 'true'
         run: node scripts/linux-prebuild.ts --libc=${{ matrix.libc }} --mode=build
+
+      - name: Verify cached Linux prebuild
+        if: steps.native-cache.outputs.cache-hit == 'true'
+        run: node scripts/linux-prebuild.ts --libc=${{ matrix.libc }} --mode=verify
 
       - name: Upload native addon
         uses: actions/upload-artifact@v4
@@ -55,6 +59,7 @@ jobs:
           name: prebuild-${{ matrix.platform }}
           path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
           if-no-files-found: error
+          retention-days: 1
 
   build-desktop:
     strategy:
@@ -85,7 +90,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
-          key: native-prebuild-v1-${{ matrix.platform }}-${{ hashFiles('native/**', 'rust-toolchain.toml', 'scripts/*.ts', 'src/native/platform-key-core.ts') }}
+          key: native-prebuild-v2-${{ matrix.platform }}-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml', 'native/build.rs', 'native/build.ts', 'native/src/**', 'rust-toolchain.toml') }}
 
       - name: Set up Rust
         if: steps.native-cache.outputs.cache-hit != 'true'
@@ -108,6 +113,7 @@ jobs:
           name: prebuild-${{ matrix.platform }}
           path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
           if-no-files-found: error
+          retention-days: 1
 
   build-windows-x86:
     runs-on: windows-2025
@@ -117,19 +123,31 @@ jobs:
         with:
           node-version: 22.x
           architecture: x86
+      - name: Restore cached native addon
+        id: native-cache
+        uses: actions/cache@v4
+        with:
+          path: prebuilds/sync_request_curl_native.win32-ia32-msvc.node
+          key: native-prebuild-v2-win32-ia32-msvc-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml', 'native/build.rs', 'native/build.ts', 'native/src/**', 'rust-toolchain.toml') }}
       - name: Set up Rust and x86 target
+        if: steps.native-cache.outputs.cache-hit != 'true'
         run: |
           rustup toolchain install 1.88.0 --profile minimal --no-self-update
           rustup target add i686-pc-windows-msvc --toolchain 1.88.0
       - name: Build and verify with 32-bit Node.js
+        if: steps.native-cache.outputs.cache-hit != 'true'
         run: node native/build.ts
       - name: Stage native addon
+        if: steps.native-cache.outputs.cache-hit != 'true'
         run: Copy-Item native/build/sync_request_curl_native.node prebuilds/sync_request_curl_native.win32-ia32-msvc.node
+      - name: Verify native addon loads
+        run: node scripts/verify-native-load.ts --file=prebuilds/sync_request_curl_native.win32-ia32-msvc.node
       - uses: actions/upload-artifact@v4
         with:
           name: prebuild-win32-ia32-msvc
           path: prebuilds/sync_request_curl_native.win32-ia32-msvc.node
           if-no-files-found: error
+          retention-days: 1
 
   collect:
     needs:
@@ -163,6 +181,7 @@ jobs:
           name: native-prebuilds
           path: prebuilds/*.node
           if-no-files-found: error
+          retention-days: 1
 
       - name: Write release metadata
         run: |
@@ -176,6 +195,7 @@ jobs:
           name: release-metadata
           path: release-metadata
           if-no-files-found: error
+          retention-days: 7
 
   package:
     needs: collect
@@ -228,3 +248,5 @@ jobs:
           name: release-packages
           path: release-tarballs/*.tgz
           if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

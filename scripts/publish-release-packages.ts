@@ -1,59 +1,24 @@
-import { lstatSync, readdirSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { realpathSync } from "node:fs";
+import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { supportedPlatformKeys } from "#/native/platform-key-core";
-import { run } from "#scripts/process";
+import { publishReleasePackages } from "#scripts/release-publisher";
 
 const { values } = parseArgs({
   options: {
     registry: { type: "string" },
+    tag: { type: "string" },
+    "expected-sha": { type: "string" },
+    "dry-run": { type: "boolean", default: false },
   },
 });
 
 const registry = values.registry;
-if (!registry) {
-  throw new Error(
-    "--registry is required. Refusing to publish without an explicit registry.",
-  );
-}
+if (!registry) throw new Error("--registry is required");
 
-const directory = resolve(import.meta.dirname, "..", "release-packages");
-const tarballs = readdirSync(directory)
-  .filter((entry) => entry.endsWith(".tgz"))
-  .map((entry) => join(directory, entry))
-  .filter((path) => lstatSync(path).isFile());
-
-const nativeTarballs = tarballs
-  .filter((path) => basename(path).startsWith("nktnet-sync-request-curl-"))
-  .sort();
-const mainTarballs = tarballs.filter((path) =>
-  basename(path).startsWith("sync-request-curl-"),
-);
-
-if (nativeTarballs.length !== supportedPlatformKeys.length) {
-  throw new Error(
-    `Expected ${supportedPlatformKeys.length} native release tarballs, found ${nativeTarballs.length}`,
-  );
-}
-if (mainTarballs.length !== 1) {
-  throw new Error(
-    `Expected exactly one main release tarball, found ${mainTarballs.length}`,
-  );
-}
-
-const publish = (tarball: string, accessPublic = false): void => {
-  const args = ["publish", tarball, "--registry", registry, "--ignore-scripts"];
-  if (accessPublic) {
-    args.push("--access", "public");
-  }
-  run("npm", args);
-};
-
-for (const tarball of nativeTarballs) {
-  publish(tarball, true);
-}
-publish(mainTarballs[0]);
-
-console.log(
-  `Published ${nativeTarballs.length} native packages and the main package to ${registry}`,
-);
+publishReleasePackages({
+  root: realpathSync(resolve(import.meta.dirname, "..")),
+  registry,
+  tag: values.tag,
+  expectedSha: values["expected-sha"],
+  dryRun: values["dry-run"],
+});
