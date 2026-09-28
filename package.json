@@ -27,6 +27,7 @@
   },
   "scripts": {
     "release:beta": "node scripts/release-beta.ts",
+    "bootstrap:native": "node scripts/bootstrap-native-packages.ts",
     "start": "tsx tests/app/server",
     "dev": "tsx watch --include ./tests/app ./tests/app/server.ts",
     "test:source-build": "node --test tests/build/*.check.mjs",

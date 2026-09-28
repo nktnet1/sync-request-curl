@@ -27,8 +27,12 @@ export const run = (
   }
 
   if (result.status !== 0) {
-    const stderr = options.capture ? result.stderr?.trim() : undefined;
-    const detail = stderr ? `: ${stderr}` : "";
+    const output = options.capture
+      ? [result.stderr?.trim(), result.stdout?.trim()]
+          .filter(Boolean)
+          .join("\n")
+      : "";
+    const detail = output ? `: ${output}` : "";
     throw new Error(`${command} ${args.join(" ")} failed${detail}`);
   }
 
