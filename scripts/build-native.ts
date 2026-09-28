@@ -80,5 +80,4 @@ if (!shouldSkipIfNeededBuild()) {
   run(process.execPath, [join(nativeDir, "build.ts"), ...nativeBuildArgs], {
     cwd: root,
   });
-  console.log(`Built native addon: ${localOutput}`);
 }

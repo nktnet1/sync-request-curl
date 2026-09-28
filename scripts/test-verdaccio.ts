@@ -27,6 +27,7 @@ import {
   createNativePackageManifest,
   parseReleasePackageJson,
 } from "#scripts/release-package";
+import { parseReleaseVersion } from "#scripts/release-policy";
 
 interface PackResult {
   filename: string;
@@ -65,7 +66,7 @@ const mainPackageRoot = join(packagesRoot, "main");
 const nativePackageRoot = join(packagesRoot, "native");
 const tarballsRoot = join(temporaryRoot, "tarballs");
 const consumerRoot = join(temporaryRoot, "consumer");
-const configPath = join(verdaccioRoot, "config.json");
+const configPath = join(verdaccioRoot, "config.yaml");
 const verdaccioLog = join(verdaccioRoot, "verdaccio.log");
 const npmrcPath = join(temporaryRoot, ".npmrc");
 
@@ -159,47 +160,41 @@ const stagePackages = (): void => {
 
 const createVerdaccioConfig = (): void => {
   mkdirSync(verdaccioRoot, { recursive: true });
-  writeJson(configPath, {
-    storage: join(verdaccioRoot, "storage"),
-    auth: {
-      htpasswd: {
-        file: join(verdaccioRoot, "htpasswd"),
-        max_users: 10,
-      },
-    },
-    uplinks: {
-      npmjs: {
-        url: "https://registry.npmjs.org/",
-      },
-    },
-    packages: {
-      "@nktnet/*": {
-        access: "$all",
-        publish: "$authenticated",
-        unpublish: "$authenticated",
-      },
-      "sync-request-curl": {
-        access: "$all",
-        publish: "$authenticated",
-        unpublish: "$authenticated",
-      },
-      "**": {
-        access: "$all",
-        publish: "$authenticated",
-        unpublish: "$authenticated",
-        proxy: "npmjs",
-      },
-    },
-    log: {
-      type: "stdout",
-      format: "pretty",
-      level: "warn",
-      redact: {
-        paths: ["req.header.authorization", "req.header.cookie"],
-        censor: "<redacted>",
-      },
-    },
-  });
+  writeFileSync(
+    configPath,
+    [
+      `storage: ${JSON.stringify(join(verdaccioRoot, "storage"))}`,
+      "auth:",
+      "  htpasswd:",
+      `    file: ${JSON.stringify(join(verdaccioRoot, "htpasswd"))}`,
+      "    max_users: 10",
+      "uplinks:",
+      "  npmjs:",
+      '    url: "https://registry.npmjs.org/"',
+      "packages:",
+      '  "@nktnet/*":',
+      '    access: "$all"',
+      '    publish: "$authenticated"',
+      '    unpublish: "$authenticated"',
+      '  "sync-request-curl":',
+      '    access: "$all"',
+      '    publish: "$authenticated"',
+      '    unpublish: "$authenticated"',
+      '  "**":',
+      '    access: "$all"',
+      '    publish: "$authenticated"',
+      '    unpublish: "$authenticated"',
+      '    proxy: "npmjs"',
+      "log:",
+      '  type: "stdout"',
+      '  format: "pretty"',
+      '  level: "warn"',
+      "  redact:",
+      '    paths: ["req.header.authorization", "req.header.cookie"]',
+      '    censor: "<redacted>"',
+      "",
+    ].join("\n"),
+  );
 };
 
 const startVerdaccio = (registry: string): void => {
@@ -409,6 +404,27 @@ const verifyPublishedMetadata = (
   }
 };
 
+const verifyPublishedDistTags = (
+  registry: string,
+  npmEnv: NodeJS.ProcessEnv,
+  distTag: string,
+): void => {
+  for (const packageName of [nativePackageName, packageJson.name]) {
+    const distTags = JSON.parse(
+      run(
+        npmCommand,
+        ["view", packageName, "dist-tags", "--json", "--registry", registry],
+        { capture: true, env: npmEnv },
+      ),
+    ) as Record<string, string>;
+    if (distTags[distTag] !== packageJson.version) {
+      throw new Error(
+        `${packageName} ${distTag} dist-tag points to ${distTags[distTag] ?? "nothing"}, expected ${packageJson.version}`,
+      );
+    }
+  }
+};
+
 const verifyCleanInstall = async (
   registry: string,
   npmEnv: NodeJS.ProcessEnv,
@@ -503,7 +519,7 @@ const stopChildProcess = async (
   }
   const exited = once(child, "exit").then(() => true);
   child.kill("SIGTERM");
-  const timedOut = delay(5_000).then(() => false);
+  const timedOut = delay(5_000, false, { ref: false });
   if (!(await Promise.race([exited, timedOut]))) {
     child.kill("SIGKILL");
     await once(child, "exit");
@@ -540,6 +556,7 @@ const main = async (): Promise<void> => {
   const registry = `http://127.0.0.1:${port}`;
   const mainPackageSpec = `${packageJson.name}@${packageJson.version}`;
   const nativePackageSpec = `${nativePackageName}@${packageJson.version}`;
+  const { distTag } = parseReleaseVersion(packageJson.version);
   createVerdaccioConfig();
 
   stage(`Building ${accent(mainPackageSpec)} for ${accent(platform)}`);
@@ -586,32 +603,43 @@ const main = async (): Promise<void> => {
       "--access",
       "public",
       "--ignore-scripts",
+      "--tag",
+      distTag,
     ],
-    { cwd: root, env: npmEnv },
+    { cwd: root, capture: true, env: npmEnv },
   );
   success(`${accent(nativePackageSpec)} published`);
 
   stage(`Publishing ${accent(mainPackageSpec)}`);
   run(
     npmCommand,
-    ["publish", mainTarball, "--registry", registry, "--ignore-scripts"],
-    { cwd: root, env: npmEnv },
+    [
+      "publish",
+      mainTarball,
+      "--registry",
+      registry,
+      "--ignore-scripts",
+      "--tag",
+      distTag,
+    ],
+    { cwd: root, capture: true, env: npmEnv },
   );
   success(`${accent(mainPackageSpec)} published`);
 
   stage("Verifying published optional-dependency metadata");
   verifyPublishedMetadata(registry, npmEnv);
-  success(`Main package points to ${accent(nativePackageSpec)}`);
+  verifyPublishedDistTags(registry, npmEnv, distTag);
+  success(
+    `Main package points to ${accent(nativePackageSpec)} and both packages use the ${accent(distTag)} dist-tag`,
+  );
 
   await verifyCleanInstall(registry, npmEnv);
-
-  console.log(
-    `\n${styleText(["bold", "green"], "PASS")} ${styleText("bold", "Verdaccio publish + request smoke test")} (${accent(platform)})`,
-  );
 };
 
+let passed = false;
 try {
   await main();
+  passed = true;
 } catch (error) {
   if (existsSync(verdaccioLog)) {
     const log = readFileSync(verdaccioLog, "utf8").trim();
@@ -621,8 +649,7 @@ try {
   }
   throw error;
 } finally {
-  await stopSmokeServer();
-  await stopVerdaccio();
+  await Promise.all([stopSmokeServer(), stopVerdaccio()]);
   if (values.keep) {
     console.log(
       `${styleText(["bold", "yellow"], "KEPT")} Verdaccio smoke-test files at ${temporaryRoot}`,
@@ -630,4 +657,10 @@ try {
   } else {
     rmSync(temporaryRoot, { recursive: true, force: true });
   }
+}
+
+if (passed) {
+  console.log(
+    `\n${styleText(["bold", "green"], "PASS")} ${styleText("bold", "Verdaccio publish + request smoke test")} (${accent(platform)})`,
+  );
 }
