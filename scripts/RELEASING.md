@@ -42,8 +42,12 @@ pnpm publish:release-packages --registry=https://registry.npmjs.org --tag=v5.0.0
 ```
 
 Local publication requires npm authentication and `tar` on PATH. CI uses npm
-trusted publishing. `--directory` overrides the artifact directory. The dry run
-validates local artifacts and prints the plan; it does not test registry access.
+trusted publishing. `--directory` overrides the artifact directory, but release
+artifact and metadata directories must resolve inside the repository root; symlink
+escapes and symlinked metadata files are rejected. npm is invoked through the
+`npm-cli.js` installation paired with the running Node.js executable rather than a
+caller-controlled `PATH`. The dry run validates local artifacts and prints the plan;
+it does not test registry access.
 
 Both paths use the same policy: numbered beta versions publish under `beta`,
 stable versions under `latest`, and other version formats are rejected. All

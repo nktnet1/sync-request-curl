@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { lstatSync, readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
 import { run } from "#scripts/process";
 import {
@@ -20,6 +20,74 @@ const { values } = parseArgs({
     "dry-run": { type: "boolean", default: false },
   },
 });
+
+const root = realpathSync(resolve(import.meta.dirname, ".."));
+
+const resolveNpmCli = (): string => {
+  const nodeDirectory = dirname(realpathSync(process.execPath));
+  const candidates = [
+    resolve(
+      nodeDirectory,
+      "..",
+      "lib",
+      "node_modules",
+      "npm",
+      "bin",
+      "npm-cli.js",
+    ),
+    resolve(nodeDirectory, "node_modules", "npm", "bin", "npm-cli.js"),
+    resolve(nodeDirectory, "..", "node_modules", "npm", "bin", "npm-cli.js"),
+  ];
+  for (const candidate of candidates) {
+    try {
+      const canonical = realpathSync(candidate);
+      if (lstatSync(canonical).isFile()) return canonical;
+    } catch {
+      // Try the next layout used by supported Node installations.
+    }
+  }
+  throw new Error(
+    `Unable to locate npm-cli.js next to the current Node.js executable: ${process.execPath}`,
+  );
+};
+
+const npmCli = resolveNpmCli();
+const npmArgs = (args: string[]): string[] => [npmCli, ...args];
+const isInsideRoot = (path: string): boolean => {
+  const pathFromRoot = relative(root, path);
+  return (
+    pathFromRoot !== ".." &&
+    !pathFromRoot.startsWith(`..${sep}`) &&
+    !isAbsolute(pathFromRoot)
+  );
+};
+const resolveReleaseDirectory = (
+  requested: string | undefined,
+  fallback: string,
+  option: string,
+): string => {
+  const candidate = resolve(root, requested ?? fallback);
+  if (!isInsideRoot(candidate)) {
+    throw new Error(`${option} must resolve inside the repository root`);
+  }
+  const canonical = realpathSync(candidate);
+  if (!isInsideRoot(canonical) || !lstatSync(canonical).isDirectory()) {
+    throw new Error(
+      `${option} must be a directory inside the repository root and must not escape through a symlink`,
+    );
+  }
+  return canonical;
+};
+const readMetadataFile = (
+  metadata: string,
+  filename: "sha" | "tag",
+): string => {
+  const file = join(metadata, filename);
+  if (!lstatSync(file).isFile()) {
+    throw new Error(`Release metadata ${filename} must be a regular file`);
+  }
+  return readFileSync(file, "utf8").trim();
+};
 
 const registry = values.registry;
 if (!registry) throw new Error("--registry is required");
@@ -40,20 +108,26 @@ if (Boolean(values.metadata) !== Boolean(values["expected-sha"])) {
 }
 let tag = values.tag;
 if (values.metadata) {
-  const metadata = resolve(values.metadata);
-  const sha = readFileSync(join(metadata, "sha"), "utf8").trim();
+  const metadata = resolveReleaseDirectory(
+    values.metadata,
+    "release-metadata",
+    "--metadata",
+  );
+  const sha = readMetadataFile(metadata, "sha");
   if (!/^[a-f0-9]{40}$/.test(sha) || sha !== values["expected-sha"]) {
     throw new Error(
       "Release metadata SHA does not match the expected build SHA",
     );
   }
-  tag = readFileSync(join(metadata, "tag"), "utf8").trim();
+  tag = readMetadataFile(metadata, "tag");
 }
 if (!tag) throw new Error("Supply --tag or --metadata with --expected-sha");
 const version = versionFromReleaseTag(tag);
 const { distTag } = parseReleaseVersion(version);
-const directory = resolve(
-  values.directory ?? resolve(import.meta.dirname, "..", "release-packages"),
+const directory = resolveReleaseDirectory(
+  values.directory,
+  "release-packages",
+  "--directory",
 );
 const artifacts = readdirSync(directory)
   .filter((file) => file.endsWith(".tgz"))
@@ -74,15 +148,15 @@ const plan = planRelease(artifacts, version);
 
 const isAlreadyPublished = (name: string, file: string): boolean => {
   const result = spawnSync(
-    "npm",
-    [
+    process.execPath,
+    npmArgs([
       "view",
       `${name}@${version}`,
       "dist.integrity",
       "--json",
       "--registry",
       registry,
-    ],
+    ]),
     {
       encoding: "utf8",
     },
@@ -127,17 +201,20 @@ if (values["dry-run"]) {
     return false;
   });
   for (const { file } of pending) {
-    run("npm", [
-      "publish",
-      file,
-      "--registry",
-      registry,
-      "--access",
-      "public",
-      "--ignore-scripts",
-      "--tag",
-      distTag,
-    ]);
+    run(
+      process.execPath,
+      npmArgs([
+        "publish",
+        file,
+        "--registry",
+        registry,
+        "--access",
+        "public",
+        "--ignore-scripts",
+        "--tag",
+        distTag,
+      ]),
+    );
   }
   console.log(
     `Release ${version} complete (${distTag}); ${pending.length} packages published`,

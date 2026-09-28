@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import {
   getNativePackageName,
@@ -11,12 +11,16 @@ import {
 const mocks = vi.hoisted(() => ({ spawn: vi.fn() }));
 vi.mock("node:child_process", () => ({ spawnSync: mocks.spawn }));
 const originalArgv = process.argv;
+const root = resolve(import.meta.dirname, "../..");
 let directory: string;
+let outsideDirectory: string;
 afterEach(() => {
   process.argv = originalArgv;
   vi.restoreAllMocks();
   vi.resetModules();
   if (directory) rmSync(directory, { recursive: true, force: true });
+  if (outsideDirectory)
+    rmSync(outsideDirectory, { recursive: true, force: true });
 });
 
 test.each([
@@ -29,8 +33,10 @@ test.each([
   "network",
   "bad-manifest",
   "bad-sha",
+  "directory-traversal",
+  "metadata-traversal",
 ])("publisher orchestration: %s", async (mode) => {
-  directory = mkdtempSync(join(tmpdir(), "curl-release-test-"));
+  directory = mkdtempSync(join(root, ".curl-release-test-"));
   const version = mode === "stable" ? "5.0.0" : "5.0.0-beta.2";
   const names = [
     ...supportedPlatformKeys.map(getNativePackageName),
@@ -51,14 +57,16 @@ test.each([
   const calls: string[][] = [];
   mocks.spawn.mockReset();
   mocks.spawn.mockImplementation((command: string, args: string[]) => {
-    calls.push([command, ...args]);
     if (command === "tar") {
+      calls.push([command, ...args]);
       return { status: 0, stdout: JSON.stringify(manifests.get(args[1])) };
     }
-    expect(command).toBe("npm");
-    if (args[0] === "view") {
+    expect(command).toBe(process.execPath);
+    expect(args[0]).toMatch(/[\\/]npm[\\/]bin[\\/]npm-cli\.js$/);
+    calls.push(["npm", ...args.slice(1)]);
+    if (args[1] === "view") {
       // Fail on the last lookup to prove earlier absent packages weren't published.
-      if (args[1].startsWith("sync-request-curl@")) {
+      if (args[2].startsWith("sync-request-curl@")) {
         if (mode === "network")
           return { status: 1, stdout: '{"error":{"code":"E503"}}' };
         if (mode === "different")
@@ -74,7 +82,7 @@ test.each([
       }
       return { status: 1, stdout: '{"error":{"code":"E404"}}' };
     }
-    expect(args[0]).toBe("publish");
+    expect(args[1]).toBe("publish");
     return { status: 0 };
   });
   process.argv = [
@@ -83,7 +91,19 @@ test.each([
     "--registry=https://registry.npmjs.org",
     `--directory=${directory}`,
   ];
-  if (mode === "bad-sha" || mode === "metadata") {
+  if (mode === "directory-traversal") {
+    outsideDirectory = mkdtempSync(join(tmpdir(), "curl-release-outside-"));
+    process.argv[3] = `--directory=${outsideDirectory}`;
+    process.argv.push(`--tag=v${version}`);
+  } else if (mode === "metadata-traversal") {
+    outsideDirectory = mkdtempSync(join(tmpdir(), "curl-release-outside-"));
+    writeFileSync(join(outsideDirectory, "sha"), "a".repeat(40));
+    writeFileSync(join(outsideDirectory, "tag"), `v${version}`);
+    process.argv.push(
+      `--metadata=${outsideDirectory}`,
+      `--expected-sha=${"a".repeat(40)}`,
+    );
+  } else if (mode === "bad-sha" || mode === "metadata") {
     writeFileSync(join(directory, "sha"), "a".repeat(40));
     writeFileSync(join(directory, "tag"), `v${version}`);
     process.argv.push(
@@ -96,7 +116,16 @@ test.each([
   if (mode === "dry-run") process.argv.push("--dry-run");
   vi.spyOn(console, "log").mockImplementation(() => undefined);
   const execute = import("#scripts/publish-release-packages");
-  if (["different", "network", "bad-manifest", "bad-sha"].includes(mode)) {
+  if (
+    [
+      "different",
+      "network",
+      "bad-manifest",
+      "bad-sha",
+      "directory-traversal",
+      "metadata-traversal",
+    ].includes(mode)
+  ) {
     await expect(execute).rejects.toThrow();
   } else {
     await execute;
@@ -119,7 +148,15 @@ test.each([
   } else {
     expect(publishes).toHaveLength(0);
   }
-  if (mode === "dry-run" || mode === "bad-manifest" || mode === "bad-sha") {
+  if (
+    [
+      "dry-run",
+      "bad-manifest",
+      "bad-sha",
+      "directory-traversal",
+      "metadata-traversal",
+    ].includes(mode)
+  ) {
     expect(calls.filter(([command]) => command === "npm")).toHaveLength(0);
   }
 });

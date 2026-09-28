@@ -8,7 +8,7 @@ const versionPattern =
 
 export const parseReleaseVersion = (version: string) => {
   const match = versionPattern.exec(version);
-  if (!match || match[0] !== version) {
+  if (match?.[0] !== version) {
     throw new Error(`Invalid or unsupported release version: ${version}`);
   }
   return {
