@@ -1,222 +1,24 @@
-import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { realpathSync } from "node:fs";
+import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { run } from "#scripts/process";
-import {
-  parseReleaseVersion,
-  planRelease,
-  versionFromReleaseTag,
-} from "#scripts/release-policy";
+import { publishReleasePackages } from "#scripts/release-publisher";
 
 const { values } = parseArgs({
   options: {
     registry: { type: "string" },
-    directory: { type: "string" },
     tag: { type: "string" },
-    metadata: { type: "string" },
     "expected-sha": { type: "string" },
     "dry-run": { type: "boolean", default: false },
   },
 });
 
-const root = realpathSync(resolve(import.meta.dirname, ".."));
-
-const resolveNpmCli = (): string => {
-  const nodeDirectory = dirname(realpathSync(process.execPath));
-  const candidates = [
-    resolve(
-      nodeDirectory,
-      "..",
-      "lib",
-      "node_modules",
-      "npm",
-      "bin",
-      "npm-cli.js",
-    ),
-    resolve(nodeDirectory, "node_modules", "npm", "bin", "npm-cli.js"),
-    resolve(nodeDirectory, "..", "node_modules", "npm", "bin", "npm-cli.js"),
-  ];
-  for (const candidate of candidates) {
-    try {
-      const canonical = realpathSync(candidate);
-      if (lstatSync(canonical).isFile()) return canonical;
-    } catch {
-      // Try the next layout used by supported Node installations.
-    }
-  }
-  throw new Error(
-    `Unable to locate npm-cli.js next to the current Node.js executable: ${process.execPath}`,
-  );
-};
-
-const npmCli = resolveNpmCli();
-const npmArgs = (args: string[]): string[] => [npmCli, ...args];
-const isInsideRoot = (path: string): boolean => {
-  const pathFromRoot = relative(root, path);
-  return (
-    pathFromRoot !== ".." &&
-    !pathFromRoot.startsWith(`..${sep}`) &&
-    !isAbsolute(pathFromRoot)
-  );
-};
-const resolveReleaseDirectory = (
-  requested: string | undefined,
-  fallback: string,
-  option: string,
-): string => {
-  const candidate = resolve(root, requested ?? fallback);
-  if (!isInsideRoot(candidate)) {
-    throw new Error(`${option} must resolve inside the repository root`);
-  }
-  const canonical = realpathSync(candidate);
-  if (!isInsideRoot(canonical) || !lstatSync(canonical).isDirectory()) {
-    throw new Error(
-      `${option} must be a directory inside the repository root and must not escape through a symlink`,
-    );
-  }
-  return canonical;
-};
-const readMetadataFile = (
-  metadata: string,
-  filename: "sha" | "tag",
-): string => {
-  const file = join(metadata, filename);
-  if (!lstatSync(file).isFile()) {
-    throw new Error(`Release metadata ${filename} must be a regular file`);
-  }
-  return readFileSync(file, "utf8").trim();
-};
-
 const registry = values.registry;
 if (!registry) throw new Error("--registry is required");
-const registryUrl = new URL(registry);
-if (
-  !["https:", "http:"].includes(registryUrl.protocol) ||
-  registryUrl.username ||
-  registryUrl.password
-) {
-  throw new Error(
-    "Registry must be an HTTP(S) URL without embedded credentials",
-  );
-}
-if (values.metadata && values.tag)
-  throw new Error("Use --metadata or --tag, not both");
-if (Boolean(values.metadata) !== Boolean(values["expected-sha"])) {
-  throw new Error("--metadata and --expected-sha must be supplied together");
-}
-let tag = values.tag;
-if (values.metadata) {
-  const metadata = resolveReleaseDirectory(
-    values.metadata,
-    "release-metadata",
-    "--metadata",
-  );
-  const sha = readMetadataFile(metadata, "sha");
-  if (!/^[a-f0-9]{40}$/.test(sha) || sha !== values["expected-sha"]) {
-    throw new Error(
-      "Release metadata SHA does not match the expected build SHA",
-    );
-  }
-  tag = readMetadataFile(metadata, "tag");
-}
-if (!tag) throw new Error("Supply --tag or --metadata with --expected-sha");
-const version = versionFromReleaseTag(tag);
-const { distTag } = parseReleaseVersion(version);
-const directory = resolveReleaseDirectory(
-  values.directory,
-  "release-packages",
-  "--directory",
-);
-const artifacts = readdirSync(directory)
-  .filter((file) => file.endsWith(".tgz"))
-  .map((name) => {
-    const file = join(directory, name);
-    if (!lstatSync(file).isFile())
-      throw new Error(`Not a regular tarball: ${file}`);
-    // Read only the manifest; never extract or execute package contents.
-    const manifest: unknown = JSON.parse(
-      run("tar", ["-xOf", file, "package/package.json"], { capture: true }),
-    );
-    if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
-      throw new Error(`Invalid package manifest: ${file}`);
-    }
-    return { file, manifest: manifest as Record<string, unknown> };
-  });
-const plan = planRelease(artifacts, version);
 
-const isAlreadyPublished = (name: string, file: string): boolean => {
-  const result = spawnSync(
-    process.execPath,
-    npmArgs([
-      "view",
-      `${name}@${version}`,
-      "dist.integrity",
-      "--json",
-      "--registry",
-      registry,
-    ]),
-    {
-      encoding: "utf8",
-    },
-  );
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    // Only a structured E404 means absent; authentication/network failures abort.
-    let errorCode: unknown;
-    try {
-      errorCode = JSON.parse(result.stdout || result.stderr)?.error?.code;
-    } catch {
-      // An unstructured failure is not proof that the version is absent.
-    }
-    if (result.status !== null && errorCode === "E404") return false;
-    throw new Error(
-      `Registry lookup failed for ${name}@${version}: ${result.stderr}`,
-    );
-  }
-  const integrity: unknown = JSON.parse(result.stdout);
-  const expected = `sha512-${createHash("sha512").update(readFileSync(file)).digest("base64")}`;
-  if (
-    typeof integrity !== "string" ||
-    !integrity.split(/\s+/).includes(expected)
-  ) {
-    throw new Error(
-      `Published tarball differs from local artifact: ${name}@${version}`,
-    );
-  }
-  return true;
-};
-
-if (values["dry-run"]) {
-  for (const { manifest } of plan)
-    console.log(`Would publish ${manifest.name}@${version} --tag ${distTag}`);
-} else {
-  // Preflight every package before the first registry mutation.
-  const pending = plan.filter(({ manifest, file }) => {
-    if (!isAlreadyPublished(String(manifest.name), file)) return true;
-    console.log(
-      `Identical ${manifest.name}@${version} already published; skipping`,
-    );
-    return false;
-  });
-  for (const { file } of pending) {
-    run(
-      process.execPath,
-      npmArgs([
-        "publish",
-        file,
-        "--registry",
-        registry,
-        "--access",
-        "public",
-        "--ignore-scripts",
-        "--tag",
-        distTag,
-      ]),
-    );
-  }
-  console.log(
-    `Release ${version} complete (${distTag}); ${pending.length} packages published`,
-  );
-}
+publishReleasePackages({
+  root: realpathSync(resolve(import.meta.dirname, "..")),
+  registry,
+  tag: values.tag,
+  expectedSha: values["expected-sha"],
+  dryRun: values["dry-run"],
+});

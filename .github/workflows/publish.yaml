@@ -63,6 +63,4 @@ jobs:
         run: >-
           node scripts/publish-release-packages.ts
           --registry=https://registry.npmjs.org
-          --directory=release-packages
-          --metadata=release-metadata
           --expected-sha="$BUILD_SHA"

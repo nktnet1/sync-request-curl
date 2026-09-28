@@ -1,26 +1,48 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
+import { gzipSync } from "node:zlib";
 import { afterEach, expect, test, vi } from "vitest";
 import {
   getNativePackageName,
   supportedPlatformKeys,
 } from "#/native/platform-key-core";
+import { publishReleasePackages } from "#scripts/release-publisher";
 
 const mocks = vi.hoisted(() => ({ spawn: vi.fn() }));
 vi.mock("node:child_process", () => ({ spawnSync: mocks.spawn }));
 const originalArgv = process.argv;
-const root = resolve(import.meta.dirname, "../..");
-let directory: string;
-let outsideDirectory: string;
+const writeTarball = (file: string, manifest: object): void => {
+  const payload = Buffer.from(JSON.stringify(manifest));
+  const header = Buffer.alloc(512);
+  header.write("package/package.json", 0, "utf8");
+  header.write(
+    `${payload.length.toString(8).padStart(11, "0")}\0`,
+    124,
+    "ascii",
+  );
+  header[156] = "0".charCodeAt(0);
+  const padding = Buffer.alloc((512 - (payload.length % 512)) % 512);
+  writeFileSync(
+    file,
+    gzipSync(Buffer.concat([header, payload, padding, Buffer.alloc(1024)])),
+  );
+};
+
+let rootDirectory: string | undefined;
 afterEach(() => {
   process.argv = originalArgv;
   vi.restoreAllMocks();
   vi.resetModules();
-  if (directory) rmSync(directory, { recursive: true, force: true });
-  if (outsideDirectory)
-    rmSync(outsideDirectory, { recursive: true, force: true });
+  if (rootDirectory) rmSync(rootDirectory, { recursive: true, force: true });
+  rootDirectory = undefined;
 });
 
 test.each([
@@ -33,34 +55,30 @@ test.each([
   "network",
   "bad-manifest",
   "bad-sha",
-  "directory-traversal",
-  "metadata-traversal",
-])("publisher orchestration: %s", async (mode) => {
-  directory = mkdtempSync(join(root, ".curl-release-test-"));
+])("publisher orchestration: %s", (mode) => {
+  rootDirectory = mkdtempSync(join(tmpdir(), "curl-release-test-"));
+  const directory = join(rootDirectory, "release-packages");
+  mkdirSync(directory);
   const version = mode === "stable" ? "5.0.0" : "5.0.0-beta.2";
   const names = [
     ...supportedPlatformKeys.map(getNativePackageName),
     "sync-request-curl",
   ];
-  const manifests = new Map<string, object>();
+  const filesByName = new Map<string, string>();
   for (const [index, name] of names.entries()) {
     const file = join(directory, `${index}.tgz`);
-    writeFileSync(file, "test artifact");
-    manifests.set(file, {
+    writeTarball(file, {
       name,
       version: mode === "bad-manifest" && index === 0 ? "0.0.0" : version,
       optionalDependencies: Object.fromEntries(
         names.slice(0, -1).map((native) => [native, version]),
       ),
     });
+    filesByName.set(name, file);
   }
   const calls: string[][] = [];
   mocks.spawn.mockReset();
   mocks.spawn.mockImplementation((command: string, args: string[]) => {
-    if (command === "tar") {
-      calls.push([command, ...args]);
-      return { status: 0, stdout: JSON.stringify(manifests.get(args[1])) };
-    }
     expect(command).toBe(process.execPath);
     expect(args[0]).toMatch(/[\\/]npm[\\/]bin[\\/]npm-cli\.js$/);
     calls.push(["npm", ...args.slice(1)]);
@@ -73,10 +91,14 @@ test.each([
           return { status: 0, stdout: '"sha512-other"' };
       }
       if (mode === "retry") {
+        const suffix = `@${version}`;
+        const packageName = args[2].slice(0, -suffix.length);
+        const file = filesByName.get(packageName);
+        if (!file) throw new Error(`Missing fixture for ${packageName}`);
         return {
           status: 0,
           stdout: JSON.stringify(
-            `sha512-${createHash("sha512").update("test artifact").digest("base64")}`,
+            `sha512-${createHash("sha512").update(readFileSync(file)).digest("base64")}`,
           ),
         };
       }
@@ -85,50 +107,29 @@ test.each([
     expect(args[1]).toBe("publish");
     return { status: 0 };
   });
-  process.argv = [
-    process.execPath,
-    "publish-release-packages.ts",
-    "--registry=https://registry.npmjs.org",
-    `--directory=${directory}`,
-  ];
-  if (mode === "directory-traversal") {
-    outsideDirectory = mkdtempSync(join(tmpdir(), "curl-release-outside-"));
-    process.argv[3] = `--directory=${outsideDirectory}`;
-    process.argv.push(`--tag=v${version}`);
-  } else if (mode === "metadata-traversal") {
-    outsideDirectory = mkdtempSync(join(tmpdir(), "curl-release-outside-"));
-    writeFileSync(join(outsideDirectory, "sha"), "a".repeat(40));
-    writeFileSync(join(outsideDirectory, "tag"), `v${version}`);
-    process.argv.push(
-      `--metadata=${outsideDirectory}`,
-      `--expected-sha=${"a".repeat(40)}`,
-    );
-  } else if (mode === "bad-sha" || mode === "metadata") {
-    writeFileSync(join(directory, "sha"), "a".repeat(40));
-    writeFileSync(join(directory, "tag"), `v${version}`);
-    process.argv.push(
-      `--metadata=${directory}`,
-      `--expected-sha=${(mode === "bad-sha" ? "b" : "a").repeat(40)}`,
-    );
-  } else {
-    process.argv.push(`--tag=v${version}`);
+
+  const options = {
+    root: rootDirectory,
+    registry: "https://registry.npmjs.org",
+    tag: `v${version}` as string | undefined,
+    expectedSha: undefined as string | undefined,
+    dryRun: mode === "dry-run",
+  };
+  if (mode === "bad-sha" || mode === "metadata") {
+    const metadataDirectory = join(rootDirectory, "release-metadata");
+    mkdirSync(metadataDirectory);
+    writeFileSync(join(metadataDirectory, "sha"), "a".repeat(40));
+    writeFileSync(join(metadataDirectory, "tag"), `v${version}`);
+    options.tag = undefined;
+    options.expectedSha = (mode === "bad-sha" ? "b" : "a").repeat(40);
   }
-  if (mode === "dry-run") process.argv.push("--dry-run");
+
   vi.spyOn(console, "log").mockImplementation(() => undefined);
-  const execute = import("#scripts/publish-release-packages");
-  if (
-    [
-      "different",
-      "network",
-      "bad-manifest",
-      "bad-sha",
-      "directory-traversal",
-      "metadata-traversal",
-    ].includes(mode)
-  ) {
-    await expect(execute).rejects.toThrow();
+  const execute = () => publishReleasePackages(options);
+  if (["different", "network", "bad-manifest", "bad-sha"].includes(mode)) {
+    expect(execute).toThrow();
   } else {
-    await execute;
+    execute();
   }
   const publishes = calls.filter(
     ([command, action]) => command === "npm" && action === "publish",
@@ -148,15 +149,23 @@ test.each([
   } else {
     expect(publishes).toHaveLength(0);
   }
-  if (
-    [
-      "dry-run",
-      "bad-manifest",
-      "bad-sha",
-      "directory-traversal",
-      "metadata-traversal",
-    ].includes(mode)
-  ) {
+  if (["dry-run", "bad-manifest", "bad-sha"].includes(mode)) {
     expect(calls.filter(([command]) => command === "npm")).toHaveLength(0);
   }
 });
+
+test.each(["--directory=elsewhere", "--metadata=elsewhere"])(
+  "publisher CLI rejects removed path option: %s",
+  async (option) => {
+    process.argv = [
+      process.execPath,
+      "publish-release-packages.ts",
+      "--registry=https://registry.npmjs.org",
+      option,
+      "--tag=v5.0.0-beta.2",
+    ];
+    await expect(import("#scripts/publish-release-packages")).rejects.toThrow(
+      /Unknown option/,
+    );
+  },
+);
