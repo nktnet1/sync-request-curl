@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { nextBetaVersion } from "#scripts/beta-version";
 import { run } from "#scripts/process";
+import { releaseLabel } from "#scripts/release-policy";
 
 const { values } = parseArgs({
   options: {
@@ -75,7 +76,7 @@ Run --publish from a clean checkout, not after an uncommitted preparation run.`)
     ...git(["tag", "--list"]).split("\n"),
     ...remoteTags,
   ]);
-  const tag = `v${version}`;
+  const tag = releaseLabel(version);
   console.log(`${manifest.version} -> ${version} (npm tag: beta)`);
   if (values["dry-run"]) return;
 
@@ -110,7 +111,7 @@ Run --publish from a clean checkout, not after an uncommitted preparation run.`)
     throw new Error("Package version changed during validation");
   }
   git(["add", "--", "package.json"]);
-  git(["commit", "-m", `chore: release ${version}`]);
+  git(["commit", "-m", tag]);
   git(["tag", "-a", tag, "-m", tag]);
   run(
     "git",

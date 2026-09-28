@@ -33,10 +33,24 @@ describe("native platform detection", () => {
 
   test("rejects unsupported platforms and architectures", () => {
     expect(() => getPlatformKey("freebsd", "x64", "gnu")).toThrow(
-      "sync-request-curl does not provide a native binary for freebsd-x64",
+      [
+        "sync-request-curl does not provide a native binary for freebsd-x64.",
+        "",
+        "Build from source with:",
+        "  npx --no-install sync-request-curl-build",
+        "",
+        "See the Compatibility section for prerequisites.",
+      ].join("\n"),
     );
     expect(() => getPlatformKey("linux", "ia32", "gnu")).toThrow(
-      "sync-request-curl does not provide a native binary for linux-ia32",
+      [
+        "sync-request-curl does not provide a native binary for linux-ia32.",
+        "",
+        "Build from source with:",
+        "  npx --no-install sync-request-curl-build",
+        "",
+        "See the Compatibility section for prerequisites.",
+      ].join("\n"),
     );
   });
 
