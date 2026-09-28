@@ -39,6 +39,24 @@ yarn run sync-request-curl-build
 Run the build with the same Node.js architecture that will use the library. Run
 `sync-request-curl-build --help` for the current prerequisites.
 
+Source builds keep the release defaults: macOS links the system libcurl, while
+Linux and Windows build the libcurl bundled by `curl-sys`. Override that choice
+explicitly when needed:
+
+```sh
+npx --no-install sync-request-curl-build --libcurl=system
+npx --no-install sync-request-curl-build --libcurl=bundled
+```
+
+`--libcurl=system` is strict: if `curl-sys` cannot discover a compatible system
+libcurl, the build fails instead of silently falling back to its bundled copy.
+On Unix systems, system discovery uses the platform libcurl or `pkg-config`.
+On Windows, `curl-sys` uses vcpkg. System builds inherit the capabilities and
+TLS behaviour of the selected libcurl. `--libcurl=bundled` uses the pinned libcurl
+shipped by `curl-sys` and retains the package's vendored build configuration.
+The flag selects the libcurl implementation. Both modes continue to use
+`curl-sys` as the Rust FFI layer.
+
 Source builds require:
 
 - Rust 1.88 or newer and Cargo

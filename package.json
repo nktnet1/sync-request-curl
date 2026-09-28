@@ -74,7 +74,7 @@
   ],
   "author": "Khiet Tam Nguyen",
   "license": "MIT",
-  "description": "Fast synchronous HTTP requests for Node.js using an in-process Node-API binding to libcurl.",
+  "description": "A high-performance Node.js alternative to sync-request for making synchronous web requests.",
   "dependencies": {
     "valibot": "^1.5.0"
   },

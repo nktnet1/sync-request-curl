@@ -8,7 +8,11 @@ const root = resolve(import.meta.dirname, "..");
 const nativeDir = join(root, "native");
 const buildDir = join(nativeDir, "build");
 const localOutput = join(buildDir, "sync_request_curl_native.node");
-const ifNeeded = new Set(process.argv.slice(2)).has("--if-needed");
+const cliArgs = process.argv.slice(2);
+const ifNeeded = new Set(cliArgs).has("--if-needed");
+const nativeBuildArgs = cliArgs.filter(
+  (argument) => argument !== "--if-needed",
+);
 
 mkdirSync(buildDir, { recursive: true });
 
@@ -51,7 +55,7 @@ const matchingPrebuild = (): string | undefined => {
 };
 
 const shouldSkipIfNeededBuild = (): boolean => {
-  if (!ifNeeded) {
+  if (!ifNeeded || nativeBuildArgs.length > 0) {
     return false;
   }
 
@@ -73,6 +77,8 @@ const shouldSkipIfNeededBuild = (): boolean => {
 };
 
 if (!shouldSkipIfNeededBuild()) {
-  run(process.execPath, [join(nativeDir, "build.ts")], { cwd: root });
+  run(process.execPath, [join(nativeDir, "build.ts"), ...nativeBuildArgs], {
+    cwd: root,
+  });
   console.log(`Built native addon: ${localOutput}`);
 }

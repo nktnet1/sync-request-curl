@@ -37,6 +37,12 @@ static in the prebuild path. The Linux GCC unwinding runtime (`libgcc_s`) may
 remain dynamically linked; the dependency verifier permits this platform runtime
 while rejecting dynamically linked copies of the bundled native dependencies.
 
+The source builder accepts `--libcurl=system` and `--libcurl=bundled`. With no flag it
+keeps those platform defaults: system libcurl on macOS, bundled libcurl elsewhere.
+`--libcurl=system` fails if `curl-sys` cannot discover a system libcurl instead of
+allowing its normal bundled fallback. Both modes still use `curl-sys` for the Rust
+FFI bindings.
+
 ## Release prebuilds
 
 See [the prebuilds README](../prebuilds/README.md) for the release matrix and CI details.
