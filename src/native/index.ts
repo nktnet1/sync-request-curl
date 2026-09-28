@@ -152,7 +152,14 @@ export const getPlatformKey = (
   }
 
   throw new Error(
-    `sync-request-curl does not provide a native binary for ${platform}-${arch}`,
+    [
+      `sync-request-curl does not provide a native binary for ${platform}-${arch}.`,
+      "",
+      "Build from source with:",
+      "  npx --no-install sync-request-curl-build",
+      "",
+      "See the Compatibility section for prerequisites.",
+    ].join("\n"),
   );
 };
 
@@ -207,15 +214,19 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
 
   const platform = options.platform ?? process.platform;
   const arch = options.arch ?? process.arch;
-  const sourceBuildHelp =
-    "Build from source with: npx --no-install sync-request-curl-build. " +
-    "See the Compatibility section for prerequisites.";
   const platformKey =
     options.platformKey ??
     resolveNativePlatformKey(platform, arch, getLinuxLibc());
   if (!platformKey) {
     throw new Error(
-      `sync-request-curl does not provide a native binary for ${platform}-${arch}. ${sourceBuildHelp}`,
+      [
+        `sync-request-curl does not provide a native binary for ${platform}-${arch}.`,
+        "",
+        "Build from source with:",
+        "  npx --no-install sync-request-curl-build",
+        "",
+        "See the Compatibility section for prerequisites.",
+      ].join("\n"),
     );
   }
   const prebuiltBinding = loadFirstExisting(
@@ -237,8 +248,19 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
   }
 
   throw new Error(
-    `Unable to load the sync-request-curl native binary for ${platformKey}. ` +
-      `The optional package ${nativePackageName} is missing. Reinstall sync-request-curl with optional dependencies enabled. ${sourceBuildHelp}`,
+    [
+      `Unable to load the sync-request-curl native binary for ${platformKey}.`,
+      "",
+      `The optional package ${nativePackageName} is missing.`,
+      "",
+      "Install the prebuilt binary with:",
+      "  npm install sync-request-curl --include=optional",
+      "",
+      "Alternatively, if optional dependencies were intentionally omitted, build from source with:",
+      "  npx --no-install sync-request-curl-build",
+      "",
+      "See the Compatibility section for source-build prerequisites.",
+    ].join("\n"),
   );
 };
 

@@ -259,7 +259,19 @@ describe("native binding loading", () => {
         },
       }),
     ).toThrow(
-      "The optional package @nktnet/sync-request-curl-linux-arm64-musl is missing",
+      [
+        "Unable to load the sync-request-curl native binary for linux-arm64-musl.",
+        "",
+        "The optional package @nktnet/sync-request-curl-linux-arm64-musl is missing.",
+        "",
+        "Install the prebuilt binary with:",
+        "  npm install sync-request-curl --include=optional",
+        "",
+        "Alternatively, if optional dependencies were intentionally omitted, build from source with:",
+        "  npx --no-install sync-request-curl-build",
+        "",
+        "See the Compatibility section for source-build prerequisites.",
+      ].join("\n"),
     );
   });
 });
