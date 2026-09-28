@@ -1,4 +1,4 @@
-import { Agent } from "node:http";
+import { Agent, type IncomingHttpHeaders } from "node:http";
 import { URL } from "node:url";
 import * as v from "valibot";
 import { FormData } from "#/form-data";
@@ -59,9 +59,7 @@ const headerValueSchema = v.union([
 
 const incomingHttpHeadersObjectSchema = v.record(v.string(), headerValueSchema);
 
-export const incomingHttpHeadersSchema = v.custom<
-  v.InferOutput<typeof incomingHttpHeadersObjectSchema>
->(
+export const incomingHttpHeadersSchema = v.custom<IncomingHttpHeaders>(
   (input) => v.is(incomingHttpHeadersObjectSchema, input),
   "Invalid HTTP headers",
 );

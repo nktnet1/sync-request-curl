@@ -1,5 +1,5 @@
 import type { Blob } from "node:buffer";
-import { Agent } from "node:http";
+import { Agent, type IncomingHttpHeaders } from "node:http";
 import { URL } from "node:url";
 import * as v from "valibot";
 import { describe, expect, expectTypeOf, test } from "vitest";
@@ -41,6 +41,16 @@ import {
 } from "#/validation";
 
 describe("schema-aligned types", () => {
+  test("preserves Node's well-known response header types", () => {
+    expectTypeOf<Response["headers"]>().toEqualTypeOf<IncomingHttpHeaders>();
+    expectTypeOf<Response["headers"]["content-type"]>().toEqualTypeOf<
+      string | undefined
+    >();
+    expectTypeOf<Response["headers"]["set-cookie"]>().toEqualTypeOf<
+      string[] | undefined
+    >();
+  });
+
   test("keeps public data types tied to their schemas", () => {
     expectTypeOf<FormDataEntry>().toEqualTypeOf<
       v.InferOutput<typeof formDataEntrySchema>
