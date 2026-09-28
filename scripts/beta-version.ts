@@ -1,5 +1,4 @@
-const stableVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
-const betaVersion = /^(\d+\.\d+\.\d+)-beta\.(0|[1-9]\d*)$/;
+import { parseReleaseVersion } from "#scripts/release-policy";
 
 /** Select a beta above the manifest, registry versions, and existing Git tags. */
 export const nextBetaVersion = (
@@ -7,12 +6,9 @@ export const nextBetaVersion = (
   published: string[],
   tags: string[],
 ): string => {
-  const currentBeta = betaVersion.exec(current);
-  const base = currentBeta?.[1] ?? current;
-  if (!stableVersion.test(base) || !base.startsWith("5.")) {
-    throw new Error(
-      "Expected a v5 stable or numbered beta version in package.json",
-    );
+  const { base } = parseReleaseVersion(current);
+  if (!base.startsWith("5.")) {
+    throw new Error("Expected a v5 version in package.json");
   }
   if (published.includes(base)) {
     throw new Error(
@@ -25,9 +21,15 @@ export const nextBetaVersion = (
     ...published,
     ...tags.map((tag) => tag.replace(/^v/, "")),
   ]) {
-    const match = betaVersion.exec(version);
-    if (match?.[1] === base) {
-      const number = BigInt(match[2]);
+    // Other releases may use channels this publisher does not support.
+    let parsed: ReturnType<typeof parseReleaseVersion>;
+    try {
+      parsed = parseReleaseVersion(version);
+    } catch {
+      continue;
+    }
+    if (parsed.base === base && parsed.beta !== undefined) {
+      const number = BigInt(parsed.beta);
       if (number > highest) highest = number;
     }
   }
