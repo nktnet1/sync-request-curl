@@ -8,7 +8,7 @@ The published package does not download or compile native code during installati
 
 ### Windows
 
-Prebuilt addons are prepared for x64, arm64, and x86 (`ia32`) Windows. The x86 addon is built and load-checked with 32-bit Node.js 22; use a Node.js release that provides an x86 runtime. No Visual Studio, Python, Rust, CMake, vcpkg, or node-gyp installation is required by package consumers.
+Prebuilt addons are prepared for x64, arm64, and x86 (`ia32`) Windows. The x86 addon is built and load-checked with 32-bit Node.js 22. Use a Node.js release that provides an x86 runtime. No Visual Studio, Python, Rust, CMake, vcpkg, or node-gyp installation is required by package consumers.
 
 Requests may still fail with Libcurl Error 60 (`CURLE_PEER_FAILED_VERIFICATION`) when the peer certificate cannot be verified. `rejectUnauthorized: false` disables origin certificate and hostname verification and should only be used when that trade-off is intentional.
 
@@ -33,20 +33,20 @@ npx --no-install sync-request-curl-build
 
 Run this with the same Node.js architecture that will use the library. This works
 with installation scripts disabled and does not require node-gyp or development
-JavaScript dependencies. Run the build command from your application directory;
-there is no need to navigate into `node_modules`. `--no-install` prevents npx from downloading a
+JavaScript dependencies. Run the build command from your application directory.
+There is no need to navigate into `node_modules`. `--no-install` prevents npx from downloading a
 separate package if the local command is missing. With pnpm, use
 `pnpm exec sync-request-curl-build`. Use `--help` to see the build prerequisites.
-`--omit=optional` skips all optional dependencies for that npm installation;
-omit that flag if you want them installed. Rebuild after replacing or upgrading
-the package. The command is explicit; installation still runs no build hook.
+`--omit=optional` skips all optional dependencies for that npm installation.
+Omit that flag if you want them installed. Rebuild after replacing or upgrading
+the package. The command is explicit. Installation still runs no build hook.
 
 Prerequisites:
 
 - Rust 1.88 or newer and Cargo (rustup uses the included pinned toolchain).
-- Linux/other Unix: a C/C++ compiler, make, Perl, and pkg-config; install your
+- Linux/other Unix: a C/C++ compiler, make, Perl, and pkg-config. Install your
   distribution's development tools and CA certificates.
-- macOS: Xcode Command Line Tools; the addon uses system libcurl.
+- macOS: Xcode Command Line Tools. The addon uses system libcurl.
 - Windows: Visual Studio C++ Build Tools and Windows SDK for the target CPU.
   For x86, also install `rustup target add i686-pc-windows-msvc`.
 - Access to the locked Cargo dependencies, or an already populated Cargo cache.
@@ -83,7 +83,7 @@ pnpm test
 
 `build:native` explicitly invokes Cargo even when a prebuild exists. The
 source-build checks test orchestration and failure handling with mocked compiler
-processes; `pnpm test` exercises the real addon, preferring the local build.
+processes. `pnpm test` exercises the real addon, preferring the local build.
 The build itself validates addon loading before installing the output. For a
 standalone load check after compilation:
 

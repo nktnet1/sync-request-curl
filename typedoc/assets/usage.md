@@ -4,7 +4,7 @@
 request(method, url, options);
 ```
 
-The request function is the package default export. ESM consumers can import `FormData` and public types from the root entry; the `/types` subpath remains available explicitly:
+The request function is the package default export. ESM consumers can import `FormData` and public types from the root entry. The `/types` subpath remains available explicitly:
 
 ```typescript
 import request, { FormData } from 'sync-request-curl';
@@ -93,27 +93,3 @@ console.log(jsonBody);
 </details>
 
 <br/>
-
-### Proxy configuration
-
-Use `proxy: { url, username?, password? }` instead of the former `proxy` string
-and separate `proxyAuth` option. `url` is required. Both credential fields can be
-omitted for an unauthenticated proxy. A username alone uses an empty password;
-`password` requires an explicit `username` (which may be an empty string).
-
-```ts
-request('GET', 'https://example.com', {
-  proxy: { url: 'http://localhost:8080', username: 'user' },
-});
-```
-
-Without an explicit username, credentials embedded in `url` are decoded and
-used. An explicit username overrides both URL credentials; omitting `password`
-in that case sends an empty password, never the password from the URL.
-Proxy credentials apply only to the proxy hop. Ambient proxy variables remain
-ignored. The former `proxyAuth` option is rejected rather than silently ignored.
-
-When both effective credential fields are empty, libcurl may omit
-`Proxy-Authorization` or send an empty Basic credential pair, depending on the
-libcurl build. Do not rely on an all-empty pair to force an authentication header.
-A non-empty username with an omitted password still uses `username:` credentials.

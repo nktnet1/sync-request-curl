@@ -5,10 +5,10 @@ import {
   ReflectionKind,
 } from "typedoc";
 
-const hasTypeAliasAncestor = (reflection: Reflection): boolean => {
+const hasNonRuntimePropertyContainer = (reflection: Reflection): boolean => {
   let parent = reflection.parent;
   while (parent) {
-    if (parent.kindOf(ReflectionKind.TypeAlias)) {
+    if (parent.kindOf(ReflectionKind.TypeAlias | ReflectionKind.Interface)) {
       return true;
     }
     parent = parent.parent;
@@ -17,10 +17,11 @@ const hasTypeAliasAncestor = (reflection: Reflection): boolean => {
 };
 
 /**
- * Properties synthesized while expanding schema-derived type aliases can retain
- * the Valibot object-entry expression as a TypeDoc `defaultValue`. A type alias
- * cannot define runtime property defaults, so those values are documentation
- * artefacts rather than defaults of the public API.
+ * Properties synthesized while expanding schema-derived type aliases or
+ * interface-shaped aliases can retain the Valibot object-entry expression as a
+ * TypeDoc `defaultValue`. Neither type aliases nor interfaces define runtime
+ * property defaults, so those values are documentation artefacts rather than
+ * defaults of the public API.
  */
 export function removeTypeAliasPropertyDefaults(app: Application): void {
   app.converter.on(Converter.EVENT_RESOLVE_END, ({ project }) => {
@@ -29,7 +30,7 @@ export function removeTypeAliasPropertyDefaults(app: Application): void {
         !reflection.isDeclaration() ||
         !reflection.kindOf(ReflectionKind.Property) ||
         reflection.defaultValue === undefined ||
-        !hasTypeAliasAncestor(reflection)
+        !hasNonRuntimePropertyContainer(reflection)
       ) {
         continue;
       }

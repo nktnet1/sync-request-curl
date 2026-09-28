@@ -2,7 +2,7 @@
 
 If you already use `sync-request`, most code should feel familiar. The main differences are the extra controls `sync-request-curl` provides and a few cases where its behaviour is more explicit.
 
-### What `sync-request-curl` adds
+### Additions
 
 - `Response#getJSON()` is available as a convenience helper.
 - `cache: "memory"` is available as an alternative to the file cache.
@@ -11,11 +11,12 @@ If you already use `sync-request`, most code should feel familiar. The main diff
 - `overallTimeout` sets a deadline for the whole operation, alongside the per-attempt `timeout` and inactivity `socketTimeout` options.
 - Proxy, TLS, local network binding, and TCP keepalive have dedicated options instead of requiring low-level libcurl callbacks.
 
-### Where behaviour differs
+### Behavioural differences
 
-- Request bodies are allowed on `GET`, `DELETE`, and `HEAD`, and falsy JSON values such as `false`, `0`, `""`, and `null` are valid payloads.
+- [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html) defines request framing independently of the method, so request content is permitted on `GET`, `DELETE`, and `HEAD`. The standard also notes that this content has no generally defined semantics and may be rejected by some implementations.
+- Falsy JSON values such as `false`, `0`, `""`, and `null` are valid payloads.
 - Invalid HTTP framing is rejected rather than sending conflicting `Content-Length` and `Transfer-Encoding` headers.
-- Only absolute `http:` and `https:` URLs are accepted. Proxy environment variables are ignored; use the `proxy` option when proxying a request.
+- Only absolute `http:` and `https:` URLs are accepted. Proxy environment variables are ignored. Use the `proxy` option when proxying a request.
 - An explicit `Authorization` header takes precedence over credentials in the URL, and a caller-supplied `Accept-Encoding` header is left unchanged.
 - 307 and 308 redirects preserve the request method and body. `sync-request` can rewrite some body-bearing redirects to `GET`.
 - Query merging preserves additional literal `?` and `#` delimiters that `sync-request` can truncate while splitting URLs.

@@ -40,11 +40,10 @@ Make synchronous web requests similar to [sync-request](https://github.com/Forbe
 
 - [1. Installation](#installation)
 - [2. Usage](#usage)
-  - [2.1. Proxy configuration](#usage-proxy-configuration)
 - [3. API reference](#api-reference)
 - [4. Differences from `sync-request`](#differences-from-sync-request)
-  - [4.1. What `sync-request-curl` adds](#differences-from-sync-request-what-sync-request-curl-adds)
-  - [4.2. Where behaviour differs](#differences-from-sync-request-where-behaviour-differs)
+  - [4.1. Additions](#differences-from-sync-request-additions)
+  - [4.2. Behavioural differences](#differences-from-sync-request-behavioural-differences)
 - [5. License](#license)
 - [6. Compatibility](#compatibility)
   - [6.1. Windows](#compatibility-windows)
@@ -67,7 +66,7 @@ npm install sync-request-curl
 request(method, url, options);
 ```
 
-The request function is the package default export. ESM consumers can import `FormData` and public types from the root entry; the `/types` subpath remains available explicitly:
+The request function is the package default export. ESM consumers can import `FormData` and public types from the root entry. The `/types` subpath remains available explicitly:
 
 ```typescript
 import request, { FormData } from 'sync-request-curl';
@@ -156,31 +155,6 @@ console.log(jsonBody);
 </details>
 
 <br/>
-
-<a id="usage-proxy-configuration"></a>
-### 2.1. Proxy configuration
-
-Use `proxy: { url, username?, password? }` instead of the former `proxy` string
-and separate `proxyAuth` option. `url` is required. Both credential fields can be
-omitted for an unauthenticated proxy. A username alone uses an empty password;
-`password` requires an explicit `username` (which may be an empty string).
-
-```ts
-request('GET', 'https://example.com', {
-  proxy: { url: 'http://localhost:8080', username: 'user' },
-});
-```
-
-Without an explicit username, credentials embedded in `url` are decoded and
-used. An explicit username overrides both URL credentials; omitting `password`
-in that case sends an empty password, never the password from the URL.
-Proxy credentials apply only to the proxy hop. Ambient proxy variables remain
-ignored. The former `proxyAuth` option is rejected rather than silently ignored.
-
-When both effective credential fields are empty, libcurl may omit
-`Proxy-Authorization` or send an empty Basic credential pair, depending on the
-libcurl build. Do not rely on an all-empty pair to force an authentication header.
-A non-empty username with an omitted password still uses `username:` credentials.
 
 <a id="api-reference"></a>
 ## 3. API reference
@@ -326,7 +300,7 @@ An explicit HTTP/HTTPS proxy and optional Basic credentials.
 | ------ | ------ | ------ |
 | <a id="property-url-1"></a> `url` | `string` | HTTP/HTTPS proxy origin URL. May contain URL-encoded credentials. |
 | <a id="property-username"></a> `username?` | `string` | Overrides both URL credentials. An omitted password becomes an empty string. |
-| <a id="property-password"></a> `password?` | `string` | Proxy password. Requires an explicit username; defaults to an empty string. |
+| <a id="property-password"></a> `password?` | `string` | Proxy password. Requires an explicit username. Defaults to an empty string. |
 
 ***
 
@@ -507,8 +481,8 @@ type GetJSON = <T>(encoding?) => T;
 
 Parse the current response body as JSON.
 
-Unlike `GetBody`, this helper does not reject HTTP error status codes;
-it only throws if the body cannot be parsed as JSON.
+Unlike `GetBody`, this helper does not reject HTTP error status codes.
+It only throws if the body cannot be parsed as JSON.
 
 ##### Type Parameters
 
@@ -537,14 +511,14 @@ than a hidden immutable snapshot.
 
 ##### Properties
 
-| Property | Type | Default value | Description |
-| ------ | ------ | ------ | ------ |
-| <a id="property-getbody"></a> `getBody` | [`GetBody`](#getbody) | `undefined` | Read the response body and throw `ResponseError` for HTTP status >= 300. |
-| <a id="property-getjson"></a> `getJSON` | [`GetJSON`](#getjson) | `undefined` | Parse the response body as JSON without applying HTTP status handling. |
-| <a id="property-statuscode-1"></a> `statusCode` | `number` | `undefined` | HTTP response status code. |
-| <a id="property-headers-2"></a> `headers` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | `incomingHttpHeadersSchema` | Node-style response headers with lowercase keys. |
-| <a id="property-url"></a> `url` | `string` | `undefined` | Final effective URL after query handling and redirects. |
-| <a id="property-body-2"></a> `body` | `Buffer`\<`ArrayBufferLike`\> | `undefined` | Mutable buffered response body. |
+| Property | Type | Description |
+| ------ | ------ | ------ |
+| <a id="property-getbody"></a> `getBody` | [`GetBody`](#getbody) | Read the response body and throw `ResponseError` for HTTP status >= 300. |
+| <a id="property-getjson"></a> `getJSON` | [`GetJSON`](#getjson) | Parse the response body as JSON without applying HTTP status handling. |
+| <a id="property-statuscode-1"></a> `statusCode` | `number` | HTTP response status code. |
+| <a id="property-headers-2"></a> `headers` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Node-style response headers with lowercase keys. |
+| <a id="property-url"></a> `url` | `string` | Final effective URL after query handling and redirects. |
+| <a id="property-body-2"></a> `body` | `Buffer`\<`ArrayBufferLike`\> | Mutable buffered response body. |
 
 ### Multipart
 
@@ -554,11 +528,11 @@ One multipart entry accepted by `FormData`.
 
 ##### Properties
 
-| Property | Type | Default value | Description |
-| ------ | ------ | ------ | ------ |
-| <a id="property-key"></a> `key` | `string` | `metadataSchema` | Multipart field name. |
-| <a id="property-value"></a> `value` | `string` \| `Buffer`\<`ArrayBufferLike`\> \| `Blob` | `undefined` | Text, `Buffer`, or `Blob` field value. |
-| <a id="property-filename"></a> `fileName?` | `string` | `undefined` | Optional file name. Path components are stripped before sending. |
+| Property | Type | Description |
+| ------ | ------ | ------ |
+| <a id="property-key"></a> `key` | `string` | Multipart field name. |
+| <a id="property-value"></a> `value` | `string` \| `Buffer`\<`ArrayBufferLike`\> \| `Blob` | Text, `Buffer`, or `Blob` field value. |
+| <a id="property-filename"></a> `fileName?` | `string` | Optional file name. Path components are stripped before sending. |
 
 ***
 
@@ -775,8 +749,8 @@ Error.constructor
 
 If you already use `sync-request`, most code should feel familiar. The main differences are the extra controls `sync-request-curl` provides and a few cases where its behaviour is more explicit.
 
-<a id="differences-from-sync-request-what-sync-request-curl-adds"></a>
-### 4.1. What `sync-request-curl` adds
+<a id="differences-from-sync-request-additions"></a>
+### 4.1. Additions
 
 - `Response#getJSON()` is available as a convenience helper.
 - `cache: "memory"` is available as an alternative to the file cache.
@@ -785,12 +759,13 @@ If you already use `sync-request`, most code should feel familiar. The main diff
 - `overallTimeout` sets a deadline for the whole operation, alongside the per-attempt `timeout` and inactivity `socketTimeout` options.
 - Proxy, TLS, local network binding, and TCP keepalive have dedicated options instead of requiring low-level libcurl callbacks.
 
-<a id="differences-from-sync-request-where-behaviour-differs"></a>
-### 4.2. Where behaviour differs
+<a id="differences-from-sync-request-behavioural-differences"></a>
+### 4.2. Behavioural differences
 
-- Request bodies are allowed on `GET`, `DELETE`, and `HEAD`, and falsy JSON values such as `false`, `0`, `""`, and `null` are valid payloads.
+- [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html) defines request framing independently of the method, so request content is permitted on `GET`, `DELETE`, and `HEAD`. The standard also notes that this content has no generally defined semantics and may be rejected by some implementations.
+- Falsy JSON values such as `false`, `0`, `""`, and `null` are valid payloads.
 - Invalid HTTP framing is rejected rather than sending conflicting `Content-Length` and `Transfer-Encoding` headers.
-- Only absolute `http:` and `https:` URLs are accepted. Proxy environment variables are ignored; use the `proxy` option when proxying a request.
+- Only absolute `http:` and `https:` URLs are accepted. Proxy environment variables are ignored. Use the `proxy` option when proxying a request.
 - An explicit `Authorization` header takes precedence over credentials in the URL, and a caller-supplied `Accept-Encoding` header is left unchanged.
 - 307 and 308 redirects preserve the request method and body. `sync-request` can rewrite some body-bearing redirects to `GET`.
 - Query merging preserves additional literal `?` and `#` delimiters that `sync-request` can truncate while splitting URLs.
@@ -814,7 +789,7 @@ The published package does not download or compile native code during installati
 <a id="compatibility-windows"></a>
 ### 6.1. Windows
 
-Prebuilt addons are prepared for x64, arm64, and x86 (`ia32`) Windows. The x86 addon is built and load-checked with 32-bit Node.js 22; use a Node.js release that provides an x86 runtime. No Visual Studio, Python, Rust, CMake, vcpkg, or node-gyp installation is required by package consumers.
+Prebuilt addons are prepared for x64, arm64, and x86 (`ia32`) Windows. The x86 addon is built and load-checked with 32-bit Node.js 22. Use a Node.js release that provides an x86 runtime. No Visual Studio, Python, Rust, CMake, vcpkg, or node-gyp installation is required by package consumers.
 
 Requests may still fail with Libcurl Error 60 (`CURLE_PEER_FAILED_VERIFICATION`) when the peer certificate cannot be verified. `rejectUnauthorized: false` disables origin certificate and hostname verification and should only be used when that trade-off is intentional.
 
@@ -842,20 +817,20 @@ npx --no-install sync-request-curl-build
 
 Run this with the same Node.js architecture that will use the library. This works
 with installation scripts disabled and does not require node-gyp or development
-JavaScript dependencies. Run the build command from your application directory;
-there is no need to navigate into `node_modules`. `--no-install` prevents npx from downloading a
+JavaScript dependencies. Run the build command from your application directory.
+There is no need to navigate into `node_modules`. `--no-install` prevents npx from downloading a
 separate package if the local command is missing. With pnpm, use
 `pnpm exec sync-request-curl-build`. Use `--help` to see the build prerequisites.
-`--omit=optional` skips all optional dependencies for that npm installation;
-omit that flag if you want them installed. Rebuild after replacing or upgrading
-the package. The command is explicit; installation still runs no build hook.
+`--omit=optional` skips all optional dependencies for that npm installation.
+Omit that flag if you want them installed. Rebuild after replacing or upgrading
+the package. The command is explicit. Installation still runs no build hook.
 
 Prerequisites:
 
 - Rust 1.88 or newer and Cargo (rustup uses the included pinned toolchain).
-- Linux/other Unix: a C/C++ compiler, make, Perl, and pkg-config; install your
+- Linux/other Unix: a C/C++ compiler, make, Perl, and pkg-config. Install your
   distribution's development tools and CA certificates.
-- macOS: Xcode Command Line Tools; the addon uses system libcurl.
+- macOS: Xcode Command Line Tools. The addon uses system libcurl.
 - Windows: Visual Studio C++ Build Tools and Windows SDK for the target CPU.
   For x86, also install `rustup target add i686-pc-windows-msvc`.
 - Access to the locked Cargo dependencies, or an already populated Cargo cache.
@@ -892,7 +867,7 @@ pnpm test
 
 `build:native` explicitly invokes Cargo even when a prebuild exists. The
 source-build checks test orchestration and failure handling with mocked compiler
-processes; `pnpm test` exercises the real addon, preferring the local build.
+processes. `pnpm test` exercises the real addon, preferring the local build.
 The build itself validates addon loading before installing the output. For a
 standalone load check after compilation:
 

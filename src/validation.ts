@@ -36,7 +36,7 @@ export interface ProxyOptions {
   url: string;
   /** Overrides both URL credentials. An omitted password becomes an empty string. */
   username?: string;
-  /** Proxy password. Requires an explicit username; defaults to an empty string. */
+  /** Proxy password. Requires an explicit username. Defaults to an empty string. */
   password?: string;
 }
 
