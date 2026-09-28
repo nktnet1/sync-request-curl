@@ -107,9 +107,8 @@ const publishBootstrapPackage = (packageName: string): void => {
   }
 };
 
-const main = (): void => {
-  if (values.help) {
-    console.log(`Usage: pnpm bootstrap:native [--publish] [options]
+const printHelp = (): void => {
+  console.log(`Usage: pnpm bootstrap:native [--publish] [options]
 
 Bootstraps only the platform-specific @nktnet/sync-request-curl-* package names.
 Any package name that already exists in the registry is skipped, regardless of version.
@@ -124,42 +123,71 @@ Default: check the registry and dry-run each missing bootstrap package.
 After publishing, configure Trusted Publishing for each package, then let the normal
 release workflow publish real beta/stable versions. Before --publish, authenticate
 with pnpm login. If npm requires 2FA, pnpm will prompt for it.`);
-    return;
-  }
+};
 
+interface PackageScanResult {
+  missing: string[];
+  skipped: number;
+}
+
+const scanPackages = (): PackageScanResult => {
   const packages = supportedPlatformKeys.map(getNativePackageName);
   const missing: string[] = [];
   let skipped = 0;
 
   for (const packageName of packages) {
-    if (packageExists(packageName)) {
-      skipped += 1;
-      console.log(`${status("green", "SKIP")} ${packageName} already exists`);
-    } else {
+    if (!packageExists(packageName)) {
       missing.push(packageName);
       console.log(
         `${status("yellow", "CREATE")} ${packageName} does not exist`,
       );
+      continue;
     }
+
+    skipped += 1;
+    console.log(`${status("green", "SKIP")} ${packageName} already exists`);
   }
 
-  if (missing.length === 0) {
-    console.log(
-      `${status("green", "DONE")} all ${skipped} native packages already exist`,
-    );
-    return;
+  return { missing, skipped };
+};
+
+const ensurePublisherAuthentication = (): boolean => {
+  if (!values.publish) {
+    return true;
   }
 
-  if (values.publish) {
+  try {
     const username = run("pnpm", ["whoami", `--registry=${registry}`], {
       cwd: root,
       capture: true,
     });
     console.log(`${status("cyan", "USER")} publishing as ${username}`);
+    return true;
+  } catch {
+    console.error(
+      `${status("yellow", "LOGIN")} authentication is required to publish to ${registry}`,
+    );
+    console.error(`Run: pnpm login --registry=${registry}`);
+    console.error("Then retry: pnpm bootstrap:native --publish");
+    process.exitCode = 1;
+    return false;
   }
+};
 
+interface BootstrapResult {
+  published: number;
+  skipped: number;
+  validated: number;
+}
+
+const bootstrapMissingPackages = (
+  missing: string[],
+  initialSkipped: number,
+): BootstrapResult => {
   let published = 0;
+  let skipped = initialSkipped;
   let validated = 0;
+
   for (const packageName of missing) {
     if (values.publish && packageExists(packageName)) {
       skipped += 1;
@@ -173,24 +201,55 @@ with pnpm login. If npm requires 2FA, pnpm will prompt for it.`);
       console.log(
         `${status("green", "PUBLISHED")} ${packageName}@${BOOTSTRAP_VERSION}`,
       );
-    } else {
-      validated += 1;
-      console.log(`${status("cyan", "DRY-RUN")} ${packageName} is publishable`);
+      continue;
     }
+
+    validated += 1;
+    console.log(`${status("cyan", "DRY-RUN")} ${packageName} is publishable`);
   }
 
+  return { published, skipped, validated };
+};
+
+const printBootstrapSummary = ({
+  published,
+  skipped,
+  validated,
+}: BootstrapResult): void => {
   if (values.publish) {
     console.log(
       `${status("green", "DONE")} ${published} published, ${skipped} already existed`,
     );
-  } else {
-    console.log(
-      `${status("cyan", "READY")} ${validated} can be bootstrapped, ${skipped} already existed`,
-    );
-    console.log(
-      "Run pnpm bootstrap:native --publish to create the missing packages.",
-    );
+    return;
   }
+
+  console.log(
+    `${status("cyan", "READY")} ${validated} can be bootstrapped, ${skipped} already existed`,
+  );
+  console.log(
+    "Run pnpm bootstrap:native --publish to create the missing packages.",
+  );
+};
+
+const main = (): void => {
+  if (values.help) {
+    printHelp();
+    return;
+  }
+
+  const { missing, skipped } = scanPackages();
+  if (missing.length === 0) {
+    console.log(
+      `${status("green", "DONE")} all ${skipped} native packages already exist`,
+    );
+    return;
+  }
+
+  if (!ensurePublisherAuthentication()) {
+    return;
+  }
+
+  printBootstrapSummary(bootstrapMissingPackages(missing, skipped));
 };
 
 main();
