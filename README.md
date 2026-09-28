@@ -315,7 +315,7 @@ type NestedJsonLike =
   | JsonLike
   | undefined
   | {
-  toJSON: NestedJsonLike;
+  toJSON: () => NestedJsonLike;
 };
 ```
 
@@ -333,7 +333,7 @@ type JsonLike =
 [key: string]: NestedJsonLike;
 }
   | {
-  toJSON: JsonLike;
+  toJSON: () => JsonLike;
 };
 ```
 

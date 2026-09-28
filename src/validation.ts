@@ -16,7 +16,7 @@ export type JsonPrimitive = string | number | boolean | null;
 export type NestedJsonLike =
   | JsonLike
   | undefined
-  | { toJSON(): NestedJsonLike };
+  | { toJSON: () => NestedJsonLike };
 
 /**
  * Values accepted for JSON request bodies.
@@ -31,7 +31,7 @@ export type JsonLike =
   | JsonPrimitive
   | readonly NestedJsonLike[]
   | { [key: string]: NestedJsonLike }
-  | { toJSON(): JsonLike };
+  | { toJSON: () => JsonLike };
 
 /**
  * Buffer encodings accepted by response body helpers.

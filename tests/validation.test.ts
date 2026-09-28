@@ -60,27 +60,19 @@ describe("schema-aligned types", () => {
     expectTypeOf<UppercaseHttpVerb>().toEqualTypeOf<
       v.InferOutput<typeof uppercaseHttpVerbSchema>
     >();
-    expectTypeOf<HttpVerb>().toEqualTypeOf<
+    type StandardVerb =
       | "GET"
-      | "get"
       | "HEAD"
-      | "head"
       | "POST"
-      | "post"
       | "PUT"
-      | "put"
       | "DELETE"
-      | "delete"
       | "CONNECT"
-      | "connect"
       | "OPTIONS"
-      | "options"
       | "TRACE"
-      | "trace"
       | "PATCH"
-      | "patch"
-      | "PROPFIND"
-      | "propfind"
+      | "PROPFIND";
+    expectTypeOf<HttpVerb>().toEqualTypeOf<
+      StandardVerb | Lowercase<StandardVerb>
     >();
     expectTypeOf<
       v.InferOutput<typeof httpVerbInputSchema>

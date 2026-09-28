@@ -4,14 +4,7 @@ export { FormData } from "#/form-data";
 
 import type {
   BufferEncoding,
-  JsonLike,
-  JsonPrimitive,
-  NestedJsonLike,
   optionsSchema,
-  ProxyOptions,
-  RetryDelayFunction,
-  RetryFunction,
-  RetryResponse,
   responseDataSchema,
   uppercaseHttpVerbSchema,
 } from "#/validation";
@@ -26,7 +19,7 @@ export type {
   RetryDelayFunction,
   RetryFunction,
   RetryResponse,
-};
+} from "#/validation";
 
 /** @internal */
 export type UppercaseHttpVerb = v.InferOutput<typeof uppercaseHttpVerbSchema>;
