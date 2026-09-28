@@ -4,12 +4,22 @@ import * as v from "valibot";
 import { FormData } from "#/form-data";
 
 type JsonPrimitive = string | number | boolean | null;
-type NestedJsonLike = JsonLikeValue | undefined | { toJSON(): NestedJsonLike };
-type JsonLikeValue =
+type NestedJsonLike = JsonLike | undefined | { toJSON(): NestedJsonLike };
+
+/**
+ * Values accepted for JSON request bodies.
+ *
+ * This intentionally follows practical `JSON.stringify()` inputs rather than
+ * only strict JSON syntax. `undefined` is allowed inside objects and arrays,
+ * and objects with `toJSON()` (for example `Date`) are supported.
+ *
+ * @group Request
+ */
+export type JsonLike =
   | JsonPrimitive
   | readonly NestedJsonLike[]
   | { [key: string]: NestedJsonLike }
-  | { toJSON(): JsonLikeValue };
+  | { toJSON(): JsonLike };
 
 const headerValueSchema = v.union([
   v.string(),
@@ -101,7 +111,7 @@ const retryDelayFunctionSchema = v.custom<RetryDelayFunction>(
 
 // JSON serializability is validated by jsonBodySchema immediately before use.
 // This schema carries the public input type without eagerly invoking toJSON().
-export const jsonLikeSchema = v.custom<JsonLikeValue>(() => true);
+export const jsonLikeSchema = v.custom<JsonLike>(() => true);
 
 const nativeStringSchema = v.pipe(
   v.string(),

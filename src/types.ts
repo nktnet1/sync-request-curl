@@ -5,7 +5,6 @@ export { FormData } from "#/form-data";
 import type {
   bufferEncodingSchema,
   httpVerbInputSchema,
-  jsonLikeSchema,
   optionsSchema,
   responseDataSchema,
   uppercaseHttpVerbSchema,
@@ -13,22 +12,12 @@ import type {
 
 export type { FormDataEntry } from "#/form-data";
 export type {
+  JsonLike,
   ProxyOptions,
   RetryDelayFunction,
   RetryFunction,
   RetryResponse,
 } from "#/validation";
-
-/**
- * Values accepted for JSON request bodies.
- *
- * This intentionally follows practical `JSON.stringify()` inputs rather than
- * only strict JSON syntax. `undefined` is allowed inside objects and arrays,
- * and objects with `toJSON()` (for example `Date`) are supported.
- *
- * @group Request
- */
-export type JsonLike = v.InferOutput<typeof jsonLikeSchema>;
 
 /** @internal */
 export type UppercaseHttpVerb = v.InferOutput<typeof uppercaseHttpVerbSchema>;

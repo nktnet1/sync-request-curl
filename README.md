@@ -192,20 +192,6 @@ The buffered response after redirects and retries complete.
 
 ***
 
-#### JsonLike
-
-```ts
-type JsonLike = JsonLikeValue;
-```
-
-Values accepted for JSON request bodies.
-
-This intentionally follows practical `JSON.stringify()` inputs rather than
-only strict JSON syntax. `undefined` is allowed inside objects and arrays,
-and objects with `toJSON()` (for example `Date`) are supported.
-
-***
-
 #### HttpVerb
 
 ```ts
@@ -238,7 +224,7 @@ type Options = {
   qs?: {
    [key: string]: unknown;
   };
-  json?: JsonLikeValue;
+  json?: JsonLike;
   body?: string | Buffer<ArrayBufferLike>;
   form?: FormData;
   timeout?: number;
@@ -274,7 +260,7 @@ supplied.
 | <a id="property-cachenamespace"></a> `cacheNamespace?` | `string` | Private cache identity. Defaults to `process.cwd()`. |
 | <a id="property-headers-1"></a> `headers?` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Node-style request headers. |
 | <a id="property-qs"></a> `qs?` | \{ \[`key`: `string`\]: `unknown`; \} | Query values merged with any existing query string. |
-| <a id="property-json"></a> `json?` | `JsonLikeValue` | JSON-compatible request body. Adds `application/json` when needed. |
+| <a id="property-json"></a> `json?` | [`JsonLike`](#jsonlike) | JSON-compatible request body. Adds `application/json` when needed. |
 | <a id="property-body-1"></a> `body?` | `string` \| `Buffer`\<`ArrayBufferLike`\> | Raw string or `Buffer` request body. |
 | <a id="property-form"></a> `form?` | [`FormData`](#formdata) | Synchronous multipart/form-data body. |
 | <a id="property-timeout"></a> `timeout?` | `number` | Per-network-attempt timeout in milliseconds. `0` disables it. |
@@ -289,6 +275,28 @@ supplied.
 | <a id="property-retry"></a> `retry?` | `boolean` \| [`RetryFunction`](#retryfunction) | Retry GET requests, or provide a callback to decide per attempt. |
 | <a id="property-retrydelay"></a> `retryDelay?` | `number` \| [`RetryDelayFunction`](#retrydelayfunction) | Retry delay in milliseconds, or a callback returning the delay. |
 | <a id="property-maxretries"></a> `maxRetries?` | `number` | Maximum retry count. Defaults to 5 when retries are enabled. |
+
+***
+
+#### JsonLike
+
+```ts
+type JsonLike =
+  | JsonPrimitive
+  | readonly NestedJsonLike[]
+  | {
+[key: string]: NestedJsonLike;
+}
+  | {
+  toJSON: JsonLike;
+};
+```
+
+Values accepted for JSON request bodies.
+
+This intentionally follows practical `JSON.stringify()` inputs rather than
+only strict JSON syntax. `undefined` is allowed inside objects and arrays,
+and objects with `toJSON()` (for example `Date`) are supported.
 
 ***
 
