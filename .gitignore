@@ -8,7 +8,9 @@ coverage/
 *.bundle
 
 native/build/
+native/build.mjs
 native/target/
+tests/build/*.check.mjs
 prebuilds/*.node
 .release/
 

@@ -76,8 +76,8 @@ export type GetBody = {
 /**
  * Parse the current response body as JSON.
  *
- * Unlike `GetBody`, this helper does not reject HTTP error status codes;
- * it only throws if the body cannot be parsed as JSON.
+ * Unlike `GetBody`, this helper does not reject HTTP error status codes.
+ * It only throws if the body cannot be parsed as JSON.
  *
  * @group Response
  */

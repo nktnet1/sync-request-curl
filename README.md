@@ -40,11 +40,10 @@ Make synchronous web requests similar to [sync-request](https://github.com/Forbe
 
 - [1. Installation](#installation)
 - [2. Usage](#usage)
-  - [2.1. Proxy configuration](#usage-proxy-configuration)
 - [3. API reference](#api-reference)
 - [4. Differences from `sync-request`](#differences-from-sync-request)
-  - [4.1. What `sync-request-curl` adds](#differences-from-sync-request-what-sync-request-curl-adds)
-  - [4.2. Where behaviour differs](#differences-from-sync-request-where-behaviour-differs)
+  - [4.1. Additions](#differences-from-sync-request-additions)
+  - [4.2. Behavioural differences](#differences-from-sync-request-behavioural-differences)
 - [5. License](#license)
 - [6. Compatibility](#compatibility)
   - [6.1. Windows](#compatibility-windows)
@@ -67,7 +66,9 @@ npm install sync-request-curl
 request(method, url, options);
 ```
 
-The request function is the package default export. ESM consumers can import `FormData` and public types from the root entry; the `/types` subpath remains available explicitly:
+The request function is the package default export. ESM consumers can import
+`FormData` and public types from the root entry. The `/types` subpath remains
+available explicitly:
 
 ```typescript
 import request, { FormData } from 'sync-request-curl';
@@ -135,7 +136,7 @@ const res = request('POST', 'https://example.com/upload', { form });
 console.log('Status Code:', res.statusCode);
 ```
 
-Using a proxy URL (Note: replace with your own proxy details)
+Proxy request
 
 ```javascript
 import request from 'sync-request-curl';
@@ -156,31 +157,6 @@ console.log(jsonBody);
 </details>
 
 <br/>
-
-<a id="usage-proxy-configuration"></a>
-### 2.1. Proxy configuration
-
-Use `proxy: { url, username?, password? }` instead of the former `proxy` string
-and separate `proxyAuth` option. `url` is required. Both credential fields can be
-omitted for an unauthenticated proxy. A username alone uses an empty password;
-`password` requires an explicit `username` (which may be an empty string).
-
-```ts
-request('GET', 'https://example.com', {
-  proxy: { url: 'http://localhost:8080', username: 'user' },
-});
-```
-
-Without an explicit username, credentials embedded in `url` are decoded and
-used. An explicit username overrides both URL credentials; omitting `password`
-in that case sends an empty password, never the password from the URL.
-Proxy credentials apply only to the proxy hop. Ambient proxy variables remain
-ignored. The former `proxyAuth` option is rejected rather than silently ignored.
-
-When both effective credential fields are empty, libcurl may omit
-`Proxy-Authorization` or send an empty Basic credential pair, depending on the
-libcurl build. Do not rely on an all-empty pair to force an authentication header.
-A non-empty username with an omitted password still uses `username:` credentials.
 
 <a id="api-reference"></a>
 ## 3. API reference
@@ -326,7 +302,7 @@ An explicit HTTP/HTTPS proxy and optional Basic credentials.
 | ------ | ------ | ------ |
 | <a id="property-url-1"></a> `url` | `string` | HTTP/HTTPS proxy origin URL. May contain URL-encoded credentials. |
 | <a id="property-username"></a> `username?` | `string` | Overrides both URL credentials. An omitted password becomes an empty string. |
-| <a id="property-password"></a> `password?` | `string` | Proxy password. Requires an explicit username; defaults to an empty string. |
+| <a id="property-password"></a> `password?` | `string` | Proxy password. Requires an explicit username. Defaults to an empty string. |
 
 ***
 
@@ -507,8 +483,8 @@ type GetJSON = <T>(encoding?) => T;
 
 Parse the current response body as JSON.
 
-Unlike `GetBody`, this helper does not reject HTTP error status codes;
-it only throws if the body cannot be parsed as JSON.
+Unlike `GetBody`, this helper does not reject HTTP error status codes.
+It only throws if the body cannot be parsed as JSON.
 
 ##### Type Parameters
 
@@ -537,14 +513,14 @@ than a hidden immutable snapshot.
 
 ##### Properties
 
-| Property | Type | Default value | Description |
-| ------ | ------ | ------ | ------ |
-| <a id="property-getbody"></a> `getBody` | [`GetBody`](#getbody) | `undefined` | Read the response body and throw `ResponseError` for HTTP status >= 300. |
-| <a id="property-getjson"></a> `getJSON` | [`GetJSON`](#getjson) | `undefined` | Parse the response body as JSON without applying HTTP status handling. |
-| <a id="property-statuscode-1"></a> `statusCode` | `number` | `undefined` | HTTP response status code. |
-| <a id="property-headers-2"></a> `headers` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | `incomingHttpHeadersSchema` | Node-style response headers with lowercase keys. |
-| <a id="property-url"></a> `url` | `string` | `undefined` | Final effective URL after query handling and redirects. |
-| <a id="property-body-2"></a> `body` | `Buffer`\<`ArrayBufferLike`\> | `undefined` | Mutable buffered response body. |
+| Property | Type | Description |
+| ------ | ------ | ------ |
+| <a id="property-getbody"></a> `getBody` | [`GetBody`](#getbody) | Read the response body and throw `ResponseError` for HTTP status >= 300. |
+| <a id="property-getjson"></a> `getJSON` | [`GetJSON`](#getjson) | Parse the response body as JSON without applying HTTP status handling. |
+| <a id="property-statuscode-1"></a> `statusCode` | `number` | HTTP response status code. |
+| <a id="property-headers-2"></a> `headers` | \{ \[`key`: `string`\]: `string` \| `string`[] \| `undefined`; \} | Node-style response headers with lowercase keys. |
+| <a id="property-url"></a> `url` | `string` | Final effective URL after query handling and redirects. |
+| <a id="property-body-2"></a> `body` | `Buffer`\<`ArrayBufferLike`\> | Mutable buffered response body. |
 
 ### Multipart
 
@@ -554,11 +530,11 @@ One multipart entry accepted by `FormData`.
 
 ##### Properties
 
-| Property | Type | Default value | Description |
-| ------ | ------ | ------ | ------ |
-| <a id="property-key"></a> `key` | `string` | `metadataSchema` | Multipart field name. |
-| <a id="property-value"></a> `value` | `string` \| `Buffer`\<`ArrayBufferLike`\> \| `Blob` | `undefined` | Text, `Buffer`, or `Blob` field value. |
-| <a id="property-filename"></a> `fileName?` | `string` | `undefined` | Optional file name. Path components are stripped before sending. |
+| Property | Type | Description |
+| ------ | ------ | ------ |
+| <a id="property-key"></a> `key` | `string` | Multipart field name. |
+| <a id="property-value"></a> `value` | `string` \| `Buffer`\<`ArrayBufferLike`\> \| `Blob` | Text, `Buffer`, or `Blob` field value. |
+| <a id="property-filename"></a> `fileName?` | `string` | Optional file name. Path components are stripped before sending. |
 
 ***
 
@@ -773,29 +749,45 @@ Error.constructor
 <a id="differences-from-sync-request"></a>
 ## 4. Differences from `sync-request`
 
-If you already use `sync-request`, most code should feel familiar. The main differences are the extra controls `sync-request-curl` provides and a few cases where its behaviour is more explicit.
+If you already use `sync-request`, most code should feel familiar. The main
+differences are the extra controls `sync-request-curl` provides and a few cases
+where its behaviour is more explicit.
 
-<a id="differences-from-sync-request-what-sync-request-curl-adds"></a>
-### 4.1. What `sync-request-curl` adds
+<a id="differences-from-sync-request-additions"></a>
+### 4.1. Additions
 
 - `Response#getJSON()` is available as a convenience helper.
 - `cache: "memory"` is available as an alternative to the file cache.
-- `retry` and `retryDelay` can be callbacks when you need to decide retry behaviour at runtime.
-- `agent` still accepts the boolean values supported by `sync-request`, and can also take a keep-alive Node `Agent` for connection reuse.
-- `overallTimeout` sets a deadline for the whole operation, alongside the per-attempt `timeout` and inactivity `socketTimeout` options.
-- Proxy, TLS, local network binding, and TCP keepalive have dedicated options instead of requiring low-level libcurl callbacks.
+- `retry` and `retryDelay` can be callbacks when you need to decide retry
+  behaviour at runtime.
+- `agent` still accepts the boolean values supported by `sync-request`, and can
+  also take a keep-alive Node `Agent` for connection reuse.
+- `overallTimeout` sets a deadline for the whole operation, alongside the
+  per-attempt `timeout` and inactivity `socketTimeout` options.
+- Proxy, TLS, local network binding, and TCP keepalive have dedicated options.
 
-<a id="differences-from-sync-request-where-behaviour-differs"></a>
-### 4.2. Where behaviour differs
+<a id="differences-from-sync-request-behavioural-differences"></a>
+### 4.2. Behavioural differences
 
-- Request bodies are allowed on `GET`, `DELETE`, and `HEAD`, and falsy JSON values such as `false`, `0`, `""`, and `null` are valid payloads.
-- Invalid HTTP framing is rejected rather than sending conflicting `Content-Length` and `Transfer-Encoding` headers.
-- Only absolute `http:` and `https:` URLs are accepted. Proxy environment variables are ignored; use the `proxy` option when proxying a request.
-- An explicit `Authorization` header takes precedence over credentials in the URL, and a caller-supplied `Accept-Encoding` header is left unchanged.
-- 307 and 308 redirects preserve the request method and body. `sync-request` can rewrite some body-bearing redirects to `GET`.
-- Query merging preserves additional literal `?` and `#` delimiters that `sync-request` can truncate while splitting URLs.
-- Cache handling is stricter: `no-store` takes precedence, `Age` is updated on cache hits, cached headers are isolated from mutation, and recoverable cache-read errors are treated as misses.
-- HTTPS requests can use HTTP/2 automatically when the available libcurl supports it.
+- [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html) defines request
+  framing independently of the method, so request content is permitted on
+  `GET`, `DELETE`, and `HEAD`. The standard also notes that this content has no
+  generally defined semantics and may be rejected by some implementations.
+- Falsy JSON values such as `false`, `0`, `""`, and `null` are valid payloads.
+- Invalid HTTP framing is rejected rather than sending conflicting
+  `Content-Length` and `Transfer-Encoding` headers.
+- Only absolute `http:` and `https:` URLs are accepted. Proxy environment
+  variables are ignored. Use the `proxy` option when proxying a request.
+- An explicit `Authorization` header takes precedence over credentials in the
+  URL, and a caller-supplied `Accept-Encoding` header is left unchanged.
+- 307 and 308 redirects preserve the request method and body. `sync-request`
+  can rewrite some body-bearing redirects to `GET`.
+- Query merging preserves additional literal `?` and `#` delimiters that
+  `sync-request` can truncate while splitting URLs.
+- Cache handling is stricter: `no-store` takes precedence, `Age` is updated on
+  cache hits, cached headers are isolated from mutation, and recoverable
+  cache-read errors are treated as misses.
+- HTTPS requests can negotiate HTTP/2 automatically when supported.
 
 <a id="license"></a>
 ## 5. License
@@ -805,110 +797,84 @@ If you already use `sync-request`, most code should feel familiar. The main diff
 <a id="compatibility"></a>
 ## 6. Compatibility
 
-`sync-request-curl` supports Node.js 16.17.0 and newer at runtime. The native addon targets Node-API v8, so a prebuilt addon is tied to its operating system, CPU architecture, and C runtime, but not to a specific Node.js major version. The same prebuilt binary can be reused by Node.js releases that support Node-API v8.
+`sync-request-curl` supports Node.js 16.17.0 and newer.
 
-Repository build and release automation runs on newer Node.js versions independently of the published runtime requirement. The optional source-build entry point is plain JavaScript and runs on Node.js 16.17.0 or newer.
-
-The published package does not download or compile native code during installation. Each release declares platform-specific optional packages, so the package manager installs only the native binary compatible with the current operating system, CPU architecture, and Linux C runtime. If optional dependencies are disabled or a matching package is unavailable, loading fails with an explicit error with instructions for an explicit source build. Compilation is never triggered by importing the library.
+The package manager selects a matching native binary when one is available.
+Installing or importing the package does not compile native code.
 
 <a id="compatibility-windows"></a>
 ### 6.1. Windows
 
-Prebuilt addons are prepared for x64, arm64, and x86 (`ia32`) Windows. The x86 addon is built and load-checked with 32-bit Node.js 22; use a Node.js release that provides an x86 runtime. No Visual Studio, Python, Rust, CMake, vcpkg, or node-gyp installation is required by package consumers.
+Prebuilt binaries are available for x64, arm64, and x86 (`ia32`) Windows. For
+x86, use a Node.js release that provides an x86 runtime.
 
-Requests may still fail with Libcurl Error 60 (`CURLE_PEER_FAILED_VERIFICATION`) when the peer certificate cannot be verified. `rejectUnauthorized: false` disables origin certificate and hostname verification and should only be used when that trade-off is intentional.
+Requests can fail with Libcurl Error 60 (`CURLE_PEER_FAILED_VERIFICATION`) when
+the peer certificate cannot be verified. `rejectUnauthorized: false` disables
+origin certificate and hostname verification and should only be used when that
+trade-off is intentional.
 
 <a id="compatibility-macos"></a>
 ### 6.2. macOS
 
-Prebuilt addons are prepared for Apple Silicon (`arm64`) and Intel (`x64`) macOS. No Xcode command-line tools or local libcurl installation is required by package consumers.
+Prebuilt binaries are available for Apple Silicon (`arm64`) and Intel (`x64`) macOS.
 
 <a id="compatibility-linux"></a>
 ### 6.3. Linux
 
-Prebuilt addons are prepared for both glibc and musl on x64 and arm64 Linux. This covers the common Debian, Ubuntu, Arch, and Alpine variants without compiling native code during installation. GNU/Linux release binaries are built against a GLIBC 2.31 baseline, while Alpine binaries are built and tested in a musl environment.
+Prebuilt binaries are available for x64 and arm64 Linux on both glibc and musl.
+GNU/Linux release binaries require GLIBC 2.31 or newer.
 
 <a id="compatibility-building-from-source"></a>
 ### 6.4. Building from source
 
-The npm package includes the Rust addon sources and Cargo lockfile. If your
-architecture has no prebuilt package, or you need a build for your local system,
-install normally and explicitly compile the installed package:
+If a prebuilt binary is unavailable for your platform, install the package
+without optional dependencies and build it explicitly:
 
 ```sh
 npm install sync-request-curl --omit=optional
 npx --no-install sync-request-curl-build
 ```
 
-Run this with the same Node.js architecture that will use the library. This works
-with installation scripts disabled and does not require node-gyp or development
-JavaScript dependencies. Run the build command from your application directory;
-there is no need to navigate into `node_modules`. `--no-install` prevents npx from downloading a
-separate package if the local command is missing. With pnpm, use
-`pnpm exec sync-request-curl-build`. Use `--help` to see the build prerequisites.
-`--omit=optional` skips all optional dependencies for that npm installation;
-omit that flag if you want them installed. Rebuild after replacing or upgrading
-the package. The command is explicit; installation still runs no build hook.
+Run the build with the same Node.js architecture that will use the library.
+With pnpm, use `pnpm exec sync-request-curl-build`. Run
+`sync-request-curl-build --help` for the current prerequisites.
 
-Prerequisites:
+Source builds require:
 
-- Rust 1.88 or newer and Cargo (rustup uses the included pinned toolchain).
-- Linux/other Unix: a C/C++ compiler, make, Perl, and pkg-config; install your
-  distribution's development tools and CA certificates.
-- macOS: Xcode Command Line Tools; the addon uses system libcurl.
-- Windows: Visual Studio C++ Build Tools and Windows SDK for the target CPU.
-  For x86, also install `rustup target add i686-pc-windows-msvc`.
-- Access to the locked Cargo dependencies, or an already populated Cargo cache.
+- Rust 1.88 or newer and Cargo
+- Linux and other Unix systems: a C/C++ compiler, make, Perl, pkg-config, and
+  CA certificates
+- macOS: Xcode Command Line Tools
+- Windows: Visual Studio C++ Build Tools and the Windows SDK for the target CPU
+- Access to the locked Cargo dependencies, or an already populated Cargo cache
 
-Linux builds bundle libcurl, HTTP/2, and OpenSSL. musl builds disable Rust's
-static CRT mode so Node.js can load the shared addon. Source builds inherit the
-local system's compatibility baseline, not the release prebuilds' GLIBC baseline.
+Other architectures and Unix platforms may work when Node.js, Rust, and the
+required native dependencies support them, but they are not part of the
+prebuilt release matrix.
 
-The source builder does not restrict CPU architectures to the prebuilt matrix.
-Additional Linux architectures (for example ARMv7, ppc64, s390x, and riscv64) and
-other Unix platforms are best-effort: they need compatible Node.js, Rust, and
-native dependencies and are not covered by release CI. A source-build route is
-not a guarantee that every upstream dependency supports every target.
+Set `CARGO_BUILD_TARGET` when you need to select a Rust target explicitly. The
+build must still run with a Node.js architecture compatible with the resulting
+addon.
 
-`CARGO_BUILD_TARGET` can select a Rust target when the Rust host differs from
-Node.js (for example an ARMv7 ABI). Install that target and configure its C/linker
-toolchain yourself. The builder must run on the destination system with matching
-Node.js: it verifies the addon before installing it and is not a general-purpose
-cross-compilation command. Windows defaults to the MSVC target matching Node.js.
-
-The loader prefers `native/build/sync_request_curl_native.node` before detecting
-prebuilt targets, including on unlisted architectures. For an externally managed
-build, set `SYNC_REQUEST_CURL_NATIVE_PATH` to its absolute `.node` path. Invalid
-local or explicitly selected binaries fail visibly rather than silently loading
-a different binary. Normal prebuilt installations still require no build tools.
-
-For repository development (Node.js 24.14+ or 26+), use:
-
-```sh
-pnpm build:native
-pnpm test:source-build
-pnpm test
-```
-
-`build:native` explicitly invokes Cargo even when a prebuild exists. The
-source-build checks test orchestration and failure handling with mocked compiler
-processes; `pnpm test` exercises the real addon, preferring the local build.
-The build itself validates addon loading before installing the output. For a
-standalone load check after compilation:
-
-```sh
-node scripts/verify-native-load.ts --file=native/build/sync_request_curl_native.node
-```
-
-For an installed package, run the source-build command shown above, then import
-`sync-request-curl` normally. No environment override is needed. Keep the build
-on the machine, architecture, and C runtime that will execute your application.
+To use an externally managed native build, set `SYNC_REQUEST_CURL_NATIVE_PATH`
+to the absolute path of its `.node` file.
 
 <a id="caveats"></a>
 ## 7. Caveats
 
-**sync-request-curl** was developed to improve performance with sending synchronous requests in Node.js. It is also free from the sync-request bug which leaves an orphaned sync-rpc process, resulting in a [leaked handle being detected in Jest](https://github.com/ForbesLindesay/sync-request/issues/129).
+**sync-request-curl** was developed to improve performance with sending
+synchronous requests in Node.js. It is also free from the sync-request bug
+which leaves an orphaned sync-rpc process, resulting in a [leaked handle being
+detected in Jest](https://github.com/ForbesLindesay/sync-request/issues/129).
 
-**sync-request-curl** was designed to work with UNIX-like systems for UNSW students enrolled in [COMP1531 Software Engineering Fundamentals](https://webcms3.cse.unsw.edu.au/COMP1531/23T2/outline). The native distribution targets glibc- and musl-based Linux, Windows, and macOS on the architectures listed in the compatibility section.
+**sync-request-curl** was designed to work with UNIX-like systems for UNSW
+students enrolled in [COMP1531 Software Engineering
+Fundamentals](https://webcms3.cse.unsw.edu.au/COMP1531/23T2/outline). The
+native distribution targets glibc- and musl-based Linux, Windows, and macOS on
+the architectures listed in the compatibility section.
 
-Please note that this library's primary goal is to simplify the learning of JavaScript for novice programmers, hence its synchronous nature. However, we recommend to **always use an [asynchronous alternative](https://blog.appsignal.com/2024/09/11/top-5-http-request-libraries-for-nodejs.html)** where possible.
+Please note that this library's primary goal is to simplify the learning of
+JavaScript for novice programmers, hence its synchronous nature. However, we
+recommend to always use an
+[asynchronous alternative](https://blog.appsignal.com/2024/09/11/top-5-http-request-libraries-for-nodejs.html)
+where possible.

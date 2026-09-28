@@ -15,7 +15,11 @@ mkdirSync(buildDir, { recursive: true });
 const listNativeSources = (directory: string): string[] => {
   const files: string[] = [];
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    if (entry.name === "build" || entry.name === "target") {
+    if (
+      entry.name === "build" ||
+      entry.name === "build.mjs" ||
+      entry.name === "target"
+    ) {
       continue;
     }
     const path = join(directory, entry.name);
@@ -69,6 +73,6 @@ const shouldSkipIfNeededBuild = (): boolean => {
 };
 
 if (!shouldSkipIfNeededBuild()) {
-  run(process.execPath, [join(nativeDir, "build.mjs")], { cwd: root });
+  run(process.execPath, [join(nativeDir, "build.ts")], { cwd: root });
   console.log(`Built native addon: ${localOutput}`);
 }

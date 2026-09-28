@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-// Kept as plain JavaScript so the published source-build entry point runs on Node 16.17+.
 import { spawnSync } from "node:child_process";
 import { copyFileSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -11,7 +9,12 @@ const targetDir = join(nativeDir, "target");
 const buildDir = join(nativeDir, "build");
 const output = join(buildDir, "sync_request_curl_native.node");
 
-const run = (command, args, env = process.env, capture = false) => {
+const run = (
+  command: string,
+  args: readonly string[],
+  env: NodeJS.ProcessEnv = process.env,
+  capture = false,
+): string => {
   const result = spawnSync(command, args, {
     cwd: root,
     env,
@@ -28,13 +31,13 @@ const run = (command, args, env = process.env, capture = false) => {
   return result.stdout?.trim() || "";
 };
 
-const buildNative = () => {
+const buildNative = (): void => {
   const host = run("rustc", ["-vV"], process.env, true)
     .split("\n")
     .find((line) => line.startsWith("host: "))
     ?.slice(6)
     .trim();
-  const windowsTargets = {
+  const windowsTargets: Readonly<Record<string, string>> = {
     ia32: "i686-pc-windows-msvc",
     x64: "x86_64-pc-windows-msvc",
     arm64: "aarch64-pc-windows-msvc",
@@ -47,7 +50,7 @@ const buildNative = () => {
       "Unable to determine Rust target; set CARGO_BUILD_TARGET explicitly.",
     );
   }
-  const env = {
+  const env: NodeJS.ProcessEnv = {
     ...process.env,
     CARGO_TARGET_DIR: targetDir,
     LIBZ_SYS_STATIC: "1",
@@ -108,7 +111,7 @@ const buildNative = () => {
   console.log(`Built native addon: ${output}`);
 };
 
-const main = () => {
+const main = (): void => {
   const cliArgs = process.argv.slice(2);
   if (
     cliArgs.length === 1 &&

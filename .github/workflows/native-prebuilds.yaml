@@ -122,7 +122,7 @@ jobs:
           rustup toolchain install 1.88.0 --profile minimal --no-self-update
           rustup target add i686-pc-windows-msvc --toolchain 1.88.0
       - name: Build and verify with 32-bit Node.js
-        run: node native/build.mjs
+        run: node native/build.ts
       - name: Stage native addon
         run: Copy-Item native/build/sync_request_curl_native.node prebuilds/sync_request_curl_native.win32-ia32-msvc.node
       - uses: actions/upload-artifact@v4
