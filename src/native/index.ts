@@ -82,6 +82,12 @@ const moduleNotFoundErrorSchema = v.object({
   code: v.literal("MODULE_NOT_FOUND"),
 });
 
+const sourceBuildCommandLines = [
+  "  npm exec sync-request-curl-build",
+  "  pnpm exec sync-request-curl-build",
+  "  yarn run sync-request-curl-build",
+] as const;
+
 const rawNativeBindingObjectSchema = v.object({
   request: v.function(),
   createConnectionPool: v.function(),
@@ -155,8 +161,8 @@ export const getPlatformKey = (
     [
       `sync-request-curl does not provide a native binary for ${platform}-${arch}.`,
       "",
-      "Build from source with:",
-      "  npx --no-install sync-request-curl-build",
+      "Build from source using your package manager:",
+      ...sourceBuildCommandLines,
       "",
       "See the Compatibility section for prerequisites.",
     ].join("\n"),
@@ -222,8 +228,8 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
       [
         `sync-request-curl does not provide a native binary for ${platform}-${arch}.`,
         "",
-        "Build from source with:",
-        "  npx --no-install sync-request-curl-build",
+        "Build from source using your package manager:",
+        ...sourceBuildCommandLines,
         "",
         "See the Compatibility section for prerequisites.",
       ].join("\n"),
@@ -253,11 +259,10 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
       "",
       `The optional package ${nativePackageName} is missing.`,
       "",
-      "Install the prebuilt binary with:",
-      "  npm install sync-request-curl --include=optional",
+      "Reinstall sync-request-curl with optional dependencies enabled.",
       "",
-      "Alternatively, if optional dependencies were intentionally omitted, build from source with:",
-      "  npx --no-install sync-request-curl-build",
+      "Alternatively, if optional dependencies were intentionally omitted, build from source using your package manager:",
+      ...sourceBuildCommandLines,
       "",
       "See the Compatibility section for source-build prerequisites.",
     ].join("\n"),

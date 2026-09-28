@@ -26,16 +26,17 @@ GNU/Linux release binaries require GLIBC 2.31 or newer.
 
 ### Building from source
 
-If a prebuilt binary is unavailable for your platform, install the package
-without optional dependencies and build it explicitly:
+If a prebuilt binary is unavailable for your platform, or if optional
+dependencies were intentionally omitted, build the installed package explicitly
+using your package manager:
 
-```sh
-npm install sync-request-curl --omit=optional
-npx --no-install sync-request-curl-build
+```text
+npm exec sync-request-curl-build
+pnpm exec sync-request-curl-build
+yarn run sync-request-curl-build
 ```
 
-Run the build with the same Node.js architecture that will use the library.
-With pnpm, use `pnpm exec sync-request-curl-build`. Run
+Run the build with the same Node.js architecture that will use the library. Run
 `sync-request-curl-build --help` for the current prerequisites.
 
 Source builds require:

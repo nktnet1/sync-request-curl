@@ -45,8 +45,10 @@ Package consumers normally use platform-specific optional npm packages without
 compilers or lifecycle scripts. The main package also includes the exact Rust
 sources, Cargo.lock, and `build.mjs` for an explicit source build:
 
-```sh
-npx --no-install sync-request-curl-build
+```text
+npm exec sync-request-curl-build
+pnpm exec sync-request-curl-build
+yarn run sync-request-curl-build
 ```
 
 See [Compatibility](../README.md#compatibility-source) for prerequisites, target
