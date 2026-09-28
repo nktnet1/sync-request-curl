@@ -6,6 +6,7 @@ import {
 import {
   parseReleaseVersion,
   planRelease,
+  releaseLabel,
   versionFromReleaseTag,
 } from "#scripts/release-policy";
 
@@ -30,6 +31,7 @@ test.each([
   ["5.0.0-beta.12", "beta"],
 ])("maps %s to %s", (version, tag) => {
   expect(parseReleaseVersion(version).distTag).toBe(tag);
+  expect(releaseLabel(version)).toBe(`v${version}`);
   expect(versionFromReleaseTag(`v${version}`)).toBe(version);
 });
 test.each([

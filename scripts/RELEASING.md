@@ -18,7 +18,9 @@ pnpm release:beta --publish
 The preview is read-only. The second command selects the next unused numbered
 v5 beta using the manifest, npm versions, and local/remote tags. It runs release
 checks, commits the manifest, creates an annotated tag, and atomically pushes the
-branch and tag to origin. Branch permissions must permit that push.
+branch and tag to origin. Release commits use the version label itself (for
+example, `v5.0.0-beta.3`) so they stand out in Git history. Branch permissions
+must permit that push.
 
 For preparation without committing or pushing, use `pnpm release:beta` instead.
 Do not follow that with `--publish` on the dirty checkout. Review and commit the
@@ -51,7 +53,9 @@ validates local artifacts and prints the plan; it does not test registry access.
 Both paths use the same policy: numbered beta versions publish under `beta`,
 stable versions under `latest`, and other version formats are rejected. All
 package names, versions, and exact optional native dependency pins are validated
-before publication. Native packages publish before the main package.
+before publication. Native packages publish before the main package. Use the
+same version-label format for a manually prepared stable release commit and tag,
+for example `v5.0.0`.
 
 Registry preflight aborts on authentication/network errors. Existing versions
 are skipped only when their SHA-512 integrity matches the local tarball. Keep the

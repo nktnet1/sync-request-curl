@@ -24,6 +24,9 @@ export const versionFromReleaseTag = (tag: string): string => {
   return parseReleaseVersion(tag.slice(1)).version;
 };
 
+export const releaseLabel = (version: string): string =>
+  `v${parseReleaseVersion(version).version}`;
+
 export interface ReleaseArtifact {
   file: string;
   manifest: Record<string, unknown>;
