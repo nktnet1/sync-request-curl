@@ -52,7 +52,7 @@ compilers or lifecycle scripts. The main package also includes the exact Rust
 sources, Cargo.lock, and `build.mjs` for an explicit source build:
 
 ```text
-npm exec sync-request-curl-build
+npm exec --no -- sync-request-curl-build
 pnpm exec sync-request-curl-build
 yarn run sync-request-curl-build
 ```

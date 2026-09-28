@@ -31,7 +31,7 @@ dependencies were intentionally omitted, build the installed package explicitly
 using your package manager:
 
 ```text
-npm exec sync-request-curl-build
+npm exec --no -- sync-request-curl-build
 pnpm exec sync-request-curl-build
 yarn run sync-request-curl-build
 ```
@@ -44,8 +44,8 @@ Linux and Windows build the libcurl bundled by `curl-sys`. Override that choice
 explicitly when needed:
 
 ```sh
-npx --no-install sync-request-curl-build --libcurl=system
-npx --no-install sync-request-curl-build --libcurl=bundled
+npm exec --no -- sync-request-curl-build --libcurl=system
+npm exec --no -- sync-request-curl-build --libcurl=bundled
 ```
 
 `--libcurl=system` is strict: if `curl-sys` cannot discover a compatible system
