@@ -68,6 +68,8 @@
     "https",
     "curl",
     "libcurl",
+    "then-request",
+    "http-basic",
     "comp1531"
   ],
   "author": "Khiet Tam Nguyen",

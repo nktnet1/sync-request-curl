@@ -74,6 +74,7 @@ export const createNativePackageManifest = (
     license: packageJson.license,
     author: packageJson.author,
     engines: packageJson.engines,
+    keywords: ["sync-request-curl", "binary", "native", ...platform.split("-")],
     os: [target.os],
     cpu: [target.cpu],
     main: "./sync_request_curl_native.node",
