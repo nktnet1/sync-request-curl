@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import childProcess from "node:child_process";
+import childProcess, {
+  type SpawnSyncOptionsWithStringEncoding,
+  type SpawnSyncReturns,
+} from "node:child_process";
 import {
   copyFileSync,
   mkdirSync,
@@ -20,13 +23,30 @@ const source = fileURLToPath(
   new URL("../../native/build.mjs", import.meta.url),
 );
 
+const spawnResult = (
+  status: number,
+  stdout = "",
+  stderr = "",
+): SpawnSyncReturns<string> => ({
+  pid: 1,
+  output: [null, stdout, stderr],
+  stdout,
+  stderr,
+  status,
+  signal: null,
+});
+
+const mutableChildProcess = childProcess as {
+  spawnSync: typeof childProcess.spawnSync;
+};
+
 for (const mode of [
   "success",
   "cargo-failure",
   "load-failure",
   "musl",
   "symlink",
-]) {
+] as const) {
   test(`source builder: ${mode}`, async () => {
     // ESM resolves symlinks, including macOS /var -> /private/var.
     const root = realpathSync(mkdtempSync(join(tmpdir(), "curl-source-test-")));
@@ -53,21 +73,29 @@ for (const mode of [
     const originalFlags = process.env.CARGO_ENCODED_RUSTFLAGS;
     process.env.CARGO_BUILD_TARGET = target;
     process.env.CARGO_ENCODED_RUSTFLAGS = "--cfg\x1ftest_build";
-    const commands = [];
-    childProcess.spawnSync = (command, args, options) => {
+    const commands: string[] = [];
+    const mockSpawn = (
+      command: string,
+      args: readonly string[] = [],
+      options?: SpawnSyncOptionsWithStringEncoding,
+    ): SpawnSyncReturns<string> => {
       commands.push(command);
-      if (command === "rustc") return { status: 0, stdout: `host: ${target}` };
+      if (command === "rustc") {
+        return spawnResult(0, `host: ${target}`);
+      }
       if (command === "cargo") {
         assert.ok(args.includes("--locked"));
         assert.equal(args.at(-1), target);
-        assert.equal(options.env.CARGO_TARGET_DIR, join(native, "target"));
+        assert.equal(options?.env?.CARGO_TARGET_DIR, join(native, "target"));
         if (mode === "musl") {
           assert.equal(
-            options.env.CARGO_ENCODED_RUSTFLAGS,
+            options?.env?.CARGO_ENCODED_RUSTFLAGS,
             "--cfg\x1ftest_build\x1f-C\x1ftarget-feature=-crt-static",
           );
         }
-        if (mode === "cargo-failure") return { status: 1 };
+        if (mode === "cargo-failure") {
+          return spawnResult(1);
+        }
         let name = "libsync_request_curl_native.so";
         if (process.platform === "win32") {
           name = "sync_request_curl_native.dll";
@@ -80,11 +108,16 @@ for (const mode of [
       } else {
         assert.equal(command, process.execPath);
         assert.equal(readFileSync(output, "utf8"), "previous addon");
-        assert.equal(readFileSync(args.at(-1), "utf8"), "new addon");
-        if (mode === "load-failure") return { status: 1 };
+        const candidate = args.at(-1);
+        assert.ok(candidate);
+        assert.equal(readFileSync(candidate, "utf8"), "new addon");
+        if (mode === "load-failure") {
+          return spawnResult(1);
+        }
       }
-      return { status: 0 };
+      return spawnResult(0);
     };
+    mutableChildProcess.spawnSync = mockSpawn as typeof childProcess.spawnSync;
     syncBuiltinESMExports();
     try {
       const build = import(
@@ -99,13 +132,18 @@ for (const mode of [
       }
       assert.deepEqual(commands.slice(0, 2), ["rustc", "cargo"]);
     } finally {
-      childProcess.spawnSync = originalSpawn;
+      mutableChildProcess.spawnSync = originalSpawn;
       syncBuiltinESMExports();
-      if (originalTarget === undefined) delete process.env.CARGO_BUILD_TARGET;
-      else process.env.CARGO_BUILD_TARGET = originalTarget;
-      if (originalFlags === undefined)
+      if (originalTarget === undefined) {
+        delete process.env.CARGO_BUILD_TARGET;
+      } else {
+        process.env.CARGO_BUILD_TARGET = originalTarget;
+      }
+      if (originalFlags === undefined) {
         delete process.env.CARGO_ENCODED_RUSTFLAGS;
-      else process.env.CARGO_ENCODED_RUSTFLAGS = originalFlags;
+      } else {
+        process.env.CARGO_ENCODED_RUSTFLAGS = originalFlags;
+      }
       rmSync(root, { recursive: true, force: true });
     }
   });
