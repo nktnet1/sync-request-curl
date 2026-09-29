@@ -4,6 +4,11 @@ export { FormData } from "#/form-data";
 export { default } from "#/index";
 export type {
   BufferEncoding,
+  CacheCanCacheFunction,
+  CachedResponse,
+  CacheIsExpiredFunction,
+  CacheIsMatchFunction,
+  CachePolicyResponse,
   FormDataEntry,
   GetBody,
   GetJSON,

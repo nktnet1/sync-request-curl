@@ -10,6 +10,11 @@ import type {
 export type { FormDataEntry } from "#/form-data";
 export type {
   BufferEncoding,
+  CacheCanCacheFunction,
+  CachedResponse,
+  CacheIsExpiredFunction,
+  CacheIsMatchFunction,
+  CachePolicyResponse,
   JsonLike,
   JsonPrimitive,
   NestedJsonLike,

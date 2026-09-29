@@ -8,6 +8,7 @@ import native from "#/native/index";
 import { getAgentPoolId } from "#/request/agent";
 import {
   type CacheableResponse,
+  canCacheResponse,
   getCachedRedirectUrl,
   getCachedResponse,
   invalidateCache,
@@ -189,6 +190,7 @@ export const performRequest = (
     cache,
     requestTimestamp,
     options.gzip !== false,
+    options,
   );
 
   remaining();
@@ -231,6 +233,17 @@ export const performRequest = (
     cacheLookup.allowStore &&
     result.response.statusCode !== 304
   ) {
+    const cacheableResponse: CacheableResponse = {
+      statusCode: result.response.statusCode,
+      headers: result.response.headers,
+      body: result.response.body,
+      responseUrl: result.response.url,
+    };
+    const defaultValue = canCacheResponse(cacheableResponse);
+    const shouldStore = options.canCache
+      ? options.canCache(result.response, defaultValue)
+      : defaultValue;
+
     storeCacheResponse(
       cacheKey,
       cacheLookup.requestHeaders,
@@ -244,6 +257,7 @@ export const performRequest = (
       },
       cache,
       options.gzip !== false,
+      shouldStore,
     );
   } else if (
     options.cache &&

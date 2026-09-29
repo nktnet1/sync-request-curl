@@ -103,6 +103,78 @@ export interface RetryResponse {
 }
 
 /**
+ * Buffered cached response passed to cache policy callbacks.
+ *
+ * The body, headers, and request headers are defensive copies. Mutating them
+ * does not modify the stored cache entry.
+ *
+ * @group Request
+ */
+export interface CachedResponse {
+  /** Cached HTTP response status code. */
+  statusCode: number;
+  /** Cached Node-style response headers with lowercase keys. */
+  headers: v.InferOutput<typeof incomingHttpHeadersSchema>;
+  /** Buffered cached response body. */
+  body: Buffer;
+  /** Request headers stored with this cache variant. */
+  requestHeaders: v.InferOutput<typeof incomingHttpHeadersSchema>;
+  /** Timestamp when the cached request started, in Unix milliseconds. */
+  requestTimestamp: number;
+}
+
+/**
+ * Buffered origin response passed to `canCache`.
+ *
+ * This is the normal public response shape for the completed GET request.
+ *
+ * @group Request
+ */
+export interface CachePolicyResponse extends RetryResponse {
+  /** Parse the buffered response body as JSON. */
+  // biome-ignore lint/suspicious/noExplicitAny: match Response#getJSON default
+  getJSON<T = any>(encoding?: BufferEncoding): T;
+}
+
+/**
+ * Override whether a stored cache variant matches the outgoing request.
+ *
+ * `defaultValue` is the built-in `Vary` comparison result.
+ *
+ * @group Request
+ */
+export type CacheIsMatchFunction = (
+  requestHeaders: v.InferOutput<typeof incomingHttpHeadersSchema>,
+  cachedResponse: CachedResponse,
+  defaultValue: boolean,
+) => boolean;
+
+/**
+ * Override whether a matched cached response is expired.
+ *
+ * `defaultValue` is the result of the built-in freshness calculation.
+ *
+ * @group Request
+ */
+export type CacheIsExpiredFunction = (
+  cachedResponse: CachedResponse,
+  defaultValue: boolean,
+) => boolean;
+
+/**
+ * Override whether a completed origin response may be stored in the cache.
+ *
+ * `defaultValue` is the built-in response cacheability result. Request-side
+ * `Cache-Control: no-store` still disables storage before this callback runs.
+ *
+ * @group Request
+ */
+export type CacheCanCacheFunction = (
+  response: CachePolicyResponse,
+  defaultValue: boolean,
+) => boolean;
+
+/**
  * Decide whether a GET request should be retried after an error or response.
  *
  * `attemptNumber` starts at 1 for the first completed attempt. Transport
@@ -140,6 +212,21 @@ const retryFunctionSchema = v.custom<RetryFunction>(
 const retryDelayFunctionSchema = v.custom<RetryDelayFunction>(
   (input) => typeof input === "function",
   "Invalid retry delay function",
+);
+
+const cacheIsMatchFunctionSchema = v.custom<CacheIsMatchFunction>(
+  (input) => typeof input === "function",
+  "Invalid cache isMatch function",
+);
+
+const cacheIsExpiredFunctionSchema = v.custom<CacheIsExpiredFunction>(
+  (input) => typeof input === "function",
+  "Invalid cache isExpired function",
+);
+
+const cacheCanCacheFunctionSchema = v.custom<CacheCanCacheFunction>(
+  (input) => typeof input === "function",
+  "Invalid cache canCache function",
 );
 
 // JSON serializability is validated by jsonBodySchema immediately before use.
@@ -233,6 +320,12 @@ const optionsObjectSchema = v.object({
   gzip: v.optional(v.boolean()),
   /** Enable the private HTTP-aware cache in file or memory storage. */
   cache: v.optional(v.picklist(["file", "memory"])),
+  /** Override whether a stored cache variant matches the outgoing request. */
+  isMatch: v.optional(cacheIsMatchFunctionSchema),
+  /** Override whether a matched cached response is expired. */
+  isExpired: v.optional(cacheIsExpiredFunctionSchema),
+  /** Override whether a completed origin response may be stored. */
+  canCache: v.optional(cacheCanCacheFunctionSchema),
   /** `sync-request` boolean agent option, or a keep-alive Node `Agent` for connection reuse. */
   agent: v.optional(v.union([v.boolean(), v.instance(Agent)])),
   /** Retry GET requests, or provide a callback to decide per attempt. */

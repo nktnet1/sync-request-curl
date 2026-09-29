@@ -7,7 +7,7 @@ import {
   setRequestHeader,
 } from "#/http/headers";
 import { fileCacheDirectory, getCachePath } from "#/request/cache-path";
-import type { Options, Response } from "#/types";
+import type { CachedResponse, Options, Response } from "#/types";
 import { incomingHttpHeadersSchema } from "#/validation";
 
 const cacheEntrySchema = v.object({
@@ -56,6 +56,24 @@ const copyHeaders = (headers: Response["headers"]): Response["headers"] =>
       Array.isArray(value) ? [...value] : value,
     ]),
   );
+
+const copyRequestHeaders = (
+  headers: NormalizedRequestHeaders,
+): CachedResponse["requestHeaders"] =>
+  Object.fromEntries(
+    Object.entries(headers).map(([name, values]) => [
+      name,
+      values.length === 1 ? values[0] : [...values],
+    ]),
+  );
+
+const toCachedResponse = (entry: CacheEntry): CachedResponse => ({
+  statusCode: entry.statusCode,
+  headers: copyHeaders(entry.headers),
+  body: Buffer.from(entry.body, "base64"),
+  requestHeaders: copyRequestHeaders(entry.requestHeaders),
+  requestTimestamp: entry.requestTimestamp,
+});
 
 const defaultCacheableStatusCodes = new Set([
   200, 203, 204, 300, 301, 308, 404, 405, 410, 414, 501,
@@ -415,6 +433,7 @@ export const prepareCacheLookup = (
   cache: CacheMode | undefined,
   now = Date.now(),
   decompress = true,
+  policy: Pick<Options, "isMatch" | "isExpired"> = {},
 ): CacheLookup => {
   const requestHeaders = normalizeRequestHeaders(headers);
   const requestCacheControl = getRequestCacheControl(requestHeaders);
@@ -432,11 +451,20 @@ export const prepareCacheLookup = (
     return base;
   }
 
-  const entry = readCacheEntries(url, cache).find(
-    (candidate) =>
-      candidate.decompress === decompress &&
-      requestMatchesEntry(candidate, requestHeaders),
-  );
+  const entry = readCacheEntries(url, cache).find((candidate) => {
+    if (candidate.decompress !== decompress) {
+      return false;
+    }
+
+    const defaultValue = requestMatchesEntry(candidate, requestHeaders);
+    return policy.isMatch
+      ? policy.isMatch(
+          copyRequestHeaders(requestHeaders),
+          toCachedResponse(candidate),
+          defaultValue,
+        )
+      : defaultValue;
+  });
   if (!entry) {
     return base;
   }
@@ -450,7 +478,11 @@ export const prepareCacheLookup = (
     return { ...base, entry };
   }
 
-  if (isFresh(entry, requestHeaders, now)) {
+  const defaultExpired = !isFresh(entry, requestHeaders, now);
+  const expired = policy.isExpired
+    ? policy.isExpired(toCachedResponse(entry), defaultExpired)
+    : defaultExpired;
+  if (!expired) {
     return { ...base, entry, useCachedResponse: true };
   }
 
@@ -484,7 +516,7 @@ const responseForbidsStorage = (headers: Response["headers"]): boolean =>
   getHeaderValue(headers, "set-cookie") !== undefined ||
   getVaryNamesFromHeaders(headers).includes("*");
 
-const canStoreResponse = (response: CacheableResponse): boolean => {
+export const canCacheResponse = (response: CacheableResponse): boolean => {
   if (responseForbidsStorage(response.headers)) return false;
   const cacheControl = parseCacheControl(
     getHeaderValue(response.headers, "cache-control"),
@@ -508,8 +540,9 @@ export const storeCacheResponse = (
   response: CacheableResponse,
   cache: CacheMode,
   decompress = true,
+  shouldStore = canCacheResponse(response),
 ): void => {
-  if (!canStoreResponse(response)) {
+  if (!shouldStore) {
     if (responseForbidsStorage(response.headers)) invalidateCache(url, cache);
     return;
   }
@@ -630,7 +663,7 @@ export const refreshCacheEntry = (
     body: Buffer.from(entry.body, "base64"),
     responseUrl: entry.responseUrl,
   };
-  if (!canStoreResponse(response)) {
+  if (!canCacheResponse(response)) {
     invalidateCache(url, cache);
     return response;
   }

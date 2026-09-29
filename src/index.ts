@@ -14,6 +14,11 @@ export declare const ResponseError: typeof ResponseErrorImpl;
 export type { RequestErrorCode } from "#/errors";
 export type {
   BufferEncoding,
+  CacheCanCacheFunction,
+  CachedResponse,
+  CacheIsExpiredFunction,
+  CacheIsMatchFunction,
+  CachePolicyResponse,
   FormDataEntry,
   GetBody,
   GetJSON,

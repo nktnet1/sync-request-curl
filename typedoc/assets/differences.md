@@ -4,6 +4,9 @@
 
 - `Response#getJSON()` is available as a convenience helper.
 - `cache: "memory"` is available as an alternative to the file cache.
+- `isMatch`, `isExpired`, and `canCache` expose the synchronous cache-policy
+  hooks from `http-basic`. Callback/stream-based custom cache implementations
+  remain out of scope; use the built-in `"file"` or `"memory"` cache.
 - `retry` and `retryDelay` can be callbacks when you need to decide retry
   behaviour at runtime. Transport failures passed to these callbacks are
   `CurlError` instances with numeric libcurl error codes rather than Node
@@ -31,7 +34,7 @@
   can rewrite some body-bearing redirects to `GET`.
 - Query merging preserves additional literal `?` and `#` delimiters that
   `sync-request` can truncate while splitting URLs.
-- Cache handling is stricter: `no-store` takes precedence, `Age` is updated on
+- Default cache handling is stricter: `no-store` takes precedence, `Age` is updated on
   cache hits, cached headers are isolated from mutation, and recoverable
   cache-read errors are treated as misses.
 - HTTPS requests can negotiate HTTP/2 automatically when supported.

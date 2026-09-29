@@ -87,6 +87,11 @@ test("built CommonJS declarations expose the public root API", () => {
        RequestError,
        ResponseError,
        type BufferEncoding,
+       type CachedResponse,
+       type CacheCanCacheFunction,
+       type CacheIsExpiredFunction,
+       type CacheIsMatchFunction,
+       type CachePolicyResponse,
        type FormDataEntry,
        type GetBody,
        type GetJSON,
@@ -117,6 +122,16 @@ test("built CommonJS declarations expose the public root API", () => {
      const nested: NestedJsonLike = { value: json };
      const proxy: ProxyOptions = { url: "http://localhost" };
      const errorCode: RequestErrorCode = "ERR_REQUEST_FAILED";
+     const isMatch: CacheIsMatchFunction = (_headers, cached, defaultValue) => {
+       const copy: CachedResponse = cached;
+       return copy.body.length >= 0 && defaultValue;
+     };
+     const isExpired: CacheIsExpiredFunction = (_cached, defaultValue) =>
+       defaultValue;
+     const canCache: CacheCanCacheFunction = (cacheResponse, defaultValue) => {
+       const copy: CachePolicyResponse = cacheResponse;
+       return copy.statusCode > 0 && defaultValue;
+     };
      let formEntry: FormDataEntry | undefined;
      let getBody: GetBody | undefined;
      let getJSON: GetJSON | undefined;
@@ -135,6 +150,9 @@ test("built CommonJS declarations expose the public root API", () => {
        nested,
        proxy,
        errorCode,
+       isMatch,
+       isExpired,
+       canCache,
        formEntry,
        getBody,
        getJSON,
