@@ -5,7 +5,9 @@
 - `Response#getJSON()` is available as a convenience helper.
 - `cache: "memory"` is available as an alternative to the file cache.
 - `retry` and `retryDelay` can be callbacks when you need to decide retry
-  behaviour at runtime.
+  behaviour at runtime. Transport failures passed to these callbacks are
+  `CurlError` instances with numeric libcurl error codes rather than Node
+  `ErrnoException` errors.
 - `agent` still accepts the boolean values supported by `sync-request`, and can
   also take a keep-alive Node `Agent` for connection reuse.
 - `overallTimeout` sets a deadline for the whole operation, alongside the

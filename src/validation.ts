@@ -1,6 +1,7 @@
 import { Agent, type IncomingHttpHeaders } from "node:http";
 import { URL } from "node:url";
 import * as v from "valibot";
+import type { CurlError } from "#/errors";
 import { FormData } from "#/form-data";
 
 /** Primitive JSON values accepted in request bodies.
@@ -104,12 +105,14 @@ export interface RetryResponse {
 /**
  * Decide whether a GET request should be retried after an error or response.
  *
- * `attemptNumber` starts at 1 for the first completed attempt.
+ * `attemptNumber` starts at 1 for the first completed attempt. Transport
+ * failures are passed as `CurlError` instances whose `code` is the numeric
+ * libcurl error code.
  *
  * @group Request
  */
 export type RetryFunction = (
-  error: Error | null,
+  error: CurlError | null,
   response: RetryResponse | undefined,
   attemptNumber: number,
 ) => boolean;
@@ -117,12 +120,14 @@ export type RetryFunction = (
 /**
  * Return the delay in milliseconds before the next retry.
  *
- * `attemptNumber` starts at 1 for the first completed attempt.
+ * `attemptNumber` starts at 1 for the first completed attempt. Transport
+ * failures are passed as `CurlError` instances whose `code` is the numeric
+ * libcurl error code.
  *
  * @group Request
  */
 export type RetryDelayFunction = (
-  error: Error | null,
+  error: CurlError | null,
   response: RetryResponse | undefined,
   attemptNumber: number,
 ) => number;
@@ -228,7 +233,7 @@ const optionsObjectSchema = v.object({
   gzip: v.optional(v.boolean()),
   /** Enable the private HTTP-aware cache in file or memory storage. */
   cache: v.optional(v.picklist(["file", "memory"])),
-  /** `sync-request` boolean agent option, or a keep-alive Node `Agent`. */
+  /** `sync-request` boolean agent option, or a keep-alive Node `Agent` for connection reuse. */
   agent: v.optional(v.union([v.boolean(), v.instance(Agent)])),
   /** Retry GET requests, or provide a callback to decide per attempt. */
   retry: v.optional(v.union([v.boolean(), retryFunctionSchema])),

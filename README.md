@@ -67,8 +67,7 @@ request(method, url, options);
 ```
 
 The request function is the package default export. ESM consumers can import
-`FormData` and public types from the root entry. The `/types` subpath remains
-available explicitly:
+`FormData` and public types from the root entry:
 
 ```typescript
 import request, { FormData } from 'sync-request-curl';
@@ -289,7 +288,7 @@ supplied.
 | <a id="property-allowredirectheaders"></a> `allowRedirectHeaders?` | `string`[] | Caller headers allowed to be forwarded to redirect hops. |
 | <a id="property-gzip"></a> `gzip?` | `boolean` | Transparently decompress gzip/deflate responses. Defaults to enabled. |
 | <a id="property-cache"></a> `cache?` | `"file"` \| `"memory"` | Enable the private HTTP-aware cache in file or memory storage. |
-| <a id="property-agent"></a> `agent?` | `boolean` \| `Agent` | `sync-request` boolean agent option, or a keep-alive Node `Agent`. |
+| <a id="property-agent"></a> `agent?` | `boolean` \| `Agent` | `sync-request` boolean agent option, or a keep-alive Node `Agent` for connection reuse. |
 | <a id="property-retry"></a> `retry?` | `boolean` \| [`RetryFunction`](#retryfunction) | Retry GET requests, or provide a callback to decide per attempt. |
 | <a id="property-retrydelay"></a> `retryDelay?` | `number` \| [`RetryDelayFunction`](#retrydelayfunction) | Retry delay in milliseconds, or a callback returning the delay. |
 | <a id="property-maxretries"></a> `maxRetries?` | `number` | Maximum retry count. Defaults to 5 when retries are enabled. |
@@ -417,13 +416,15 @@ type RetryFunction = (error, response, attemptNumber) => boolean;
 
 Decide whether a GET request should be retried after an error or response.
 
-`attemptNumber` starts at 1 for the first completed attempt.
+`attemptNumber` starts at 1 for the first completed attempt. Transport
+failures are passed as `CurlError` instances whose `code` is the numeric
+libcurl error code.
 
 ##### Parameters
 
 | Parameter | Type |
 | ------ | ------ |
-| `error` | `Error` \| `null` |
+| `error` | [`CurlError`](#curlerror) \| `null` |
 | `response` | [`RetryResponse`](#retryresponse) \| `undefined` |
 | `attemptNumber` | `number` |
 
@@ -441,13 +442,15 @@ type RetryDelayFunction = (error, response, attemptNumber) => number;
 
 Return the delay in milliseconds before the next retry.
 
-`attemptNumber` starts at 1 for the first completed attempt.
+`attemptNumber` starts at 1 for the first completed attempt. Transport
+failures are passed as `CurlError` instances whose `code` is the numeric
+libcurl error code.
 
 ##### Parameters
 
 | Parameter | Type |
 | ------ | ------ |
-| `error` | `Error` \| `null` |
+| `error` | [`CurlError`](#curlerror) \| `null` |
 | `response` | [`RetryResponse`](#retryresponse) \| `undefined` |
 | `attemptNumber` | `number` |
 
@@ -807,7 +810,9 @@ Error.constructor
 - `Response#getJSON()` is available as a convenience helper.
 - `cache: "memory"` is available as an alternative to the file cache.
 - `retry` and `retryDelay` can be callbacks when you need to decide retry
-  behaviour at runtime.
+  behaviour at runtime. Transport failures passed to these callbacks are
+  `CurlError` instances with numeric libcurl error codes rather than Node
+  `ErrnoException` errors.
 - `agent` still accepts the boolean values supported by `sync-request`, and can
   also take a keep-alive Node `Agent` for connection reuse.
 - `overallTimeout` sets a deadline for the whole operation, alongside the
