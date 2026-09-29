@@ -37,4 +37,10 @@ test.each([
 
 test("ordinary anonymous requests can use a private application cache", () => {
   expect(canUseRequestCache("http://example.com", [], {})).toBe(true);
+  expect(
+    canUseRequestCache("http://example.com", [], {
+      rejectUnauthorized: true,
+      tcpKeepAlive: false,
+    }),
+  ).toBe(true);
 });

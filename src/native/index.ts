@@ -84,7 +84,7 @@ const moduleNotFoundErrorSchema = v.object({
 });
 
 const sourceBuildCommandLines = [
-  "  npm exec sync-request-curl-build",
+  "  npm exec --no -- sync-request-curl-build",
   "  pnpm exec sync-request-curl-build",
   "  yarn run sync-request-curl-build",
 ] as const;

@@ -129,7 +129,7 @@ Run --publish from a clean checkout, not after an uncommitted preparation run.`)
 
 Consumer prebuilt: npm install sync-request-curl@${version}
 Consumer source build (after installing without optional dependencies):
-  npm exec sync-request-curl-build
+  npm exec --no -- sync-request-curl-build
   pnpm exec sync-request-curl-build
   yarn run sync-request-curl-build`);
 };

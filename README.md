@@ -538,7 +538,7 @@ Override whether a stored cache variant matches the outgoing request.
 
 | Parameter | Type |
 | ------ | ------ |
-| `requestHeaders` | `v.InferOutput`\<*typeof* `incomingHttpHeadersSchema`\> |
+| `requestHeaders` | `IncomingHttpHeaders` |
 | `cachedResponse` | [`CachedResponse`](#cachedresponse) |
 | `defaultValue` | `boolean` |
 
@@ -835,12 +835,7 @@ or does not finish within 30 seconds.
 #### RequestErrorCode
 
 ```ts
-type RequestErrorCode =
-  | "ERR_INVALID_URL"
-  | "ENOTFOUND"
-  | "ETIMEDOUT"
-  | "ERR_TOO_MANY_REDIRECTS"
-  | "ERR_REQUEST_FAILED";
+type RequestErrorCode = "ETIMEDOUT" | "ERR_TOO_MANY_REDIRECTS" | "ERR_REQUEST_FAILED";
 ```
 
 Stable transport-neutral error codes emitted by the TypeScript request layer.

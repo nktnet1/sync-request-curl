@@ -91,7 +91,7 @@ export interface RetryResponse {
   /** HTTP response status code. */
   statusCode: number;
   /** Node-style response headers with lowercase keys. */
-  headers: v.InferOutput<typeof incomingHttpHeadersSchema>;
+  headers: IncomingHttpHeaders;
   /** Final effective URL for the completed attempt. */
   url: string;
   /** Buffered response body. */
@@ -114,11 +114,11 @@ export interface CachedResponse {
   /** Cached HTTP response status code. */
   statusCode: number;
   /** Cached Node-style response headers with lowercase keys. */
-  headers: v.InferOutput<typeof incomingHttpHeadersSchema>;
+  headers: IncomingHttpHeaders;
   /** Buffered cached response body. */
   body: Buffer;
   /** Request headers stored with this cache variant. */
-  requestHeaders: v.InferOutput<typeof incomingHttpHeadersSchema>;
+  requestHeaders: IncomingHttpHeaders;
   /** Timestamp when the cached request started, in Unix milliseconds. */
   requestTimestamp: number;
 }
@@ -144,7 +144,7 @@ export interface CachePolicyResponse extends RetryResponse {
  * @group Request
  */
 export type CacheIsMatchFunction = (
-  requestHeaders: v.InferOutput<typeof incomingHttpHeadersSchema>,
+  requestHeaders: IncomingHttpHeaders,
   cachedResponse: CachedResponse,
   defaultValue: boolean,
 ) => boolean;

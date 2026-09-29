@@ -7,15 +7,11 @@ import type { BufferEncoding, Response } from "#/types/definition";
  * @group Errors
  */
 export type RequestErrorCode =
-  | "ERR_INVALID_URL"
-  | "ENOTFOUND"
   | "ETIMEDOUT"
   | "ERR_TOO_MANY_REDIRECTS"
   | "ERR_REQUEST_FAILED";
 
 const requestErrorCodeSchema = v.picklist([
-  "ERR_INVALID_URL",
-  "ENOTFOUND",
   "ETIMEDOUT",
   "ERR_TOO_MANY_REDIRECTS",
   "ERR_REQUEST_FAILED",
@@ -44,6 +40,7 @@ export class CurlError extends Error {
 
   constructor(code: number, message: string) {
     super(message);
+    this.name = "CurlError";
     const parsedCode = v.safeParse(curlErrorCodeSchema, code);
     if (!parsedCode.success) {
       throw new Error(`

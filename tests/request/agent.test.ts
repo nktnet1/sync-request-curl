@@ -39,6 +39,20 @@ describe("agent", () => {
     expect(getConnectionId(agent)).toBe(getConnectionId(agent));
   });
 
+  test("keeps pooling with explicit default-equivalent transport options", () => {
+    const agent = new Agent({ keepAlive: true });
+    const getDefaultEquivalentConnectionId = (): number =>
+      request("GET", `${SERVER_URL}/connection/id`, {
+        agent,
+        rejectUnauthorized: true,
+        tcpKeepAlive: false,
+      }).getJSON<{ connectionId: number }>().connectionId;
+
+    expect(getDefaultEquivalentConnectionId()).toBe(
+      getDefaultEquivalentConnectionId(),
+    );
+  });
+
   test("preserves socket inactivity timeouts on pooled connections", () => {
     const agent = new Agent({ keepAlive: true });
     const response = request("GET", `${SERVER_URL}/socket-timeout/active`, {
