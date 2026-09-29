@@ -2,7 +2,8 @@
 
 ## Project scope
 
-`sync-request-curl` targets the Node.js API surface of `sync-request` while
+`sync-request-curl` targets the Node.js API surface of
+[`sync-request`](https://github.com/ForbesLindesay/sync-request) while
 keeping a synchronous in-process native transport. Browser synchronous-XHR
 support is not a target.
 
@@ -15,8 +16,9 @@ native addon is the transport boundary. Do not replace the HTTP-aware cache with
 a response-body-only cache or move request orchestration into the native layer.
 Features that fundamentally require asynchronous stream or callback contracts,
 such as stream request bodies, custom callback caches, or the lower-level
-`http-basic` duplex API, are outside the compatibility target unless they can be
-expressed honestly as a buffered synchronous API.
+[`http-basic`](https://github.com/ForbesLindesay/http-basic) duplex API, are
+outside the compatibility target unless they can be expressed honestly as a
+buffered synchronous API.
 
 ## Documentation
 
