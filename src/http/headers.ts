@@ -511,20 +511,42 @@ interface ResponseHeaderSections {
   detachedLines: string[];
 }
 
+const splitHeaderLinesWithoutStatus = (
+  headerLines: string[],
+): ResponseHeaderSections => {
+  const headerEndIndex = headerLines.indexOf("");
+  return {
+    blocks: [
+      headerEndIndex >= 0
+        ? headerLines.slice(0, headerEndIndex)
+        : headerLines.slice(),
+    ],
+    detachedLines:
+      headerEndIndex >= 0 ? headerLines.slice(headerEndIndex + 1) : [],
+  };
+};
+
+const canStartResponseHeaderBlock = (
+  statusCode: number | undefined,
+  allowAnotherResponseBlock: boolean,
+  currentHeaders: string[] | undefined,
+): statusCode is number =>
+  statusCode !== undefined &&
+  allowAnotherResponseBlock &&
+  currentHeaders === undefined;
+
+const canFollowResponseHeaderBlock = (
+  statusCode: number | undefined,
+): boolean =>
+  statusCode !== undefined &&
+  ((statusCode >= 100 && statusCode < 200) ||
+    redirectStatusCodes.has(statusCode));
+
 const splitResponseHeaderSections = (
   headerLines: string[],
 ): ResponseHeaderSections => {
   if (!headerLines.some(isHttpStatusLine)) {
-    const headerEndIndex = headerLines.indexOf("");
-    return {
-      blocks: [
-        headerEndIndex >= 0
-          ? headerLines.slice(0, headerEndIndex)
-          : headerLines.slice(),
-      ],
-      detachedLines:
-        headerEndIndex >= 0 ? headerLines.slice(headerEndIndex + 1) : [],
-    };
+    return splitHeaderLinesWithoutStatus(headerLines);
   }
 
   const blocks: string[][] = [];
@@ -536,9 +558,11 @@ const splitResponseHeaderSections = (
   for (const line of headerLines) {
     const statusCode = getHttpStatusCode(line);
     if (
-      statusCode !== undefined &&
-      allowAnotherResponseBlock &&
-      currentHeaders === undefined
+      canStartResponseHeaderBlock(
+        statusCode,
+        allowAnotherResponseBlock,
+        currentHeaders,
+      )
     ) {
       currentHeaders = [];
       currentStatusCode = statusCode;
@@ -546,23 +570,22 @@ const splitResponseHeaderSections = (
     }
 
     if (line === "") {
-      if (currentHeaders !== undefined) {
-        blocks.push(currentHeaders);
-        allowAnotherResponseBlock =
-          currentStatusCode !== undefined &&
-          ((currentStatusCode >= 100 && currentStatusCode < 200) ||
-            redirectStatusCodes.has(currentStatusCode));
-        currentHeaders = undefined;
-        currentStatusCode = undefined;
+      if (currentHeaders === undefined) {
+        continue;
       }
+      blocks.push(currentHeaders);
+      allowAnotherResponseBlock =
+        canFollowResponseHeaderBlock(currentStatusCode);
+      currentHeaders = undefined;
+      currentStatusCode = undefined;
       continue;
     }
 
-    if (currentHeaders !== undefined) {
-      currentHeaders.push(line);
-    } else {
+    if (currentHeaders === undefined) {
       detachedLines.push(line);
+      continue;
     }
+    currentHeaders.push(line);
   }
 
   if (currentHeaders !== undefined) {
