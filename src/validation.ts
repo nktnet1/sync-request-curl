@@ -265,7 +265,10 @@ export const proxySchema = v.custom<ProxyOptions>(
 );
 
 const optionsObjectSchema = v.object({
-  /** Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. */
+  /**
+   * Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored.
+   * Defaults to no proxy.
+   */
   proxy: v.optional(proxySchema),
   /** Verify the origin certificate chain and hostname. Defaults to `true`. */
   rejectUnauthorized: v.optional(v.boolean()),
@@ -275,7 +278,10 @@ const optionsObjectSchema = v.object({
   localAddress: v.optional(nativeStringSchema),
   /** Source interface name. Mutually exclusive with `localAddress`. */
   localInterface: v.optional(nativeStringSchema),
-  /** Enable TCP keepalive, optionally with idle and interval controls. */
+  /**
+   * Enable TCP keepalive, optionally with idle and interval controls. Defaults
+   * to `false`.
+   */
   tcpKeepAlive: v.optional(
     v.union([
       v.boolean(),
@@ -299,42 +305,75 @@ const optionsObjectSchema = v.object({
   body: v.optional(v.union([v.string(), v.instance(Buffer)])),
   /** Synchronous multipart/form-data body. */
   form: v.optional(v.instance(FormData)),
-  /** Maximum time to wait for response headers in milliseconds. `0` disables it. */
+  /**
+   * Maximum time to wait for response headers in milliseconds. Defaults to `0`,
+   * which disables it.
+   */
   timeout: v.optional(
     v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(2_147_483_647)),
   ),
-  /** Complete-operation deadline in milliseconds. `0` disables it. */
+  /**
+   * Complete-operation deadline in milliseconds. Defaults to `0`, which
+   * disables it.
+   */
   overallTimeout: v.optional(
     v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(2_147_483_647)),
   ),
-  /** Socket inactivity timeout in milliseconds. `0` disables it. */
+  /**
+   * Socket inactivity timeout in milliseconds. Defaults to `0`, which disables
+   * it.
+   */
   socketTimeout: v.optional(
     v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(2_147_483_647)),
   ),
   /** Follow redirects automatically. Defaults to `true`. */
   followRedirects: v.optional(v.boolean()),
   /**
-   * Maximum redirects to follow. Negative values and infinities mean no limit;
-   * `NaN` is invalid.
+   * Maximum redirects to follow. Defaults to no limit. Negative values and
+   * infinities also mean no limit; `NaN` is invalid.
    */
   maxRedirects: v.optional(v.number()),
-  /** Caller headers allowed to be forwarded to redirect hops. */
+  /**
+   * Caller headers allowed to be forwarded to redirect hops. Defaults to none.
+   */
   allowRedirectHeaders: v.optional(v.array(v.string())),
-  /** Transparently decompress gzip/deflate responses. Defaults to enabled. */
+  /** Transparently decompress gzip/deflate responses. Defaults to `true`. */
   gzip: v.optional(v.boolean()),
-  /** Enable the private HTTP-aware cache in file or memory storage. */
+  /**
+   * Enable the private HTTP-aware cache in file or memory storage. Defaults to
+   * disabled.
+   */
   cache: v.optional(v.picklist(["file", "memory"])),
-  /** Override whether a stored cache variant matches the outgoing request. */
+  /**
+   * Override whether a stored cache variant matches the outgoing request. When
+   * caching is enabled, defaults to the built-in `Vary` comparison.
+   */
   isMatch: v.optional(cacheIsMatchFunctionSchema),
-  /** Override whether a matched cached response is expired. */
+  /**
+   * Override whether a matched cached response is expired. When caching is
+   * enabled, defaults to the built-in freshness calculation.
+   */
   isExpired: v.optional(cacheIsExpiredFunctionSchema),
-  /** Override whether a completed origin response may be stored. */
+  /**
+   * Override whether a completed origin response may be stored. When caching is
+   * enabled, defaults to the built-in response cacheability rules.
+   */
   canCache: v.optional(cacheCanCacheFunctionSchema),
-  /** `sync-request` boolean agent option, or a keep-alive Node `Agent` for connection reuse. */
+  /**
+   * `sync-request` boolean agent option, or a keep-alive Node `Agent` for
+   * connection reuse. Defaults to the standard connection behaviour without a
+   * dedicated persistent pool.
+   */
   agent: v.optional(v.union([v.boolean(), v.instance(Agent)])),
-  /** Retry GET requests, or provide a callback to decide per attempt. */
+  /**
+   * Retry GET requests, or provide a callback to decide per attempt. Defaults
+   * to disabled.
+   */
   retry: v.optional(v.union([v.boolean(), retryFunctionSchema])),
-  /** Retry delay in milliseconds, or a callback returning the delay. */
+  /**
+   * Retry delay in milliseconds, or a callback returning the delay. Defaults to
+   * 200 milliseconds when retries are enabled.
+   */
   retryDelay: v.optional(
     v.union([
       v.pipe(v.number(), v.finite(), v.minValue(0)),
