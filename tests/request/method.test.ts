@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
+import { FormData } from "#/form-data";
 import request from "#/index";
-import { FormData } from "#/types";
 import { SERVER_URL } from "#tests/app/config";
 
 describe("HTTP method compatibility", () => {

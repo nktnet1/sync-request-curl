@@ -117,26 +117,6 @@
         "default": "./dist/index.cjs"
       }
     },
-    "./errors": {
-      "import": {
-        "types": "./dist/errors.d.mts",
-        "default": "./dist/errors.mjs"
-      },
-      "require": {
-        "types": "./dist/errors.d.cts",
-        "default": "./dist/errors.cjs"
-      }
-    },
-    "./types": {
-      "import": {
-        "types": "./dist/types.d.mts",
-        "default": "./dist/types.mjs"
-      },
-      "require": {
-        "types": "./dist/types.d.cts",
-        "default": "./dist/types.cjs"
-      }
-    },
     "./package.json": "./package.json"
   }
 }

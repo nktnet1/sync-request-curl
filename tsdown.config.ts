@@ -4,8 +4,6 @@ export default defineConfig([
   {
     entry: {
       index: "./src/index.ts",
-      errors: "./src/errors.ts",
-      types: "./src/types.ts",
     },
     format: "commonjs",
     platform: "node",
@@ -20,8 +18,6 @@ export default defineConfig([
   {
     entry: {
       "index-esm": "./src/index-esm.ts",
-      errors: "./src/errors.ts",
-      types: "./src/types.ts",
     },
     format: "esm",
     platform: "node",
