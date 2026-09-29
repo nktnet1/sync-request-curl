@@ -48,9 +48,15 @@ const config = {
   groupOrder: ["Request", "Response", "Multipart", "Errors", "*"],
   groupReferencesByType: true,
   jsDocCompatibility: true,
-  blockTags: [...OptionDefaults.blockTags, "@level", "@noInheritDoc"],
+  blockTags: [...OptionDefaults.blockTags, "@noInheritDoc"],
   notRenderedTags: [...OptionDefaults.notRenderedTags, "@noInheritDoc"],
   sort: ["source-order"],
+  externalSymbolLinkMappings: {
+    typescript: {
+      ErrorOptions:
+        "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/Error#parameters",
+    },
+  },
 } satisfies TypeDocOptions & PluginOptions;
 
 export default config;

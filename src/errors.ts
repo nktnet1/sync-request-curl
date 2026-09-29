@@ -68,19 +68,8 @@ export class RequestError extends Error {
   /** Stable transport-neutral request error code. */
   readonly code: RequestErrorCode;
 
-  constructor(
-    code: RequestErrorCode,
-    message: string,
-    options?: { cause?: unknown },
-  ) {
-    super(message);
-    if (options && "cause" in options) {
-      Object.defineProperty(this, "cause", {
-        value: options.cause,
-        configurable: true,
-        writable: true,
-      });
-    }
+  constructor(code: RequestErrorCode, message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = "RequestError";
     this.code = v.parse(requestErrorCodeSchema, code);
   }

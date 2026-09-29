@@ -727,8 +727,7 @@ new RequestError(
 | ------ | ------ |
 | `code` | [`RequestErrorCode`](#requesterrorcode) |
 | `message` | `string` |
-| `options?` | \{ `cause?`: `unknown`; \} |
-| `options.cause?` | `unknown` |
+| `options?` | [`ErrorOptions`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/Error#parameters) |
 
 ###### Returns
 
