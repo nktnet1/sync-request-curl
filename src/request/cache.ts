@@ -532,6 +532,11 @@ export const canCacheResponse = (response: CacheableResponse): boolean => {
   return response.statusCode !== 206 && hasExplicitFreshness;
 };
 
+interface StoreCacheResponseOptions {
+  decompress?: boolean;
+  shouldStore?: boolean;
+}
+
 export const storeCacheResponse = (
   url: string,
   requestHeaders: NormalizedRequestHeaders,
@@ -539,9 +544,11 @@ export const storeCacheResponse = (
   responseTimestamp: number,
   response: CacheableResponse,
   cache: CacheMode,
-  decompress = true,
-  shouldStore = canCacheResponse(response),
+  options: StoreCacheResponseOptions = {},
 ): void => {
+  const decompress = options.decompress ?? true;
+  const shouldStore = options.shouldStore ?? canCacheResponse(response);
+
   if (!shouldStore) {
     if (responseForbidsStorage(response.headers)) invalidateCache(url, cache);
     return;
@@ -674,7 +681,7 @@ export const refreshCacheEntry = (
     responseTimestamp,
     response,
     cache,
-    entry.decompress,
+    { decompress: entry.decompress },
   );
   return response;
 };

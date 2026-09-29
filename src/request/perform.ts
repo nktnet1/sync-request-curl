@@ -256,8 +256,10 @@ export const performRequest = (
         responseUrl: result.response.url,
       },
       cache,
-      options.gzip !== false,
-      shouldStore,
+      {
+        decompress: options.gzip !== false,
+        shouldStore,
+      },
     );
   } else if (
     options.cache &&
