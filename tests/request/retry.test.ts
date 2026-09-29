@@ -87,7 +87,7 @@ describe("single request execution", () => {
     expect(result.response.url).toBe("https://example.com/path");
   });
 
-  test("passes overall and socket timeouts independently to native transport", () => {
+  test("passes response, overall, and socket timeouts independently to native transport", () => {
     nativeRequest.mockReturnValueOnce({
       transportCode: 0,
       transportMessage: "",
@@ -98,13 +98,19 @@ describe("single request execution", () => {
       body: Buffer.alloc(0),
     });
 
-    performRequest("GET", "https://example.com/path", {
-      timeout: 900,
-      socketTimeout: 125,
-    });
+    performRequest(
+      "GET",
+      "https://example.com/path",
+      { timeout: 900, socketTimeout: 125 },
+      () => 450,
+    );
 
     expect(nativeRequest).toHaveBeenCalledWith(
-      expect.objectContaining({ timeout: 900, socketTimeout: 125 }),
+      expect.objectContaining({
+        timeout: 900,
+        overallTimeout: 450,
+        socketTimeout: 125,
+      }),
     );
   });
 
@@ -598,7 +604,9 @@ describe("overall deadline and legacy options", () => {
       }),
     ).toThrow("Overall timeout exceeded");
     expect(nativeRequest).toHaveBeenCalledOnce();
-    expect(nativeRequest.mock.calls[0]?.[0].timeout).toBe(20);
+    expect(nativeRequest.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ timeout: 100, overallTimeout: 20 }),
+    );
     expect(wait.mock.calls[0]?.[3]).toBe(15);
   });
 
@@ -621,8 +629,11 @@ describe("overall deadline and legacy options", () => {
       request("GET", "https://example.com", { overallTimeout: 40 }).statusCode,
     ).toBe(200);
     expect(
-      nativeRequest.mock.calls.map(([options]) => options.timeout),
+      nativeRequest.mock.calls.map(([options]) => options.overallTimeout),
     ).toEqual([40, 30]);
+    expect(
+      nativeRequest.mock.calls.map(([options]) => options.timeout),
+    ).toEqual([0, 0]);
   });
 
   test("checks a deadline with redirects disabled after synchronous work completes", () => {

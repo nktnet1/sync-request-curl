@@ -280,7 +280,7 @@ supplied.
 | <a id="property-json"></a> `json?` | [`JsonLike`](#jsonlike) | JSON-compatible request body. Adds `application/json` when needed. |
 | <a id="property-body-1"></a> `body?` | `string` \| `Buffer`\<`ArrayBufferLike`\> | Raw string or `Buffer` request body. |
 | <a id="property-form"></a> `form?` | [`FormData`](#formdata) | Synchronous multipart/form-data body. |
-| <a id="property-timeout"></a> `timeout?` | `number` | Per-network-attempt timeout in milliseconds. `0` disables it. |
+| <a id="property-timeout"></a> `timeout?` | `number` | Maximum time to wait for response headers in milliseconds. `0` disables it. |
 | <a id="property-overalltimeout"></a> `overallTimeout?` | `number` | Complete-operation deadline in milliseconds. `0` disables it. |
 | <a id="property-sockettimeout"></a> `socketTimeout?` | `number` | Socket inactivity timeout in milliseconds. `0` disables it. |
 | <a id="property-followredirects"></a> `followRedirects?` | `boolean` | Follow redirects automatically. Defaults to `true`. |
@@ -816,7 +816,7 @@ Error.constructor
 - `agent` still accepts the boolean values supported by `sync-request`, and can
   also take a keep-alive Node `Agent` for connection reuse.
 - `overallTimeout` sets a deadline for the whole operation, alongside the
-  per-attempt `timeout` and inactivity `socketTimeout` options.
+  response-header `timeout` and inactivity `socketTimeout` options.
 - Proxy, TLS, local network binding, and TCP keepalive have dedicated options.
 
 <a id="differences-from-sync-request-behavioural-differences"></a>

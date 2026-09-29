@@ -16,13 +16,3 @@ export const createDeadline = (timeout = 0): (() => number) => {
     return remaining;
   };
 };
-
-export const attemptTimeout = (timeout: number, remaining: number): number => {
-  if (remaining === 0) {
-    return timeout;
-  }
-  if (timeout === 0) {
-    return remaining;
-  }
-  return Math.min(timeout, remaining);
-};

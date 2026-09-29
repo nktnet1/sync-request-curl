@@ -11,7 +11,7 @@
 - `agent` still accepts the boolean values supported by `sync-request`, and can
   also take a keep-alive Node `Agent` for connection reuse.
 - `overallTimeout` sets a deadline for the whole operation, alongside the
-  per-attempt `timeout` and inactivity `socketTimeout` options.
+  response-header `timeout` and inactivity `socketTimeout` options.
 - Proxy, TLS, local network binding, and TCP keepalive have dedicated options.
 
 ### Behavioural differences
