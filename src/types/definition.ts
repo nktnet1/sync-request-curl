@@ -28,8 +28,12 @@ export type {
 export type UppercaseHttpVerb = v.InferOutput<typeof uppercaseHttpVerbSchema>;
 
 /**
- * Supported HTTP methods. Input is case-insensitive and is normalised to
+ * Recognised HTTP methods. Input is case-insensitive and is normalised to
  * uppercase before transport.
+ *
+ * `CONNECT` is retained in the union for source compatibility with
+ * `sync-request`, but `request()` rejects it because the buffered API cannot
+ * expose the tunnel socket created by a successful CONNECT response.
  *
  * @group Request
  */

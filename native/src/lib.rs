@@ -46,6 +46,9 @@ unsafe extern "C" {
 
 // Public libcurl ABI value; curl-sys leaves this constant commented out.
 const CURLE_NOT_BUILT_IN: CURLcode = 4;
+const DEFAULT_MAX_RESPONSE_HEADER_SIZE: usize = 16 * 1024;
+const RESPONSE_HEADER_OVERFLOW_ERROR: &str =
+  "Response headers exceeded the configured size limit";
 
 const CURLOPT_MIMEPOST: CURLoption = CURLOPTTYPE_OBJECTPOINT + 269;
 // Public long-option ABI value, available since libcurl 7.54.0.
@@ -65,6 +68,9 @@ struct RequestState {
   stop_after_final_headers: bool,
   current_status_code: Option<u16>,
   stopped_after_final_headers: bool,
+  current_response_header_bytes: usize,
+  max_response_header_bytes: usize,
+  response_header_overflow: bool,
 }
 
 impl Default for RequestState {
@@ -77,6 +83,9 @@ impl Default for RequestState {
       stop_after_final_headers: false,
       current_status_code: None,
       stopped_after_final_headers: false,
+      current_response_header_bytes: 0,
+      max_response_header_bytes: DEFAULT_MAX_RESPONSE_HEADER_SIZE,
+      response_header_overflow: false,
     }
   }
 }
@@ -219,6 +228,8 @@ pub struct NativeRequestOptions {
   pub tcp_keep_interval: Option<i64>,
   #[napi(js_name = "socketTimeout")]
   pub socket_timeout: Option<i64>,
+  #[napi(js_name = "maxResponseHeaderSize")]
+  pub max_response_header_size: Option<i64>,
   #[napi(js_name = "noBody")]
   pub no_body: Option<bool>,
   #[napi(js_name = "connectionPoolId")]
@@ -463,6 +474,14 @@ fn header_bytes_to_latin1(bytes: &[u8]) -> String {
   bytes.iter().map(|byte| char::from(*byte)).collect()
 }
 
+fn strip_header_line_ending(bytes: &[u8]) -> &[u8] {
+  let mut end = bytes.len();
+  while end > 0 && matches!(bytes[end - 1], b'\r' | b'\n') {
+    end -= 1;
+  }
+  &bytes[..end]
+}
+
 fn trim_header_line(bytes: &[u8]) -> &[u8] {
   let is_space = |byte: u8| matches!(byte, b' ' | b'\t' | b'\r' | b'\n');
   let begin = bytes
@@ -496,12 +515,22 @@ fn parse_http_status_code(line: &[u8]) -> Option<u16> {
 }
 
 fn process_header_chunk(state: &mut RequestState, chunk: &[u8], bytes: usize) -> usize {
-  let line = trim_header_line(chunk);
-  state.headers.push(header_bytes_to_latin1(line));
+  let line = strip_header_line_ending(chunk);
 
   if let Some(status_code) = parse_http_status_code(line) {
+    state.current_response_header_bytes = 0;
     state.current_status_code = Some(status_code);
+  } else if !line.is_empty() {
+    state.current_response_header_bytes = state
+      .current_response_header_bytes
+      .saturating_add(line.len());
+    if state.current_response_header_bytes > state.max_response_header_bytes {
+      state.response_header_overflow = true;
+      return 0;
+    }
   }
+
+  state.headers.push(header_bytes_to_latin1(line));
 
   if line.is_empty()
     && state
@@ -870,6 +899,11 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   let curl = easy.0;
   let mut state = Box::new(RequestState::default());
   state.stop_after_final_headers = no_body && has_request_payload;
+  state.max_response_header_bytes = options
+    .max_response_header_size
+    .and_then(|value| usize::try_from(value).ok())
+    .filter(|value| *value > 0)
+    .unwrap_or(DEFAULT_MAX_RESPONSE_HEADER_SIZE);
   let state_pointer = (&mut *state as *mut RequestState).cast::<c_void>();
   let mut error_buffer = vec![0 as c_char; curl_sys::CURL_ERROR_SIZE as usize];
   let mut headers = HeaderList::default();
@@ -1086,9 +1120,15 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   let _mime = mime;
   let _keepalive = keepalive;
 
+  let transport_message = if state.response_header_overflow {
+    RESPONSE_HEADER_OVERFLOW_ERROR.to_owned()
+  } else {
+    transport_error_message(code, &error_buffer)
+  };
+
   Ok(NativeResponse {
     transport_code: i64::from(code),
-    transport_message: transport_error_message(code, &error_buffer),
+    transport_message,
     status_code: status_code as i64,
     effective_url,
     redirect_url,

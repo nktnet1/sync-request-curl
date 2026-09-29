@@ -27,14 +27,12 @@ describe("res.getBody()", () => {
 // ========================================================================= //
 
 describe("Response framing", () => {
-  test("normalizes identical duplicate content-length fields", () => {
-    const res = request(
-      "GET",
-      `${FRAMING_SERVER_URL}/content-length/identical`,
+  test("rejects identical duplicate content-length fields", () => {
+    expect(() =>
+      request("GET", `${FRAMING_SERVER_URL}/content-length/identical`),
+    ).toThrow(
+      "Request failed: Invalid response framing: multiple Content-Length values are not allowed",
     );
-
-    expect(res.headers["content-length"]).toBe("5");
-    expect(res.body.toString()).toBe("hello");
   });
 
   test("rejects conflicting content-length fields", () => {
@@ -43,7 +41,7 @@ describe("Response framing", () => {
     ).toThrowError(
       new RequestError(
         "ERR_REQUEST_FAILED",
-        "Request failed: Invalid response framing: conflicting Content-Length values",
+        "Request failed: Invalid response framing: multiple Content-Length values are not allowed",
       ),
     );
   });
@@ -71,6 +69,22 @@ describe("Response framing", () => {
     const response = request("GET", `${FRAMING_SERVER_URL}/obs-text`);
 
     expect(response.headers["x-obs-text"]).toBe("caf\u00e9\u0080\u00ff");
+  });
+
+  test.each([
+    ["invalid header names", "/headers/invalid-name"],
+    ["invalid header values", "/headers/invalid-value"],
+    ["obsolete folded headers", "/headers/obs-fold"],
+  ])("rejects %s", (_description, path) => {
+    expect(() => request("GET", `${FRAMING_SERVER_URL}${path}`)).toThrow(
+      RequestError,
+    );
+  });
+
+  test("rejects response headers larger than Node's configured maximum", () => {
+    expect(() =>
+      request("GET", `${FRAMING_SERVER_URL}/headers/oversized`),
+    ).toThrow("Request failed: Parse Error: Header overflow");
   });
 });
 

@@ -16,7 +16,7 @@
   and can also take a keep-alive Node `Agent` for connection reuse.
 - `overallTimeout` sets a deadline for the whole operation, alongside the
   response-header `timeout` and inactivity `socketTimeout` options.
-- Proxy, TLS, local network binding, and TCP keepalive have dedicated options.
+- TLS, local network binding, and TCP keepalive have dedicated options.
 
 ### Behavioural differences
 
@@ -30,8 +30,10 @@
   `name` is `"ResponseError"` rather than sync-request's default `"Error"`.
 - Invalid HTTP framing is rejected rather than sending conflicting
   `Content-Length` and `Transfer-Encoding` headers.
-- Only absolute `http:` and `https:` URLs are accepted. Proxy environment
-  variables are ignored. Use the `proxy` option when proxying a request.
+- `CONNECT` is rejected explicitly. Although `sync-request` accepts it at the
+  type level, its underlying buffered request stack does not complete a
+  successful CONNECT tunnel response.
+- Only absolute `http:` and `https:` URLs are accepted.
 - An explicit `Authorization` header takes precedence over credentials in the
   URL, and a caller-supplied `Accept-Encoding` header is left unchanged.
 - 307 and 308 redirects preserve the request method and body.

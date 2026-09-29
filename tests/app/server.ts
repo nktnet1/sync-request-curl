@@ -1,4 +1,4 @@
-import { createServer } from "node:http";
+import { createServer, maxHeaderSize } from "node:http";
 import { serve } from "@hono/node-server";
 import {
   FRAMING_PORT,
@@ -69,6 +69,33 @@ const framingServer = createServer((request, response) => {
       request.socket.end(rawResponse);
       return;
     }
+    case "/headers/invalid-name":
+      request.socket.end(
+        "HTTP/1.1 200 OK\r\nBad Header: value\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+      );
+      return;
+    case "/headers/invalid-value":
+      request.socket.end(
+        Buffer.concat([
+          Buffer.from("HTTP/1.1 200 OK\r\nX-Test: bad", "ascii"),
+          Buffer.from([0x01]),
+          Buffer.from(
+            "value\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            "ascii",
+          ),
+        ]),
+      );
+      return;
+    case "/headers/obs-fold":
+      request.socket.end(
+        "HTTP/1.1 200 OK\r\nX-Test: first\r\n second\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+      );
+      return;
+    case "/headers/oversized":
+      request.socket.end(
+        `HTTP/1.1 200 OK\r\nX-Large: ${"x".repeat(maxHeaderSize)}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`,
+      );
+      return;
     default:
       response.statusCode = 404;
       response.end("Not found");

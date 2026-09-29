@@ -1,3 +1,4 @@
+import { maxHeaderSize } from "node:http";
 import { performance } from "node:perf_hooks";
 import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -110,6 +111,7 @@ describe("single request execution", () => {
         timeout: 900,
         overallTimeout: 450,
         socketTimeout: 125,
+        maxResponseHeaderSize: maxHeaderSize,
       }),
     );
   });
@@ -125,7 +127,7 @@ describe("single request execution", () => {
         "",
       ],
       expectedError:
-        "Request failed: Invalid response framing: conflicting Content-Length values",
+        "Request failed: Invalid response framing: multiple Content-Length values are not allowed",
     },
     {
       title:

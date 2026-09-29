@@ -352,26 +352,12 @@ const validateAndNormalizeContentLength = (
     return undefined;
   }
 
-  const candidates = values.flatMap((value) => value.split(","));
-  let first: string | undefined;
-  let normalizedFirst: string | undefined;
-
-  for (const candidate of candidates) {
-    const trimmed = candidate.trim();
-    const normalized = normalizeContentLengthValue(trimmed);
-
-    if (first === undefined) {
-      first = trimmed;
-      normalizedFirst = normalized;
-      continue;
-    }
-
-    if (normalized !== normalizedFirst) {
-      invalidResponseFraming("conflicting Content-Length values");
-    }
+  if (values.length !== 1 || values[0].includes(",")) {
+    invalidResponseFraming("multiple Content-Length values are not allowed");
   }
 
-  return first;
+  normalizeContentLengthValue(values[0]);
+  return values[0];
 };
 
 export const throwForResponseFramingTransportError = (
@@ -402,6 +388,67 @@ export const throwForResponseFramingTransportError = (
   );
 };
 
+const invalidResponseHeaders = (message: string, cause?: unknown): never => {
+  throw new RequestError(
+    "ERR_REQUEST_FAILED",
+    `Request failed: Invalid response headers: ${message}`,
+    cause === undefined ? undefined : { cause },
+  );
+};
+
+const trimOptionalWhitespace = (value: string): string => {
+  let begin = 0;
+  while (value.charAt(begin) === " " || value.charAt(begin) === "\t") {
+    begin += 1;
+  }
+
+  let end = value.length;
+  while (
+    end > begin &&
+    (value.charAt(end - 1) === " " || value.charAt(end - 1) === "\t")
+  ) {
+    end -= 1;
+  }
+
+  return value.slice(begin, end);
+};
+
+interface ParsedResponseHeaderLine {
+  name: string;
+  value: string;
+}
+
+const parseResponseHeaderLine = (header: string): ParsedResponseHeaderLine => {
+  if (header.startsWith(" ") || header.startsWith("\t")) {
+    invalidResponseHeaders("obsolete line folding is not supported");
+  }
+
+  const separatorIndex = header.indexOf(":");
+  if (separatorIndex <= 0) {
+    invalidResponseHeaders("malformed header line");
+  }
+
+  const rawName = header.slice(0, separatorIndex);
+  const rawValue = header.slice(separatorIndex + 1);
+
+  try {
+    validateHeaderName(rawName);
+  } catch (error) {
+    invalidResponseHeaders("invalid header name", error);
+  }
+
+  try {
+    validateHeaderValue(rawName, rawValue);
+  } catch (error) {
+    invalidResponseHeaders(`invalid value for ${rawName}`, error);
+  }
+
+  return {
+    name: rawName.toLowerCase(),
+    value: trimOptionalWhitespace(rawValue),
+  };
+};
+
 const appendResponseHeader = (
   parsedHeaders: Map<string, string | string[]>,
   name: string,
@@ -430,6 +477,26 @@ const appendResponseHeader = (
   }
 };
 
+// CURLE_WRITE_ERROR from libcurl.
+const curlWriteErrorCode = 23;
+const responseHeaderOverflowTransportMessage =
+  "Response headers exceeded the configured size limit";
+
+export const throwForResponseHeaderTransportError = (
+  transportCode: number,
+  transportMessage: string,
+): void => {
+  if (
+    transportCode === curlWriteErrorCode &&
+    transportMessage === responseHeaderOverflowTransportMessage
+  ) {
+    throw new RequestError(
+      "ERR_REQUEST_FAILED",
+      "Request failed: Parse Error: Header overflow",
+    );
+  }
+};
+
 /** Parses the final response header block using Node IncomingMessage folding. */
 export const parseResponseHeaders = (
   headerLines: string[],
@@ -440,13 +507,7 @@ export const parseResponseHeaders = (
   let hasTransferEncoding = false;
 
   for (const header of finalHeaderLines) {
-    const separatorIndex = header.indexOf(":");
-    if (separatorIndex <= 0) {
-      continue;
-    }
-
-    const name = header.slice(0, separatorIndex).trim().toLowerCase();
-    const value = header.slice(separatorIndex + 1).trim();
+    const { name, value } = parseResponseHeaderLine(header);
     if (name === "content-length") {
       contentLengthValues.push(value);
       continue;
