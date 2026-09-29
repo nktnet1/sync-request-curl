@@ -287,7 +287,7 @@ supplied.
 | <a id="property-overalltimeout"></a> `overallTimeout?` | `number` | Complete-operation deadline in milliseconds. `0` disables it. |
 | <a id="property-sockettimeout"></a> `socketTimeout?` | `number` | Socket inactivity timeout in milliseconds. `0` disables it. |
 | <a id="property-followredirects"></a> `followRedirects?` | `boolean` | Follow redirects automatically. Defaults to `true`. |
-| <a id="property-maxredirects"></a> `maxRedirects?` | `number` | Maximum redirects to follow. Negative or non-finite values mean no limit. |
+| <a id="property-maxredirects"></a> `maxRedirects?` | `number` | Maximum redirects to follow. Negative values and infinities mean no limit; `NaN` is invalid. |
 | <a id="property-allowredirectheaders"></a> `allowRedirectHeaders?` | `string`[] | Caller headers allowed to be forwarded to redirect hops. |
 | <a id="property-gzip"></a> `gzip?` | `boolean` | Transparently decompress gzip/deflate responses. Defaults to enabled. |
 | <a id="property-cache"></a> `cache?` | `"file"` \| `"memory"` | Enable the private HTTP-aware cache in file or memory storage. |
@@ -755,6 +755,7 @@ type BufferEncoding =
   | "utf8"
   | "utf-8"
   | "utf16le"
+  | "utf-16le"
   | "ucs2"
   | "ucs-2"
   | "base64url"
@@ -1013,6 +1014,9 @@ Error.constructor
   `GET`, `DELETE`, and `HEAD`. The standard also notes that this content has no
   generally defined semantics and may be rejected by some implementations.
 - Falsy JSON values such as `false`, `0`, `""`, and `null` are valid payloads.
+- `Response#getBody()` throws `ResponseError` for HTTP status codes >= 300. It
+  still extends `Error` and exposes `statusCode`, `headers`, and `body`, but its
+  `name` is `"ResponseError"` rather than sync-request's default `"Error"`.
 - Invalid HTTP framing is rejected rather than sending conflicting
   `Content-Length` and `Transfer-Encoding` headers.
 - Only absolute `http:` and `https:` URLs are accepted. Proxy environment

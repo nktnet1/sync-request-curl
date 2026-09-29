@@ -45,6 +45,7 @@ export type BufferEncoding =
   | "utf8"
   | "utf-8"
   | "utf16le"
+  | "utf-16le"
   | "ucs2"
   | "ucs-2"
   | "base64url"
@@ -312,7 +313,10 @@ const optionsObjectSchema = v.object({
   ),
   /** Follow redirects automatically. Defaults to `true`. */
   followRedirects: v.optional(v.boolean()),
-  /** Maximum redirects to follow. Negative or non-finite values mean no limit. */
+  /**
+   * Maximum redirects to follow. Negative values and infinities mean no limit;
+   * `NaN` is invalid.
+   */
   maxRedirects: v.optional(v.number()),
   /** Caller headers allowed to be forwarded to redirect hops. */
   allowRedirectHeaders: v.optional(v.array(v.string())),
@@ -378,6 +382,7 @@ export const bufferEncodingSchema = v.picklist([
   "utf8",
   "utf-8",
   "utf16le",
+  "utf-16le",
   "ucs2",
   "ucs-2",
   "base64",
