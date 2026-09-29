@@ -271,32 +271,32 @@ supplied.
 
 | Name | Type | Description |
 | ------ | ------ | ------ |
-| <a id="property-proxy"></a> `proxy?` | [`ProxyOptions`](#proxyoptions) | Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. |
+| <a id="property-proxy"></a> `proxy?` | [`ProxyOptions`](#proxyoptions) | Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. Defaults to no proxy. |
 | <a id="property-rejectunauthorized"></a> `rejectUnauthorized?` | `boolean` | Verify the origin certificate chain and hostname. Defaults to `true`. |
 | <a id="property-cafile"></a> `caFile?` | `string` | PEM CA bundle path for origin TLS verification. |
 | <a id="property-localaddress"></a> `localAddress?` | `string` | Source IPv4/IPv6 address. Hostnames are rejected. |
 | <a id="property-localinterface"></a> `localInterface?` | `string` | Source interface name. Mutually exclusive with `localAddress`. |
-| <a id="property-tcpkeepalive"></a> `tcpKeepAlive?` | \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; \} | Enable TCP keepalive, optionally with idle and interval controls. |
+| <a id="property-tcpkeepalive"></a> `tcpKeepAlive?` | \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; \} | Enable TCP keepalive, optionally with idle and interval controls. Defaults to `false`. |
 | <a id="property-cachenamespace"></a> `cacheNamespace?` | `string` | Private cache identity. Defaults to `process.cwd()`. |
 | <a id="property-headers-1"></a> `headers?` | `IncomingHttpHeaders` | Node-style request headers. |
 | <a id="property-qs"></a> `qs?` | \{ \[`key`: `string`\]: `unknown`; \} | Query values merged with any existing query string. |
 | <a id="property-json"></a> `json?` | [`JsonLike`](#jsonlike) | JSON-compatible request body. Adds `application/json` when needed. |
 | <a id="property-body-1"></a> `body?` | `string` \| `Buffer`\<`ArrayBufferLike`\> | Raw string or `Buffer` request body. |
 | <a id="property-form"></a> `form?` | [`FormData`](#formdata) | Synchronous multipart/form-data body. |
-| <a id="property-timeout"></a> `timeout?` | `number` | Maximum time to wait for response headers in milliseconds. `0` disables it. |
-| <a id="property-overalltimeout"></a> `overallTimeout?` | `number` | Complete-operation deadline in milliseconds. `0` disables it. |
-| <a id="property-sockettimeout"></a> `socketTimeout?` | `number` | Socket inactivity timeout in milliseconds. `0` disables it. |
+| <a id="property-timeout"></a> `timeout?` | `number` | Maximum time to wait for response headers in milliseconds. Defaults to `0`, which disables it. |
+| <a id="property-overalltimeout"></a> `overallTimeout?` | `number` | Complete-operation deadline in milliseconds. Defaults to `0`, which disables it. |
+| <a id="property-sockettimeout"></a> `socketTimeout?` | `number` | Socket inactivity timeout in milliseconds. Defaults to `0`, which disables it. |
 | <a id="property-followredirects"></a> `followRedirects?` | `boolean` | Follow redirects automatically. Defaults to `true`. |
-| <a id="property-maxredirects"></a> `maxRedirects?` | `number` | Maximum redirects to follow. Negative or non-finite values mean no limit. |
-| <a id="property-allowredirectheaders"></a> `allowRedirectHeaders?` | `string`[] | Caller headers allowed to be forwarded to redirect hops. |
-| <a id="property-gzip"></a> `gzip?` | `boolean` | Transparently decompress gzip/deflate responses. Defaults to enabled. |
-| <a id="property-cache"></a> `cache?` | `"file"` \| `"memory"` | Enable the private HTTP-aware cache in file or memory storage. |
-| <a id="property-ismatch"></a> `isMatch?` | [`CacheIsMatchFunction`](#cacheismatchfunction) | Override whether a stored cache variant matches the outgoing request. |
-| <a id="property-isexpired"></a> `isExpired?` | [`CacheIsExpiredFunction`](#cacheisexpiredfunction) | Override whether a matched cached response is expired. |
-| <a id="property-cancache"></a> `canCache?` | [`CacheCanCacheFunction`](#cachecancachefunction) | Override whether a completed origin response may be stored. |
-| <a id="property-agent"></a> `agent?` | `boolean` \| `Agent` | `sync-request` boolean agent option, or a keep-alive Node `Agent` for connection reuse. |
-| <a id="property-retry"></a> `retry?` | `boolean` \| [`RetryFunction`](#retryfunction) | Retry GET requests, or provide a callback to decide per attempt. |
-| <a id="property-retrydelay"></a> `retryDelay?` | `number` \| [`RetryDelayFunction`](#retrydelayfunction) | Retry delay in milliseconds, or a callback returning the delay. |
+| <a id="property-maxredirects"></a> `maxRedirects?` | `number` | Maximum redirects to follow. Defaults to no limit. Negative values and infinities also mean no limit; `NaN` is invalid. |
+| <a id="property-allowredirectheaders"></a> `allowRedirectHeaders?` | `string`[] | Caller headers allowed to be forwarded to redirect hops. Defaults to none. |
+| <a id="property-gzip"></a> `gzip?` | `boolean` | Transparently decompress gzip/deflate responses. Defaults to `true`. |
+| <a id="property-cache"></a> `cache?` | `"file"` \| `"memory"` | Enable the private HTTP-aware cache in file or memory storage. Defaults to disabled. |
+| <a id="property-ismatch"></a> `isMatch?` | [`CacheIsMatchFunction`](#cacheismatchfunction) | Override whether a stored cache variant matches the outgoing request. When caching is enabled, defaults to the built-in `Vary` comparison. |
+| <a id="property-isexpired"></a> `isExpired?` | [`CacheIsExpiredFunction`](#cacheisexpiredfunction) | Override whether a matched cached response is expired. When caching is enabled, defaults to the built-in freshness calculation. |
+| <a id="property-cancache"></a> `canCache?` | [`CacheCanCacheFunction`](#cachecancachefunction) | Override whether a completed origin response may be stored. When caching is enabled, defaults to the built-in response cacheability rules. |
+| <a id="property-agent"></a> `agent?` | `boolean` \| `Agent` | `sync-request` boolean agent option, or a keep-alive Node `Agent` for connection reuse. Defaults to the standard connection behaviour without a dedicated persistent pool. |
+| <a id="property-retry"></a> `retry?` | `boolean` \| [`RetryFunction`](#retryfunction) | Retry GET requests, or provide a callback to decide per attempt. Defaults to disabled. |
+| <a id="property-retrydelay"></a> `retryDelay?` | `number` \| [`RetryDelayFunction`](#retrydelayfunction) | Retry delay in milliseconds, or a callback returning the delay. Defaults to 200 milliseconds when retries are enabled. |
 | <a id="property-maxretries"></a> `maxRetries?` | `number` | Maximum retry count. Defaults to 5 when retries are enabled. |
 
 ***
@@ -755,6 +755,7 @@ type BufferEncoding =
   | "utf8"
   | "utf-8"
   | "utf16le"
+  | "utf-16le"
   | "ucs2"
   | "ucs-2"
   | "base64url"
@@ -1013,6 +1014,9 @@ Error.constructor
   `GET`, `DELETE`, and `HEAD`. The standard also notes that this content has no
   generally defined semantics and may be rejected by some implementations.
 - Falsy JSON values such as `false`, `0`, `""`, and `null` are valid payloads.
+- `Response#getBody()` throws `ResponseError` for HTTP status codes >= 300. It
+  still extends `Error` and exposes `statusCode`, `headers`, and `body`, but its
+  `name` is `"ResponseError"` rather than sync-request's default `"Error"`.
 - Invalid HTTP framing is rejected rather than sending conflicting
   `Content-Length` and `Transfer-Encoding` headers.
 - Only absolute `http:` and `https:` URLs are accepted. Proxy environment

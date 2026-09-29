@@ -25,6 +25,9 @@
   `GET`, `DELETE`, and `HEAD`. The standard also notes that this content has no
   generally defined semantics and may be rejected by some implementations.
 - Falsy JSON values such as `false`, `0`, `""`, and `null` are valid payloads.
+- `Response#getBody()` throws `ResponseError` for HTTP status codes >= 300. It
+  still extends `Error` and exposes `statusCode`, `headers`, and `body`, but its
+  `name` is `"ResponseError"` rather than sync-request's default `"Error"`.
 - Invalid HTTP framing is rejected rather than sending conflicting
   `Content-Length` and `Transfer-Encoding` headers.
 - Only absolute `http:` and `https:` URLs are accepted. Proxy environment

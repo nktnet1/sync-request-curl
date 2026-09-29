@@ -16,6 +16,12 @@ describe("res.getBody()", () => {
     const body: string = res.rawResponse.getBody("utf-8");
     expect(typeof body).toBe("string");
   });
+
+  test("Using getBody('utf-16le')", () => {
+    const res = wrapperRequest("GET", SERVER_URL);
+    const body: string = res.rawResponse.getBody("utf-16le");
+    expect(typeof body).toBe("string");
+  });
 });
 
 // ========================================================================= //
