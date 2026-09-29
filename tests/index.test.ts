@@ -1,13 +1,17 @@
 import { describe, expect, expectTypeOf, test } from "vitest";
 import { CurlError } from "#/errors";
-import request from "#/index";
+import request, {
+  type HttpVerb as CommonJsRootHttpVerb,
+  type Options as CommonJsRootOptions,
+  type Response as CommonJsRootResponse,
+} from "#/index";
 import esmRequest, {
   FormData as RootFormData,
   type Options as RootOptions,
   type Response as RootResponse,
 } from "#/index-esm";
 import requestImplementation from "#/request/index";
-import { FormData, type Options, type Response } from "#/types";
+import { FormData, type HttpVerb, type Options, type Response } from "#/types";
 
 describe("public entrypoint", () => {
   test("exports the request implementation as default", () => {
@@ -18,6 +22,14 @@ describe("public entrypoint", () => {
   test("exposes the same FormData constructor for CommonJS and ESM consumers", () => {
     expect(request.FormData).toBe(FormData);
     expect(RootFormData).toBe(FormData);
+  });
+
+  test("re-exports sync-request root declarations from the CommonJS entry", () => {
+    type CommonJsRootFormData = typeof import("#/index").FormData;
+    expectTypeOf<CommonJsRootFormData>().toEqualTypeOf<typeof FormData>();
+    expectTypeOf<CommonJsRootHttpVerb>().toEqualTypeOf<HttpVerb>();
+    expectTypeOf<CommonJsRootOptions>().toEqualTypeOf<Options>();
+    expectTypeOf<CommonJsRootResponse>().toEqualTypeOf<Response>();
   });
 
   test("re-exports public types from the ESM root entry", () => {
