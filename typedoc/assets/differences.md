@@ -1,4 +1,4 @@
-## Differences from [`sync-request`](https://github.com/ForbesLindesay/sync-request)
+## Differences from sync-request
 
 ### Additions
 

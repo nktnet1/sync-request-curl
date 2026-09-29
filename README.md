@@ -41,7 +41,7 @@ A high-performance Node.js alternative to [sync-request](https://github.com/Forb
 - [1. Installation](#installation)
 - [2. Usage](#usage)
 - [3. API reference](#api-reference)
-- [4. Differences from [`sync-request`](https://github.com/ForbesLindesay/sync-request)](#differences-from-sync-request)
+- [4. Differences from sync-request](#differences-from-sync-request)
   - [4.1. Additions](#differences-from-sync-request-additions)
   - [4.2. Behavioural differences](#differences-from-sync-request-behavioural-differences)
 - [5. License](#license)
@@ -989,7 +989,7 @@ Error.constructor
 | <a id="property-body"></a> `body` | `readonly` | `Buffer` | Buffered response body returned by the server. |
 
 <a id="differences-from-sync-request"></a>
-## 4. Differences from [`sync-request`](https://github.com/ForbesLindesay/sync-request)
+## 4. Differences from sync-request
 
 <a id="differences-from-sync-request-additions"></a>
 ### 4.1. Additions
