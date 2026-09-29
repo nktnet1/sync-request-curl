@@ -60,6 +60,7 @@ const copyHeaders = (headers: Response["headers"]): Response["headers"] =>
 const defaultCacheableStatusCodes = new Set([
   200, 203, 204, 300, 301, 308, 404, 405, 410, 414, 501,
 ]);
+const permanentRedirectStatusCodes = new Set([301, 308]);
 const redirectStatusCodes = new Set([301, 302, 303, 307, 308]);
 
 const isNotFoundError = (error: unknown): error is NodeJS.ErrnoException =>
@@ -244,6 +245,12 @@ const getFreshnessLifetime = (entry: CacheEntry): number => {
 
   const expires = getHeaderValue(entry.headers, "expires");
   if (expires === undefined) {
+    // http-basic keeps bare permanent redirects reusable indefinitely. 301
+    // and 308 are heuristically cacheable by HTTP, so preserve that inherited
+    // behaviour when the origin did not provide an explicit freshness limit.
+    if (permanentRedirectStatusCodes.has(entry.statusCode)) {
+      return Number.POSITIVE_INFINITY;
+    }
     return 0;
   }
   const expiresAt = Date.parse(expires);

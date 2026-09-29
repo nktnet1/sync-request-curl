@@ -252,6 +252,62 @@ describe("file cache policy", () => {
     expect(existsSync(getCachePath(url))).toBe(true);
   });
 
+  test.each([301, 308])(
+    "reuses a bare %i permanent redirect without explicit freshness",
+    (statusCode) => {
+      const url = cacheUrl();
+      storeFileCacheResponse(url, {}, 0, 0, {
+        statusCode,
+        headers: { location: "https://cache.test/destination" },
+        body: Buffer.alloc(0),
+        responseUrl: url,
+      });
+
+      expect(
+        prepareCacheLookup("GET", url, [], "file", 86_400_000)
+          .useCachedResponse,
+      ).toBe(true);
+    },
+  );
+
+  test.each([301, 308])(
+    "honours explicit freshness for %i permanent redirects",
+    (statusCode) => {
+      const url = cacheUrl();
+      storeFileCacheResponse(url, {}, 0, 0, {
+        statusCode,
+        headers: {
+          "cache-control": "max-age=0",
+          location: "https://cache.test/destination",
+        },
+        body: Buffer.alloc(0),
+        responseUrl: url,
+      });
+
+      expect(
+        prepareCacheLookup("GET", url, [], "file", 1).useCachedResponse,
+      ).toBe(false);
+    },
+  );
+
+  test.each([301, 308])(
+    "allows request max-age=0 to bypass a cached bare %i permanent redirect",
+    (statusCode) => {
+      const url = cacheUrl();
+      storeFileCacheResponse(url, {}, 0, 0, {
+        statusCode,
+        headers: { location: "https://cache.test/destination" },
+        body: Buffer.alloc(0),
+        responseUrl: url,
+      });
+
+      expect(
+        prepareCacheLookup("GET", url, ["Cache-Control: max-age=0"], "file", 1)
+          .useCachedResponse,
+      ).toBe(false);
+    },
+  );
+
   test("returns null for cached redirects without a Location header", () => {
     expect(getCachedRedirectUrl({ statusCode: 302, headers: {} })).toBeNull();
   });
