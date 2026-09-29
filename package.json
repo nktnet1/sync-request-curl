@@ -127,16 +127,6 @@
         "default": "./dist/errors.cjs"
       }
     },
-    "./types": {
-      "import": {
-        "types": "./dist/types.d.mts",
-        "default": "./dist/types.mjs"
-      },
-      "require": {
-        "types": "./dist/types.d.cts",
-        "default": "./dist/types.cjs"
-      }
-    },
     "./package.json": "./package.json"
   }
 }

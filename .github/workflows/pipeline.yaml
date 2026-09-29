@@ -283,29 +283,31 @@ jobs:
           node <<'NODE'
           const { Blob } = require("node:buffer");
           const request = require("sync-request-curl");
-          const { FormData } = require("sync-request-curl/types");
-          const { CurlError } = require("sync-request-curl/errors");
+          const { CurlError, FormData } = request;
+          const { CurlError: ErrorsCurlError } = require("sync-request-curl/errors");
           if (typeof request !== "function") throw new Error("CommonJS default export is not callable");
-          if (typeof FormData !== "function") throw new Error("CommonJS types entry does not expose FormData");
+          if (typeof FormData !== "function") throw new Error("CommonJS root entry does not expose FormData");
           if (request.default !== request) throw new Error("CommonJS request.default must reference request");
-          if (request.FormData !== FormData) throw new Error("CommonJS request.FormData does not match the exported FormData constructor");
+          if (request.FormData !== FormData) throw new Error("CommonJS request.FormData does not match the root FormData constructor");
+          if (CurlError !== ErrorsCurlError) throw new Error("CommonJS root and errors entry do not share CurlError");
           const form = new request.FormData();
           form.append("blob", new Blob(["runtime compatibility"]), "runtime.txt");
-          if (new CurlError(60, "TLS failure").code !== 60) throw new Error("CommonJS errors entry does not preserve CurlError code");
+          if (new CurlError(60, "TLS failure").code !== 60) throw new Error("CommonJS root does not preserve CurlError code");
           const response = request("GET", "http://127.0.0.1:18765/");
           if (response.statusCode !== 200) throw new Error(`Unexpected CommonJS status: ${response.statusCode}`);
           NODE
 
           node --input-type=module <<'NODE'
           import { Blob } from "node:buffer";
-          import request, { FormData } from "sync-request-curl";
-          import { CurlError } from "sync-request-curl/errors";
+          import request, { CurlError, FormData } from "sync-request-curl";
+          import { CurlError as ErrorsCurlError } from "sync-request-curl/errors";
           if (typeof request !== "function") throw new Error("ESM default export is not callable");
           if (typeof FormData !== "function") throw new Error("ESM root entry does not expose FormData");
-          if (request.FormData !== FormData) throw new Error("ESM request.FormData does not match the exported FormData constructor");
+          if (request.FormData !== FormData) throw new Error("ESM request.FormData does not match the root FormData constructor");
+          if (CurlError !== ErrorsCurlError) throw new Error("ESM root and errors entry do not share CurlError");
           const form = new request.FormData();
           form.append("blob", new Blob(["runtime compatibility"]), "runtime.txt");
-          if (new CurlError(60, "TLS failure").code !== 60) throw new Error("ESM errors entry does not preserve CurlError code");
+          if (new CurlError(60, "TLS failure").code !== 60) throw new Error("ESM root does not preserve CurlError code");
           const response = request("GET", "http://127.0.0.1:18765/");
           if (response.statusCode !== 200) throw new Error(`Unexpected ESM status: ${response.statusCode}`);
           NODE

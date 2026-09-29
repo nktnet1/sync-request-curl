@@ -1,7 +1,5 @@
 import type * as v from "valibot";
 
-export { FormData } from "#/form-data";
-
 import type {
   BufferEncoding,
   optionsSchema,

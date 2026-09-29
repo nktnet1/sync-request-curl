@@ -35,14 +35,20 @@ for (const format of ["module", "commonjs"]) {
     );
     const imports =
       format === "module"
-        ? `import request, { FormData as RootFormData } from 'sync-request-curl';
-           import { FormData } from 'sync-request-curl/types';
-           import { CurlError, RequestError, ResponseError } from 'sync-request-curl/errors';
+        ? `import request, { CurlError, FormData, RequestError, ResponseError } from 'sync-request-curl';
+           import {
+             CurlError as ErrorsCurlError,
+             RequestError as ErrorsRequestError,
+             ResponseError as ErrorsResponseError,
+           } from 'sync-request-curl/errors';
            import assert from 'node:assert/strict';`
         : `const request = require('sync-request-curl');
-           const RootFormData = request.FormData;
-           const { FormData } = require('sync-request-curl/types');
-           const { CurlError, RequestError, ResponseError } = require('sync-request-curl/errors');
+           const { CurlError, FormData, RequestError, ResponseError } = request;
+           const {
+             CurlError: ErrorsCurlError,
+             RequestError: ErrorsRequestError,
+             ResponseError: ErrorsResponseError,
+           } = require('sync-request-curl/errors');
            const assert = require('node:assert/strict');`;
     try {
       const result = spawnSync(
@@ -52,12 +58,17 @@ for (const format of ["module", "commonjs"]) {
           "-e",
           `${imports}
            assert.equal(typeof request, 'function');
+           assert.equal(request.FormData, FormData);
+           assert.equal(request.CurlError, CurlError);
+           assert.equal(request.RequestError, RequestError);
+           assert.equal(request.ResponseError, ResponseError);
+           assert.equal(CurlError, ErrorsCurlError);
+           assert.equal(RequestError, ErrorsRequestError);
+           assert.equal(ResponseError, ErrorsResponseError);
            assert.throws(() => request('GET', 'http://localhost/transport-error'), CurlError);
            assert.throws(() => request('GET', 'http://localhost/redirect', { maxRedirects: 0 }), RequestError);
            const response = request('GET', 'http://localhost/http-error');
            assert.throws(() => response.getBody(), ResponseError);
-           assert.equal(RootFormData, FormData);
-           assert.equal(request.FormData, FormData);
            const form = new FormData();
            form.append('message', 'hello');
            assert.equal(request('POST', 'http://localhost/ok', { form }).statusCode, 200);`,
@@ -76,7 +87,7 @@ for (const format of ["module", "commonjs"]) {
   });
 }
 
-test("built CommonJS declarations expose the sync-request root API", () => {
+test("built CommonJS declarations expose the public root API", () => {
   const directory = mkdtempSync(join(root, ".entrypoints-types-"));
   const fixture = join(directory, "consumer.cts");
   const tsconfig = join(directory, "tsconfig.json");
@@ -84,10 +95,25 @@ test("built CommonJS declarations expose the sync-request root API", () => {
   writeFileSync(
     fixture,
     `import request, {
+       CurlError,
        FormData,
+       RequestError,
+       ResponseError,
+       type BufferEncoding,
+       type FormDataEntry,
+       type GetBody,
+       type GetJSON,
        type HttpVerb,
+       type JsonLike,
+       type JsonPrimitive,
+       type NestedJsonLike,
        type Options,
+       type ProxyOptions,
+       type RequestErrorCode,
        type Response,
+       type RetryDelayFunction,
+       type RetryFunction,
+       type RetryResponse,
      } from "sync-request-curl";
 
      const method: HttpVerb = "GET";
@@ -95,7 +121,39 @@ test("built CommonJS declarations expose the sync-request root API", () => {
      const response: Response = request(method, "http://localhost", options);
      const form = new FormData();
      const attachedForm = new request.FormData();
-     void [response, form, attachedForm];`,
+     const curlError = new CurlError(7, "failed");
+     const requestError = new RequestError("ERR_REQUEST_FAILED", "failed");
+     const responseError = new ResponseError(500, {}, Buffer.alloc(0));
+     const encoding: BufferEncoding = "utf8";
+     const primitive: JsonPrimitive = null;
+     const json: JsonLike = primitive;
+     const nested: NestedJsonLike = { value: json };
+     const proxy: ProxyOptions = { url: "http://localhost" };
+     const errorCode: RequestErrorCode = "ERR_REQUEST_FAILED";
+     let formEntry: FormDataEntry | undefined;
+     let getBody: GetBody | undefined;
+     let getJSON: GetJSON | undefined;
+     let retryDelay: RetryDelayFunction | undefined;
+     let retry: RetryFunction | undefined;
+     let retryResponse: RetryResponse | undefined;
+     void [
+       response,
+       form,
+       attachedForm,
+       curlError,
+       requestError,
+       responseError,
+       encoding,
+       nested,
+       proxy,
+       errorCode,
+       formEntry,
+       getBody,
+       getJSON,
+       retryDelay,
+       retry,
+       retryResponse,
+     ];`,
   );
   writeFileSync(
     tsconfig,
