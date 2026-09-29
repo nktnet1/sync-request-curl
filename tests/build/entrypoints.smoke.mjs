@@ -120,8 +120,9 @@ test("built CommonJS declarations expose the public root API", () => {
      let formEntry: FormDataEntry | undefined;
      let getBody: GetBody | undefined;
      let getJSON: GetJSON | undefined;
-     let retryDelay: RetryDelayFunction | undefined;
-     let retry: RetryFunction | undefined;
+     const retry: RetryFunction = (error) => error === null || error.code === 7;
+     const retryDelay: RetryDelayFunction = (error) =>
+       error === null ? 0 : error.code;
      let retryResponse: RetryResponse | undefined;
      void [
        response,

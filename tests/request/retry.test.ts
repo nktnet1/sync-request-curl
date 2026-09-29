@@ -12,6 +12,7 @@ vi.mock("#/native/index", () => ({
   },
 }));
 
+import { CurlError } from "#/errors";
 import request from "#/index";
 import { performRequest } from "#/request/perform";
 import type { RetryResponse } from "#/types";
@@ -315,7 +316,7 @@ describe("request retries", () => {
       .mockReturnValueOnce(nativeResponse());
     const retry = vi.fn(
       (
-        error: Error | null,
+        error: CurlError | null,
         response: RetryResponse | undefined,
         attemptNumber: number,
       ) => {
@@ -385,7 +386,7 @@ describe("request retries", () => {
       .mockReturnValueOnce(nativeResponse());
     const retry = vi.fn(
       (
-        error: Error | null,
+        error: CurlError | null,
         _response: RetryResponse | undefined,
         attemptNumber: number,
       ) => error !== null && attemptNumber === 1,
@@ -399,6 +400,7 @@ describe("request retries", () => {
 
     expect(response.statusCode).toBe(200);
     expect(retry).toHaveBeenCalledTimes(2);
+    expect(retry.mock.calls[0]?.[0]).toBeInstanceOf(CurlError);
     expect(retry.mock.calls[0]?.[0]).toMatchObject({ code: 7 });
     expect(retry.mock.calls[0]?.[1]).toBeUndefined();
     expect(retry.mock.calls[0]?.[2]).toBe(1);
@@ -414,7 +416,7 @@ describe("request retries", () => {
     const wait = vi.spyOn(Atomics, "wait").mockReturnValue("timed-out");
     const retryDelay = vi.fn(
       (
-        error: Error | null,
+        error: CurlError | null,
         response: RetryResponse | undefined,
         attemptNumber: number,
       ) => {

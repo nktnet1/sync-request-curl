@@ -5,8 +5,7 @@ request(method, url, options);
 ```
 
 The request function is the package default export. ESM consumers can import
-`FormData` and public types from the root entry. The `/types` subpath remains
-available explicitly:
+`FormData` and public types from the root entry:
 
 ```typescript
 import request, { FormData } from 'sync-request-curl';
