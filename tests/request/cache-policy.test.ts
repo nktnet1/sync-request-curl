@@ -55,6 +55,25 @@ const prepareStaleResponse = (headers: Record<string, string | string[]>) => {
   };
 };
 
+const preparePermanentRedirectLookup = (
+  statusCode: number,
+  requestHeaders: string[] = [],
+  responseHeaders: Record<string, string | string[]> = {},
+  now = 1,
+) => {
+  const url = cacheUrl();
+  storeFileCacheResponse(url, {}, 0, 0, {
+    statusCode,
+    headers: {
+      ...responseHeaders,
+      location: "https://cache.test/destination",
+    },
+    body: Buffer.alloc(0),
+    responseUrl: url,
+  });
+  return prepareCacheLookup("GET", url, requestHeaders, "file", now);
+};
+
 const writeBucket = (
   url: string,
   entries: Array<Record<string, unknown>>,
@@ -255,16 +274,8 @@ describe("file cache policy", () => {
   test.each([301, 308])(
     "reuses a bare %i permanent redirect without explicit freshness",
     (statusCode) => {
-      const url = cacheUrl();
-      storeFileCacheResponse(url, {}, 0, 0, {
-        statusCode,
-        headers: { location: "https://cache.test/destination" },
-        body: Buffer.alloc(0),
-        responseUrl: url,
-      });
-
       expect(
-        prepareCacheLookup("GET", url, [], "file", 86_400_000)
+        preparePermanentRedirectLookup(statusCode, [], {}, 86_400_000)
           .useCachedResponse,
       ).toBe(true);
     },
@@ -273,19 +284,10 @@ describe("file cache policy", () => {
   test.each([301, 308])(
     "honours explicit freshness for %i permanent redirects",
     (statusCode) => {
-      const url = cacheUrl();
-      storeFileCacheResponse(url, {}, 0, 0, {
-        statusCode,
-        headers: {
-          "cache-control": "max-age=0",
-          location: "https://cache.test/destination",
-        },
-        body: Buffer.alloc(0),
-        responseUrl: url,
-      });
-
       expect(
-        prepareCacheLookup("GET", url, [], "file", 1).useCachedResponse,
+        preparePermanentRedirectLookup(statusCode, [], {
+          "cache-control": "max-age=0",
+        }).useCachedResponse,
       ).toBe(false);
     },
   );
@@ -293,16 +295,8 @@ describe("file cache policy", () => {
   test.each([301, 308])(
     "allows request max-age=0 to bypass a cached bare %i permanent redirect",
     (statusCode) => {
-      const url = cacheUrl();
-      storeFileCacheResponse(url, {}, 0, 0, {
-        statusCode,
-        headers: { location: "https://cache.test/destination" },
-        body: Buffer.alloc(0),
-        responseUrl: url,
-      });
-
       expect(
-        prepareCacheLookup("GET", url, ["Cache-Control: max-age=0"], "file", 1)
+        preparePermanentRedirectLookup(statusCode, ["Cache-Control: max-age=0"])
           .useCachedResponse,
       ).toBe(false);
     },
