@@ -1,5 +1,9 @@
 import { maxHeaderSize } from "node:http";
-import { type CurlError, throwForTransportError } from "#/errors";
+import {
+  type CurlError,
+  type RequestError,
+  throwForTransportError,
+} from "#/errors";
 import { decompressResponseBody } from "#/http/compression";
 import {
   parseResponseHeaders,
@@ -78,6 +82,7 @@ const performTransportRequest = (
     socketTimeout: Math.ceil(options.socketTimeout ?? 0),
     maxResponseHeaderSize: maxHeaderSize,
     noBody: method === "HEAD",
+    stopOnRedirectHeaders: options.followRedirects !== false,
     ...(connectionPoolId === undefined ? {} : { connectionPoolId }),
   });
 
@@ -97,11 +102,22 @@ const performTransportRequest = (
     result.headers,
   );
   throwForTransportError(result.transportCode, result.transportMessage);
-  const responseBody = decompressResponseBody(
-    result.body,
-    responseHeaders,
-    options.gzip !== false,
-  );
+  const redirectUrl =
+    options.followRedirects === false
+      ? null
+      : (result.redirectUrl ??
+        getCachedRedirectUrl({
+          statusCode: result.statusCode,
+          headers: responseHeaders,
+        }));
+  const responseBody =
+    redirectUrl === null
+      ? decompressResponseBody(
+          result.body,
+          responseHeaders,
+          options.gzip !== false,
+        )
+      : result.body;
   const response: CacheableResponse = {
     statusCode: result.statusCode,
     headers: responseHeaders,
@@ -111,7 +127,7 @@ const performTransportRequest = (
 
   return {
     ...createRequestResult(method, originalUrl, response),
-    redirectUrl: result.redirectUrl,
+    redirectUrl,
   };
 };
 
@@ -131,7 +147,7 @@ const performRequestWithRetry = (
 
   for (let retries = 0; ; retries += 1) {
     const attemptNumber = retries + 1;
-    let retryError: CurlError | null = null;
+    let retryError: CurlError | RequestError | null = null;
     let retryResponse: Response | undefined;
 
     try {

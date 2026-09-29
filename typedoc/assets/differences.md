@@ -9,8 +9,8 @@
   implementations remain out of scope; use the built-in `"file"` or `"memory"` cache.
 - `retry` and `retryDelay` can be callbacks when you need to decide retry
   behaviour at runtime. Transport failures passed to these callbacks are
-  `CurlError` instances with numeric libcurl error codes rather than Node
-  `ErrnoException` errors.
+  `CurlError` instances with numeric libcurl error codes, while response parser
+  failures are `RequestError` instances rather than Node `ErrnoException` errors.
 - `agent` still accepts the boolean values supported by
   [`sync-request`](https://github.com/ForbesLindesay/sync-request),
   and can also take a keep-alive Node `Agent` for connection reuse.
@@ -34,6 +34,9 @@
   type level, its underlying buffered request stack does not complete a
   successful CONNECT tunnel response.
 - Only absolute `http:` and `https:` URLs are accepted.
+- libcurl applies RFC 3986 URL normalisation, including removal of `.` and `..`
+  path segments. `Response#url` reports libcurl's effective URL, so it can
+  reflect that normalisation instead of preserving the caller's literal URL.
 - An explicit `Authorization` header takes precedence over credentials in the
   URL, and a caller-supplied `Accept-Encoding` header is left unchanged.
 - 307 and 308 redirects preserve the request method and body.

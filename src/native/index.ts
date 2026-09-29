@@ -26,6 +26,7 @@ export const nativeRequestOptionsSchema = v.object({
     v.pipe(v.number(), v.integer(), v.minValue(1)),
   ),
   noBody: v.boolean(),
+  stopOnRedirectHeaders: v.optional(v.boolean()),
   proxy: v.optional(v.string()),
   proxyUsername: v.optional(v.string()),
   proxyPassword: v.optional(v.string()),

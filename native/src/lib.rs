@@ -66,7 +66,9 @@ struct RequestState {
   last_activity: Instant,
   final_headers_received: bool,
   stop_after_final_headers: bool,
+  stop_after_redirect_headers: bool,
   current_status_code: Option<u16>,
+  current_response_has_location: bool,
   stopped_after_final_headers: bool,
   current_response_header_bytes: usize,
   max_response_header_bytes: usize,
@@ -81,7 +83,9 @@ impl Default for RequestState {
       last_activity: Instant::now(),
       final_headers_received: false,
       stop_after_final_headers: false,
+      stop_after_redirect_headers: false,
       current_status_code: None,
+      current_response_has_location: false,
       stopped_after_final_headers: false,
       current_response_header_bytes: 0,
       max_response_header_bytes: DEFAULT_MAX_RESPONSE_HEADER_SIZE,
@@ -232,6 +236,8 @@ pub struct NativeRequestOptions {
   pub max_response_header_size: Option<i64>,
   #[napi(js_name = "noBody")]
   pub no_body: Option<bool>,
+  #[napi(js_name = "stopOnRedirectHeaders")]
+  pub stop_on_redirect_headers: Option<bool>,
   #[napi(js_name = "connectionPoolId")]
   pub connection_pool_id: Option<i64>,
 }
@@ -514,12 +520,24 @@ fn parse_http_status_code(line: &[u8]) -> Option<u16> {
   )
 }
 
+fn is_redirect_status(status_code: u16) -> bool {
+  matches!(status_code, 301 | 302 | 303 | 307 | 308)
+}
+
+fn is_location_header(line: &[u8]) -> bool {
+  line
+    .iter()
+    .position(|byte| *byte == b':')
+    .is_some_and(|separator| line[..separator].eq_ignore_ascii_case(b"location"))
+}
+
 fn process_header_chunk(state: &mut RequestState, chunk: &[u8], bytes: usize) -> usize {
   let line = strip_header_line_ending(chunk);
 
   if let Some(status_code) = parse_http_status_code(line) {
     state.current_response_header_bytes = 0;
     state.current_status_code = Some(status_code);
+    state.current_response_has_location = false;
   } else if !line.is_empty() {
     state.current_response_header_bytes = state
       .current_response_header_bytes
@@ -527,6 +545,9 @@ fn process_header_chunk(state: &mut RequestState, chunk: &[u8], bytes: usize) ->
     if state.current_response_header_bytes > state.max_response_header_bytes {
       state.response_header_overflow = true;
       return 0;
+    }
+    if is_location_header(line) {
+      state.current_response_has_location = true;
     }
   }
 
@@ -538,7 +559,10 @@ fn process_header_chunk(state: &mut RequestState, chunk: &[u8], bytes: usize) ->
       .is_some_and(|status_code| !(100..200).contains(&status_code))
   {
     state.final_headers_received = true;
-    if state.stop_after_final_headers {
+    let should_stop_for_redirect = state.stop_after_redirect_headers
+      && state.current_response_has_location
+      && state.current_status_code.is_some_and(is_redirect_status);
+    if state.stop_after_final_headers || should_stop_for_redirect {
       state.stopped_after_final_headers = true;
       return 0;
     }
@@ -899,6 +923,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   let curl = easy.0;
   let mut state = Box::new(RequestState::default());
   state.stop_after_final_headers = no_body && has_request_payload;
+  state.stop_after_redirect_headers = options.stop_on_redirect_headers.unwrap_or(false);
   state.max_response_header_bytes = options
     .max_response_header_size
     .and_then(|value| usize::try_from(value).ok())

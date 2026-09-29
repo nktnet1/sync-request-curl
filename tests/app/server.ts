@@ -57,6 +57,16 @@ const framingServer = createServer((request, response) => {
       response.addTrailers({ "X-Checksum": "abc123" });
       response.end();
       return;
+    case "/redirect/hanging-body": {
+      response.statusCode = 302;
+      response.setHeader("Location", "/redirect/target");
+      response.flushHeaders();
+      setTimeout(() => response.destroy(), 1_000).unref();
+      return;
+    }
+    case "/redirect/target":
+      response.end("redirected");
+      return;
     case "/obs-text": {
       const rawResponse = Buffer.concat([
         Buffer.from("HTTP/1.1 200 OK\r\nX-Obs-Text: caf", "ascii"),

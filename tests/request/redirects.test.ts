@@ -1,7 +1,7 @@
 import { performance } from "node:perf_hooks";
 import { describe, expect, test, vi } from "vitest";
 import request from "#/index";
-import { SERVER_URL } from "#tests/app/config";
+import { FRAMING_SERVER_URL, SERVER_URL } from "#tests/app/config";
 import { wrapperRequest } from "#tests/request/helpers";
 
 describe("Redirects", () => {
@@ -28,6 +28,17 @@ describe("Redirects", () => {
       code: 200,
       json: { message: "Redirect success!" },
     });
+  });
+
+  test("follows redirects without waiting for the redirect body to finish", () => {
+    const response = request(
+      "GET",
+      `${FRAMING_SERVER_URL}/redirect/hanging-body`,
+      { socketTimeout: 100 },
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body.toString()).toBe("redirected");
   });
 
   test("Native redirects enforce maxRedirects", () => {

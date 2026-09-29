@@ -230,6 +230,19 @@ describe("file cache", () => {
     expect(second.getJSON()).toStrictEqual({ sourceHits: 1, targetHits: 2 });
   });
 
+  test("returns a cached redirect when redirect following is disabled", () => {
+    const url = cacheUrl("/cache/redirect");
+    const options = { cache: "file" as const, followRedirects: false };
+
+    const first = request("GET", url, options);
+    const second = request("GET", url, options);
+
+    expect(first.statusCode).toBe(302);
+    expect(second.statusCode).toBe(302);
+    expect(second.headers.location).toBe(first.headers.location);
+    expect(second.headers.location).toContain("sourceHits=1");
+  });
+
   test("invalidates a cached GET after a successful unsafe request", () => {
     const url = cacheUrl("/cache/mutable");
 

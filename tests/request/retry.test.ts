@@ -13,7 +13,7 @@ vi.mock("#/native/index", () => ({
   },
 }));
 
-import { CurlError } from "#/errors";
+import { CurlError, RequestError } from "#/errors";
 import request from "#/index";
 import { performRequest } from "#/request/perform";
 import type { RetryResponse } from "#/types/definition";
@@ -112,8 +112,29 @@ describe("single request execution", () => {
         overallTimeout: 450,
         socketTimeout: 125,
         maxResponseHeaderSize: maxHeaderSize,
+        stopOnRedirectHeaders: true,
       }),
     );
+  });
+
+  test("does not decompress a redirect body that native stopped after headers", () => {
+    nativeRequest.mockReturnValueOnce(
+      nativeResponse({
+        statusCode: 302,
+        headers: [
+          "HTTP/1.1 302 Found",
+          "Location: /next",
+          "Content-Encoding: gzip",
+          "",
+        ],
+        body: Buffer.alloc(0),
+      }),
+    );
+
+    const result = performRequest("GET", "https://example.com/start", {});
+
+    expect(result.redirectUrl).toBe("/next");
+    expect(result.response.body).toHaveLength(0);
   });
 
   test.for([
@@ -134,6 +155,14 @@ describe("single request execution", () => {
         "maps libcurl Content-Length parser failures using captured framing context",
       transportMessage: "Invalid Content-Length: value",
       headers: ["HTTP/1.1 200 OK", "Content-Length: 5"],
+      expectedError:
+        "Request failed: Invalid response framing: conflicting Content-Length values",
+    },
+    {
+      title:
+        "maps libcurl Content-Length parser failures with a terminated captured header block",
+      transportMessage: "Invalid Content-Length: value",
+      headers: ["HTTP/1.1 200 OK", "Content-Length: 5", ""],
       expectedError:
         "Request failed: Invalid response framing: conflicting Content-Length values",
     },
@@ -238,26 +267,89 @@ describe("request retries", () => {
     expect(nativeRequest).toHaveBeenCalledTimes(3);
   });
 
-  test("does not retry deterministic response framing errors", () => {
-    nativeRequest.mockReturnValue(
-      nativeResponse({
-        transportCode: 8,
-        transportMessage: "Invalid Content-Length: value",
-        headers: ["HTTP/1.1 200 OK", "Content-Length: 5"],
-        body: Buffer.alloc(0),
-      }),
+  test("retries response framing parser errors", () => {
+    nativeRequest
+      .mockReturnValueOnce(
+        nativeResponse({
+          transportCode: 8,
+          transportMessage: "Invalid Content-Length: value",
+          headers: ["HTTP/1.1 200 OK", "Content-Length: 5"],
+          body: Buffer.alloc(0),
+        }),
+      )
+      .mockReturnValueOnce(nativeResponse());
+
+    const response = request("GET", "https://example.com/retry", {
+      retry: true,
+      retryDelay: 0,
+      maxRetries: 1,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(nativeRequest).toHaveBeenCalledTimes(2);
+  });
+
+  test("retries malformed response header parser errors", () => {
+    nativeRequest
+      .mockReturnValueOnce(
+        nativeResponse({
+          headers: ["HTTP/1.1 200 OK", "Bad Header: value", ""],
+        }),
+      )
+      .mockReturnValueOnce(nativeResponse());
+
+    const response = request("GET", "https://example.com/retry", {
+      retry: true,
+      retryDelay: 0,
+      maxRetries: 1,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(nativeRequest).toHaveBeenCalledTimes(2);
+  });
+
+  test("retries response header overflow parser errors", () => {
+    nativeRequest
+      .mockReturnValueOnce(
+        nativeResponse({
+          transportCode: 23,
+          transportMessage:
+            "Response headers exceeded the configured size limit",
+          headers: ["HTTP/1.1 200 OK"],
+        }),
+      )
+      .mockReturnValueOnce(nativeResponse());
+
+    const response = request("GET", "https://example.com/retry", {
+      retry: true,
+      retryDelay: 0,
+      maxRetries: 1,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(nativeRequest).toHaveBeenCalledTimes(2);
+  });
+
+  test("passes response parser failures to custom retry callbacks", () => {
+    nativeRequest
+      .mockReturnValueOnce(
+        nativeResponse({
+          headers: ["HTTP/1.1 200 OK", "Bad Header: value", ""],
+        }),
+      )
+      .mockReturnValueOnce(nativeResponse());
+    const retry = vi.fn(
+      (error: CurlError | RequestError | null) => error instanceof RequestError,
     );
 
-    expect(() =>
-      request("GET", "https://example.com/retry", {
-        retry: true,
-        retryDelay: 0,
-        maxRetries: 2,
-      }),
-    ).toThrow(
-      "Request failed: Invalid response framing: conflicting Content-Length values",
-    );
-    expect(nativeRequest).toHaveBeenCalledOnce();
+    const response = request("GET", "https://example.com/retry", {
+      retry,
+      retryDelay: 0,
+      maxRetries: 1,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(retry).toHaveBeenCalledWith(expect.any(RequestError), undefined, 1);
   });
 
   test("throws the final transport error after maxRetries", () => {
@@ -324,7 +416,7 @@ describe("request retries", () => {
       .mockReturnValueOnce(nativeResponse());
     const retry = vi.fn(
       (
-        error: CurlError | null,
+        error: CurlError | RequestError | null,
         response: RetryResponse | undefined,
         attemptNumber: number,
       ) => {
@@ -394,7 +486,7 @@ describe("request retries", () => {
       .mockReturnValueOnce(nativeResponse());
     const retry = vi.fn(
       (
-        error: CurlError | null,
+        error: CurlError | RequestError | null,
         _response: RetryResponse | undefined,
         attemptNumber: number,
       ) => error !== null && attemptNumber === 1,
@@ -424,7 +516,7 @@ describe("request retries", () => {
     const wait = vi.spyOn(Atomics, "wait").mockReturnValue("timed-out");
     const retryDelay = vi.fn(
       (
-        error: CurlError | null,
+        error: CurlError | RequestError | null,
         response: RetryResponse | undefined,
         attemptNumber: number,
       ) => {
