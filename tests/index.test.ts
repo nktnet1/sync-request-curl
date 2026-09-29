@@ -2,8 +2,8 @@ import { describe, expect, expectTypeOf, test } from "vitest";
 import {
   CurlError,
   RequestError,
-  ResponseError,
   type RequestErrorCode,
+  ResponseError,
 } from "#/errors";
 import { FormData } from "#/form-data";
 import request, {
@@ -14,11 +14,11 @@ import request, {
 import esmRequest, {
   CurlError as RootCurlError,
   FormData as RootFormData,
-  RequestError as RootRequestError,
-  ResponseError as RootResponseError,
   type Options as RootOptions,
+  RequestError as RootRequestError,
   type RequestErrorCode as RootRequestErrorCode,
   type Response as RootResponse,
+  ResponseError as RootResponseError,
 } from "#/index-esm";
 import requestImplementation from "#/request/index";
 import type { HttpVerb, Options, Response } from "#/types";
@@ -44,7 +44,9 @@ describe("public entrypoint", () => {
 
     expectTypeOf<CommonJsRootFormData>().toEqualTypeOf<typeof FormData>();
     expectTypeOf<CommonJsRootCurlError>().toEqualTypeOf<typeof CurlError>();
-    expectTypeOf<CommonJsRootRequestError>().toEqualTypeOf<typeof RequestError>();
+    expectTypeOf<CommonJsRootRequestError>().toEqualTypeOf<
+      typeof RequestError
+    >();
     expectTypeOf<CommonJsRootResponseError>().toEqualTypeOf<
       typeof ResponseError
     >();

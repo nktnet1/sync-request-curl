@@ -6,9 +6,6 @@ import {
 import { FormData as FormDataImpl } from "#/form-data";
 import originalRequest from "#/request/index";
 
-// Keep the CommonJS runtime as a callable module.exports value. These
-// declaration-only exports describe properties attached to that function
-// without making the bundler emit a named CommonJS export object.
 export declare const FormData: typeof FormDataImpl;
 export declare const CurlError: typeof CurlErrorImpl;
 export declare const RequestError: typeof RequestErrorImpl;
@@ -46,6 +43,6 @@ const request = Object.assign(originalRequest, {
   RequestError: RequestErrorImpl,
   ResponseError: ResponseErrorImpl,
 }) as Request;
-request.default = request;
 
+request.default = request;
 export default request;

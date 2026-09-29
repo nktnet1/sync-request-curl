@@ -36,19 +36,9 @@ for (const format of ["module", "commonjs"]) {
     const imports =
       format === "module"
         ? `import request, { CurlError, FormData, RequestError, ResponseError } from 'sync-request-curl';
-           import {
-             CurlError as ErrorsCurlError,
-             RequestError as ErrorsRequestError,
-             ResponseError as ErrorsResponseError,
-           } from 'sync-request-curl/errors';
            import assert from 'node:assert/strict';`
         : `const request = require('sync-request-curl');
            const { CurlError, FormData, RequestError, ResponseError } = request;
-           const {
-             CurlError: ErrorsCurlError,
-             RequestError: ErrorsRequestError,
-             ResponseError: ErrorsResponseError,
-           } = require('sync-request-curl/errors');
            const assert = require('node:assert/strict');`;
     try {
       const result = spawnSync(
@@ -62,9 +52,6 @@ for (const format of ["module", "commonjs"]) {
            assert.equal(request.CurlError, CurlError);
            assert.equal(request.RequestError, RequestError);
            assert.equal(request.ResponseError, ResponseError);
-           assert.equal(CurlError, ErrorsCurlError);
-           assert.equal(RequestError, ErrorsRequestError);
-           assert.equal(ResponseError, ErrorsResponseError);
            assert.throws(() => request('GET', 'http://localhost/transport-error'), CurlError);
            assert.throws(() => request('GET', 'http://localhost/redirect', { maxRedirects: 0 }), RequestError);
            const response = request('GET', 'http://localhost/http-error');

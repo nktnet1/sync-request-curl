@@ -2,8 +2,8 @@ import { Blob } from "node:buffer";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
-import request from "#/index";
 import { FormData } from "#/form-data";
+import request from "#/index";
 import { SERVER_URL } from "#tests/app/config";
 
 const upload = (form: FormData): unknown => {
