@@ -16,7 +16,7 @@ export default defineConfig({
       exclude: [
         "src/index.ts",
         "src/index-esm.ts",
-        "src/types.ts",
+        "src/types/*.ts",
         "src/internal/blob-reader-worker.ts",
       ],
     },

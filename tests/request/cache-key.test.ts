@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { canUseRequestCache, getRequestCacheKey } from "#/request/cache-key";
-import type { Options } from "#/types";
+import type { Options } from "#/types/definition";
 
 test("cache targets ignore fragments, credentials, and default ports", () => {
   expect(

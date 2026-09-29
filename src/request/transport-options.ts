@@ -1,5 +1,5 @@
 import { isIP } from "node:net";
-import type { Options } from "#/types";
+import type { Options } from "#/types/definition";
 
 interface PreparedProxyOptions {
   proxy: string;

@@ -1,7 +1,7 @@
 import { validateHeaderName, validateHeaderValue } from "node:http";
 import * as v from "valibot";
 import { RequestError } from "#/errors";
-import type { Options, Response } from "#/types";
+import type { Options, Response } from "#/types/definition";
 import { incomingHttpHeadersSchema } from "#/validation";
 
 const getRequestHeaderDelimiterIndex = (header: string): number => {

@@ -31,7 +31,7 @@ import {
   usesCustomTransport,
 } from "#/request/transport-options";
 import { createResponse } from "#/response";
-import type { Options, Response, UppercaseHttpVerb } from "#/types";
+import type { Options, Response, UppercaseHttpVerb } from "#/types/definition";
 
 export interface RequestResult {
   response: Response;

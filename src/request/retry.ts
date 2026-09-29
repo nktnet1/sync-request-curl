@@ -1,5 +1,5 @@
 import { CurlError } from "#/errors";
-import type { Options, Response, UppercaseHttpVerb } from "#/types";
+import type { Options, Response, UppercaseHttpVerb } from "#/types/definition";
 
 const defaultRetryDelay = 200;
 export const defaultMaxRetries = 5;

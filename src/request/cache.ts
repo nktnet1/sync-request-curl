@@ -7,7 +7,7 @@ import {
   setRequestHeader,
 } from "#/http/headers";
 import { fileCacheDirectory, getCachePath } from "#/request/cache-path";
-import type { CachedResponse, Options, Response } from "#/types";
+import type { CachedResponse, Options, Response } from "#/types/definition";
 import { incomingHttpHeadersSchema } from "#/validation";
 
 const cacheEntrySchema = v.object({

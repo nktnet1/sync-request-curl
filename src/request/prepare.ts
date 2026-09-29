@@ -16,7 +16,7 @@ import {
   normalizeUrlHostname,
 } from "#/http/url";
 import type { NativeRequestOptions } from "#/native/index";
-import type { Options, UppercaseHttpVerb } from "#/types";
+import type { Options, UppercaseHttpVerb } from "#/types/definition";
 
 export type PreparedRequest = Pick<
   NativeRequestOptions,

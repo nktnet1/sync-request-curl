@@ -26,7 +26,7 @@ import type {
   ProxyOptions,
   Response,
   UppercaseHttpVerb,
-} from "#/types";
+} from "#/types/definition";
 import {
   type bufferEncodingSchema,
   type httpVerbInputSchema,

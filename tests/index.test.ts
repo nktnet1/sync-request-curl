@@ -21,7 +21,7 @@ import esmRequest, {
   ResponseError as RootResponseError,
 } from "#/index-esm";
 import requestImplementation from "#/request/index";
-import type { HttpVerb, Options, Response } from "#/types";
+import type { HttpVerb, Options, Response } from "#/types/definition";
 
 describe("public entrypoint", () => {
   test("exports the request implementation as default", () => {

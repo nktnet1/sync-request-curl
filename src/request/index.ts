@@ -5,7 +5,12 @@ import { assertSupportedHttpUrl } from "#/http/url";
 import { createDeadline } from "#/request/deadline";
 import { performRequest } from "#/request/perform";
 import { getRedirectMethod, getRedirectOptions } from "#/request/redirects";
-import type { HttpVerb, Options, Response, UppercaseHttpVerb } from "#/types";
+import type {
+  HttpVerb,
+  Options,
+  Response,
+  UppercaseHttpVerb,
+} from "#/types/definition";
 import { httpVerbSchema, optionsSchema, requestUrlSchema } from "#/validation";
 
 const normalizeMethod = (method: HttpVerb): UppercaseHttpVerb =>

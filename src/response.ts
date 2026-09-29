@@ -5,7 +5,7 @@ import type {
   GetJSON,
   Response,
   UppercaseHttpVerb,
-} from "#/types";
+} from "#/types/definition";
 
 type CreateResponseOptions = Pick<
   Response,

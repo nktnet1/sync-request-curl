@@ -1,6 +1,6 @@
 import { gunzipSync, inflateSync } from "node:zlib";
 import { RequestError } from "#/errors";
-import type { Response } from "#/types";
+import type { Response } from "#/types/definition";
 
 const getContentEncodings = (headers: Response["headers"]): string[] => {
   const contentEncoding = headers["content-encoding"];
