@@ -117,6 +117,11 @@ describe("transport option validation", () => {
       prepareTransportOptions({ tcpKeepAlive: {} }).tcpKeepIdle,
     ).toBeUndefined();
     expect(usesCustomTransport({})).toBe(false);
+    expect(usesCustomTransport({ rejectUnauthorized: true })).toBe(false);
+    expect(usesCustomTransport({ tcpKeepAlive: false })).toBe(false);
+    expect(usesCustomTransport({ rejectUnauthorized: false })).toBe(true);
+    expect(usesCustomTransport({ tcpKeepAlive: true })).toBe(true);
+    expect(usesCustomTransport({ tcpKeepAlive: {} })).toBe(true);
     expect(usesCustomTransport({ caFile })).toBe(true);
   });
 

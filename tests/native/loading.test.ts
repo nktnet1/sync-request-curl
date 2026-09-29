@@ -181,7 +181,7 @@ describe("native binding loading", () => {
         packageRoot: join("", "package"),
         exists: () => false,
       }),
-    ).toThrow("npm exec sync-request-curl-build");
+    ).toThrow("npm exec --no -- sync-request-curl-build");
   });
 
   test("does not hide a broken local source build", () => {
@@ -267,7 +267,7 @@ describe("native binding loading", () => {
         "Reinstall sync-request-curl with optional dependencies enabled.",
         "",
         "Alternatively, if optional dependencies were intentionally omitted, build from source using your package manager:",
-        "  npm exec sync-request-curl-build",
+        "  npm exec --no -- sync-request-curl-build",
         "  pnpm exec sync-request-curl-build",
         "  yarn run sync-request-curl-build",
         "",

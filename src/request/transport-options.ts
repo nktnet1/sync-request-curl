@@ -96,11 +96,9 @@ export const prepareTransportOptions = (options: Options) => {
 // Custom trust/routing/socket policy must not reuse sockets created under a
 // different policy. Default Agents retain their existing pool semantics.
 export const usesCustomTransport = (options: Options): boolean =>
-  [
-    options.proxy,
-    options.rejectUnauthorized,
-    options.caFile,
-    options.localAddress,
-    options.localInterface,
-    options.tcpKeepAlive,
-  ].some((value) => value !== undefined);
+  options.proxy !== undefined ||
+  options.rejectUnauthorized === false ||
+  options.caFile !== undefined ||
+  options.localAddress !== undefined ||
+  options.localInterface !== undefined ||
+  (options.tcpKeepAlive !== undefined && options.tcpKeepAlive !== false);

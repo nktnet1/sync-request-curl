@@ -18,8 +18,10 @@ const expectCurlError = (requestWrapped: () => void, code: number): void => {
 };
 
 describe("request transport errors", () => {
-  test("CurlError preserves the libcurl error code", () => {
-    expect(new CurlError(1, "transport failure").code).toBe(1);
+  test("CurlError preserves its identity and libcurl error code", () => {
+    const error = new CurlError(1, "transport failure");
+    expect(error.name).toBe("CurlError");
+    expect(error.code).toBe(1);
     expect(new CurlError(101, "transport failure").code).toBe(101);
     expect(() => new CurlError(0, "transport failure")).toThrow(Error);
     expect(() => new CurlError(102, "transport failure")).toThrow(Error);
