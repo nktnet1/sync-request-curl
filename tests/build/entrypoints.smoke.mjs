@@ -149,6 +149,7 @@ test("built CommonJS declarations expose the public root API", () => {
         module: "NodeNext",
         moduleResolution: "NodeNext",
         target: "ES2022",
+        types: ["node"],
         strict: true,
         skipLibCheck: true,
         noEmit: true,
