@@ -347,16 +347,7 @@ describe("file cache policy", () => {
   });
 
   test("does not reuse a response marked Cache-Control: no-cache", () => {
-    const url = cacheUrl();
-    storeFileCacheResponse(
-      url,
-      {},
-      0,
-      0,
-      response(url, { "cache-control": "no-cache" }),
-    );
-
-    const lookup = prepareCacheLookup("GET", url, [], "file", 1);
+    const { lookup } = prepareStaleResponse({ "cache-control": "no-cache" });
 
     expect(lookup.entry).toBeDefined();
     expect(lookup.useCachedResponse).toBe(false);
