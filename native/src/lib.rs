@@ -61,6 +61,7 @@ struct RequestState {
   body: Vec<u8>,
   headers: Vec<String>,
   last_activity: Instant,
+  final_headers_received: bool,
   stop_after_final_headers: bool,
   current_status_code: Option<u16>,
   stopped_after_final_headers: bool,
@@ -72,6 +73,7 @@ impl Default for RequestState {
       body: Vec::new(),
       headers: Vec::new(),
       last_activity: Instant::now(),
+      final_headers_received: false,
       stop_after_final_headers: false,
       current_status_code: None,
       stopped_after_final_headers: false,
@@ -196,6 +198,8 @@ pub struct NativeRequestOptions {
   pub body: Option<Either<String, Buffer>>,
   pub form: Option<Vec<NativeFormDataEntry>>,
   pub timeout: Option<i64>,
+  #[napi(js_name = "overallTimeout")]
+  pub overall_timeout: Option<i64>,
   pub proxy: Option<String>,
   #[napi(js_name = "proxyUsername")]
   pub proxy_username: Option<String>,
@@ -499,14 +503,16 @@ fn process_header_chunk(state: &mut RequestState, chunk: &[u8], bytes: usize) ->
     state.current_status_code = Some(status_code);
   }
 
-  if state.stop_after_final_headers
-    && line.is_empty()
+  if line.is_empty()
     && state
       .current_status_code
       .is_some_and(|status_code| !(100..200).contains(&status_code))
   {
-    state.stopped_after_final_headers = true;
-    return 0;
+    state.final_headers_received = true;
+    if state.stop_after_final_headers {
+      state.stopped_after_final_headers = true;
+      return 0;
+    }
   }
 
   bytes
@@ -690,22 +696,32 @@ fn read_multi_result(multi: *mut CURLM, curl: *mut CURL) -> CURLcode {
   }
 }
 
+fn timeout_duration(timeout_ms: i64) -> std::result::Result<Option<Duration>, CURLcode> {
+  if timeout_ms <= 0 {
+    return Ok(None);
+  }
+  let timeout_ms = u64::try_from(timeout_ms).map_err(|_| CURLE_FAILED_INIT)?;
+  Ok(Some(Duration::from_millis(timeout_ms)))
+}
+
 fn perform_with_multi(
   curl: *mut CURL,
   multi: *mut CURLM,
   state: *mut RequestState,
+  response_timeout_ms: i64,
   socket_timeout_ms: i64,
 ) -> CURLcode {
-  let socket_timeout = if socket_timeout_ms > 0 {
-    let Ok(socket_timeout_ms) = u64::try_from(socket_timeout_ms) else {
-      return CURLE_FAILED_INIT;
-    };
-    Some(Duration::from_millis(socket_timeout_ms))
-  } else {
-    None
+  let response_timeout = match timeout_duration(response_timeout_ms) {
+    Ok(timeout) => timeout,
+    Err(code) => return code,
   };
+  let socket_timeout = match timeout_duration(socket_timeout_ms) {
+    Ok(timeout) => timeout,
+    Err(code) => return code,
+  };
+  let response_started = Instant::now();
   unsafe {
-    (*state).last_activity = Instant::now();
+    (*state).last_activity = response_started;
   }
 
   let add_code = unsafe { curl_sys::curl_multi_add_handle(multi, curl) };
@@ -720,14 +736,28 @@ fn perform_with_multi(
       return multi_error_to_curl(code);
     }
     while running_handles > 0 {
-      let elapsed = unsafe { (*state).last_activity.elapsed() };
-      if socket_timeout.is_some_and(|timeout| elapsed >= timeout) {
+      let socket_elapsed = unsafe { (*state).last_activity.elapsed() };
+      if socket_timeout.is_some_and(|timeout| socket_elapsed >= timeout) {
         return CURLE_OPERATION_TIMEDOUT;
       }
 
-      let wait_limit = socket_timeout
-        .map(|timeout| timeout.saturating_sub(elapsed))
+      let waiting_for_headers = unsafe { !(*state).final_headers_received };
+      let response_elapsed = response_started.elapsed();
+      if waiting_for_headers
+        && response_timeout.is_some_and(|timeout| response_elapsed >= timeout)
+      {
+        return CURLE_OPERATION_TIMEDOUT;
+      }
+
+      let mut wait_limit = socket_timeout
+        .map(|timeout| timeout.saturating_sub(socket_elapsed))
         .unwrap_or(Duration::from_secs(1));
+      if waiting_for_headers {
+        if let Some(timeout) = response_timeout {
+          wait_limit = wait_limit.min(timeout.saturating_sub(response_elapsed));
+        }
+      }
+
       let socket_activity = match wait_for_multi(multi, wait_limit) {
         Ok(socket_activity) => socket_activity,
         Err(code) => return code,
@@ -748,6 +778,12 @@ fn perform_with_multi(
       if code != CURLM_OK {
         return multi_error_to_curl(code);
       }
+
+      if response_timeout.is_some_and(|timeout| unsafe {
+        !(*state).final_headers_received && response_started.elapsed() >= timeout
+      }) {
+        return CURLE_OPERATION_TIMEDOUT;
+      }
     }
 
     read_multi_result(multi, curl)
@@ -762,6 +798,7 @@ fn perform_with_multi(
 fn perform_request(
   curl: *mut CURL,
   state: *mut RequestState,
+  response_timeout_ms: i64,
   socket_timeout_ms: i64,
   connection_pool_id: Option<i64>,
 ) -> CURLcode {
@@ -772,10 +809,16 @@ fn perform_request(
     let Ok(pool) = pool.lock() else {
       return CURLE_FAILED_INIT;
     };
-    return perform_with_multi(curl, pool.0, state, socket_timeout_ms);
+    return perform_with_multi(
+      curl,
+      pool.0,
+      state,
+      response_timeout_ms,
+      socket_timeout_ms,
+    );
   }
 
-  if socket_timeout_ms <= 0 {
+  if response_timeout_ms <= 0 && socket_timeout_ms <= 0 {
     return unsafe { curl_sys::curl_easy_perform(curl) };
   }
 
@@ -783,7 +826,13 @@ fn perform_request(
     Ok(multi) => multi,
     Err(code) => return code,
   };
-  perform_with_multi(curl, multi.0, state, socket_timeout_ms)
+  perform_with_multi(
+    curl,
+    multi.0,
+    state,
+    response_timeout_ms,
+    socket_timeout_ms,
+  )
 }
 
 fn get_string_info(curl: *mut CURL, info: curl_sys::CURLINFO) -> Option<String> {
@@ -872,7 +921,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     curl_sys::curl_easy_setopt(
       curl,
       curl_sys::CURLOPT_TIMEOUT_MS,
-      options.timeout.unwrap_or_default() as c_long,
+      options.overall_timeout.unwrap_or_default() as c_long,
     )
   });
   keep_first_error(&mut code, unsafe {
@@ -1014,6 +1063,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     code = perform_request(
       curl,
       state_pointer.cast::<RequestState>(),
+      options.timeout.unwrap_or_default(),
       options.socket_timeout.unwrap_or_default(),
       options.connection_pool_id,
     );

@@ -16,7 +16,6 @@ import {
   storeCacheResponse,
 } from "#/request/cache";
 import { canUseRequestCache, getRequestCacheKey } from "#/request/cache-key";
-import { attemptTimeout } from "#/request/deadline";
 import { type PreparedRequest, prepareRequest } from "#/request/prepare";
 import {
   canRetryRequest,
@@ -71,7 +70,8 @@ const performTransportRequest = (
     headers: prepared.headers,
     ...(prepared.body === undefined ? {} : { body: prepared.body }),
     ...(prepared.form === undefined ? {} : { form: prepared.form }),
-    timeout: Math.ceil(attemptTimeout(options.timeout ?? 0, remaining())),
+    timeout: Math.ceil(options.timeout ?? 0),
+    overallTimeout: Math.ceil(remaining()),
     socketTimeout: Math.ceil(options.socketTimeout ?? 0),
     noBody: method === "HEAD",
     ...(connectionPoolId === undefined ? {} : { connectionPoolId }),

@@ -211,7 +211,7 @@ const optionsObjectSchema = v.object({
   body: v.optional(v.union([v.string(), v.instance(Buffer)])),
   /** Synchronous multipart/form-data body. */
   form: v.optional(v.instance(FormData)),
-  /** Per-network-attempt timeout in milliseconds. `0` disables it. */
+  /** Maximum time to wait for response headers in milliseconds. `0` disables it. */
   timeout: v.optional(
     v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(2_147_483_647)),
   ),
