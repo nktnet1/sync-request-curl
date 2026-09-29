@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { describe, expect, test } from "vitest";
+import { FormData } from "#/form-data";
 import request from "#/index";
 import { SERVER_URL } from "#tests/app/config";
 import { wrapperRequest } from "#tests/request/helpers";
@@ -88,7 +89,7 @@ describe("HEAD request payloads", () => {
   });
 
   test("sends multipart form payloads", () => {
-    const form = new request.FormData();
+    const form = new FormData();
     form.append("message", "hello from HEAD");
 
     const response = request("HEAD", `${SERVER_URL}/compat/head-payload`, {
