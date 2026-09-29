@@ -55,6 +55,25 @@ const prepareStaleResponse = (headers: Record<string, string | string[]>) => {
   };
 };
 
+const preparePermanentRedirectLookup = (
+  statusCode: number,
+  requestHeaders: string[] = [],
+  responseHeaders: Record<string, string | string[]> = {},
+  now = 1,
+) => {
+  const url = cacheUrl();
+  storeFileCacheResponse(url, {}, 0, 0, {
+    statusCode,
+    headers: {
+      ...responseHeaders,
+      location: "https://cache.test/destination",
+    },
+    body: Buffer.alloc(0),
+    responseUrl: url,
+  });
+  return prepareCacheLookup("GET", url, requestHeaders, "file", now);
+};
+
 const writeBucket = (
   url: string,
   entries: Array<Record<string, unknown>>,
@@ -252,6 +271,37 @@ describe("file cache policy", () => {
     expect(existsSync(getCachePath(url))).toBe(true);
   });
 
+  test.each([301, 308])(
+    "reuses a bare %i permanent redirect without explicit freshness",
+    (statusCode) => {
+      expect(
+        preparePermanentRedirectLookup(statusCode, [], {}, 86_400_000)
+          .useCachedResponse,
+      ).toBe(true);
+    },
+  );
+
+  test.each([301, 308])(
+    "honours explicit freshness for %i permanent redirects",
+    (statusCode) => {
+      expect(
+        preparePermanentRedirectLookup(statusCode, [], {
+          "cache-control": "max-age=0",
+        }).useCachedResponse,
+      ).toBe(false);
+    },
+  );
+
+  test.each([301, 308])(
+    "allows request max-age=0 to bypass a cached bare %i permanent redirect",
+    (statusCode) => {
+      expect(
+        preparePermanentRedirectLookup(statusCode, ["Cache-Control: max-age=0"])
+          .useCachedResponse,
+      ).toBe(false);
+    },
+  );
+
   test("returns null for cached redirects without a Location header", () => {
     expect(getCachedRedirectUrl({ statusCode: 302, headers: {} })).toBeNull();
   });
@@ -291,16 +341,7 @@ describe("file cache policy", () => {
   });
 
   test("does not reuse a response marked Cache-Control: no-cache", () => {
-    const url = cacheUrl();
-    storeFileCacheResponse(
-      url,
-      {},
-      0,
-      0,
-      response(url, { "cache-control": "no-cache" }),
-    );
-
-    const lookup = prepareCacheLookup("GET", url, [], "file", 1);
+    const { lookup } = prepareStaleResponse({ "cache-control": "no-cache" });
 
     expect(lookup.entry).toBeDefined();
     expect(lookup.useCachedResponse).toBe(false);
