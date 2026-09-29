@@ -1,6 +1,6 @@
 import type { IncomingHttpHeaders } from "node:http";
 import * as v from "valibot";
-import type { Options, UppercaseHttpVerb } from "#/types";
+import type { Options, UppercaseHttpVerb } from "#/types/definition";
 import { incomingHttpHeadersSchema } from "#/validation";
 
 export const getRedirectMethod = (

@@ -11,23 +11,7 @@ export declare const CurlError: typeof CurlErrorImpl;
 export declare const RequestError: typeof RequestErrorImpl;
 export declare const ResponseError: typeof ResponseErrorImpl;
 
-export type { RequestErrorCode } from "#/errors";
-export type {
-  BufferEncoding,
-  FormDataEntry,
-  GetBody,
-  GetJSON,
-  HttpVerb,
-  JsonLike,
-  JsonPrimitive,
-  NestedJsonLike,
-  Options,
-  ProxyOptions,
-  Response,
-  RetryDelayFunction,
-  RetryFunction,
-  RetryResponse,
-} from "#/types";
+export type * from "#/types/public";
 
 type Request = typeof originalRequest & {
   FormData: typeof FormDataImpl;

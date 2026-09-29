@@ -1,6 +1,6 @@
 import { hasRequestHeader } from "#/http/headers";
 import { usesCustomTransport } from "#/request/transport-options";
-import type { Options } from "#/types";
+import type { Options } from "#/types/definition";
 
 /** Private application namespace plus canonical HTTP target (no fragment). */
 export const getRequestCacheKey = (url: string, options: Options): string => {

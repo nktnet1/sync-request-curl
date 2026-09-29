@@ -6,7 +6,7 @@ import {
   prepareTransportOptions,
   usesCustomTransport,
 } from "#/request/transport-options";
-import type { Options } from "#/types";
+import type { Options } from "#/types/definition";
 import { PROXY_URL, SERVER_URL, TLS_URL } from "#tests/app/config";
 
 const caFile = fileURLToPath(

@@ -26,7 +26,7 @@ import type {
   ProxyOptions,
   Response,
   UppercaseHttpVerb,
-} from "#/types";
+} from "#/types/definition";
 import {
   type bufferEncodingSchema,
   type httpVerbInputSchema,
@@ -171,6 +171,27 @@ describe("runtime validation", () => {
     expect(v.safeParse(optionsSchema, { cache: "file" }).success).toBe(true);
     expect(v.safeParse(optionsSchema, { cache: "memory" }).success).toBe(true);
     expect(v.safeParse(optionsSchema, { cache: "custom" }).success).toBe(false);
+    expect(
+      v.safeParse(optionsSchema, {
+        cache: {
+          getResponse: () => undefined,
+          setResponse: () => undefined,
+          invalidateResponse: () => undefined,
+        },
+      }).success,
+    ).toBe(false);
+    expect(v.safeParse(optionsSchema, { isMatch: () => true }).success).toBe(
+      true,
+    );
+    expect(v.safeParse(optionsSchema, { isExpired: () => false }).success).toBe(
+      true,
+    );
+    expect(v.safeParse(optionsSchema, { canCache: () => true }).success).toBe(
+      true,
+    );
+    expect(v.safeParse(optionsSchema, { isMatch: true }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { isExpired: 0 }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { canCache: "yes" }).success).toBe(false);
     expect(v.safeParse(optionsSchema, { agent: false }).success).toBe(true);
     expect(v.safeParse(optionsSchema, { agent: true }).success).toBe(true);
     expect(v.safeParse(optionsSchema, { agent: {} }).success).toBe(false);

@@ -41,7 +41,7 @@ A high-performance Node.js alternative to [sync-request](https://github.com/Forb
 - [1. Installation](#installation)
 - [2. Usage](#usage)
 - [3. API reference](#api-reference)
-- [4. Differences from `sync-request`](#differences-from-sync-request)
+- [4. Differences from sync-request](#differences-from-sync-request)
   - [4.1. Additions](#differences-from-sync-request-additions)
   - [4.2. Behavioural differences](#differences-from-sync-request-behavioural-differences)
 - [5. License](#license)
@@ -252,6 +252,9 @@ type Options = {
   allowRedirectHeaders?: string[];
   gzip?: boolean;
   cache?: "file" | "memory";
+  isMatch?: CacheIsMatchFunction;
+  isExpired?: CacheIsExpiredFunction;
+  canCache?: CacheCanCacheFunction;
   agent?: boolean | Agent;
   retry?: boolean | RetryFunction;
   retryDelay?: number | RetryDelayFunction;
@@ -288,6 +291,9 @@ supplied.
 | <a id="property-allowredirectheaders"></a> `allowRedirectHeaders?` | `string`[] | Caller headers allowed to be forwarded to redirect hops. |
 | <a id="property-gzip"></a> `gzip?` | `boolean` | Transparently decompress gzip/deflate responses. Defaults to enabled. |
 | <a id="property-cache"></a> `cache?` | `"file"` \| `"memory"` | Enable the private HTTP-aware cache in file or memory storage. |
+| <a id="property-ismatch"></a> `isMatch?` | [`CacheIsMatchFunction`](#cacheismatchfunction) | Override whether a stored cache variant matches the outgoing request. |
+| <a id="property-isexpired"></a> `isExpired?` | [`CacheIsExpiredFunction`](#cacheisexpiredfunction) | Override whether a matched cached response is expired. |
+| <a id="property-cancache"></a> `canCache?` | [`CacheCanCacheFunction`](#cachecancachefunction) | Override whether a completed origin response may be stored. |
 | <a id="property-agent"></a> `agent?` | `boolean` \| `Agent` | `sync-request` boolean agent option, or a keep-alive Node `Agent` for connection reuse. |
 | <a id="property-retry"></a> `retry?` | `boolean` \| [`RetryFunction`](#retryfunction) | Retry GET requests, or provide a callback to decide per attempt. |
 | <a id="property-retrydelay"></a> `retryDelay?` | `number` \| [`RetryDelayFunction`](#retrydelayfunction) | Retry delay in milliseconds, or a callback returning the delay. |
@@ -363,6 +369,10 @@ Response shape passed to retry policy callbacks.
 `getBody()` follows the same status handling as a normal response. Retry
 callbacks receive this buffered response before the next attempt begins.
 
+##### Extended by
+
+- [`CachePolicyResponse`](#cachepolicyresponse)
+
 ##### Methods
 
 ###### getBody()
@@ -405,6 +415,183 @@ Read the response body as a `Buffer`.
 | <a id="property-headers-3"></a> `headers` | `IncomingHttpHeaders` | Node-style response headers with lowercase keys. |
 | <a id="property-url-2"></a> `url` | `string` | Final effective URL for the completed attempt. |
 | <a id="property-body-3"></a> `body` | `Buffer` | Buffered response body. |
+
+***
+
+#### CachedResponse
+
+Buffered cached response passed to cache policy callbacks.
+
+The body, headers, and request headers are defensive copies. Mutating them
+does not modify the stored cache entry.
+
+##### Properties
+
+| Property | Type | Description |
+| ------ | ------ | ------ |
+| <a id="property-statuscode-3"></a> `statusCode` | `number` | Cached HTTP response status code. |
+| <a id="property-headers-4"></a> `headers` | `IncomingHttpHeaders` | Cached Node-style response headers with lowercase keys. |
+| <a id="property-body-4"></a> `body` | `Buffer` | Buffered cached response body. |
+| <a id="property-requestheaders"></a> `requestHeaders` | `IncomingHttpHeaders` | Request headers stored with this cache variant. |
+| <a id="property-requesttimestamp"></a> `requestTimestamp` | `number` | Timestamp when the cached request started, in Unix milliseconds. |
+
+***
+
+#### CachePolicyResponse
+
+Buffered origin response passed to `canCache`.
+
+This is the normal public response shape for the completed GET request.
+
+##### Extends
+
+- [`RetryResponse`](#retryresponse)
+
+##### Methods
+
+###### getBody()
+
+###### Call Signature
+
+```ts
+getBody(encoding): string;
+```
+
+Read the response body as a string using the requested encoding.
+
+###### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `encoding` | [`BufferEncoding`](#bufferencoding) |
+
+###### Returns
+
+`string`
+
+###### Inherited from
+
+[`RetryResponse`](#retryresponse).[`getBody`](#getbody-1)
+
+###### Call Signature
+
+```ts
+getBody(): Buffer;
+```
+
+Read the response body as a `Buffer`.
+
+###### Returns
+
+`Buffer`
+
+###### Inherited from
+
+[`RetryResponse`](#retryresponse).[`getBody`](#getbody-1)
+
+###### getJSON()
+
+```ts
+getJSON<T>(encoding?): T;
+```
+
+Parse the buffered response body as JSON.
+
+###### Type Parameters
+
+| Type Parameter | Default type |
+| ------ | ------ |
+| `T` | `any` |
+
+###### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `encoding?` | [`BufferEncoding`](#bufferencoding) |
+
+###### Returns
+
+`T`
+
+##### Properties
+
+| Property | Type | Description | Inherited from |
+| ------ | ------ | ------ | ------ |
+| <a id="property-statuscode-4"></a> `statusCode` | `number` | HTTP response status code. | [`RetryResponse`](#retryresponse).[`statusCode`](#property-statuscode-2) |
+| <a id="property-headers-5"></a> `headers` | `IncomingHttpHeaders` | Node-style response headers with lowercase keys. | [`RetryResponse`](#retryresponse).[`headers`](#property-headers-3) |
+| <a id="property-url-3"></a> `url` | `string` | Final effective URL for the completed attempt. | [`RetryResponse`](#retryresponse).[`url`](#property-url-2) |
+| <a id="property-body-5"></a> `body` | `Buffer` | Buffered response body. | [`RetryResponse`](#retryresponse).[`body`](#property-body-3) |
+
+***
+
+#### CacheIsMatchFunction
+
+```ts
+type CacheIsMatchFunction = (requestHeaders, cachedResponse, defaultValue) => boolean;
+```
+
+Override whether a stored cache variant matches the outgoing request.
+
+`defaultValue` is the built-in `Vary` comparison result.
+
+##### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `requestHeaders` | `v.InferOutput`\<*typeof* `incomingHttpHeadersSchema`\> |
+| `cachedResponse` | [`CachedResponse`](#cachedresponse) |
+| `defaultValue` | `boolean` |
+
+##### Returns
+
+`boolean`
+
+***
+
+#### CacheIsExpiredFunction
+
+```ts
+type CacheIsExpiredFunction = (cachedResponse, defaultValue) => boolean;
+```
+
+Override whether a matched cached response is expired.
+
+`defaultValue` is the result of the built-in freshness calculation.
+
+##### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `cachedResponse` | [`CachedResponse`](#cachedresponse) |
+| `defaultValue` | `boolean` |
+
+##### Returns
+
+`boolean`
+
+***
+
+#### CacheCanCacheFunction
+
+```ts
+type CacheCanCacheFunction = (response, defaultValue) => boolean;
+```
+
+Override whether a completed origin response may be stored in the cache.
+
+`defaultValue` is the built-in response cacheability result. Request-side
+`Cache-Control: no-store` still disables storage before this callback runs.
+
+##### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `response` | [`CachePolicyResponse`](#cachepolicyresponse) |
+| `defaultValue` | `boolean` |
+
+##### Returns
+
+`boolean`
 
 ***
 
@@ -802,19 +989,23 @@ Error.constructor
 | <a id="property-body"></a> `body` | `readonly` | `Buffer` | Buffered response body returned by the server. |
 
 <a id="differences-from-sync-request"></a>
-## 4. Differences from `sync-request`
+## 4. Differences from sync-request
 
 <a id="differences-from-sync-request-additions"></a>
 ### 4.1. Additions
 
 - `Response#getJSON()` is available as a convenience helper.
 - `cache: "memory"` is available as an alternative to the file cache.
+- `isMatch`, `isExpired`, and `canCache` expose the synchronous cache-policy
+  hooks from [`http-basic`](https://github.com/ForbesLindesay/http-basic). Callback/stream-based custom cache
+  implementations remain out of scope; use the built-in `"file"` or `"memory"` cache.
 - `retry` and `retryDelay` can be callbacks when you need to decide retry
   behaviour at runtime. Transport failures passed to these callbacks are
   `CurlError` instances with numeric libcurl error codes rather than Node
   `ErrnoException` errors.
-- `agent` still accepts the boolean values supported by `sync-request`, and can
-  also take a keep-alive Node `Agent` for connection reuse.
+- `agent` still accepts the boolean values supported by
+  [`sync-request`](https://github.com/ForbesLindesay/sync-request),
+  and can also take a keep-alive Node `Agent` for connection reuse.
 - `overallTimeout` sets a deadline for the whole operation, alongside the
   response-header `timeout` and inactivity `socketTimeout` options.
 - Proxy, TLS, local network binding, and TCP keepalive have dedicated options.
@@ -833,11 +1024,13 @@ Error.constructor
   variables are ignored. Use the `proxy` option when proxying a request.
 - An explicit `Authorization` header takes precedence over credentials in the
   URL, and a caller-supplied `Accept-Encoding` header is left unchanged.
-- 307 and 308 redirects preserve the request method and body. `sync-request`
+- 307 and 308 redirects preserve the request method and body.
+  [`sync-request`](https://github.com/ForbesLindesay/sync-request)
   can rewrite some body-bearing redirects to `GET`.
 - Query merging preserves additional literal `?` and `#` delimiters that
-  `sync-request` can truncate while splitting URLs.
-- Cache handling is stricter: `no-store` takes precedence, `Age` is updated on
+  [`sync-request`](https://github.com/ForbesLindesay/sync-request) can truncate
+  while splitting URLs.
+- Default cache handling is stricter: `no-store` takes precedence, `Age` is updated on
   cache hits, cached headers are isolated from mutation, and recoverable
   cache-read errors are treated as misses.
 - HTTPS requests can negotiate HTTP/2 automatically when supported.
@@ -935,7 +1128,8 @@ to the absolute path of its `.node` file.
 ## 7. Caveats
 
 **sync-request-curl** was developed to improve performance with sending
-synchronous requests in Node.js. It is also free from the sync-request bug
+synchronous requests in Node.js. It is also free from the
+[sync-request](https://github.com/ForbesLindesay/sync-request) bug
 which leaves an orphaned sync-rpc process, resulting in a [leaked handle being
 detected in Jest](https://github.com/ForbesLindesay/sync-request/issues/129).
 

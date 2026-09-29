@@ -1,5 +1,5 @@
 import request from "#/index";
-import type { HttpVerb, Options } from "#/types";
+import type { HttpVerb, Options } from "#/types/definition";
 
 export const wrapperRequest = (
   method: HttpVerb,

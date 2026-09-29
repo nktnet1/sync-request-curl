@@ -34,6 +34,98 @@ test.for(["file", "memory"] as const)(
   },
 );
 
+test.for(["file", "memory"] as const)(
+  "%s cache supports synchronous cache policy hooks",
+  (cache) => {
+    const varyUrl = cacheUrl("/cache/vary");
+    expect(
+      request("GET", varyUrl, {
+        cache,
+        headers: { "X-Variant": "a", "X-Multi": ["one", "two"] },
+      }).getJSON(),
+    ).toStrictEqual({
+      hits: 1,
+      variant: "a",
+    });
+
+    let matchCalls = 0;
+    const matched = request("GET", varyUrl, {
+      cache,
+      headers: { "X-Variant": "b" },
+      isMatch: (requestHeaders, cachedResponse, defaultValue) => {
+        matchCalls += 1;
+        expect(defaultValue).toBe(false);
+        expect(requestHeaders["x-variant"]).toBe("b");
+        expect(cachedResponse.requestHeaders["x-variant"]).toBe("a");
+        expect(cachedResponse.requestHeaders["x-multi"]).toStrictEqual([
+          "one",
+          "two",
+        ]);
+        expect(cachedResponse.body.toString()).toContain('"variant":"a"');
+
+        // Callback inputs are copies and cannot mutate the stored entry.
+        cachedResponse.body.fill(0);
+        cachedResponse.headers["cache-control"] = "no-store";
+        return true;
+      },
+    });
+    expect(matchCalls).toBe(1);
+    expect(matched.getJSON()).toStrictEqual({ hits: 1, variant: "a" });
+    expect(cachedJson(varyUrl, { "X-Variant": "a" }, cache)).toStrictEqual({
+      hits: 1,
+      variant: "a",
+    });
+
+    const staleUrl = cacheUrl("/cache/revalidate/etag");
+    expect(cachedJson(staleUrl, undefined, cache)).toStrictEqual({ hits: 1 });
+
+    let expiredCalls = 0;
+    const stale = request("GET", staleUrl, {
+      cache,
+      isExpired: (cachedResponse, defaultValue) => {
+        expiredCalls += 1;
+        expect(defaultValue).toBe(true);
+        expect(cachedResponse.statusCode).toBe(200);
+        return false;
+      },
+    });
+    expect(expiredCalls).toBe(1);
+    expect(stale.getJSON()).toStrictEqual({ hits: 1 });
+    expect(stale.headers["x-origin-hits"]).toBe("1");
+
+    const forcedStoreUrl = cacheUrl("/cache/no-store-fresh");
+    let canCacheCalls = 0;
+    const forcedStore = request("GET", forcedStoreUrl, {
+      cache,
+      canCache: (response, defaultValue) => {
+        canCacheCalls += 1;
+        expect(defaultValue).toBe(false);
+        expect(response.getJSON()).toStrictEqual({ hits: 1 });
+        return true;
+      },
+    });
+    expect(forcedStore.getJSON()).toStrictEqual({ hits: 1 });
+    expect(canCacheCalls).toBe(1);
+    expect(cachedJson(forcedStoreUrl, undefined, cache)).toStrictEqual({
+      hits: 1,
+    });
+
+    const blockedStoreUrl = cacheUrl("/cache/fresh");
+    const blockStore = (defaultValues: boolean[]) =>
+      request("GET", blockedStoreUrl, {
+        cache,
+        canCache: (_response, defaultValue) => {
+          defaultValues.push(defaultValue);
+          return false;
+        },
+      }).getJSON();
+    const defaultValues: boolean[] = [];
+    expect(blockStore(defaultValues)).toStrictEqual({ hits: 1 });
+    expect(blockStore(defaultValues)).toStrictEqual({ hits: 2 });
+    expect(defaultValues).toStrictEqual([true, true]);
+  },
+);
+
 test.for([
   { cache: "file" as const, path: "/cache/revalidate/etag" },
   { cache: "file" as const, path: "/cache/revalidate/last-modified" },

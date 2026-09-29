@@ -1,7 +1,8 @@
 ## Caveats
 
 **sync-request-curl** was developed to improve performance with sending
-synchronous requests in Node.js. It is also free from the sync-request bug
+synchronous requests in Node.js. It is also free from the
+[sync-request](https://github.com/ForbesLindesay/sync-request) bug
 which leaves an orphaned sync-rpc process, resulting in a [leaked handle being
 detected in Jest](https://github.com/ForbesLindesay/sync-request/issues/129).
 

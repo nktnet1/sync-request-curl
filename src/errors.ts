@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import type { BufferEncoding, Response } from "#/types";
+import type { BufferEncoding, Response } from "#/types/definition";
 
 /**
  * Stable transport-neutral error codes emitted by the TypeScript request layer.

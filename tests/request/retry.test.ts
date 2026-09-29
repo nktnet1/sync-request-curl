@@ -15,7 +15,7 @@ vi.mock("#/native/index", () => ({
 import { CurlError } from "#/errors";
 import request from "#/index";
 import { performRequest } from "#/request/perform";
-import type { RetryResponse } from "#/types";
+import type { RetryResponse } from "#/types/definition";
 
 const nativeResponse = (
   overrides: Partial<{

@@ -273,6 +273,13 @@ app.get("/cache/no-store", (c) => {
   return c.json({ hits });
 });
 
+app.get("/cache/no-store-fresh", (c) => {
+  const key = c.req.query("key") ?? "default";
+  const hits = nextCacheOriginHit("no-store-fresh", key);
+  c.header("Cache-Control", "no-store, max-age=3600");
+  return c.json({ hits });
+});
+
 app.get("/cache/revalidate/etag", (c) => {
   const key = c.req.query("key") ?? "default";
   return conditionalCacheResponse(
