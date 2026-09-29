@@ -233,7 +233,7 @@ const optionsObjectSchema = v.object({
   gzip: v.optional(v.boolean()),
   /** Enable the private HTTP-aware cache in file or memory storage. */
   cache: v.optional(v.picklist(["file", "memory"])),
-  /** `sync-request` boolean agent option, or a keep-alive Node `Agent`. */
+  /** `sync-request` boolean agent option, or a keep-alive Node `Agent` for connection reuse. */
   agent: v.optional(v.union([v.boolean(), v.instance(Agent)])),
   /** Retry GET requests, or provide a callback to decide per attempt. */
   retry: v.optional(v.union([v.boolean(), retryFunctionSchema])),
