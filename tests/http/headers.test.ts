@@ -190,11 +190,28 @@ describe("parseResponseHeaders", () => {
     ["invalid header names", "Bad Header: value"],
     ["whitespace before the colon", "X-Test : value"],
     ["invalid header value characters", "X-Test: bad\u0001value"],
-    ["obsolete folded lines", " X-Folded: value"],
   ])("rejects %s", (_description, header) => {
     expect(() => parseResponseHeaders(["HTTP/1.1 200 OK", header, ""])).toThrow(
       RequestError,
     );
+  });
+
+  test("unfolds obsolete response header lines", () => {
+    const headers = parseResponseHeaders([
+      "HTTP/1.1 200 OK",
+      "X-Folded: first",
+      " second",
+      "\tthird",
+      "",
+    ]);
+
+    expect(headers["x-folded"]).toBe("first second third");
+  });
+
+  test("rejects folded response lines without a preceding field", () => {
+    expect(() =>
+      parseResponseHeaders(["HTTP/1.1 200 OK", " folded", ""]),
+    ).toThrow(RequestError);
   });
 
   test("does not fold response trailers into the header section", () => {

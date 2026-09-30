@@ -390,7 +390,7 @@ export const throwForResponseFramingTransportError = (
 
   invalidResponseFraming(
     capturedContentLength
-      ? "conflicting Content-Length values"
+      ? "multiple Content-Length values are not allowed"
       : "invalid Content-Length",
   );
 };
@@ -426,10 +426,6 @@ interface ParsedResponseHeaderLine {
 }
 
 const parseResponseHeaderLine = (header: string): ParsedResponseHeaderLine => {
-  if (header.startsWith(" ") || header.startsWith("\t")) {
-    invalidResponseHeaders("obsolete line folding is not supported");
-  }
-
   const separatorIndex = header.indexOf(":");
   if (separatorIndex <= 0) {
     invalidResponseHeaders("malformed header line");
@@ -595,6 +591,28 @@ const splitResponseHeaderSections = (
   return { blocks, detachedLines };
 };
 
+const unfoldResponseHeaderLines = (headerLines: string[]): string[] => {
+  const unfoldedLines: string[] = [];
+
+  for (const line of headerLines) {
+    if (!line.startsWith(" ") && !line.startsWith("\t")) {
+      unfoldedLines.push(line);
+      continue;
+    }
+
+    // libcurl 8.18+ unfolds obs-fold before the header callback. Older
+    // versions expose continuation lines, so normalise them here as well.
+    const previousLine = unfoldedLines.pop();
+    if (previousLine === undefined || previousLine === "") {
+      invalidResponseHeaders("malformed header line");
+    }
+
+    unfoldedLines.push(`${previousLine} ${trimOptionalWhitespace(line)}`);
+  }
+
+  return unfoldedLines;
+};
+
 const parseResponseHeaderBlock = (
   headerLines: string[],
 ): Response["headers"] => {
@@ -602,7 +620,7 @@ const parseResponseHeaderBlock = (
   const contentLengthValues: string[] = [];
   let hasTransferEncoding = false;
 
-  for (const header of headerLines) {
+  for (const header of unfoldResponseHeaderLines(headerLines)) {
     const { name, value } = parseResponseHeaderLine(header);
     if (name === "content-length") {
       contentLengthValues.push(value);
@@ -641,7 +659,7 @@ export const parseResponseHeaders = (
     finalHeaders = parseResponseHeaderBlock(block);
   }
 
-  for (const line of detachedLines) {
+  for (const line of unfoldResponseHeaderLines(detachedLines)) {
     if (line !== "") {
       parseResponseHeaderLine(line);
     }

@@ -74,11 +74,16 @@ describe("Response framing", () => {
   test.each([
     ["invalid header names", "/headers/invalid-name"],
     ["invalid header values", "/headers/invalid-value"],
-    ["obsolete folded headers", "/headers/obs-fold"],
   ])("rejects %s", (_description, path) => {
     expect(() => request("GET", `${FRAMING_SERVER_URL}${path}`)).toThrow(
       RequestError,
     );
+  });
+
+  test("unfolds obsolete folded response headers", () => {
+    const response = request("GET", `${FRAMING_SERVER_URL}/headers/obs-fold`);
+
+    expect(response.headers["x-test"]).toBe("first second");
   });
 
   test("rejects response headers larger than Node's configured maximum", () => {

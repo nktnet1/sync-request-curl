@@ -1023,6 +1023,10 @@ Error.constructor
   `name` is `"ResponseError"` rather than sync-request's default `"Error"`.
 - Invalid HTTP framing is rejected rather than sending conflicting
   `Content-Length` and `Transfer-Encoding` headers.
+- Obsolete HTTP/1 response line folding is normalised to spaces as required for
+  user agents by [RFC 9112](https://www.rfc-editor.org/rfc/rfc9112.html).
+  `sync-request` inherits Node's stricter parser, which can reject those
+  responses instead.
 - `CONNECT` is rejected explicitly. Although `sync-request` accepts it at the
   type level, its underlying buffered request stack does not complete a
   successful CONNECT tunnel response.
