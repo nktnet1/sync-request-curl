@@ -19,6 +19,7 @@ describe("sync-request Node.js compatibility", () => {
     expect(response.headers).toBeTypeOf("object");
     expect(response.body).toBeInstanceOf(Buffer);
     expect(response.url).toBe(`${SERVER_URL}/compat/echo`);
+    expect(response.isError()).toBe(false);
     expect(response.getBody()).toBeInstanceOf(Buffer);
     expect(response.getBody("utf8")).toContain('"method":"GET"');
   });
@@ -166,6 +167,7 @@ describe("sync-request Node.js compatibility", () => {
       qs: { value: "echo" },
     });
 
+    expect(response.isError()).toBe(true);
     expect(() => response.getBody("utf8")).toThrow(
       'Server responded with status code 400:\n{"error":"Cannot echo \'echo\'!"}',
     );

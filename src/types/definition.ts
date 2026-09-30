@@ -109,6 +109,8 @@ type ResponseData = v.InferOutput<typeof responseDataSchema>;
  * @interface
  */
 export type Response = ResponseData & {
+  /** Return whether the response represents an HTTP error. */
+  isError: () => boolean;
   /** Read the response body and throw `ResponseError` for HTTP status >= 300. */
   getBody: GetBody;
   /** Parse the response body as JSON without applying HTTP status handling. */

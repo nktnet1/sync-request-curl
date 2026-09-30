@@ -2,6 +2,25 @@ import { describe, expect, expectTypeOf, test, vi } from "vitest";
 import { createResponse } from "#/response";
 
 describe("response internals", () => {
+  test("matches http-response-object isError status classification", () => {
+    const response = createResponse({
+      method: "GET",
+      requestUrl: "https://example.com/request",
+      responseUrl: "https://example.com/response",
+      statusCode: 200,
+      headers: {},
+      body: Buffer.alloc(0),
+    });
+
+    expect(response.isError()).toBe(false);
+    response.statusCode = 399;
+    expect(response.isError()).toBe(false);
+    response.statusCode = 400;
+    expect(response.isError()).toBe(true);
+    response.statusCode = 0;
+    expect(response.isError()).toBe(true);
+  });
+
   test("preserves the v4 getJSON default and explicit result types", () => {
     const response = createResponse({
       method: "GET",

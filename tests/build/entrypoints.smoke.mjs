@@ -55,6 +55,7 @@ for (const format of ["module", "commonjs"]) {
            assert.throws(() => request('GET', 'http://localhost/transport-error'), CurlError);
            assert.throws(() => request('GET', 'http://localhost/redirect', { maxRedirects: 0 }), RequestError);
            const response = request('GET', 'http://localhost/http-error');
+           assert.equal(response.isError(), true);
            assert.throws(() => response.getBody(), ResponseError);
            const form = new FormData();
            form.append('message', 'hello');

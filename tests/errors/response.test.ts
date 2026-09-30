@@ -20,6 +20,7 @@ describe("response errors", () => {
         statusCode: 401,
         headers: res.headers,
         body: res.body,
+        url: res.url,
       });
     }
   });
