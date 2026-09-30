@@ -58,7 +58,14 @@ for (const format of ["module", "commonjs"]) {
            assert.equal(response.isError(), true);
            assert.throws(() => response.getBody(), ResponseError);
            const form = new FormData();
+           form.setBoundary('entrypoint-boundary');
            form.append('message', 'hello');
+           form.append('count', 3);
+           assert.equal(form.getBoundary(), 'entrypoint-boundary');
+           assert.equal(form.getHeaders()['content-type'], 'multipart/form-data; boundary=entrypoint-boundary');
+           assert.equal(form.getLengthSync(), form.getBuffer().length);
+           assert.equal(form.hasKnownLength(), true);
+           assert.equal(form.toString(), '[object FormData]');
            assert.equal(request('POST', 'http://localhost/ok', { form }).statusCode, 200);`,
         ],
         {
@@ -118,6 +125,19 @@ test("built declarations expose the public root API without leaking Node header 
      const options: Options = {};
      const response: Response = request(method, "http://localhost", options);
      const form = new FormData();
+     form.append("count", 3);
+     form.append("enabled", true);
+     form.append("file", Buffer.from("abc"), {
+       filename: "report.bin",
+       contentType: "application/x-report",
+       knownLength: 3,
+     });
+     const formHeaders: Headers = form.getHeaders({ "x-test": "value" });
+     const formBoundary: string = form.getBoundary();
+     const formBuffer: Buffer = form.getBuffer();
+     const formLength: number = form.getLengthSync();
+     const formKnownLength: boolean = form.hasKnownLength();
+     const formString: string = form.toString();
      const attachedForm = new request.FormData();
      const curlError = new CurlError(7, "failed");
      const requestError = new RequestError("ERR_REQUEST_FAILED", "failed");
@@ -150,6 +170,12 @@ test("built declarations expose the public root API without leaking Node header 
        response,
        headers,
        form,
+       formHeaders,
+       formBoundary,
+       formBuffer,
+       formLength,
+       formKnownLength,
+       formString,
        attachedForm,
        curlError,
        requestError,

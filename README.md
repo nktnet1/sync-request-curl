@@ -135,6 +135,12 @@ const res = request('POST', 'https://example.com/upload', { form });
 console.log('Status Code:', res.statusCode);
 ```
 
+`FormData` also exposes the synchronous Node `form-data` helpers used by
+`then-request`: `getHeaders()`, `getBoundary()`, `setBoundary()`, `getBuffer()`,
+`getLengthSync()`, `hasKnownLength()`, and `toString()`. Stream-valued fields and
+callback/stream helpers such as `getLength()`, `pipe()`, and `submit()` are not
+provided.
+
 Proxy request
 
 ```javascript
@@ -796,16 +802,20 @@ One multipart entry accepted by `FormData`.
 | Property | Type | Description |
 | ------ | ------ | ------ |
 | <a id="property-key"></a> `key` | `string` | Multipart field name. |
-| <a id="property-value"></a> `value` | `string` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) | Text, [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer), or [`Blob`](https://nodejs.org/api/buffer.html#class-blob) field value. |
+| <a id="property-value"></a> `value` | `string` \| `number` \| `boolean` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) | Synchronously materialisable multipart field value. |
 | <a id="property-filename"></a> `fileName?` | `string` | Optional file name. Path components are stripped before sending. |
+| <a id="property-contenttype"></a> `contentType?` | `string` | Optional media type override. |
+| <a id="property-knownlength"></a> `knownLength?` | `number` | Accepted for `form-data` append-option compatibility. |
 
 ***
 
 #### FormData
 
-Synchronous multipart/form-data builder compatible with `sync-request`.
+Synchronous multipart/form-data builder compatible with the Node.js
+`FormData` surface exposed by `then-request`.
 
-Pass an instance through the request `form` option.
+Stream-valued parts and callback/stream methods from the `form-data` package
+are intentionally omitted because this package is synchronous-only.
 
 ##### Constructors
 
@@ -827,28 +837,141 @@ new FormData(): FormData;
 append(
    key,
    value,
-   fileName?
+   options?
 ): void;
 ```
 
-Append a text, [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer), or [`Blob`](https://nodejs.org/api/buffer.html#class-blob) field.
+Append a synchronously materialisable multipart field.
 
-When `fileName` is supplied, its basename is used and the media type is
-inferred from the extension with an `application/octet-stream` fallback.
-Blob media types remain authoritative. Blob reads throw if the reader fails
-or does not finish within 30 seconds.
+Numbers and booleans are converted to strings. The third argument may be a
+filename string or the synchronous subset of `form-data` append options.
+Local path components are stripped from filenames before sending.
 
 ###### Parameters
 
 | Parameter | Type |
 | ------ | ------ |
 | `key` | `string` |
-| `value` | `string` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) |
-| `fileName?` | `string` |
+| `value` | `string` \| `number` \| `boolean` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) |
+| `options?` | \| `string` \| \{ `filename?`: `string`; `contentType?`: `string`; `knownLength?`: `number`; \} |
 
 ###### Returns
 
 `void`
+
+###### getHeaders()
+
+###### Call Signature
+
+```ts
+getHeaders(): IncomingHttpHeaders & {
+  content-type: string;
+};
+```
+
+Return multipart request headers, merged with optional caller headers.
+
+###### Returns
+
+[`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) & \{
+  `content-type`: `string`;
+\}
+
+###### Call Signature
+
+```ts
+getHeaders(userHeaders): Headers;
+```
+
+Return multipart request headers, merged with optional caller headers.
+
+###### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `userHeaders` | [`Headers`](#headers) |
+
+###### Returns
+
+[`Headers`](#headers)
+
+###### getBoundary()
+
+```ts
+getBoundary(): string;
+```
+
+Return the boundary used to serialize this form.
+
+###### Returns
+
+`string`
+
+###### setBoundary()
+
+```ts
+setBoundary(boundary): void;
+```
+
+Set the multipart boundary used by headers and serialization.
+
+###### Parameters
+
+| Parameter | Type |
+| ------ | ------ |
+| `boundary` | `string` |
+
+###### Returns
+
+`void`
+
+###### getBuffer()
+
+```ts
+getBuffer(): Buffer;
+```
+
+Serialize the complete multipart payload synchronously.
+
+###### Returns
+
+[`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)
+
+###### getLengthSync()
+
+```ts
+getLengthSync(): number;
+```
+
+Return the exact byte length of `getBuffer()`.
+
+###### Returns
+
+`number`
+
+###### hasKnownLength()
+
+```ts
+hasKnownLength(): boolean;
+```
+
+All supported field values have a synchronously known length.
+
+###### Returns
+
+`boolean`
+
+###### toString()
+
+```ts
+toString(): string;
+```
+
+Match the identity string returned by Node's `form-data` package.
+
+###### Returns
+
+`string`
 
 ### Errors
 

@@ -1,6 +1,5 @@
 import * as v from "valibot";
 import { RequestError } from "#/errors";
-import { getFormDataEntries } from "#/form-data";
 import {
   hasNonEmptyRequestHeader,
   hasRequestHeader,
@@ -21,7 +20,7 @@ import { parseSchema } from "#/validate";
 
 export type PreparedRequest = Pick<
   NativeRequestOptions,
-  "url" | "headers" | "body" | "form"
+  "url" | "headers" | "body"
 >;
 
 const jsonBodySchema = v.pipe(
@@ -36,12 +35,7 @@ const invalidRequestSemantics = (message: string): never => {
   );
 };
 
-const payloadHasContent = (
-  payload: Pick<PreparedRequest, "body" | "form">,
-): boolean => {
-  if (payload.form !== undefined) {
-    return true;
-  }
+const payloadHasContent = (payload: Pick<PreparedRequest, "body">): boolean => {
   if (payload.body === undefined) {
     return false;
   }
@@ -53,7 +47,7 @@ const payloadHasContent = (
 const validateMethodSemantics = (
   method: UppercaseHttpVerb,
   headers: string[],
-  payload: Pick<PreparedRequest, "body" | "form">,
+  payload: Pick<PreparedRequest, "body">,
 ): void => {
   if (!payloadHasContent(payload)) {
     return;
@@ -64,15 +58,11 @@ const validateMethodSemantics = (
   }
 
   if (method === "OPTIONS") {
-    const hasContentType = hasRequestHeader(headers, "content-type");
     const hasContentTypeValue = hasNonEmptyRequestHeader(
       headers,
       "content-type",
     );
-    const nativeMultipartContentType =
-      payload.form !== undefined && !hasContentType;
-
-    if (!hasContentTypeValue && !nativeMultipartContentType) {
+    if (!hasContentTypeValue) {
       invalidRequestSemantics(
         "OPTIONS requests with content require Content-Type",
       );
@@ -84,10 +74,16 @@ const preparePayload = (
   method: UppercaseHttpVerb,
   options: Options,
   headers: string[],
-): Pick<PreparedRequest, "body" | "form"> => {
+): Pick<PreparedRequest, "body"> => {
   if (options.form) {
     rejectMultipartContentLength(headers);
-    return { form: getFormDataEntries(options.form) };
+    if (!hasRequestHeader(headers, "content-type")) {
+      const contentType = options.form.getHeaders()["content-type"];
+      setRequestHeader(headers, "Content-Type", contentType);
+    }
+    const body = options.form.getBuffer();
+    setContentLengthHeader(headers, body.length);
+    return { body };
   }
 
   if (options.json !== undefined) {

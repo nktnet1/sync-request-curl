@@ -35,6 +35,7 @@ describe("request preparation", () => {
 
   test("prefers form over JSON and body payloads", () => {
     const form = new FormData();
+    form.setBoundary("test-boundary");
     form.append("field", "form-value");
 
     const prepared = prepareRequest("https://example.com", {
@@ -43,10 +44,13 @@ describe("request preparation", () => {
       body: "body-value",
     });
 
-    expect(prepared).toMatchObject({
-      form: [{ key: "field", value: "form-value" }],
-    });
-    expect(prepared.body).toBeUndefined();
+    expect(prepared.body).toStrictEqual(form.getBuffer());
+    expect(prepared.headers).toContain(
+      "Content-Type: multipart/form-data; boundary=test-boundary",
+    );
+    expect(prepared.headers).toContain(
+      `Content-Length: ${form.getLengthSync()}`,
+    );
   });
 
   test("prefers JSON over body when form is absent", () => {

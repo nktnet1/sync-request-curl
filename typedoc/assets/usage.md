@@ -73,6 +73,12 @@ const res = request('POST', 'https://example.com/upload', { form });
 console.log('Status Code:', res.statusCode);
 ```
 
+`FormData` also exposes the synchronous Node `form-data` helpers used by
+`then-request`: `getHeaders()`, `getBoundary()`, `setBoundary()`, `getBuffer()`,
+`getLengthSync()`, `hasKnownLength()`, and `toString()`. Stream-valued fields and
+callback/stream helpers such as `getLength()`, `pipe()`, and `submit()` are not
+provided.
+
 Proxy request
 
 ```javascript
