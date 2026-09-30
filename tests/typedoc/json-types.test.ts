@@ -39,9 +39,14 @@ test("renders JSON serializers as callable properties in the API documentation",
       expect(markdown).toContain(`\`${property}\` | [\`Headers\`](#headers)`);
     }
 
+    const headersDeclaration = "type Headers = IncomingHttpHeaders;";
+    const headersStart = markdown.indexOf(headersDeclaration);
+    expect(headersStart).toBeGreaterThanOrEqual(0);
+
+    const headersEnd = markdown.indexOf("\n***", headersStart);
     const headersSection = markdown.slice(
-      markdown.indexOf("#### Headers"),
-      markdown.indexOf("***", markdown.indexOf("#### Headers")),
+      headersStart,
+      headersEnd === -1 ? markdown.length : headersEnd,
     );
     expect(headersSection).toContain(
       "[`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders)",
