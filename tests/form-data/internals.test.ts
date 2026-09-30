@@ -86,6 +86,31 @@ describe("FormData internals", () => {
     ]);
   });
 
+  test("supports raw custom multipart headers", () => {
+    const form = new FormData();
+    form.setBoundary("custom-header-boundary");
+    const header = [
+      "--custom-header-boundary",
+      "X-Custom-Part: yes",
+      "",
+      "",
+    ].join("\r\n");
+
+    form.append("field", "value", {
+      filename: "ignored.txt",
+      contentType: "application/ignored",
+      knownLength: 5,
+      header,
+    });
+
+    expect(getFormDataEntries(form)).toStrictEqual([
+      { key: "field", value: "value", header },
+    ]);
+    expect(form.getBuffer().toString()).toBe(
+      `${header}value\r\n--custom-header-boundary--\r\n`,
+    );
+  });
+
   test("exposes boundary, headers, buffer, and synchronous length APIs", () => {
     const form = new FormData();
     form.setBoundary("sync-request-curl-test-boundary");

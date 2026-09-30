@@ -131,6 +131,7 @@ test("built declarations expose the public root API without leaking Node header 
        filename: "report.bin",
        contentType: "application/x-report",
        knownLength: 3,
+       header: "--entrypoint-boundary\\r\\nX-Custom-Part: yes\\r\\n\\r\\n",
      });
      const formHeaders: Headers = form.getHeaders({ "x-test": "value" });
      const formBoundary: string = form.getBoundary();

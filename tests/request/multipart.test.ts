@@ -126,6 +126,13 @@ test("FormData public serialization matches the bytes sent by request", () => {
     contentType: "text/x-report",
     knownLength: 3,
   });
+  const customHeader = [
+    "--sync-request-curl-boundary",
+    "X-Custom-Part: yes",
+    "",
+    "",
+  ].join("\r\n");
+  form.append("custom", "value", { header: customHeader, knownLength: 5 });
   const expectedBody = form.getBuffer();
 
   const wire = request("POST", `${SERVER_URL}/compat/echo`, { form }).getJSON<{
@@ -137,4 +144,7 @@ test("FormData public serialization matches the bytes sent by request", () => {
     "multipart/form-data; boundary=sync-request-curl-boundary",
   );
   expect(Buffer.from(wire.bodyHex, "hex")).toStrictEqual(expectedBody);
+  expect(Buffer.from(wire.bodyHex, "hex").toString()).toContain(
+    `${customHeader}value\r\n`,
+  );
 });

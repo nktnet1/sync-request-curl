@@ -137,7 +137,10 @@ console.log('Status Code:', res.statusCode);
 
 `FormData` also exposes the synchronous Node `form-data` helpers used by
 `then-request`: `getHeaders()`, `getBoundary()`, `setBoundary()`, `getBuffer()`,
-`getLengthSync()`, `hasKnownLength()`, and `toString()`. Stream-valued fields and
+`getLengthSync()`, `hasKnownLength()`, and `toString()`. The `append()` options
+object supports `filename`, `contentType`, `knownLength`, and the advanced raw
+`header` override. A custom `header` is serialized verbatim and is responsible
+for its own multipart boundary and part headers. Stream-valued fields and
 callback/stream helpers such as `getLength()`, `pipe()`, and `submit()` are not
 provided.
 
@@ -806,6 +809,7 @@ One multipart entry accepted by `FormData`.
 | <a id="property-filename"></a> `fileName?` | `string` | Optional file name. Path components are stripped before sending. |
 | <a id="property-contenttype"></a> `contentType?` | `string` | Optional media type override. |
 | <a id="property-knownlength"></a> `knownLength?` | `number` | Accepted for `form-data` append-option compatibility. |
+| <a id="property-header"></a> `header?` | `string` | Optional raw multipart header that replaces generated part headers. |
 
 ***
 
@@ -845,7 +849,9 @@ Append a synchronously materialisable multipart field.
 
 Numbers and booleans are converted to strings. The third argument may be a
 filename string or the synchronous subset of `form-data` append options.
-Local path components are stripped from filenames before sending.
+A custom `header` is serialized verbatim and replaces the generated
+boundary and part headers, matching Node's `form-data` behavior. Local
+path components are stripped from generated filenames before sending.
 
 ###### Parameters
 
@@ -853,7 +859,7 @@ Local path components are stripped from filenames before sending.
 | ------ | ------ |
 | `key` | `string` |
 | `value` | `string` \| `number` \| `boolean` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) |
-| `options?` | \| `string` \| \{ `filename?`: `string`; `contentType?`: `string`; `knownLength?`: `number`; \} |
+| `options?` | \| `string` \| \{ `filename?`: `string`; `contentType?`: `string`; `knownLength?`: `number`; `header?`: `string`; \} |
 
 ###### Returns
 

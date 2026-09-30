@@ -39,6 +39,7 @@ const appendOptionsSchema = v.object({
   filename: v.optional(metadataSchema),
   contentType: v.optional(metadataSchema),
   knownLength: v.optional(knownLengthSchema),
+  header: v.optional(v.string()),
 });
 
 type FormDataAppendOptions = v.InferOutput<typeof appendOptionsSchema>;
@@ -60,6 +61,8 @@ export const formDataEntrySchema = v.object({
   contentType: v.optional(metadataSchema),
   /** Accepted for `form-data` append-option compatibility. */
   knownLength: v.optional(knownLengthSchema),
+  /** Optional raw multipart header that replaces generated part headers. */
+  header: v.optional(v.string()),
 });
 
 /**
@@ -75,6 +78,7 @@ export const preparedFormDataEntrySchema = v.object({
   value: v.union([v.string(), v.instance(Buffer)]),
   fileName: v.optional(v.string()),
   contentType: v.optional(v.string()),
+  header: v.optional(v.string()),
 });
 
 export type PreparedFormDataEntry = v.InferOutput<
@@ -175,6 +179,12 @@ const prepareFormDataEntry = (entry: FormDataEntry): PreparedFormDataEntry => {
       : rawValue;
   const fileName = normalizeFileName(entry.fileName);
   const contentType = entry.contentType || undefined;
+  const materializedValue =
+    value instanceof Blob ? blobToBufferSync(value) : value;
+
+  if (entry.header !== undefined) {
+    return { key: entry.key, value: materializedValue, header: entry.header };
+  }
 
   if (!(value instanceof Blob)) {
     const prepared: PreparedFormDataEntry = {
@@ -199,7 +209,7 @@ const prepareFormDataEntry = (entry: FormDataEntry): PreparedFormDataEntry => {
 
   return {
     key: entry.key,
-    value: blobToBufferSync(value),
+    value: materializedValue,
     fileName:
       fileName ??
       normalizeFileName(parseSchema(metadataSchema, getBlobFileName(value))),
@@ -234,6 +244,13 @@ const serializeEntry = (
   boundary: string,
   entry: PreparedFormDataEntry,
 ): Buffer[] => {
+  const value = Buffer.isBuffer(entry.value)
+    ? entry.value
+    : Buffer.from(entry.value);
+  if (entry.header !== undefined) {
+    return [Buffer.from(entry.header), value, Buffer.from(lineBreak)];
+  }
+
   let header = `--${boundary}${lineBreak}Content-Disposition: form-data; name="${escapeDispositionParameter(entry.key)}"`;
   if (entry.fileName !== undefined) {
     header += `; filename="${escapeDispositionParameter(entry.fileName)}"`;
@@ -244,11 +261,7 @@ const serializeEntry = (
   }
   header += lineBreak;
 
-  return [
-    Buffer.from(header),
-    Buffer.isBuffer(entry.value) ? entry.value : Buffer.from(entry.value),
-    Buffer.from(lineBreak),
-  ];
+  return [Buffer.from(header), value, Buffer.from(lineBreak)];
 };
 
 const serializeFormData = (form: FormData): Buffer => {
@@ -280,14 +293,21 @@ export class FormData {
    *
    * Numbers and booleans are converted to strings. The third argument may be a
    * filename string or the synchronous subset of `form-data` append options.
-   * Local path components are stripped from filenames before sending.
+   * A custom `header` is serialized verbatim and replaces the generated
+   * boundary and part headers, matching Node's `form-data` behavior. Local
+   * path components are stripped from generated filenames before sending.
    */
   append(
     key: string,
     value: string | number | boolean | Buffer | Blob,
     options?:
       | string
-      | { filename?: string; contentType?: string; knownLength?: number },
+      | {
+          filename?: string;
+          contentType?: string;
+          knownLength?: number;
+          header?: string;
+        },
   ): void {
     const normalizedOptions = normalizeAppendOptions(options);
     const entry = parseSchema(formDataEntrySchema, {
@@ -296,6 +316,7 @@ export class FormData {
       fileName: normalizedOptions.filename,
       contentType: normalizedOptions.contentType,
       knownLength: normalizedOptions.knownLength,
+      header: normalizedOptions.header,
     });
     getState(this).entries.push(prepareFormDataEntry(entry));
   }
