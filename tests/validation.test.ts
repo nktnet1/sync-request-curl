@@ -27,6 +27,7 @@ import type {
   Response,
   UppercaseHttpVerb,
 } from "#/types/definition";
+import { parseSchema } from "#/validate";
 import {
   type bufferEncodingSchema,
   type httpVerbInputSchema,
@@ -118,6 +119,19 @@ describe("schema-aligned types", () => {
 });
 
 describe("runtime validation", () => {
+  test("summarizes validation issues without exposing Valibot errors", () => {
+    const parseInvalid = () => parseSchema(v.string("Expected a string"), 123);
+
+    expect(parseInvalid).toThrow(TypeError);
+    expect(parseInvalid).toThrow("Expected a string");
+
+    try {
+      parseInvalid();
+    } catch (error) {
+      expect(error).not.toBeInstanceOf(v.ValiError);
+    }
+  });
+
   test("validates uppercase HTTP methods", () => {
     expect(v.parse(uppercaseHttpVerbSchema, "GET")).toBe("GET");
     expect(v.parse(uppercaseHttpVerbSchema, "PROPFIND")).toBe("PROPFIND");

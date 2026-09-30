@@ -2,6 +2,7 @@ import { domainToASCII, URL } from "node:url";
 import * as v from "valibot";
 import { CurlError } from "#/errors";
 import { parseQueryString, stringifyQuery } from "#/http/query-string";
+import { parseSchema } from "#/validate";
 
 const hasNonAscii = (value: string): boolean => {
   for (let i = 0; i < value.length; i += 1) {
@@ -148,7 +149,7 @@ export const appendQueryString = (
   url: string,
   query: Record<string, unknown>,
 ): string => {
-  const parsedQuery = v.parse(plainObjectSchema, query);
+  const parsedQuery = parseSchema(plainObjectSchema, query);
   const fragmentIndex = url.indexOf("#");
   const fragment = fragmentIndex === -1 ? "" : url.slice(fragmentIndex);
   const withoutFragment =

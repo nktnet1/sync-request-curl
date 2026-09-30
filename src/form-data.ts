@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import * as v from "valibot";
 import { lookupMimeType } from "#/http/mime-type";
+import { parseSchema } from "#/validate";
 
 const metadataSchema = v.pipe(
   v.string(),
@@ -150,14 +151,17 @@ const prepareFormDataEntry = (entry: FormDataEntry): PreparedFormDataEntry => {
     fileName:
       fileName ??
       basename(
-        v.parse(metadataSchema, getBlobFileName(value)).replaceAll("\\", "/"),
+        parseSchema(metadataSchema, getBlobFileName(value)).replaceAll(
+          "\\",
+          "/",
+        ),
       ),
     contentType: value.type || "application/octet-stream",
   };
 };
 
 const getEntries = (form: FormData): PreparedFormDataEntry[] => {
-  v.parse(v.instance(FormData), form);
+  parseSchema(v.instance(FormData), form);
   const formEntries = entries.get(form);
   if (!formEntries) {
     throw new TypeError(
@@ -188,7 +192,7 @@ export class FormData {
    * or does not finish within 30 seconds.
    */
   append(key: string, value: string | Buffer | Blob, fileName?: string): void {
-    const entry = v.parse(formDataEntrySchema, { key, value, fileName });
+    const entry = parseSchema(formDataEntrySchema, { key, value, fileName });
     getEntries(this).push(prepareFormDataEntry(entry));
   }
 }

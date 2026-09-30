@@ -17,6 +17,7 @@ import {
 } from "#/http/url";
 import type { NativeRequestOptions } from "#/native/index";
 import type { Options, UppercaseHttpVerb } from "#/types/definition";
+import { parseSchema } from "#/validate";
 
 export type PreparedRequest = Pick<
   NativeRequestOptions,
@@ -90,7 +91,7 @@ const preparePayload = (
   }
 
   if (options.json !== undefined) {
-    const body = v.parse(jsonBodySchema, options.json);
+    const body = parseSchema(jsonBodySchema, options.json);
     if (!hasRequestHeader(headers, "content-type")) {
       setRequestHeader(headers, "Content-Type", "application/json");
     }
