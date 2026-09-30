@@ -305,6 +305,19 @@ supplied.
 
 ***
 
+#### Headers
+
+```ts
+type Headers = IncomingHttpHeaders;
+```
+
+HTTP header map used by `then-request`.
+
+This is an alias of Node.js' header shape, exposed under the historical
+`then-request` name so consumers do not need to import Node's type directly.
+
+***
+
 #### JsonPrimitive
 
 ```ts
@@ -542,7 +555,7 @@ Override whether a stored cache variant matches the outgoing request.
 
 | Parameter | Type |
 | ------ | ------ |
-| `requestHeaders` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) |
+| `requestHeaders` | [`Headers`](#headers) |
 | `cachedResponse` | [`CachedResponse`](#cachedresponse) |
 | `defaultValue` | `boolean` |
 

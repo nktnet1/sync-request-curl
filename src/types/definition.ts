@@ -8,6 +8,8 @@ import type {
 } from "#/validation";
 
 export type { FormDataEntry } from "#/form-data";
+
+export type { Headers } from "#/types/headers";
 export type {
   BufferEncoding,
   CacheCanCacheFunction,

@@ -1,8 +1,9 @@
-import { Agent, type IncomingHttpHeaders } from "node:http";
+import { Agent } from "node:http";
 import { URL } from "node:url";
 import * as v from "valibot";
 import type { CurlError, RequestError } from "#/errors";
 import { FormData } from "#/form-data";
+import type { Headers } from "#/types/headers";
 
 /** Primitive JSON values accepted in request bodies.
  *
@@ -61,7 +62,7 @@ const headerValueSchema = v.union([
 
 const incomingHttpHeadersObjectSchema = v.record(v.string(), headerValueSchema);
 
-export const incomingHttpHeadersSchema = v.custom<IncomingHttpHeaders>(
+export const incomingHttpHeadersSchema = v.custom<Headers>(
   (input) => v.is(incomingHttpHeadersObjectSchema, input),
   "Invalid HTTP headers",
 );
@@ -92,7 +93,7 @@ export interface RetryResponse {
   /** HTTP response status code. */
   statusCode: number;
   /** Node-style response headers with lowercase keys. */
-  headers: IncomingHttpHeaders;
+  headers: Headers;
   /** Final effective URL for the completed attempt. */
   url: string;
   /** Buffered response body. */
@@ -115,11 +116,11 @@ export interface CachedResponse {
   /** Cached HTTP response status code. */
   statusCode: number;
   /** Cached Node-style response headers with lowercase keys. */
-  headers: IncomingHttpHeaders;
+  headers: Headers;
   /** Buffered cached response body. */
   body: Buffer;
   /** Request headers stored with this cache variant. */
-  requestHeaders: IncomingHttpHeaders;
+  requestHeaders: Headers;
   /** Timestamp when the cached request started, in Unix milliseconds. */
   requestTimestamp: number;
 }
@@ -145,7 +146,7 @@ export interface CachePolicyResponse extends RetryResponse {
  * @group Request
  */
 export type CacheIsMatchFunction = (
-  requestHeaders: IncomingHttpHeaders,
+  requestHeaders: Headers,
   cachedResponse: CachedResponse,
   defaultValue: boolean,
 ) => boolean;

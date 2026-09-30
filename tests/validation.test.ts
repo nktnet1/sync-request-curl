@@ -1,5 +1,5 @@
 import type { Blob } from "node:buffer";
-import { Agent, type IncomingHttpHeaders } from "node:http";
+import { Agent } from "node:http";
 import { URL } from "node:url";
 import * as v from "valibot";
 import { describe, expect, expectTypeOf, test } from "vitest";
@@ -18,6 +18,7 @@ import type {
 } from "#/native/platform-key";
 import type {
   BufferEncoding,
+  Headers,
   HttpVerb,
   JsonLike,
   JsonPrimitive,
@@ -43,7 +44,7 @@ import {
 
 describe("schema-aligned types", () => {
   test("preserves Node's well-known response header types", () => {
-    expectTypeOf<Response["headers"]>().toEqualTypeOf<IncomingHttpHeaders>();
+    expectTypeOf<Response["headers"]>().toEqualTypeOf<Headers>();
     expectTypeOf<Response["headers"]["content-type"]>().toEqualTypeOf<
       string | undefined
     >();
@@ -97,6 +98,7 @@ describe("schema-aligned types", () => {
     expectTypeOf<Options>().toEqualTypeOf<
       v.InferOutput<typeof optionsSchema>
     >();
+    expectTypeOf<Options["headers"]>().toEqualTypeOf<Headers | undefined>();
     expectTypeOf<Options["agent"]>().toEqualTypeOf<
       boolean | Agent | undefined
     >();

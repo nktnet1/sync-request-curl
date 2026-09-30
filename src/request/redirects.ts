@@ -1,5 +1,5 @@
-import type { IncomingHttpHeaders } from "node:http";
 import type { Options, UppercaseHttpVerb } from "#/types/definition";
+import type { Headers } from "#/types/headers";
 import { parseSchema } from "#/validate";
 import { incomingHttpHeadersSchema } from "#/validation";
 
@@ -41,10 +41,10 @@ const payloadHeaderNames = new Set([
 ]);
 
 const getRedirectHeaders = (
-  headers: IncomingHttpHeaders | undefined,
+  headers: Headers | undefined,
   allowRedirectHeaders: string[] | undefined,
   methodChanged: boolean,
-): IncomingHttpHeaders | undefined => {
+): Headers | undefined => {
   if (!headers || !allowRedirectHeaders || allowRedirectHeaders.length === 0) {
     return undefined;
   }
