@@ -180,7 +180,7 @@ response.
 | Parameter | Type | Description |
 | ------ | ------ | ------ |
 | `method` | [`HttpVerb`](#httpverb) | Recognised HTTP method. Matching is case-insensitive; `CONNECT` is rejected. |
-| `url` | `string` \| `URL` | Absolute `http:` or `https:` URL, provided as a string or `URL`. |
+| `url` | `string` \| [`URL`](https://developer.mozilla.org/en-US/docs/Web/API/URL) | Absolute `http:` or `https:` URL, provided as a string or `URL`. |
 | `options` | [`Options`](#options) | Request, transport, redirect, retry, and cache options. |
 
 ##### Returns

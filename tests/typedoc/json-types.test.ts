@@ -22,6 +22,10 @@ test("renders JSON serializers as callable properties in the API documentation",
       expect(markdown).toContain(`toJSON: () => ${type};`);
       expect(markdown).not.toContain(`toJSON: ${type};`);
     }
+
+    expect(markdown).toContain(
+      "| `url` | `string` \\| [`URL`](https://developer.mozilla.org/en-US/docs/Web/API/URL) |",
+    );
   } finally {
     rmSync(output, { recursive: true, force: true });
   }

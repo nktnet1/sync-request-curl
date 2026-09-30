@@ -3,6 +3,8 @@ import {
   type PluginOptions,
   load as typedocPluginMarkdown,
 } from "typedoc-plugin-markdown";
+import { MDN_URL_REFERENCE } from "#typedoc/externalLinks";
+import { linkRequestUrlType } from "#typedoc/plugins/linkRequestUrlType";
 import { normalizeTypeSignatureFormatting } from "#typedoc/plugins/normalizeTypeSignatureFormatting";
 import { preserveOptionsReference } from "#typedoc/plugins/preserveOptionsReference";
 import { removeEmptyTypeParameterLists } from "#typedoc/plugins/removeEmptyTypeParameterLists";
@@ -16,6 +18,7 @@ const config = {
     "typedoc-plugin-no-inherit",
     typedocPluginMarkdown,
     removeEmptyTypeParameterLists,
+    linkRequestUrlType,
     preserveOptionsReference,
     normalizeTypeSignatureFormatting,
     removeTypeAliasPropertyDefaults,
@@ -53,7 +56,7 @@ const config = {
   sort: ["source-order"],
   externalSymbolLinkMappings: {
     "@types/node": {
-      URL: "https://developer.mozilla.org/en-US/docs/Web/API/URL",
+      URL: MDN_URL_REFERENCE,
     },
     typescript: {
       ErrorOptions:
