@@ -1049,7 +1049,7 @@ Error.constructor
 <a id="license"></a>
 ## 5. License
 
-[MIT License](LICENSE)
+[MIT](LICENSE)
 
 <a id="compatibility"></a>
 ## 6. Compatibility
