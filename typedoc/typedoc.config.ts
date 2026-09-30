@@ -3,8 +3,8 @@ import {
   type PluginOptions,
   load as typedocPluginMarkdown,
 } from "typedoc-plugin-markdown";
-import { MDN_URL_REFERENCE } from "#typedoc/externalLinks";
-import { linkRequestUrlType } from "#typedoc/plugins/linkRequestUrlType";
+import { EXTERNAL_TYPE_LINKS } from "#typedoc/externalLinks";
+import { linkExternalTypes } from "#typedoc/plugins/linkExternalTypeReferences";
 import { normalizeTypeSignatureFormatting } from "#typedoc/plugins/normalizeTypeSignatureFormatting";
 import { preserveOptionsReference } from "#typedoc/plugins/preserveOptionsReference";
 import { removeEmptyTypeParameterLists } from "#typedoc/plugins/removeEmptyTypeParameterLists";
@@ -18,7 +18,7 @@ const config = {
     "typedoc-plugin-no-inherit",
     typedocPluginMarkdown,
     removeEmptyTypeParameterLists,
-    linkRequestUrlType,
+    linkExternalTypes,
     preserveOptionsReference,
     normalizeTypeSignatureFormatting,
     removeTypeAliasPropertyDefaults,
@@ -56,11 +56,15 @@ const config = {
   sort: ["source-order"],
   externalSymbolLinkMappings: {
     "@types/node": {
-      URL: MDN_URL_REFERENCE,
+      Agent: EXTERNAL_TYPE_LINKS.Agent,
+      Blob: EXTERNAL_TYPE_LINKS.Blob,
+      Buffer: EXTERNAL_TYPE_LINKS.Buffer,
+      IncomingHttpHeaders: EXTERNAL_TYPE_LINKS.IncomingHttpHeaders,
+      URL: EXTERNAL_TYPE_LINKS.URL,
     },
     typescript: {
-      ErrorOptions:
-        "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/Error#parameters",
+      Error: EXTERNAL_TYPE_LINKS.Error,
+      ErrorOptions: EXTERNAL_TYPE_LINKS.ErrorOptions,
     },
   },
 } satisfies TypeDocOptions & PluginOptions;

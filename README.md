@@ -180,7 +180,7 @@ response.
 | Parameter | Type | Description |
 | ------ | ------ | ------ |
 | `method` | [`HttpVerb`](#httpverb) | Recognised HTTP method. Matching is case-insensitive; `CONNECT` is rejected. |
-| `url` | `string` \| [`URL`](https://developer.mozilla.org/en-US/docs/Web/API/URL) | Absolute `http:` or `https:` URL, provided as a string or `URL`. |
+| `url` | `string` \| [`URL`](https://nodejs.org/api/url.html#class-url) | Absolute `http:` or `https:` URL, provided as a string or [`URL`](https://nodejs.org/api/url.html#class-url). |
 | `options` | [`Options`](#options) | Request, transport, redirect, retry, and cache options. |
 
 ##### Returns
@@ -282,10 +282,10 @@ supplied.
 | <a id="property-localinterface"></a> `localInterface?` | `string` | Source interface name. Mutually exclusive with `localAddress`. |
 | <a id="property-tcpkeepalive"></a> `tcpKeepAlive?` | \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; \} | Enable TCP keepalive, optionally with idle and interval controls. Defaults to `false`. |
 | <a id="property-cachenamespace"></a> `cacheNamespace?` | `string` | Private cache identity. Defaults to `process.cwd()`. |
-| <a id="property-headers-1"></a> `headers?` | `IncomingHttpHeaders` | Node-style request headers. |
+| <a id="property-headers-1"></a> `headers?` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Node-style request headers. |
 | <a id="property-qs"></a> `qs?` | \{ \[`key`: `string`\]: `unknown`; \} | Query values merged with any existing query string. |
 | <a id="property-json"></a> `json?` | [`JsonLike`](#jsonlike) | JSON-compatible request body. Adds `application/json` when needed. |
-| <a id="property-body-1"></a> `body?` | `string` \| `Buffer`\<`ArrayBufferLike`\> | Raw string or `Buffer` request body. |
+| <a id="property-body-1"></a> `body?` | `string` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> | Raw string or [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) request body. |
 | <a id="property-form"></a> `form?` | [`FormData`](#formdata) | Synchronous multipart/form-data body. |
 | <a id="property-timeout"></a> `timeout?` | `number` | Maximum time to wait for response headers in milliseconds. Defaults to `0`, which disables it. |
 | <a id="property-overalltimeout"></a> `overallTimeout?` | `number` | Complete-operation deadline in milliseconds. Defaults to `0`, which disables it. |
@@ -298,7 +298,7 @@ supplied.
 | <a id="property-ismatch"></a> `isMatch?` | [`CacheIsMatchFunction`](#cacheismatchfunction) | Override whether a stored cache variant matches the outgoing request. When caching is enabled, defaults to the built-in `Vary` comparison. |
 | <a id="property-isexpired"></a> `isExpired?` | [`CacheIsExpiredFunction`](#cacheisexpiredfunction) | Override whether a matched cached response is expired. When caching is enabled, defaults to the built-in freshness calculation. |
 | <a id="property-cancache"></a> `canCache?` | [`CacheCanCacheFunction`](#cachecancachefunction) | Override whether a completed origin response may be stored. When caching is enabled, defaults to the built-in response cacheability rules. |
-| <a id="property-agent"></a> `agent?` | `boolean` \| `Agent` | `sync-request` boolean agent option, or a keep-alive Node `Agent` for connection reuse. Defaults to the standard connection behaviour without a dedicated persistent pool. |
+| <a id="property-agent"></a> `agent?` | `boolean` \| [`Agent`](https://nodejs.org/api/http.html#class-httpagent) | `sync-request` boolean agent option, or a keep-alive Node [`Agent`](https://nodejs.org/api/http.html#class-httpagent) for connection reuse. Defaults to the standard connection behaviour without a dedicated persistent pool. |
 | <a id="property-retry"></a> `retry?` | `boolean` \| [`RetryFunction`](#retryfunction) | Retry GET requests, or provide a callback to decide per attempt. Defaults to disabled. |
 | <a id="property-retrydelay"></a> `retryDelay?` | `number` \| [`RetryDelayFunction`](#retrydelayfunction) | Retry delay in milliseconds, or a callback returning the delay. Defaults to 200 milliseconds when retries are enabled. |
 | <a id="property-maxretries"></a> `maxRetries?` | `number` | Maximum retry count. Defaults to 5 when retries are enabled. |
@@ -405,20 +405,20 @@ Read the response body as a string using the requested encoding.
 getBody(): Buffer;
 ```
 
-Read the response body as a `Buffer`.
+Read the response body as a [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer).
 
 ###### Returns
 
-`Buffer`
+[`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)
 
 ##### Properties
 
 | Property | Type | Description |
 | ------ | ------ | ------ |
 | <a id="property-statuscode-2"></a> `statusCode` | `number` | HTTP response status code. |
-| <a id="property-headers-3"></a> `headers` | `IncomingHttpHeaders` | Node-style response headers with lowercase keys. |
+| <a id="property-headers-3"></a> `headers` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Node-style response headers with lowercase keys. |
 | <a id="property-url-2"></a> `url` | `string` | Final effective URL for the completed attempt. |
-| <a id="property-body-3"></a> `body` | `Buffer` | Buffered response body. |
+| <a id="property-body-3"></a> `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) | Buffered response body. |
 
 ***
 
@@ -434,9 +434,9 @@ does not modify the stored cache entry.
 | Property | Type | Description |
 | ------ | ------ | ------ |
 | <a id="property-statuscode-3"></a> `statusCode` | `number` | Cached HTTP response status code. |
-| <a id="property-headers-4"></a> `headers` | `IncomingHttpHeaders` | Cached Node-style response headers with lowercase keys. |
-| <a id="property-body-4"></a> `body` | `Buffer` | Buffered cached response body. |
-| <a id="property-requestheaders"></a> `requestHeaders` | `IncomingHttpHeaders` | Request headers stored with this cache variant. |
+| <a id="property-headers-4"></a> `headers` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Cached Node-style response headers with lowercase keys. |
+| <a id="property-body-4"></a> `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) | Buffered cached response body. |
+| <a id="property-requestheaders"></a> `requestHeaders` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Request headers stored with this cache variant. |
 | <a id="property-requesttimestamp"></a> `requestTimestamp` | `number` | Timestamp when the cached request started, in Unix milliseconds. |
 
 ***
@@ -483,11 +483,11 @@ Read the response body as a string using the requested encoding.
 getBody(): Buffer;
 ```
 
-Read the response body as a `Buffer`.
+Read the response body as a [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer).
 
 ###### Returns
 
-`Buffer`
+[`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)
 
 ###### Inherited from
 
@@ -522,9 +522,9 @@ Parse the buffered response body as JSON.
 | Property | Type | Description | Inherited from |
 | ------ | ------ | ------ | ------ |
 | <a id="property-statuscode-4"></a> `statusCode` | `number` | HTTP response status code. | [`RetryResponse`](#retryresponse).[`statusCode`](#property-statuscode-2) |
-| <a id="property-headers-5"></a> `headers` | `IncomingHttpHeaders` | Node-style response headers with lowercase keys. | [`RetryResponse`](#retryresponse).[`headers`](#property-headers-3) |
+| <a id="property-headers-5"></a> `headers` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Node-style response headers with lowercase keys. | [`RetryResponse`](#retryresponse).[`headers`](#property-headers-3) |
 | <a id="property-url-3"></a> `url` | `string` | Final effective URL for the completed attempt. | [`RetryResponse`](#retryresponse).[`url`](#property-url-2) |
-| <a id="property-body-5"></a> `body` | `Buffer` | Buffered response body. | [`RetryResponse`](#retryresponse).[`body`](#property-body-3) |
+| <a id="property-body-5"></a> `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) | Buffered response body. | [`RetryResponse`](#retryresponse).[`body`](#property-body-3) |
 
 ***
 
@@ -542,7 +542,7 @@ Override whether a stored cache variant matches the outgoing request.
 
 | Parameter | Type |
 | ------ | ------ |
-| `requestHeaders` | `IncomingHttpHeaders` |
+| `requestHeaders` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) |
 | `cachedResponse` | [`CachedResponse`](#cachedresponse) |
 | `defaultValue` | `boolean` |
 
@@ -662,7 +662,7 @@ type GetBody = {
 
 Read the current response body.
 
-Calling without an encoding returns the `Buffer`. Passing an encoding returns
+Calling without an encoding returns the [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer). Passing an encoding returns
 a string. A response with `statusCode >= 300` throws `ResponseError`.
 
 ##### Call Signature
@@ -695,7 +695,7 @@ a string. A response with `statusCode >= 300` throws `ResponseError`.
 
 ###### Returns
 
-`Buffer`
+[`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)
 
 ***
 
@@ -744,9 +744,9 @@ than a hidden immutable snapshot.
 | <a id="property-getbody"></a> `getBody` | [`GetBody`](#getbody) | Read the response body and throw `ResponseError` for HTTP status >= 300. |
 | <a id="property-getjson"></a> `getJSON` | [`GetJSON`](#getjson) | Parse the response body as JSON without applying HTTP status handling. |
 | <a id="property-statuscode-1"></a> `statusCode` | `number` | HTTP response status code. |
-| <a id="property-headers-2"></a> `headers` | `IncomingHttpHeaders` | Node-style response headers with lowercase keys. |
+| <a id="property-headers-2"></a> `headers` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Node-style response headers with lowercase keys. |
 | <a id="property-url"></a> `url` | `string` | Final effective URL after query handling and redirects. |
-| <a id="property-body-2"></a> `body` | `Buffer`\<`ArrayBufferLike`\> | Mutable buffered response body. |
+| <a id="property-body-2"></a> `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> | Mutable buffered response body. |
 
 ***
 
@@ -781,7 +781,7 @@ One multipart entry accepted by `FormData`.
 | Property | Type | Description |
 | ------ | ------ | ------ |
 | <a id="property-key"></a> `key` | `string` | Multipart field name. |
-| <a id="property-value"></a> `value` | `string` \| `Buffer`\<`ArrayBufferLike`\> \| `Blob` | Text, `Buffer`, or `Blob` field value. |
+| <a id="property-value"></a> `value` | `string` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) | Text, [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer), or [`Blob`](https://nodejs.org/api/buffer.html#class-blob) field value. |
 | <a id="property-filename"></a> `fileName?` | `string` | Optional file name. Path components are stripped before sending. |
 
 ***
@@ -816,7 +816,7 @@ append(
 ): void;
 ```
 
-Append a text, `Buffer`, or `Blob` field.
+Append a text, [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer), or [`Blob`](https://nodejs.org/api/buffer.html#class-blob) field.
 
 When `fileName` is supplied, its basename is used and the media type is
 inferred from the extension with an `application/octet-stream` fallback.
@@ -828,7 +828,7 @@ or does not finish within 30 seconds.
 | Parameter | Type |
 | ------ | ------ |
 | `key` | `string` |
-| `value` | `string` \| `Buffer`\<`ArrayBufferLike`\> \| `Blob` |
+| `value` | `string` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) |
 | `fileName?` | `string` |
 
 ###### Returns
@@ -856,7 +856,7 @@ The numeric `code` is retained for compatibility with earlier
 
 ##### Extends
 
-- `Error`
+- [`Error`](https://nodejs.org/api/errors.html#class-error)
 
 ##### Constructors
 
@@ -897,7 +897,7 @@ Transport-neutral request failure created by the TypeScript request layer.
 
 ##### Extends
 
-- `Error`
+- [`Error`](https://nodejs.org/api/errors.html#class-error)
 
 ##### Constructors
 
@@ -917,7 +917,7 @@ new RequestError(
 | ------ | ------ |
 | `code` | [`RequestErrorCode`](#requesterrorcode) |
 | `message` | `string` |
-| `options?` | [`ErrorOptions`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/Error#parameters) |
+| `options?` | [`ErrorOptions`](https://nodejs.org/api/errors.html#new-errormessage-options) |
 
 ###### Returns
 
@@ -946,7 +946,7 @@ the error object.
 
 ##### Extends
 
-- `Error`
+- [`Error`](https://nodejs.org/api/errors.html#class-error)
 
 ##### Constructors
 
@@ -966,8 +966,8 @@ new ResponseError(
 | Parameter | Type |
 | ------ | ------ |
 | `statusCode` | `number` |
-| `headers` | `IncomingHttpHeaders` |
-| `body` | `Buffer` |
+| `headers` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) |
+| `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) |
 | `encoding?` | [`BufferEncoding`](#bufferencoding) |
 
 ###### Returns
@@ -985,8 +985,8 @@ Error.constructor
 | Property | Modifier | Type | Description |
 | ------ | ------ | ------ | ------ |
 | <a id="property-statuscode"></a> `statusCode` | `readonly` | `number` | HTTP status code that caused the error. |
-| <a id="property-headers"></a> `headers` | `readonly` | `IncomingHttpHeaders` | Response headers returned by the server. |
-| <a id="property-body"></a> `body` | `readonly` | `Buffer` | Buffered response body returned by the server. |
+| <a id="property-headers"></a> `headers` | `readonly` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Response headers returned by the server. |
+| <a id="property-body"></a> `body` | `readonly` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) | Buffered response body returned by the server. |
 
 <a id="differences-from-sync-request"></a>
 ## 4. Differences from sync-request
