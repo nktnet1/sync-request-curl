@@ -1,8 +1,14 @@
-import { type CurlError, throwForTransportError } from "#/errors";
+import { maxHeaderSize } from "node:http";
+import {
+  type CurlError,
+  type RequestError,
+  throwForTransportError,
+} from "#/errors";
 import { decompressResponseBody } from "#/http/compression";
 import {
   parseResponseHeaders,
   throwForResponseFramingTransportError,
+  throwForResponseHeaderTransportError,
 } from "#/http/headers";
 import native from "#/native/index";
 import { getAgentPoolId } from "#/request/agent";
@@ -54,6 +60,16 @@ const createRequestResult = (
   redirectUrl: getCachedRedirectUrl(response),
 });
 
+// Only discard a redirect body when no cache or custom retry callback can
+// observe it as a complete buffered response.
+const shouldStopOnRedirectHeaders = (
+  method: UppercaseHttpVerb,
+  options: Options,
+): boolean =>
+  options.followRedirects !== false &&
+  !(method === "GET" && options.cache !== undefined) &&
+  typeof options.retry !== "function";
+
 const performTransportRequest = (
   method: UppercaseHttpVerb,
   originalUrl: string,
@@ -64,6 +80,7 @@ const performTransportRequest = (
   const connectionPoolId = usesCustomTransport(options)
     ? undefined
     : getAgentPoolId(options.agent);
+  const stopOnRedirectHeaders = shouldStopOnRedirectHeaders(method, options);
   const result = native.request({
     ...prepareTransportOptions(options),
     method,
@@ -74,17 +91,21 @@ const performTransportRequest = (
     timeout: Math.ceil(options.timeout ?? 0),
     overallTimeout: Math.ceil(remaining()),
     socketTimeout: Math.ceil(options.socketTimeout ?? 0),
+    maxResponseHeaderSize: maxHeaderSize,
     noBody: method === "HEAD",
+    stopOnRedirectHeaders,
     ...(connectionPoolId === undefined ? {} : { connectionPoolId }),
   });
 
   remaining();
 
-  // libcurl may reject malformed HTTP framing itself (for example,
-  // conflicting Content-Length values) after it has already delivered the
-  // response header lines to our callback. Parse those captured headers first
-  // so standards-level response framing errors are surfaced consistently
-  // instead of being hidden behind a generic transport error.
+  // The native callback enforces Node's response-header size limit before the
+  // complete block is buffered. Other malformed headers may be delivered by
+  // libcurl, so parse captured lines before surfacing generic transport errors.
+  throwForResponseHeaderTransportError(
+    result.transportCode,
+    result.transportMessage,
+  );
   const responseHeaders = parseResponseHeaders(result.headers);
   throwForResponseFramingTransportError(
     result.transportCode,
@@ -92,11 +113,22 @@ const performTransportRequest = (
     result.headers,
   );
   throwForTransportError(result.transportCode, result.transportMessage);
-  const responseBody = decompressResponseBody(
-    result.body,
-    responseHeaders,
-    options.gzip !== false,
-  );
+  const redirectUrl =
+    options.followRedirects === false
+      ? null
+      : (result.redirectUrl ??
+        getCachedRedirectUrl({
+          statusCode: result.statusCode,
+          headers: responseHeaders,
+        }));
+  const responseBody =
+    stopOnRedirectHeaders && redirectUrl !== null
+      ? result.body
+      : decompressResponseBody(
+          result.body,
+          responseHeaders,
+          options.gzip !== false,
+        );
   const response: CacheableResponse = {
     statusCode: result.statusCode,
     headers: responseHeaders,
@@ -106,7 +138,7 @@ const performTransportRequest = (
 
   return {
     ...createRequestResult(method, originalUrl, response),
-    redirectUrl: result.redirectUrl,
+    redirectUrl,
   };
 };
 
@@ -126,7 +158,7 @@ const performRequestWithRetry = (
 
   for (let retries = 0; ; retries += 1) {
     const attemptNumber = retries + 1;
-    let retryError: CurlError | null = null;
+    let retryError: CurlError | RequestError | null = null;
     let retryResponse: Response | undefined;
 
     try {

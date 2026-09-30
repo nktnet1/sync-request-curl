@@ -1,4 +1,4 @@
-import { CurlError } from "#/errors";
+import { CurlError, type RequestError, RetryableRequestError } from "#/errors";
 import type { Options, Response, UppercaseHttpVerb } from "#/types/definition";
 
 const defaultRetryDelay = 200;
@@ -22,7 +22,7 @@ export const canRetryRequest = (
 
 export const shouldRetryRequest = (
   retry: NonNullable<Options["retry"]>,
-  error: CurlError | null,
+  error: CurlError | RequestError | null,
   response: Response | undefined,
   attemptNumber: number,
 ): boolean => {
@@ -37,7 +37,7 @@ export const shouldRetryRequest = (
 
 export const getRetryDelay = (
   retryDelay: Options["retryDelay"],
-  error: CurlError | null,
+  error: CurlError | RequestError | null,
   response: Response | undefined,
   attemptNumber: number,
 ): number => {
@@ -55,5 +55,7 @@ export const getRetryDelay = (
   return delay;
 };
 
-export const isRetryableRequestError = (error: unknown): error is CurlError =>
-  error instanceof CurlError;
+export const isRetryableRequestError = (
+  error: unknown,
+): error is CurlError | RetryableRequestError =>
+  error instanceof CurlError || error instanceof RetryableRequestError;

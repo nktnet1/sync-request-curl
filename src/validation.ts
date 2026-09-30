@@ -1,7 +1,7 @@
 import { Agent, type IncomingHttpHeaders } from "node:http";
 import { URL } from "node:url";
 import * as v from "valibot";
-import type { CurlError } from "#/errors";
+import type { CurlError, RequestError } from "#/errors";
 import { FormData } from "#/form-data";
 
 /** Primitive JSON values accepted in request bodies.
@@ -179,13 +179,13 @@ export type CacheCanCacheFunction = (
  * Decide whether a GET request should be retried after an error or response.
  *
  * `attemptNumber` starts at 1 for the first completed attempt. Transport
- * failures are passed as `CurlError` instances whose `code` is the numeric
- * libcurl error code.
+ * failures are passed as `CurlError` instances; response parser failures are
+ * passed as `RequestError` instances.
  *
  * @group Request
  */
 export type RetryFunction = (
-  error: CurlError | null,
+  error: CurlError | RequestError | null,
   response: RetryResponse | undefined,
   attemptNumber: number,
 ) => boolean;
@@ -194,13 +194,13 @@ export type RetryFunction = (
  * Return the delay in milliseconds before the next retry.
  *
  * `attemptNumber` starts at 1 for the first completed attempt. Transport
- * failures are passed as `CurlError` instances whose `code` is the numeric
- * libcurl error code.
+ * failures are passed as `CurlError` instances; response parser failures are
+ * passed as `RequestError` instances.
  *
  * @group Request
  */
 export type RetryDelayFunction = (
-  error: CurlError | null,
+  error: CurlError | RequestError | null,
   response: RetryResponse | undefined,
   attemptNumber: number,
 ) => number;

@@ -1,6 +1,6 @@
 import { validateHeaderName, validateHeaderValue } from "node:http";
 import * as v from "valibot";
-import { RequestError } from "#/errors";
+import { RequestError, RetryableRequestError } from "#/errors";
 import type { Options, Response } from "#/types/definition";
 import { incomingHttpHeadersSchema } from "#/validation";
 
@@ -237,14 +237,14 @@ export const serializeRequestHeaders = (
 const isAsciiDigit = (character: string): boolean =>
   character >= "0" && character <= "9";
 
-const isHttpStatusLine = (header: string): boolean => {
+const getHttpStatusCode = (header: string): number | undefined => {
   if (header.slice(0, 5).toUpperCase() !== "HTTP/") {
-    return false;
+    return undefined;
   }
 
   const versionEnd = header.indexOf(" ", 5);
   if (versionEnd < 6) {
-    return false;
+    return undefined;
   }
 
   let hasVersionDigit = false;
@@ -253,11 +253,11 @@ const isHttpStatusLine = (header: string): boolean => {
     if (isAsciiDigit(character)) {
       hasVersionDigit = true;
     } else if (character !== ".") {
-      return false;
+      return undefined;
     }
   }
   if (!hasVersionDigit) {
-    return false;
+    return undefined;
   }
 
   let statusStart = versionEnd + 1;
@@ -273,12 +273,19 @@ const isHttpStatusLine = (header: string): boolean => {
     !isAsciiDigit(header.charAt(statusStart + 1)) ||
     !isAsciiDigit(header.charAt(statusStart + 2))
   ) {
-    return false;
+    return undefined;
   }
 
   const boundary = header.charAt(statusStart + 3);
-  return boundary === "" || boundary === " " || boundary === "\t";
+  if (boundary !== "" && boundary !== " " && boundary !== "\t") {
+    return undefined;
+  }
+
+  return Number(header.slice(statusStart, statusStart + 3));
 };
+
+const isHttpStatusLine = (header: string): boolean =>
+  getHttpStatusCode(header) !== undefined;
 
 const findFinalStatusLineIndex = (headerLines: string[]): number => {
   let finalStatusLineIndex = -1;
@@ -324,7 +331,7 @@ const singletonResponseHeaders = new Set([
 ]);
 
 const invalidResponseFraming = (message: string): never => {
-  throw new RequestError(
+  throw new RetryableRequestError(
     "ERR_REQUEST_FAILED",
     `Request failed: Invalid response framing: ${message}`,
   );
@@ -352,26 +359,12 @@ const validateAndNormalizeContentLength = (
     return undefined;
   }
 
-  const candidates = values.flatMap((value) => value.split(","));
-  let first: string | undefined;
-  let normalizedFirst: string | undefined;
-
-  for (const candidate of candidates) {
-    const trimmed = candidate.trim();
-    const normalized = normalizeContentLengthValue(trimmed);
-
-    if (first === undefined) {
-      first = trimmed;
-      normalizedFirst = normalized;
-      continue;
-    }
-
-    if (normalized !== normalizedFirst) {
-      invalidResponseFraming("conflicting Content-Length values");
-    }
+  if (values.length !== 1 || values[0].includes(",")) {
+    invalidResponseFraming("multiple Content-Length values are not allowed");
   }
 
-  return first;
+  normalizeContentLengthValue(values[0]);
+  return values[0];
 };
 
 export const throwForResponseFramingTransportError = (
@@ -397,9 +390,66 @@ export const throwForResponseFramingTransportError = (
 
   invalidResponseFraming(
     capturedContentLength
-      ? "conflicting Content-Length values"
+      ? "multiple Content-Length values are not allowed"
       : "invalid Content-Length",
   );
+};
+
+const invalidResponseHeaders = (message: string, cause?: unknown): never => {
+  throw new RetryableRequestError(
+    "ERR_REQUEST_FAILED",
+    `Request failed: Invalid response headers: ${message}`,
+    cause === undefined ? undefined : { cause },
+  );
+};
+
+const trimOptionalWhitespace = (value: string): string => {
+  let begin = 0;
+  while (value.charAt(begin) === " " || value.charAt(begin) === "\t") {
+    begin += 1;
+  }
+
+  let end = value.length;
+  while (
+    end > begin &&
+    (value.charAt(end - 1) === " " || value.charAt(end - 1) === "\t")
+  ) {
+    end -= 1;
+  }
+
+  return value.slice(begin, end);
+};
+
+interface ParsedResponseHeaderLine {
+  name: string;
+  value: string;
+}
+
+const parseResponseHeaderLine = (header: string): ParsedResponseHeaderLine => {
+  const separatorIndex = header.indexOf(":");
+  if (separatorIndex <= 0) {
+    invalidResponseHeaders("malformed header line");
+  }
+
+  const rawName = header.slice(0, separatorIndex);
+  const rawValue = header.slice(separatorIndex + 1);
+
+  try {
+    validateHeaderName(rawName);
+  } catch (error) {
+    invalidResponseHeaders("invalid header name", error);
+  }
+
+  try {
+    validateHeaderValue(rawName, rawValue);
+  } catch (error) {
+    invalidResponseHeaders(`invalid value for ${rawName}`, error);
+  }
+
+  return {
+    name: rawName.toLowerCase(),
+    value: trimOptionalWhitespace(rawValue),
+  };
 };
 
 const appendResponseHeader = (
@@ -430,23 +480,148 @@ const appendResponseHeader = (
   }
 };
 
-/** Parses the final response header block using Node IncomingMessage folding. */
-export const parseResponseHeaders = (
+// CURLE_WRITE_ERROR from libcurl.
+const curlWriteErrorCode = 23;
+const responseHeaderOverflowTransportMessage =
+  "Response headers exceeded the configured size limit";
+
+export const throwForResponseHeaderTransportError = (
+  transportCode: number,
+  transportMessage: string,
+): void => {
+  if (
+    transportCode === curlWriteErrorCode &&
+    transportMessage === responseHeaderOverflowTransportMessage
+  ) {
+    throw new RetryableRequestError(
+      "ERR_REQUEST_FAILED",
+      "Request failed: Parse Error: Header overflow",
+    );
+  }
+};
+
+const redirectStatusCodes = new Set([301, 302, 303, 307, 308]);
+
+interface ResponseHeaderSections {
+  blocks: string[][];
+  detachedLines: string[];
+}
+
+const splitHeaderLinesWithoutStatus = (
+  headerLines: string[],
+): ResponseHeaderSections => {
+  const headerEndIndex = headerLines.indexOf("");
+  return {
+    blocks: [
+      headerEndIndex >= 0
+        ? headerLines.slice(0, headerEndIndex)
+        : headerLines.slice(),
+    ],
+    detachedLines:
+      headerEndIndex >= 0 ? headerLines.slice(headerEndIndex + 1) : [],
+  };
+};
+
+const canStartResponseHeaderBlock = (
+  statusCode: number | undefined,
+  allowAnotherResponseBlock: boolean,
+  currentHeaders: string[] | undefined,
+): statusCode is number =>
+  statusCode !== undefined &&
+  allowAnotherResponseBlock &&
+  currentHeaders === undefined;
+
+const canFollowResponseHeaderBlock = (
+  statusCode: number | undefined,
+): boolean =>
+  statusCode !== undefined &&
+  ((statusCode >= 100 && statusCode < 200) ||
+    redirectStatusCodes.has(statusCode));
+
+const splitResponseHeaderSections = (
+  headerLines: string[],
+): ResponseHeaderSections => {
+  if (!headerLines.some(isHttpStatusLine)) {
+    return splitHeaderLinesWithoutStatus(headerLines);
+  }
+
+  const blocks: string[][] = [];
+  const detachedLines: string[] = [];
+  let currentHeaders: string[] | undefined;
+  let currentStatusCode: number | undefined;
+  let allowAnotherResponseBlock = true;
+
+  for (const line of headerLines) {
+    const statusCode = getHttpStatusCode(line);
+    if (
+      canStartResponseHeaderBlock(
+        statusCode,
+        allowAnotherResponseBlock,
+        currentHeaders,
+      )
+    ) {
+      currentHeaders = [];
+      currentStatusCode = statusCode;
+      continue;
+    }
+
+    if (line === "") {
+      if (currentHeaders === undefined) {
+        continue;
+      }
+      blocks.push(currentHeaders);
+      allowAnotherResponseBlock =
+        canFollowResponseHeaderBlock(currentStatusCode);
+      currentHeaders = undefined;
+      currentStatusCode = undefined;
+      continue;
+    }
+
+    if (currentHeaders === undefined) {
+      detachedLines.push(line);
+      continue;
+    }
+    currentHeaders.push(line);
+  }
+
+  if (currentHeaders !== undefined) {
+    blocks.push(currentHeaders);
+  }
+
+  return { blocks, detachedLines };
+};
+
+const unfoldResponseHeaderLines = (headerLines: string[]): string[] => {
+  const unfoldedLines: string[] = [];
+
+  for (const line of headerLines) {
+    if (!line.startsWith(" ") && !line.startsWith("\t")) {
+      unfoldedLines.push(line);
+      continue;
+    }
+
+    // libcurl 8.18+ unfolds obs-fold before the header callback. Older
+    // versions expose continuation lines, so normalise them here as well.
+    const previousLine = unfoldedLines.pop();
+    if (previousLine === undefined || previousLine === "") {
+      invalidResponseHeaders("malformed header line");
+    }
+
+    unfoldedLines.push(`${previousLine} ${trimOptionalWhitespace(line)}`);
+  }
+
+  return unfoldedLines;
+};
+
+const parseResponseHeaderBlock = (
   headerLines: string[],
 ): Response["headers"] => {
-  const finalHeaderLines = getFinalResponseHeaderLines(headerLines);
   const parsedHeaders = new Map<string, string | string[]>();
   const contentLengthValues: string[] = [];
   let hasTransferEncoding = false;
 
-  for (const header of finalHeaderLines) {
-    const separatorIndex = header.indexOf(":");
-    if (separatorIndex <= 0) {
-      continue;
-    }
-
-    const name = header.slice(0, separatorIndex).trim().toLowerCase();
-    const value = header.slice(separatorIndex + 1).trim();
+  for (const header of unfoldResponseHeaderLines(headerLines)) {
+    const { name, value } = parseResponseHeaderLine(header);
     if (name === "content-length") {
       contentLengthValues.push(value);
       continue;
@@ -468,4 +643,27 @@ export const parseResponseHeaders = (
   }
 
   return v.parse(incomingHttpHeadersSchema, Object.fromEntries(parsedHeaders));
+};
+
+/**
+ * Validates every response header block and trailer line, while exposing only
+ * the final response header block like Node's IncomingMessage.
+ */
+export const parseResponseHeaders = (
+  headerLines: string[],
+): Response["headers"] => {
+  const { blocks, detachedLines } = splitResponseHeaderSections(headerLines);
+  let finalHeaders: Response["headers"] = {};
+
+  for (const block of blocks) {
+    finalHeaders = parseResponseHeaderBlock(block);
+  }
+
+  for (const line of unfoldResponseHeaderLines(detachedLines)) {
+    if (line !== "") {
+      parseResponseHeaderLine(line);
+    }
+  }
+
+  return finalHeaders;
 };

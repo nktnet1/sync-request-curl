@@ -22,7 +22,11 @@ export const nativeRequestOptionsSchema = v.object({
   timeout: v.number(),
   overallTimeout: v.number(),
   socketTimeout: v.number(),
+  maxResponseHeaderSize: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(1)),
+  ),
   noBody: v.boolean(),
+  stopOnRedirectHeaders: v.optional(v.boolean()),
   proxy: v.optional(v.string()),
   proxyUsername: v.optional(v.string()),
   proxyPassword: v.optional(v.string()),

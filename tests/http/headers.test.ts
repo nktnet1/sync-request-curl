@@ -76,21 +76,10 @@ describe("parseResponseHeaders", () => {
     expect(headers[name]).toBe("first");
   });
 
-  test("normalizes identical repeated content-length fields", () => {
+  test("preserves a single valid content-length value", () => {
     const headers = parseResponseHeaders([
       "HTTP/1.1 200 OK",
-      "Content-Length: 5",
-      "Content-Length: 5",
-      "",
-    ]);
-
-    expect(headers["content-length"]).toBe("5");
-  });
-
-  test("normalizes identical comma-separated content-length values", () => {
-    const headers = parseResponseHeaders([
-      "HTTP/1.1 200 OK",
-      "Content-Length: 005, 5",
+      "Content-Length: 005",
       "",
     ]);
 
@@ -98,15 +87,17 @@ describe("parseResponseHeaders", () => {
   });
 
   test.each([
-    ["repeated fields", ["Content-Length: 5", "Content-Length: 6"]],
-    ["comma-separated values", ["Content-Length: 5, 6"]],
-  ])("rejects conflicting content-length %s", (_description, values) => {
+    ["identical repeated fields", ["Content-Length: 5", "Content-Length: 5"]],
+    ["conflicting repeated fields", ["Content-Length: 5", "Content-Length: 6"]],
+    ["identical comma-separated values", ["Content-Length: 5, 5"]],
+    ["conflicting comma-separated values", ["Content-Length: 5, 6"]],
+  ])("rejects multiple content-length values in %s", (_description, values) => {
     expect(() =>
       parseResponseHeaders(["HTTP/1.1 200 OK", ...values, ""]),
     ).toThrowError(
       new RequestError(
         "ERR_REQUEST_FAILED",
-        "Request failed: Invalid response framing: conflicting Content-Length values",
+        "Request failed: Invalid response framing: multiple Content-Length values are not allowed",
       ),
     );
   });
@@ -140,23 +131,40 @@ describe("parseResponseHeaders", () => {
     );
   });
 
-  test("ignores invalid framing from an intermediate response block", () => {
-    const headers = parseResponseHeaders([
-      "HTTP/1.1 100 Continue",
-      "Content-Length: 1",
-      "Content-Length: 2",
-      "",
-      "HTTP/1.1 200 OK",
-      "Content-Length: 5",
-      "",
-    ]);
-
-    expect(headers["content-length"]).toBe("5");
+  test("rejects invalid framing from an informational response block", () => {
+    expect(() =>
+      parseResponseHeaders([
+        "HTTP/1.1 100 Continue",
+        "Content-Length: 1",
+        "Content-Length: 2",
+        "",
+        "HTTP/1.1 200 OK",
+        "Content-Length: 5",
+        "",
+      ]),
+    ).toThrowError(
+      new RequestError(
+        "ERR_REQUEST_FAILED",
+        "Request failed: Invalid response framing: multiple Content-Length values are not allowed",
+      ),
+    );
   });
 
   test("parses header lines without a status line", () => {
     const headers = parseResponseHeaders(["X-Test: value"]);
     expect(headers["x-test"]).toStrictEqual("value");
+  });
+
+  test("separates detached lines without a status line", () => {
+    const headers = parseResponseHeaders([
+      "X-Test: value",
+      "",
+      "X-Trailer: trailer",
+      "",
+    ]);
+
+    expect(headers["x-test"]).toBe("value");
+    expect(headers["x-trailer"]).toBeUndefined();
   });
 
   test("keeps header values containing colons", () => {
@@ -166,6 +174,44 @@ describe("parseResponseHeaders", () => {
       "",
     ]);
     expect(headers.location).toStrictEqual("https://example.com:8443/path");
+  });
+
+  test("trims optional whitespace around response header values", () => {
+    const headers = parseResponseHeaders([
+      "HTTP/1.1 200 OK",
+      "X-Test:\t value \t ",
+      "",
+    ]);
+
+    expect(headers["x-test"]).toBe("value");
+  });
+
+  test.each([
+    ["invalid header names", "Bad Header: value"],
+    ["whitespace before the colon", "X-Test : value"],
+    ["invalid header value characters", "X-Test: bad\u0001value"],
+  ])("rejects %s", (_description, header) => {
+    expect(() => parseResponseHeaders(["HTTP/1.1 200 OK", header, ""])).toThrow(
+      RequestError,
+    );
+  });
+
+  test("unfolds obsolete response header lines", () => {
+    const headers = parseResponseHeaders([
+      "HTTP/1.1 200 OK",
+      "X-Folded: first",
+      " second",
+      "\tthird",
+      "",
+    ]);
+
+    expect(headers["x-folded"]).toBe("first second third");
+  });
+
+  test("rejects folded response lines without a preceding field", () => {
+    expect(() =>
+      parseResponseHeaders(["HTTP/1.1 200 OK", " folded", ""]),
+    ).toThrow(RequestError);
   });
 
   test("does not fold response trailers into the header section", () => {
@@ -180,6 +226,18 @@ describe("parseResponseHeaders", () => {
 
     expect(headers.trailer).toBe("X-Checksum");
     expect(headers["x-checksum"]).toBeUndefined();
+  });
+
+  test("rejects malformed response trailers", () => {
+    expect(() =>
+      parseResponseHeaders([
+        "HTTP/1.1 200 OK",
+        "Transfer-Encoding: chunked",
+        "",
+        "Bad Header: value",
+        "",
+      ]),
+    ).toThrow(RequestError);
   });
 
   test("uses only the final HTTP response header block", () => {
@@ -283,18 +341,36 @@ describe("parseResponseHeaders", () => {
     expect(hasRequestHeader(["X-Test: value; parameter"], "x-test")).toBe(true);
   });
 
-  test("ignores malformed HTTP status-like lines", () => {
-    const headers = parseResponseHeaders([
-      "HTTP/ 200 OK",
-      "HTTP/1x 200 OK",
-      "HTTP/... 200 OK",
-      "HTTP/1.1 A00 Invalid",
-      "HTTP/1.1 2A0 Invalid",
-      "HTTP/1.1 20A Invalid",
-      "X-Test: value",
-    ]);
+  test.each([
+    "HTTP/ 200 OK",
+    "HTTP/1x 200 OK",
+    "HTTP/... 200 OK",
+    "HTTP/1.1 A00 Invalid",
+    "HTTP/1.1 2A0 Invalid",
+    "HTTP/1.1 20A Invalid",
+    "HTTP/1.1 200X Invalid",
+  ])("rejects malformed HTTP status-like lines: %s", (statusLine) => {
+    expect(() =>
+      parseResponseHeaders([
+        "HTTP/1.1 103 Early Hints",
+        "Link: </style.css>; rel=preload",
+        "",
+        statusLine,
+        "X-Test: value",
+      ]),
+    ).toThrow(RequestError);
+  });
 
-    expect(headers["x-test"]).toBe("value");
+  test("rejects a new status line before the previous block terminator", () => {
+    expect(() =>
+      parseResponseHeaders([
+        "HTTP/1.1 103 Early Hints",
+        "Link: </style.css>; rel=preload",
+        "HTTP/1.1 200 OK",
+        "X-Test: value",
+        "",
+      ]),
+    ).toThrow(RequestError);
   });
 
   test("accepts extra whitespace after an HTTP version", () => {

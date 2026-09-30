@@ -72,6 +72,9 @@ export class RequestError extends Error {
   }
 }
 
+/** @internal */
+export class RetryableRequestError extends RequestError {}
+
 /**
  * HTTP status error thrown by `response.getBody()` for status codes >= 300.
  *

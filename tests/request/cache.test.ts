@@ -139,6 +139,24 @@ test.for([
   expect(second.headers["x-origin-hits"]).toBe("2");
 });
 
+test.for(["file", "memory"] as const)(
+  "%s cache stores a complete redirect response before following it",
+  (cache) => {
+    const url = cacheUrl("/cache/redirect-body");
+
+    const followed = request("GET", url, { cache });
+    const cachedRedirect = request("GET", url, {
+      cache,
+      followRedirects: false,
+    });
+
+    expect(followed.statusCode).toBe(200);
+    expect(cachedRedirect.statusCode).toBe(302);
+    expect(cachedRedirect.body.toString()).toBe("redirect body 1");
+    expect(cachedRedirect.headers["content-length"]).toBe("15");
+  },
+);
+
 describe("file cache", () => {
   test("Cache-Control: no-cache bypasses freshness and replaces the entry", () => {
     const url = cacheUrl("/cache/fresh");
@@ -228,6 +246,19 @@ describe("file cache", () => {
 
     expect(first.getJSON()).toStrictEqual({ sourceHits: 1, targetHits: 1 });
     expect(second.getJSON()).toStrictEqual({ sourceHits: 1, targetHits: 2 });
+  });
+
+  test("returns a cached redirect when redirect following is disabled", () => {
+    const url = cacheUrl("/cache/redirect");
+    const options = { cache: "file" as const, followRedirects: false };
+
+    const first = request("GET", url, options);
+    const second = request("GET", url, options);
+
+    expect(first.statusCode).toBe(302);
+    expect(second.statusCode).toBe(302);
+    expect(second.headers.location).toBe(first.headers.location);
+    expect(second.headers.location).toContain("sourceHits=1");
   });
 
   test("invalidates a cached GET after a successful unsafe request", () => {

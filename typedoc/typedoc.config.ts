@@ -55,6 +55,7 @@ const config = {
     typescript: {
       ErrorOptions:
         "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/Error#parameters",
+      URL: "https://developer.mozilla.org/en-US/docs/Web/API/URL",
     },
   },
 } satisfies TypeDocOptions & PluginOptions;

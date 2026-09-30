@@ -228,12 +228,17 @@ app.post("/timeout", async (c) => {
 
 app.get("/socket-timeout/active", (c) =>
   streamText(c, async (stream) => {
-    for (let index = 0; index < 6; index += 1) {
+    const writeChunk = async (index: number): Promise<void> => {
       await stream.write(String(index));
-      if (index < 5) {
-        await stream.sleep(75);
+      if (index >= 5) {
+        return;
       }
-    }
+
+      await stream.sleep(75);
+      await writeChunk(index + 1);
+    };
+
+    await writeChunk(0);
   }),
 );
 
@@ -347,6 +352,20 @@ app.get("/cache/redirect", (c) => {
     `/cache/redirect-target?key=${encodeURIComponent(key)}&sourceHits=${hits}`,
     302,
   );
+});
+
+app.get("/cache/redirect-body", (c) => {
+  const key = c.req.query("key") ?? "default";
+  const hits = nextCacheOriginHit("redirect-body", key);
+  const body = `redirect body ${hits}`;
+  return new Response(body, {
+    status: 302,
+    headers: {
+      "Cache-Control": "max-age=3600",
+      "Content-Length": String(body.length),
+      Location: `/cache/redirect-target?key=${encodeURIComponent(key)}&sourceHits=${hits}`,
+    },
+  });
 });
 
 app.get("/cache/redirect-target", (c) => {

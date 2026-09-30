@@ -1,3 +1,4 @@
+import { maxHeaderSize } from "node:http";
 import { performance } from "node:perf_hooks";
 import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -12,10 +13,10 @@ vi.mock("#/native/index", () => ({
   },
 }));
 
-import { CurlError } from "#/errors";
+import { CurlError, RequestError } from "#/errors";
 import request from "#/index";
 import { performRequest } from "#/request/perform";
-import type { RetryResponse } from "#/types/definition";
+import type { RetryFunction, RetryResponse } from "#/types/definition";
 
 const nativeResponse = (
   overrides: Partial<{
@@ -45,6 +46,30 @@ const transportErrorResponse = () =>
     statusCode: 0,
     body: Buffer.alloc(0),
   });
+
+const requestWithRetryPolicy = (retry: RetryFunction) =>
+  request("GET", "https://example.com/retry", {
+    retry,
+    retryDelay: 0,
+    maxRetries: 1,
+  });
+
+const expectRetryAfterNativeResponse = (
+  firstResponse: ReturnType<typeof nativeResponse>,
+): void => {
+  nativeRequest
+    .mockReturnValueOnce(firstResponse)
+    .mockReturnValueOnce(nativeResponse());
+
+  const response = request("GET", "https://example.com/retry", {
+    retry: true,
+    retryDelay: 0,
+    maxRetries: 1,
+  });
+
+  expect(response.statusCode).toBe(200);
+  expect(nativeRequest).toHaveBeenCalledTimes(2);
+};
 
 afterEach(() => {
   nativeRequest.mockReset();
@@ -110,8 +135,63 @@ describe("single request execution", () => {
         timeout: 900,
         overallTimeout: 450,
         socketTimeout: 125,
+        maxResponseHeaderSize: maxHeaderSize,
+        stopOnRedirectHeaders: true,
       }),
     );
+  });
+
+  test.for([
+    { title: "cache is enabled", options: { cache: "memory" as const } },
+    {
+      title: "a custom retry callback can observe the response",
+      options: { retry: () => false },
+    },
+  ])("buffers redirect bodies when $title", ({ options }) => {
+    nativeRequest.mockReturnValueOnce(
+      nativeResponse({
+        statusCode: 302,
+        redirectUrl: "/next",
+        headers: [
+          "HTTP/1.1 302 Found",
+          "Location: /next",
+          "Cache-Control: no-store",
+          "",
+        ],
+        body: Buffer.from("redirect body"),
+      }),
+    );
+
+    const result = performRequest(
+      "GET",
+      "https://example.com/observable-redirect",
+      options,
+    );
+
+    expect(nativeRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ stopOnRedirectHeaders: false }),
+    );
+    expect(result.response.body.toString()).toBe("redirect body");
+  });
+
+  test("does not decompress a redirect body that native stopped after headers", () => {
+    nativeRequest.mockReturnValueOnce(
+      nativeResponse({
+        statusCode: 302,
+        headers: [
+          "HTTP/1.1 302 Found",
+          "Location: /next",
+          "Content-Encoding: gzip",
+          "",
+        ],
+        body: Buffer.alloc(0),
+      }),
+    );
+
+    const result = performRequest("GET", "https://example.com/start", {});
+
+    expect(result.redirectUrl).toBe("/next");
+    expect(result.response.body).toHaveLength(0);
   });
 
   test.for([
@@ -125,7 +205,7 @@ describe("single request execution", () => {
         "",
       ],
       expectedError:
-        "Request failed: Invalid response framing: conflicting Content-Length values",
+        "Request failed: Invalid response framing: multiple Content-Length values are not allowed",
     },
     {
       title:
@@ -133,7 +213,15 @@ describe("single request execution", () => {
       transportMessage: "Invalid Content-Length: value",
       headers: ["HTTP/1.1 200 OK", "Content-Length: 5"],
       expectedError:
-        "Request failed: Invalid response framing: conflicting Content-Length values",
+        "Request failed: Invalid response framing: multiple Content-Length values are not allowed",
+    },
+    {
+      title:
+        "maps libcurl Content-Length parser failures with a terminated captured header block",
+      transportMessage: "Invalid Content-Length: value",
+      headers: ["HTTP/1.1 200 OK", "Content-Length: 5", ""],
+      expectedError:
+        "Request failed: Invalid response framing: multiple Content-Length values are not allowed",
     },
     {
       title: "maps an uncaptured invalid Content-Length parser failure",
@@ -148,7 +236,7 @@ describe("single request execution", () => {
       transportMessage: "Invalid Content-Length: value",
       headers: ["Content-Length: 5"],
       expectedError:
-        "Request failed: Invalid response framing: conflicting Content-Length values",
+        "Request failed: Invalid response framing: multiple Content-Length values are not allowed",
     },
   ])("$title", ({ transportMessage, headers, expectedError }) => {
     nativeRequest.mockReturnValueOnce(
@@ -236,8 +324,8 @@ describe("request retries", () => {
     expect(nativeRequest).toHaveBeenCalledTimes(3);
   });
 
-  test("does not retry deterministic response framing errors", () => {
-    nativeRequest.mockReturnValue(
+  test("retries response framing parser errors", () => {
+    expectRetryAfterNativeResponse(
       nativeResponse({
         transportCode: 8,
         transportMessage: "Invalid Content-Length: value",
@@ -245,17 +333,42 @@ describe("request retries", () => {
         body: Buffer.alloc(0),
       }),
     );
+  });
 
-    expect(() =>
-      request("GET", "https://example.com/retry", {
-        retry: true,
-        retryDelay: 0,
-        maxRetries: 2,
+  test("retries malformed response header parser errors", () => {
+    expectRetryAfterNativeResponse(
+      nativeResponse({
+        headers: ["HTTP/1.1 200 OK", "Bad Header: value", ""],
       }),
-    ).toThrow(
-      "Request failed: Invalid response framing: conflicting Content-Length values",
     );
-    expect(nativeRequest).toHaveBeenCalledOnce();
+  });
+
+  test("retries response header overflow parser errors", () => {
+    expectRetryAfterNativeResponse(
+      nativeResponse({
+        transportCode: 23,
+        transportMessage: "Response headers exceeded the configured size limit",
+        headers: ["HTTP/1.1 200 OK"],
+      }),
+    );
+  });
+
+  test("passes response parser failures to custom retry callbacks", () => {
+    nativeRequest
+      .mockReturnValueOnce(
+        nativeResponse({
+          headers: ["HTTP/1.1 200 OK", "Bad Header: value", ""],
+        }),
+      )
+      .mockReturnValueOnce(nativeResponse());
+    const retry = vi.fn(
+      (error: CurlError | RequestError | null) => error instanceof RequestError,
+    );
+
+    const response = requestWithRetryPolicy(retry);
+
+    expect(response.statusCode).toBe(200);
+    expect(retry).toHaveBeenCalledWith(expect.any(RequestError), undefined, 1);
   });
 
   test("throws the final transport error after maxRetries", () => {
@@ -322,7 +435,7 @@ describe("request retries", () => {
       .mockReturnValueOnce(nativeResponse());
     const retry = vi.fn(
       (
-        error: CurlError | null,
+        error: CurlError | RequestError | null,
         response: RetryResponse | undefined,
         attemptNumber: number,
       ) => {
@@ -392,17 +505,13 @@ describe("request retries", () => {
       .mockReturnValueOnce(nativeResponse());
     const retry = vi.fn(
       (
-        error: CurlError | null,
+        error: CurlError | RequestError | null,
         _response: RetryResponse | undefined,
         attemptNumber: number,
       ) => error !== null && attemptNumber === 1,
     );
 
-    const response = request("GET", "https://example.com/retry", {
-      retry,
-      retryDelay: 0,
-      maxRetries: 1,
-    });
+    const response = requestWithRetryPolicy(retry);
 
     expect(response.statusCode).toBe(200);
     expect(retry).toHaveBeenCalledTimes(2);
@@ -422,7 +531,7 @@ describe("request retries", () => {
     const wait = vi.spyOn(Atomics, "wait").mockReturnValue("timed-out");
     const retryDelay = vi.fn(
       (
-        error: CurlError | null,
+        error: CurlError | RequestError | null,
         response: RetryResponse | undefined,
         attemptNumber: number,
       ) => {
