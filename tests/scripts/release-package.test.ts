@@ -17,6 +17,7 @@ describe("createNativePackageManifest", () => {
       const manifest = createNativePackageManifest(packageJson, platform);
 
       expect(manifest.keywords).toEqual([
+        "sync-request",
         "sync-request-curl",
         "binary",
         "native",

@@ -50,7 +50,7 @@
     "tc": "pnpm build:worker && node scripts/build-native.ts --if-needed && vitest run --coverage",
     "test": "pnpm build:worker && node scripts/build-native.ts --if-needed && vitest run",
     "test:docs": "vitest run --config vitest.docs.config.ts",
-    "test:entrypoints": "tsdown && node --test tests/build/entrypoints.smoke.mjs",
+    "test:entrypoints": "tsdown && node --test tests/build/entrypoints.smoke.ts",
     "test:linux:musl": "node scripts/linux-prebuild.ts --libc=musl --mode=test",
     "test:source-build": "pnpm build:source-tools && node --test tests/build/*.check.mjs",
     "test:verdaccio": "node scripts/test-verdaccio.ts",

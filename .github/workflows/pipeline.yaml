@@ -154,7 +154,7 @@ jobs:
 
       - name: Test built package entrypoints
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == '24.x'
-        run: node --test tests/build/entrypoints.smoke.mjs
+        run: pnpm test:entrypoints
 
       - name: Run tests with coverage
         run: pnpm test --coverage
