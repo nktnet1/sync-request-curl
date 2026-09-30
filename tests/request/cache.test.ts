@@ -139,6 +139,24 @@ test.for([
   expect(second.headers["x-origin-hits"]).toBe("2");
 });
 
+test.for(["file", "memory"] as const)(
+  "%s cache stores a complete redirect response before following it",
+  (cache) => {
+    const url = cacheUrl("/cache/redirect-body");
+
+    const followed = request("GET", url, { cache });
+    const cachedRedirect = request("GET", url, {
+      cache,
+      followRedirects: false,
+    });
+
+    expect(followed.statusCode).toBe(200);
+    expect(cachedRedirect.statusCode).toBe(302);
+    expect(cachedRedirect.body.toString()).toBe("redirect body 1");
+    expect(cachedRedirect.headers["content-length"]).toBe("15");
+  },
+);
+
 describe("file cache", () => {
   test("Cache-Control: no-cache bypasses freshness and replaces the entry", () => {
     const url = cacheUrl("/cache/fresh");

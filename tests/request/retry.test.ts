@@ -141,6 +141,39 @@ describe("single request execution", () => {
     );
   });
 
+  test.for([
+    { title: "cache is enabled", options: { cache: "memory" as const } },
+    {
+      title: "a custom retry callback can observe the response",
+      options: { retry: () => false },
+    },
+  ])("buffers redirect bodies when $title", ({ options }) => {
+    nativeRequest.mockReturnValueOnce(
+      nativeResponse({
+        statusCode: 302,
+        redirectUrl: "/next",
+        headers: [
+          "HTTP/1.1 302 Found",
+          "Location: /next",
+          "Cache-Control: no-store",
+          "",
+        ],
+        body: Buffer.from("redirect body"),
+      }),
+    );
+
+    const result = performRequest(
+      "GET",
+      "https://example.com/observable-redirect",
+      options,
+    );
+
+    expect(nativeRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ stopOnRedirectHeaders: false }),
+    );
+    expect(result.response.body.toString()).toBe("redirect body");
+  });
+
   test("does not decompress a redirect body that native stopped after headers", () => {
     nativeRequest.mockReturnValueOnce(
       nativeResponse({

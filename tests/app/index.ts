@@ -349,6 +349,20 @@ app.get("/cache/redirect", (c) => {
   );
 });
 
+app.get("/cache/redirect-body", (c) => {
+  const key = c.req.query("key") ?? "default";
+  const hits = nextCacheOriginHit("redirect-body", key);
+  const body = `redirect body ${hits}`;
+  return new Response(body, {
+    status: 302,
+    headers: {
+      "Cache-Control": "max-age=3600",
+      "Content-Length": String(body.length),
+      Location: `/cache/redirect-target?key=${encodeURIComponent(key)}&sourceHits=${hits}`,
+    },
+  });
+});
+
 app.get("/cache/redirect-target", (c) => {
   const key = c.req.query("key") ?? "default";
   const targetHits = nextCacheOriginHit("redirect-target", key);

@@ -60,6 +60,16 @@ const createRequestResult = (
   redirectUrl: getCachedRedirectUrl(response),
 });
 
+// Only discard a redirect body when no cache or custom retry callback can
+// observe it as a complete buffered response.
+const shouldStopOnRedirectHeaders = (
+  method: UppercaseHttpVerb,
+  options: Options,
+): boolean =>
+  options.followRedirects !== false &&
+  !(method === "GET" && options.cache !== undefined) &&
+  typeof options.retry !== "function";
+
 const performTransportRequest = (
   method: UppercaseHttpVerb,
   originalUrl: string,
@@ -70,6 +80,7 @@ const performTransportRequest = (
   const connectionPoolId = usesCustomTransport(options)
     ? undefined
     : getAgentPoolId(options.agent);
+  const stopOnRedirectHeaders = shouldStopOnRedirectHeaders(method, options);
   const result = native.request({
     ...prepareTransportOptions(options),
     method,
@@ -82,7 +93,7 @@ const performTransportRequest = (
     socketTimeout: Math.ceil(options.socketTimeout ?? 0),
     maxResponseHeaderSize: maxHeaderSize,
     noBody: method === "HEAD",
-    stopOnRedirectHeaders: options.followRedirects !== false,
+    stopOnRedirectHeaders,
     ...(connectionPoolId === undefined ? {} : { connectionPoolId }),
   });
 
@@ -111,13 +122,13 @@ const performTransportRequest = (
           headers: responseHeaders,
         }));
   const responseBody =
-    redirectUrl === null
-      ? decompressResponseBody(
+    stopOnRedirectHeaders && redirectUrl !== null
+      ? result.body
+      : decompressResponseBody(
           result.body,
           responseHeaders,
           options.gzip !== false,
-        )
-      : result.body;
+        );
   const response: CacheableResponse = {
     statusCode: result.statusCode,
     headers: responseHeaders,

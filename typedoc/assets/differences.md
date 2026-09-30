@@ -37,7 +37,6 @@
 - `CONNECT` is rejected explicitly. Although `sync-request` accepts it at the
   type level, its underlying buffered request stack does not complete a
   successful CONNECT tunnel response.
-- Only absolute `http:` and `https:` URLs are accepted.
 - libcurl applies RFC 3986 URL normalisation, including removal of `.` and `..`
   path segments. `Response#url` reports libcurl's effective URL, so it can
   reflect that normalisation instead of preserving the caller's literal URL.
