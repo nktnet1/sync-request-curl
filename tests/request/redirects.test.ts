@@ -56,6 +56,16 @@ describe("Redirects", () => {
     );
   });
 
+  test("returns a redirect response unchanged when Location is missing", () => {
+    const url = `${SERVER_URL}/redirect/missing-location`;
+    const response = request("GET", url);
+
+    expect(response.statusCode).toBe(302);
+    expect(response.url).toBe(url);
+    expect(response.body.toString()).toBe("redirect without location");
+    expect(response.headers.location).toBeUndefined();
+  });
+
   test("Only final response headers are returned after redirects", () => {
     const res = request(
       "GET",

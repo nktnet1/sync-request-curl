@@ -5,8 +5,9 @@
 - `Response#getJSON()` is available as a convenience helper.
 - `cache: "memory"` is available as an alternative to the file cache.
 - `isMatch`, `isExpired`, and `canCache` expose the synchronous cache-policy
-  hooks from [`http-basic`](https://github.com/ForbesLindesay/http-basic). Callback/stream-based custom cache
-  implementations remain out of scope; use the built-in `"file"` or `"memory"` cache.
+  hooks from [`http-basic`](https://github.com/ForbesLindesay/http-basic).
+  Callback/stream-based custom cache implementations remain out of scope; use
+  the built-in `"file"` or `"memory"` cache.
 - `retry` and `retryDelay` can be callbacks when you need to decide retry
   behaviour at runtime. Transport failures passed to these callbacks are
   `CurlError` instances with numeric libcurl error codes, while response parser
@@ -45,10 +46,16 @@
 - 307 and 308 redirects preserve the request method and body.
   [`sync-request`](https://github.com/ForbesLindesay/sync-request)
   can rewrite some body-bearing redirects to `GET`.
+- A redirect response without a `Location` header is returned unchanged rather
+  than being converted into an exception.
+  [RFC 9110's redirection semantics](https://www.rfc-editor.org/rfc/rfc9110.html#section-15.4)
+  define automatic redirection in terms of a provided `Location` value. This
+  intentionally differs from `http-basic`, which throws when a redirect status
+  has no redirect target.
 - Query merging preserves additional literal `?` and `#` delimiters that
   [`sync-request`](https://github.com/ForbesLindesay/sync-request) can truncate
   while splitting URLs.
-- Default cache handling is stricter: `no-store` takes precedence, `Age` is updated on
-  cache hits, cached headers are isolated from mutation, and recoverable
-  cache-read errors are treated as misses.
+- Default cache handling is stricter: `no-store` takes precedence, `Age` is
+  updated on cache hits, cached headers are isolated from mutation, and
+  recoverable cache-read errors are treated as misses.
 - HTTPS requests can negotiate HTTP/2 automatically when supported.
