@@ -90,7 +90,7 @@ test("built declarations expose the public root API without leaking Node header 
   ];
   const tsconfig = join(directory, "tsconfig.json");
   const tsc = createRequire(import.meta.url).resolve("typescript/bin/tsc");
-  const consumer = `// @ts-expect-error IncomingHttpHeaders is intentionally not re-exported by this package.
+  const consumer = String.raw`// @ts-expect-error IncomingHttpHeaders is intentionally not re-exported by this package.
      import type { IncomingHttpHeaders as PackageIncomingHttpHeaders } from "sync-request-curl";
      import request, {
        CurlError,
@@ -131,7 +131,7 @@ test("built declarations expose the public root API without leaking Node header 
        filename: "report.bin",
        contentType: "application/x-report",
        knownLength: 3,
-       header: "--entrypoint-boundary\\r\\nX-Custom-Part: yes\\r\\n\\r\\n",
+       header: "--entrypoint-boundary\r\nX-Custom-Part: yes\r\n\r\n",
      });
      const formHeaders: Headers = form.getHeaders({ "x-test": "value" });
      const formBoundary: string = form.getBoundary();
