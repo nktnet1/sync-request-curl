@@ -360,7 +360,7 @@ An explicit HTTP/HTTPS proxy and optional Basic credentials.
 
 | Property | Type | Description |
 | ------ | ------ | ------ |
-| <a id="property-url-1"></a> `url` | `string` | HTTP/HTTPS proxy origin URL. May contain URL-encoded credentials. |
+| <a id="property-url-2"></a> `url` | `string` | HTTP/HTTPS proxy origin URL. May contain URL-encoded credentials. |
 | <a id="property-username"></a> `username?` | `string` | Overrides both URL credentials. An omitted password becomes an empty string. |
 | <a id="property-password"></a> `password?` | `string` | Proxy password. Requires an explicit username. Defaults to an empty string. |
 
@@ -417,7 +417,7 @@ Read the response body as a [`Buffer`](https://nodejs.org/api/buffer.html#class-
 | ------ | ------ | ------ |
 | <a id="property-statuscode-2"></a> `statusCode` | `number` | HTTP response status code. |
 | <a id="property-headers-3"></a> `headers` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Node-style response headers with lowercase keys. |
-| <a id="property-url-2"></a> `url` | `string` | Final effective URL for the completed attempt. |
+| <a id="property-url-3"></a> `url` | `string` | Final effective URL for the completed attempt. |
 | <a id="property-body-3"></a> `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) | Buffered response body. |
 
 ***
@@ -523,7 +523,7 @@ Parse the buffered response body as JSON.
 | ------ | ------ | ------ | ------ |
 | <a id="property-statuscode-4"></a> `statusCode` | `number` | HTTP response status code. | [`RetryResponse`](#retryresponse).[`statusCode`](#property-statuscode-2) |
 | <a id="property-headers-5"></a> `headers` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Node-style response headers with lowercase keys. | [`RetryResponse`](#retryresponse).[`headers`](#property-headers-3) |
-| <a id="property-url-3"></a> `url` | `string` | Final effective URL for the completed attempt. | [`RetryResponse`](#retryresponse).[`url`](#property-url-2) |
+| <a id="property-url-4"></a> `url` | `string` | Final effective URL for the completed attempt. | [`RetryResponse`](#retryresponse).[`url`](#property-url-3) |
 | <a id="property-body-5"></a> `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) | Buffered response body. | [`RetryResponse`](#retryresponse).[`body`](#property-body-3) |
 
 ***
@@ -741,11 +741,12 @@ than a hidden immutable snapshot.
 
 | Property | Type | Description |
 | ------ | ------ | ------ |
+| <a id="property-iserror"></a> `isError` | () => `boolean` | Return whether the response represents an HTTP error. |
 | <a id="property-getbody"></a> `getBody` | [`GetBody`](#getbody) | Read the response body and throw `ResponseError` for HTTP status >= 300. |
 | <a id="property-getjson"></a> `getJSON` | [`GetJSON`](#getjson) | Parse the response body as JSON without applying HTTP status handling. |
 | <a id="property-statuscode-1"></a> `statusCode` | `number` | HTTP response status code. |
 | <a id="property-headers-2"></a> `headers` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Node-style response headers with lowercase keys. |
-| <a id="property-url"></a> `url` | `string` | Final effective URL after query handling and redirects. |
+| <a id="property-url-1"></a> `url` | `string` | Final effective URL after query handling and redirects. |
 | <a id="property-body-2"></a> `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> | Mutable buffered response body. |
 
 ***
@@ -941,8 +942,8 @@ Error.constructor
 
 HTTP status error thrown by `response.getBody()` for status codes >= 300.
 
-The status, headers, and body that produced the error remain available on
-the error object.
+The status, headers, body, and response URL that produced the error remain
+available on the error object.
 
 ##### Extends
 
@@ -957,7 +958,8 @@ new ResponseError(
    statusCode,
    headers,
    body,
-   encoding?
+   encoding?,
+   url?
 ): ResponseError;
 ```
 
@@ -969,6 +971,7 @@ new ResponseError(
 | `headers` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) |
 | `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) |
 | `encoding?` | [`BufferEncoding`](#bufferencoding) |
+| `url?` | `string` |
 
 ###### Returns
 
@@ -987,6 +990,7 @@ Error.constructor
 | <a id="property-statuscode"></a> `statusCode` | `readonly` | `number` | HTTP status code that caused the error. |
 | <a id="property-headers"></a> `headers` | `readonly` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Response headers returned by the server. |
 | <a id="property-body"></a> `body` | `readonly` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) | Buffered response body returned by the server. |
+| <a id="property-url"></a> `url?` | `readonly` | `string` | Final response URL when the error came from `Response#getBody()`. |
 
 <a id="differences-from-sync-request"></a>
 ## 4. Differences from sync-request

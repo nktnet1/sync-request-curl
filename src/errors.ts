@@ -79,8 +79,8 @@ export class RetryableRequestError extends RequestError {}
 /**
  * HTTP status error thrown by `response.getBody()` for status codes >= 300.
  *
- * The status, headers, and body that produced the error remain available on
- * the error object.
+ * The status, headers, body, and response URL that produced the error remain
+ * available on the error object.
  *
  * @group Errors
  * @noInheritDoc
@@ -92,12 +92,15 @@ export class ResponseError extends Error {
   readonly headers: Response["headers"];
   /** Buffered response body returned by the server. */
   readonly body: Buffer;
+  /** Final response URL when the error came from `Response#getBody()`. */
+  readonly url?: string;
 
   constructor(
     statusCode: number,
     headers: Response["headers"],
     body: Buffer,
     encoding?: BufferEncoding,
+    url?: string,
   ) {
     super(
       `Server responded with status code ${statusCode}:\n${body.toString(encoding)}`,
@@ -106,6 +109,7 @@ export class ResponseError extends Error {
     this.statusCode = statusCode;
     this.headers = headers;
     this.body = body;
+    this.url = url;
   }
 }
 

@@ -31,6 +31,9 @@ export const createResponse = ({
     body,
   };
 
+  const isError = (): boolean =>
+    responseData.statusCode === 0 || responseData.statusCode >= 400;
+
   const getBody = ((encoding?: BufferEncoding): string | Buffer => {
     if (responseData.statusCode >= 300) {
       throw new ResponseError(
@@ -38,6 +41,7 @@ export const createResponse = ({
         responseData.headers,
         responseData.body,
         encoding,
+        responseData.url,
       );
     }
     return encoding ? responseData.body.toString(encoding) : responseData.body;
@@ -64,5 +68,5 @@ export const createResponse = ({
     }
   };
 
-  return Object.assign(responseData, { getBody, getJSON });
+  return Object.assign(responseData, { isError, getBody, getJSON });
 };
