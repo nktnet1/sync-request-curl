@@ -202,7 +202,7 @@ function validateRequestHeaderValue(
   name: string,
   value: string | undefined,
 ): asserts value is string {
-  // IncomingHttpHeaders permits undefined, but Node rejects it outbound.
+  // `Headers` permits undefined values, but Node rejects them outbound.
   validateHeaderValue(name, value as string);
 }
 

@@ -241,7 +241,7 @@ type Options = {
      intervalSeconds?: number;
    };
   cacheNamespace?: string;
-  headers?: IncomingHttpHeaders;
+  headers?: Headers;
   qs?: {
    [key: string]: unknown;
   };
@@ -282,7 +282,7 @@ supplied.
 | <a id="property-localinterface"></a> `localInterface?` | `string` | Source interface name. Mutually exclusive with `localAddress`. |
 | <a id="property-tcpkeepalive"></a> `tcpKeepAlive?` | \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; \} | Enable TCP keepalive, optionally with idle and interval controls. Defaults to `false`. |
 | <a id="property-cachenamespace"></a> `cacheNamespace?` | `string` | Private cache identity. Defaults to `process.cwd()`. |
-| <a id="property-headers-1"></a> `headers?` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Node-style request headers. |
+| <a id="property-headers-1"></a> `headers?` | [`Headers`](#headers) | Node-style request headers. |
 | <a id="property-qs"></a> `qs?` | \{ \[`key`: `string`\]: `unknown`; \} | Query values merged with any existing query string. |
 | <a id="property-json"></a> `json?` | [`JsonLike`](#jsonlike) | JSON-compatible request body. Adds `application/json` when needed. |
 | <a id="property-body-1"></a> `body?` | `string` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> | Raw string or [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) request body. |
@@ -302,6 +302,20 @@ supplied.
 | <a id="property-retry"></a> `retry?` | `boolean` \| [`RetryFunction`](#retryfunction) | Retry GET requests, or provide a callback to decide per attempt. Defaults to disabled. |
 | <a id="property-retrydelay"></a> `retryDelay?` | `number` \| [`RetryDelayFunction`](#retrydelayfunction) | Retry delay in milliseconds, or a callback returning the delay. Defaults to 200 milliseconds when retries are enabled. |
 | <a id="property-maxretries"></a> `maxRetries?` | `number` | Maximum retry count. Defaults to 5 when retries are enabled. |
+
+***
+
+#### Headers
+
+```ts
+type Headers = IncomingHttpHeaders;
+```
+
+HTTP header map used by `then-request`.
+
+This is an alias of Node.js' [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders), exposed under
+the historical `then-request` name so consumers do not need to import Node's
+type directly.
 
 ***
 
@@ -416,7 +430,7 @@ Read the response body as a [`Buffer`](https://nodejs.org/api/buffer.html#class-
 | Property | Type | Description |
 | ------ | ------ | ------ |
 | <a id="property-statuscode-2"></a> `statusCode` | `number` | HTTP response status code. |
-| <a id="property-headers-3"></a> `headers` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Node-style response headers with lowercase keys. |
+| <a id="property-headers-3"></a> `headers` | [`Headers`](#headers) | Node-style response headers with lowercase keys. |
 | <a id="property-url-3"></a> `url` | `string` | Final effective URL for the completed attempt. |
 | <a id="property-body-3"></a> `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) | Buffered response body. |
 
@@ -434,9 +448,9 @@ does not modify the stored cache entry.
 | Property | Type | Description |
 | ------ | ------ | ------ |
 | <a id="property-statuscode-3"></a> `statusCode` | `number` | Cached HTTP response status code. |
-| <a id="property-headers-4"></a> `headers` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Cached Node-style response headers with lowercase keys. |
+| <a id="property-headers-4"></a> `headers` | [`Headers`](#headers) | Cached Node-style response headers with lowercase keys. |
 | <a id="property-body-4"></a> `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) | Buffered cached response body. |
-| <a id="property-requestheaders"></a> `requestHeaders` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Request headers stored with this cache variant. |
+| <a id="property-requestheaders"></a> `requestHeaders` | [`Headers`](#headers) | Request headers stored with this cache variant. |
 | <a id="property-requesttimestamp"></a> `requestTimestamp` | `number` | Timestamp when the cached request started, in Unix milliseconds. |
 
 ***
@@ -522,7 +536,7 @@ Parse the buffered response body as JSON.
 | Property | Type | Description | Inherited from |
 | ------ | ------ | ------ | ------ |
 | <a id="property-statuscode-4"></a> `statusCode` | `number` | HTTP response status code. | [`RetryResponse`](#retryresponse).[`statusCode`](#property-statuscode-2) |
-| <a id="property-headers-5"></a> `headers` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Node-style response headers with lowercase keys. | [`RetryResponse`](#retryresponse).[`headers`](#property-headers-3) |
+| <a id="property-headers-5"></a> `headers` | [`Headers`](#headers) | Node-style response headers with lowercase keys. | [`RetryResponse`](#retryresponse).[`headers`](#property-headers-3) |
 | <a id="property-url-4"></a> `url` | `string` | Final effective URL for the completed attempt. | [`RetryResponse`](#retryresponse).[`url`](#property-url-3) |
 | <a id="property-body-5"></a> `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) | Buffered response body. | [`RetryResponse`](#retryresponse).[`body`](#property-body-3) |
 
@@ -542,7 +556,7 @@ Override whether a stored cache variant matches the outgoing request.
 
 | Parameter | Type |
 | ------ | ------ |
-| `requestHeaders` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) |
+| `requestHeaders` | [`Headers`](#headers) |
 | `cachedResponse` | [`CachedResponse`](#cachedresponse) |
 | `defaultValue` | `boolean` |
 
@@ -745,7 +759,7 @@ than a hidden immutable snapshot.
 | <a id="property-getbody"></a> `getBody` | [`GetBody`](#getbody) | Read the response body and throw `ResponseError` for HTTP status >= 300. |
 | <a id="property-getjson"></a> `getJSON` | [`GetJSON`](#getjson) | Parse the response body as JSON without applying HTTP status handling. |
 | <a id="property-statuscode-1"></a> `statusCode` | `number` | HTTP response status code. |
-| <a id="property-headers-2"></a> `headers` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Node-style response headers with lowercase keys. |
+| <a id="property-headers-2"></a> `headers` | [`Headers`](#headers) | Node-style response headers with lowercase keys. |
 | <a id="property-url-1"></a> `url` | `string` | Final effective URL after query handling and redirects. |
 | <a id="property-body-2"></a> `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> | Mutable buffered response body. |
 
@@ -968,7 +982,7 @@ new ResponseError(
 | Parameter | Type |
 | ------ | ------ |
 | `statusCode` | `number` |
-| `headers` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) |
+| `headers` | [`Headers`](#headers) |
 | `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) |
 | `encoding?` | [`BufferEncoding`](#bufferencoding) |
 | `url?` | `string` |
@@ -988,7 +1002,7 @@ Error.constructor
 | Property | Modifier | Type | Description |
 | ------ | ------ | ------ | ------ |
 | <a id="property-statuscode"></a> `statusCode` | `readonly` | `number` | HTTP status code that caused the error. |
-| <a id="property-headers"></a> `headers` | `readonly` | [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) | Response headers returned by the server. |
+| <a id="property-headers"></a> `headers` | `readonly` | [`Headers`](#headers) | Response headers returned by the server. |
 | <a id="property-body"></a> `body` | `readonly` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) | Buffered response body returned by the server. |
 | <a id="property-url"></a> `url?` | `readonly` | `string` | Final response URL when the error came from `Response#getBody()`. |
 
@@ -1001,8 +1015,9 @@ Error.constructor
 - `Response#getJSON()` is available as a convenience helper.
 - `cache: "memory"` is available as an alternative to the file cache.
 - `isMatch`, `isExpired`, and `canCache` expose the synchronous cache-policy
-  hooks from [`http-basic`](https://github.com/ForbesLindesay/http-basic). Callback/stream-based custom cache
-  implementations remain out of scope; use the built-in `"file"` or `"memory"` cache.
+  hooks from [`http-basic`](https://github.com/ForbesLindesay/http-basic).
+  Callback/stream-based custom cache implementations remain out of scope; use
+  the built-in `"file"` or `"memory"` cache.
 - `retry` and `retryDelay` can be callbacks when you need to decide retry
   behaviour at runtime. Transport failures passed to these callbacks are
   `CurlError` instances with numeric libcurl error codes, while response parser
@@ -1042,12 +1057,18 @@ Error.constructor
 - 307 and 308 redirects preserve the request method and body.
   [`sync-request`](https://github.com/ForbesLindesay/sync-request)
   can rewrite some body-bearing redirects to `GET`.
+- A redirect response without a `Location` header is returned unchanged rather
+  than being converted into an exception.
+  [RFC 9110's redirection semantics](https://www.rfc-editor.org/rfc/rfc9110.html#section-15.4)
+  define automatic redirection in terms of a provided `Location` value. This
+  intentionally differs from `http-basic`, which throws when a redirect status
+  has no redirect target.
 - Query merging preserves additional literal `?` and `#` delimiters that
   [`sync-request`](https://github.com/ForbesLindesay/sync-request) can truncate
   while splitting URLs.
-- Default cache handling is stricter: `no-store` takes precedence, `Age` is updated on
-  cache hits, cached headers are isolated from mutation, and recoverable
-  cache-read errors are treated as misses.
+- Default cache handling is stricter: `no-store` takes precedence, `Age` is
+  updated on cache hits, cached headers are isolated from mutation, and
+  recoverable cache-read errors are treated as misses.
 - HTTPS requests can negotiate HTTP/2 automatically when supported.
 
 <a id="license"></a>

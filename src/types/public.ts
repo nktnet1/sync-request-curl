@@ -9,6 +9,7 @@ export type {
   FormDataEntry,
   GetBody,
   GetJSON,
+  Headers,
   HttpVerb,
   JsonLike,
   JsonPrimitive,

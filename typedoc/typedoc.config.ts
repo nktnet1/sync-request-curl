@@ -6,7 +6,7 @@ import {
 import { EXTERNAL_TYPE_LINKS } from "#typedoc/externalLinks";
 import { linkExternalTypes } from "#typedoc/plugins/linkExternalTypeReferences";
 import { normalizeTypeSignatureFormatting } from "#typedoc/plugins/normalizeTypeSignatureFormatting";
-import { preserveOptionsReference } from "#typedoc/plugins/preserveOptionsReference";
+import { preservePublicTypeReferences } from "#typedoc/plugins/preservePublicTypeReferences";
 import { removeEmptyTypeParameterLists } from "#typedoc/plugins/removeEmptyTypeParameterLists";
 import { removeLeadingReturnUnionPipe } from "#typedoc/plugins/removeLeadingReturnUnionPipe";
 import { removeTrailingWhitespace } from "#typedoc/plugins/removeTrailingWhitespace";
@@ -19,7 +19,7 @@ const config = {
     typedocPluginMarkdown,
     removeEmptyTypeParameterLists,
     linkExternalTypes,
-    preserveOptionsReference,
+    preservePublicTypeReferences,
     normalizeTypeSignatureFormatting,
     removeTypeAliasPropertyDefaults,
     removeLeadingReturnUnionPipe,

@@ -7,6 +7,7 @@ import {
 } from "#/errors";
 import { FormData } from "#/form-data";
 import request, {
+  type Headers as CommonJsRootHeaders,
   type HttpVerb as CommonJsRootHttpVerb,
   type Options as CommonJsRootOptions,
   type Response as CommonJsRootResponse,
@@ -14,6 +15,7 @@ import request, {
 import esmRequest, {
   CurlError as RootCurlError,
   FormData as RootFormData,
+  type Headers as RootHeaders,
   type Options as RootOptions,
   RequestError as RootRequestError,
   type RequestErrorCode as RootRequestErrorCode,
@@ -21,9 +23,19 @@ import esmRequest, {
   ResponseError as RootResponseError,
 } from "#/index-esm";
 import requestImplementation from "#/request/index";
-import type { HttpVerb, Options, Response } from "#/types/definition";
+import type { Headers, HttpVerb, Options, Response } from "#/types/definition";
 
 describe("public entrypoint", () => {
+  test("does not re-export Node's IncomingHttpHeaders type", () => {
+    // @ts-expect-error Consumers should use this package's Headers alias instead.
+    type CommonJsIncomingHttpHeaders = import("#/index").IncomingHttpHeaders;
+    // @ts-expect-error Consumers should use this package's Headers alias instead.
+    type EsmIncomingHttpHeaders = import("#/index-esm").IncomingHttpHeaders;
+
+    expectTypeOf<CommonJsIncomingHttpHeaders>();
+    expectTypeOf<EsmIncomingHttpHeaders>();
+  });
+
   test("exports the request implementation as default", () => {
     expect(request).toBe(requestImplementation);
     expect(esmRequest).toBe(requestImplementation);
@@ -50,12 +62,14 @@ describe("public entrypoint", () => {
     expectTypeOf<CommonJsRootResponseError>().toEqualTypeOf<
       typeof ResponseError
     >();
+    expectTypeOf<CommonJsRootHeaders>().toEqualTypeOf<Headers>();
     expectTypeOf<CommonJsRootHttpVerb>().toEqualTypeOf<HttpVerb>();
     expectTypeOf<CommonJsRootOptions>().toEqualTypeOf<Options>();
     expectTypeOf<CommonJsRootResponse>().toEqualTypeOf<Response>();
   });
 
   test("re-exports public types from the ESM root entry", () => {
+    expectTypeOf<RootHeaders>().toEqualTypeOf<Headers>();
     expectTypeOf<RootOptions>().toEqualTypeOf<Options>();
     expectTypeOf<RootResponse>().toEqualTypeOf<Response>();
     expectTypeOf<RootRequestErrorCode>().toEqualTypeOf<RequestErrorCode>();

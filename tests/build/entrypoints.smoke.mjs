@@ -75,14 +75,17 @@ for (const format of ["module", "commonjs"]) {
   });
 }
 
-test("built CommonJS declarations expose the public root API", () => {
+test("built declarations expose the public root API without leaking Node header types", () => {
   const directory = mkdtempSync(join(root, ".entrypoints-types-"));
-  const fixture = join(directory, "consumer.cts");
+  const fixtures = [
+    join(directory, "consumer.cts"),
+    join(directory, "consumer.mts"),
+  ];
   const tsconfig = join(directory, "tsconfig.json");
   const tsc = createRequire(import.meta.url).resolve("typescript/bin/tsc");
-  writeFileSync(
-    fixture,
-    `import request, {
+  const consumer = `// @ts-expect-error IncomingHttpHeaders is intentionally not re-exported by this package.
+     import type { IncomingHttpHeaders as PackageIncomingHttpHeaders } from "sync-request-curl";
+     import request, {
        CurlError,
        FormData,
        RequestError,
@@ -96,6 +99,7 @@ test("built CommonJS declarations expose the public root API", () => {
        type FormDataEntry,
        type GetBody,
        type GetJSON,
+       type Headers,
        type HttpVerb,
        type JsonLike,
        type JsonPrimitive,
@@ -110,6 +114,7 @@ test("built CommonJS declarations expose the public root API", () => {
      } from "sync-request-curl";
 
      const method: HttpVerb = "GET";
+     const headers: Headers = { "x-test": "value" };
      const options: Options = {};
      const response: Response = request(method, "http://localhost", options);
      const form = new FormData();
@@ -143,6 +148,7 @@ test("built CommonJS declarations expose the public root API", () => {
      let retryResponse: RetryResponse | undefined;
      void [
        response,
+       headers,
        form,
        attachedForm,
        curlError,
@@ -161,8 +167,10 @@ test("built CommonJS declarations expose the public root API", () => {
        retryDelay,
        retry,
        retryResponse,
-     ];`,
-  );
+     ];`;
+  for (const fixture of fixtures) {
+    writeFileSync(fixture, consumer);
+  }
   writeFileSync(
     tsconfig,
     JSON.stringify({
@@ -175,7 +183,7 @@ test("built CommonJS declarations expose the public root API", () => {
         skipLibCheck: true,
         noEmit: true,
       },
-      files: ["./consumer.cts"],
+      files: ["./consumer.cts", "./consumer.mts"],
     }),
   );
 

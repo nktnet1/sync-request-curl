@@ -136,6 +136,10 @@ app.get("/redirect/non-http", (c) => {
   return c.body(null, 302);
 });
 
+app.get("/redirect/missing-location", (c) => {
+  return c.text("redirect without location", 302);
+});
+
 app.get("/redirect/response-headers/source", (c) => {
   c.header("x-intermediate-response", "intermediate");
   return c.redirect("/redirect/response-headers/destination", 302);
