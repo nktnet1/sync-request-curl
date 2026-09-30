@@ -52,10 +52,12 @@ const config = {
   notRenderedTags: [...OptionDefaults.notRenderedTags, "@noInheritDoc"],
   sort: ["source-order"],
   externalSymbolLinkMappings: {
+    "@types/node": {
+      URL: "https://developer.mozilla.org/en-US/docs/Web/API/URL",
+    },
     typescript: {
       ErrorOptions:
         "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/Error#parameters",
-      URL: "https://developer.mozilla.org/en-US/docs/Web/API/URL",
     },
   },
 } satisfies TypeDocOptions & PluginOptions;
