@@ -58,7 +58,7 @@ describe("schema-aligned types", () => {
       v.InferOutput<typeof formDataEntrySchema>
     >();
     expectTypeOf<FormDataEntry["value"]>().toEqualTypeOf<
-      string | Buffer | Blob
+      string | number | boolean | Buffer | Blob
     >();
     expectTypeOf<JsonPrimitive>().toEqualTypeOf<
       string | number | boolean | null

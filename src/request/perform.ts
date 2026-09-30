@@ -87,7 +87,6 @@ const performTransportRequest = (
     url: prepared.url,
     headers: prepared.headers,
     ...(prepared.body === undefined ? {} : { body: prepared.body }),
-    ...(prepared.form === undefined ? {} : { form: prepared.form }),
     timeout: Math.ceil(options.timeout ?? 0),
     overallTimeout: Math.ceil(remaining()),
     socketTimeout: Math.ceil(options.socketTimeout ?? 0),

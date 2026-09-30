@@ -1,10 +1,12 @@
 import { Blob } from "node:buffer";
+import { randomBytes } from "node:crypto";
 import { basename } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import * as v from "valibot";
 import { lookupMimeType } from "#/http/mime-type";
+import type { Headers } from "#/types/headers";
 import { parseSchema } from "#/validate";
 
 const metadataSchema = v.pipe(
@@ -16,13 +18,53 @@ const metadataSchema = v.pipe(
   ),
 );
 
+const boundarySchema = v.pipe(
+  metadataSchema,
+  v.minLength(1, "FormData boundary must not be empty"),
+  v.maxLength(70, "FormData boundary must be at most 70 characters"),
+  v.regex(
+    /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/,
+    "FormData boundary must contain only HTTP token characters",
+  ),
+);
+
+const knownLengthSchema = v.pipe(
+  v.number(),
+  v.finite(),
+  v.integer(),
+  v.minValue(0),
+);
+
+const sharedAppendMetadataSchemas = {
+  /** Optional media type override. */
+  contentType: v.optional(metadataSchema),
+  /** Accepted for `form-data` append-option compatibility. */
+  knownLength: v.optional(knownLengthSchema),
+  /** Optional raw multipart header that replaces generated part headers. */
+  header: v.optional(v.string()),
+};
+
+const appendOptionsSchema = v.object({
+  filename: v.optional(metadataSchema),
+  ...sharedAppendMetadataSchemas,
+});
+
+type FormDataAppendOptions = v.InferOutput<typeof appendOptionsSchema>;
+
 export const formDataEntrySchema = v.object({
   /** Multipart field name. */
   key: metadataSchema,
-  /** Text, `Buffer`, or `Blob` field value. */
-  value: v.union([v.string(), v.instance(Buffer), v.instance(Blob)]),
+  /** Synchronously materialisable multipart field value. */
+  value: v.union([
+    v.string(),
+    v.number(),
+    v.boolean(),
+    v.instance(Buffer),
+    v.instance(Blob),
+  ]),
   /** Optional file name. Path components are stripped before sending. */
   fileName: v.optional(metadataSchema),
+  ...sharedAppendMetadataSchemas,
 });
 
 /**
@@ -38,13 +80,19 @@ export const preparedFormDataEntrySchema = v.object({
   value: v.union([v.string(), v.instance(Buffer)]),
   fileName: v.optional(v.string()),
   contentType: v.optional(v.string()),
+  header: v.optional(v.string()),
 });
 
 export type PreparedFormDataEntry = v.InferOutput<
   typeof preparedFormDataEntrySchema
 >;
 
-const entries = new WeakMap<FormData, PreparedFormDataEntry[]>();
+interface FormDataState {
+  entries: PreparedFormDataEntry[];
+  boundary?: string;
+}
+
+const states = new WeakMap<FormData, FormDataState>();
 
 const blobReaderWorkerUrl = new URL(
   "../dist/internal/blob-reader-worker.cjs",
@@ -64,6 +112,8 @@ const blobReaderBootstrap = `
   }
 `;
 const blobReadTimeoutMs = 30_000;
+const lineBreak = "\r\n";
+const boundaryPrefix = "--------------------------";
 
 const blobToBufferSync = (blob: Blob): Buffer => {
   if (blob.size === 0) {
@@ -120,19 +170,33 @@ const getBlobFileName = (blob: Blob): string => {
   return typeof name === "string" ? name : "blob";
 };
 
+const normalizeFileName = (fileName: string | undefined): string | undefined =>
+  fileName === undefined ? undefined : basename(fileName.replaceAll("\\", "/"));
+
 const prepareFormDataEntry = (entry: FormDataEntry): PreparedFormDataEntry => {
-  const value = entry.value;
-  const fileName =
-    entry.fileName === undefined
-      ? undefined
-      : basename(entry.fileName.replaceAll("\\", "/"));
+  const rawValue = entry.value;
+  const value =
+    typeof rawValue === "number" || typeof rawValue === "boolean"
+      ? String(rawValue)
+      : rawValue;
+  const fileName = normalizeFileName(entry.fileName);
+  const contentType = entry.contentType || undefined;
+  const materializedValue =
+    value instanceof Blob ? blobToBufferSync(value) : value;
+
+  if (entry.header !== undefined) {
+    return { key: entry.key, value: materializedValue, header: entry.header };
+  }
 
   if (!(value instanceof Blob)) {
-    const prepared = {
+    const prepared: PreparedFormDataEntry = {
       key: entry.key,
       value,
-      fileName,
+      ...(fileName === undefined ? {} : { fileName }),
     };
+    if (contentType !== undefined) {
+      return { ...prepared, contentType };
+    }
     if (fileName !== undefined) {
       return {
         ...prepared,
@@ -147,55 +211,165 @@ const prepareFormDataEntry = (entry: FormDataEntry): PreparedFormDataEntry => {
 
   return {
     key: entry.key,
-    value: blobToBufferSync(value),
+    value: materializedValue,
     fileName:
       fileName ??
-      basename(
-        parseSchema(metadataSchema, getBlobFileName(value)).replaceAll(
-          "\\",
-          "/",
-        ),
-      ),
-    contentType: value.type || "application/octet-stream",
+      normalizeFileName(parseSchema(metadataSchema, getBlobFileName(value))),
+    contentType: contentType ?? (value.type || "application/octet-stream"),
   };
 };
 
-const getEntries = (form: FormData): PreparedFormDataEntry[] => {
+const getState = (form: FormData): FormDataState => {
   parseSchema(v.instance(FormData), form);
-  const formEntries = entries.get(form);
-  if (!formEntries) {
+  const state = states.get(form);
+  if (!state) {
     throw new TypeError(
       "Expected a FormData instance created by sync-request-curl",
     );
   }
-  return formEntries;
+  return state;
+};
+
+const normalizeAppendOptions = (
+  options: string | FormDataAppendOptions | undefined,
+): FormDataAppendOptions => {
+  if (typeof options === "string") {
+    return { filename: parseSchema(metadataSchema, options) };
+  }
+  return options === undefined ? {} : parseSchema(appendOptionsSchema, options);
+};
+
+const escapeDispositionParameter = (value: string): string =>
+  value.replaceAll("\\", String.raw`\\`).replaceAll('"', String.raw`\"`);
+
+const serializeEntry = (
+  boundary: string,
+  entry: PreparedFormDataEntry,
+): Buffer[] => {
+  const value = Buffer.isBuffer(entry.value)
+    ? entry.value
+    : Buffer.from(entry.value);
+  if (entry.header !== undefined) {
+    return [Buffer.from(entry.header), value, Buffer.from(lineBreak)];
+  }
+
+  let header = `--${boundary}${lineBreak}Content-Disposition: form-data; name="${escapeDispositionParameter(entry.key)}"`;
+  if (entry.fileName !== undefined) {
+    header += `; filename="${escapeDispositionParameter(entry.fileName)}"`;
+  }
+  header += lineBreak;
+  if (entry.contentType !== undefined) {
+    header += `Content-Type: ${entry.contentType}${lineBreak}`;
+  }
+  header += lineBreak;
+
+  return [Buffer.from(header), value, Buffer.from(lineBreak)];
+};
+
+const serializeFormData = (form: FormData): Buffer => {
+  const state = getState(form);
+  const boundary = form.getBoundary();
+  const chunks = state.entries.flatMap((entry) =>
+    serializeEntry(boundary, entry),
+  );
+  chunks.push(Buffer.from(`--${boundary}--${lineBreak}`));
+  return Buffer.concat(chunks);
 };
 
 /**
- * Synchronous multipart/form-data builder compatible with `sync-request`.
+ * Synchronous multipart/form-data builder compatible with the Node.js
+ * `FormData` surface exposed by `then-request`.
  *
- * Pass an instance through the request `form` option.
+ * Stream-valued parts and callback/stream methods from the `form-data` package
+ * are intentionally omitted because this package is synchronous-only.
  *
  * @group Multipart
  */
 export class FormData {
   constructor() {
-    entries.set(this, []);
+    states.set(this, { entries: [] });
   }
 
   /**
-   * Append a text, `Buffer`, or `Blob` field.
+   * Append a synchronously materialisable multipart field.
    *
-   * When `fileName` is supplied, its basename is used and the media type is
-   * inferred from the extension with an `application/octet-stream` fallback.
-   * Blob media types remain authoritative. Blob reads throw if the reader fails
-   * or does not finish within 30 seconds.
+   * Numbers and booleans are converted to strings. The third argument may be a
+   * filename string or the synchronous subset of `form-data` append options.
+   * A custom `header` is serialized verbatim and replaces the generated
+   * boundary and part headers, matching Node's `form-data` behavior. Local
+   * path components are stripped from generated filenames before sending.
    */
-  append(key: string, value: string | Buffer | Blob, fileName?: string): void {
-    const entry = parseSchema(formDataEntrySchema, { key, value, fileName });
-    getEntries(this).push(prepareFormDataEntry(entry));
+  append(
+    key: string,
+    value: string | number | boolean | Buffer | Blob,
+    options?:
+      | string
+      | {
+          filename?: string;
+          contentType?: string;
+          knownLength?: number;
+          header?: string;
+        },
+  ): void {
+    const normalizedOptions = normalizeAppendOptions(options);
+    const entry = parseSchema(formDataEntrySchema, {
+      key,
+      value,
+      fileName: normalizedOptions.filename,
+      contentType: normalizedOptions.contentType,
+      knownLength: normalizedOptions.knownLength,
+      header: normalizedOptions.header,
+    });
+    getState(this).entries.push(prepareFormDataEntry(entry));
+  }
+
+  /** Return multipart request headers, merged with optional caller headers. */
+  getHeaders(): Headers & { "content-type": string };
+  getHeaders(userHeaders: Headers): Headers;
+  getHeaders(userHeaders: Headers = {}): Headers {
+    const headers: Headers = {
+      "content-type": `multipart/form-data; boundary=${this.getBoundary()}`,
+    };
+    for (const [name, value] of Object.entries(userHeaders)) {
+      headers[name.toLowerCase()] = value;
+    }
+    return headers;
+  }
+
+  /** Return the boundary used to serialize this form. */
+  getBoundary(): string {
+    const state = getState(this);
+    state.boundary ??= `${boundaryPrefix}${randomBytes(12).toString("hex")}`;
+    return state.boundary;
+  }
+
+  /** Set the multipart boundary used by headers and serialization. */
+  setBoundary(boundary: string): void {
+    getState(this).boundary = parseSchema(boundarySchema, boundary);
+  }
+
+  /** Serialize the complete multipart payload synchronously. */
+  getBuffer(): Buffer {
+    return serializeFormData(this);
+  }
+
+  /** Return the exact byte length of `getBuffer()`. */
+  getLengthSync(): number {
+    return this.getBuffer().length;
+  }
+
+  /** All supported field values have a synchronously known length. */
+  hasKnownLength(): boolean {
+    getState(this);
+    return true;
+  }
+
+  /** Match the identity string returned by Node's `form-data` package. */
+  toString(): string {
+    getState(this);
+    return "[object FormData]";
   }
 }
 
 export const getFormDataEntries = (form: FormData): PreparedFormDataEntry[] =>
-  getEntries(form).map((entry) => ({ ...entry }));
+  getState(form).entries.map((entry) => ({ ...entry }));

@@ -73,6 +73,15 @@ const res = request('POST', 'https://example.com/upload', { form });
 console.log('Status Code:', res.statusCode);
 ```
 
+`FormData` also exposes the synchronous Node `form-data` helpers used by
+`then-request`: `getHeaders()`, `getBoundary()`, `setBoundary()`, `getBuffer()`,
+`getLengthSync()`, `hasKnownLength()`, and `toString()`. The `append()` options
+object supports `filename`, `contentType`, `knownLength`, and the advanced raw
+`header` override. A custom `header` is serialized verbatim and is responsible
+for its own multipart boundary and part headers. Stream-valued fields and
+callback/stream helpers such as `getLength()`, `pipe()`, and `submit()` are not
+provided.
+
 Proxy request
 
 ```javascript

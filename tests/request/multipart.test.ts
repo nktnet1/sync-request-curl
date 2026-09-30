@@ -115,3 +115,36 @@ test("unnamed Buffers remain fields and unknown file types are octet streams", (
     },
   ]);
 });
+
+test("FormData public serialization matches the bytes sent by request", () => {
+  const form = new FormData();
+  form.setBoundary("sync-request-curl-boundary");
+  form.append("count", 3);
+  form.append("enabled", true);
+  form.append("file", Buffer.from("abc"), {
+    filename: "nested/path/report.txt",
+    contentType: "text/x-report",
+    knownLength: 3,
+  });
+  const customHeader = [
+    "--sync-request-curl-boundary",
+    "X-Custom-Part: yes",
+    "",
+    "",
+  ].join("\r\n");
+  form.append("custom", "value", { header: customHeader, knownLength: 5 });
+  const expectedBody = form.getBuffer();
+
+  const wire = request("POST", `${SERVER_URL}/compat/echo`, { form }).getJSON<{
+    contentType: string;
+    bodyHex: string;
+  }>();
+
+  expect(wire.contentType).toBe(
+    "multipart/form-data; boundary=sync-request-curl-boundary",
+  );
+  expect(Buffer.from(wire.bodyHex, "hex")).toStrictEqual(expectedBody);
+  expect(Buffer.from(wire.bodyHex, "hex").toString()).toContain(
+    `${customHeader}value\r\n`,
+  );
+});
