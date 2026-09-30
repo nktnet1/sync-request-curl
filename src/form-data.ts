@@ -228,7 +228,7 @@ const normalizeAppendOptions = (
 };
 
 const escapeDispositionParameter = (value: string): string =>
-  value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+  value.replaceAll("\\", String.raw`\\`).replaceAll('"', String.raw`\"`);
 
 const serializeEntry = (
   boundary: string,
@@ -343,6 +343,7 @@ export class FormData {
 
   /** Match the identity string returned by Node's `form-data` package. */
   toString(): string {
+    getState(this);
     return "[object FormData]";
   }
 }
