@@ -804,12 +804,12 @@ One multipart entry accepted by `FormData`.
 
 | Property | Type | Description |
 | ------ | ------ | ------ |
-| <a id="property-key"></a> `key` | `string` | Multipart field name. |
-| <a id="property-value"></a> `value` | `string` \| `number` \| `boolean` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) | Synchronously materialisable multipart field value. |
-| <a id="property-filename"></a> `fileName?` | `string` | Optional file name. Path components are stripped before sending. |
 | <a id="property-contenttype"></a> `contentType?` | `string` | Optional media type override. |
 | <a id="property-knownlength"></a> `knownLength?` | `number` | Accepted for `form-data` append-option compatibility. |
 | <a id="property-header"></a> `header?` | `string` | Optional raw multipart header that replaces generated part headers. |
+| <a id="property-key"></a> `key` | `string` | Multipart field name. |
+| <a id="property-value"></a> `value` | `string` \| `number` \| `boolean` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) | Synchronously materialisable multipart field value. |
+| <a id="property-filename"></a> `fileName?` | `string` | Optional file name. Path components are stripped before sending. |
 
 ***
 

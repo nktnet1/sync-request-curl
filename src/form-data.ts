@@ -35,11 +35,18 @@ const knownLengthSchema = v.pipe(
   v.minValue(0),
 );
 
+const sharedAppendMetadataSchemas = {
+  /** Optional media type override. */
+  contentType: v.optional(metadataSchema),
+  /** Accepted for `form-data` append-option compatibility. */
+  knownLength: v.optional(knownLengthSchema),
+  /** Optional raw multipart header that replaces generated part headers. */
+  header: v.optional(v.string()),
+};
+
 const appendOptionsSchema = v.object({
   filename: v.optional(metadataSchema),
-  contentType: v.optional(metadataSchema),
-  knownLength: v.optional(knownLengthSchema),
-  header: v.optional(v.string()),
+  ...sharedAppendMetadataSchemas,
 });
 
 type FormDataAppendOptions = v.InferOutput<typeof appendOptionsSchema>;
@@ -57,12 +64,7 @@ export const formDataEntrySchema = v.object({
   ]),
   /** Optional file name. Path components are stripped before sending. */
   fileName: v.optional(metadataSchema),
-  /** Optional media type override. */
-  contentType: v.optional(metadataSchema),
-  /** Accepted for `form-data` append-option compatibility. */
-  knownLength: v.optional(knownLengthSchema),
-  /** Optional raw multipart header that replaces generated part headers. */
-  header: v.optional(v.string()),
+  ...sharedAppendMetadataSchemas,
 });
 
 /**
