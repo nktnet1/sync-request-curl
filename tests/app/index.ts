@@ -228,12 +228,17 @@ app.post("/timeout", async (c) => {
 
 app.get("/socket-timeout/active", (c) =>
   streamText(c, async (stream) => {
-    for (let index = 0; index < 6; index += 1) {
+    const writeChunk = async (index: number): Promise<void> => {
       await stream.write(String(index));
-      if (index < 5) {
-        await stream.sleep(75);
+      if (index >= 5) {
+        return;
       }
-    }
+
+      await stream.sleep(75);
+      await writeChunk(index + 1);
+    };
+
+    await writeChunk(0);
   }),
 );
 
