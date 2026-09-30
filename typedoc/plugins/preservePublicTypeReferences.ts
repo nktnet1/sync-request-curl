@@ -6,15 +6,15 @@ import {
 } from "typedoc";
 
 /**
- * Keep request parameters linked to their named public type reflections.
+ * Keep selected public API references linked to their named package types.
  * typedoc-plugin-valibot expands schema-derived types at reference sites, and
- * TypeDoc may otherwise inline simple aliases such as HttpVerb.
+ * TypeDoc may otherwise inline aliases or resolve them to external target types.
  */
-export function preserveOptionsReference(app: Application): void {
+export function preservePublicTypeReferences(app: Application): void {
   app.converter.on(Converter.EVENT_RESOLVE_END, (context) => {
     const { project } = context;
     const publicTypes = new Map(
-      ["HttpVerb", "Options"].map((name) => {
+      ["Headers", "HttpVerb", "Options"].map((name) => {
         const reflection = Object.values(project.reflections).find(
           (candidate) =>
             candidate.name === name &&
@@ -33,6 +33,29 @@ export function preserveOptionsReference(app: Application): void {
         return [name, reflection] as const;
       }),
     );
+
+    const headersType = publicTypes.get("Headers");
+    if (!headersType) {
+      throw new Error("TypeDoc could not resolve Headers");
+    }
+
+    for (const reflection of Object.values(project.reflections)) {
+      if (reflection === headersType || !("type" in reflection)) {
+        continue;
+      }
+
+      const reflectionType = reflection.type;
+      if (
+        reflectionType instanceof ReferenceType &&
+        reflectionType.name === "IncomingHttpHeaders"
+      ) {
+        reflection.type = ReferenceType.createResolvedReference(
+          "Headers",
+          headersType,
+          project,
+        );
+      }
+    }
 
     const requestParameters = new Map([
       ["method", "HttpVerb"],
