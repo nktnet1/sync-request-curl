@@ -12,7 +12,7 @@ const linkUnlinkedInlineCodeReference = (
   const inlineCodeReference = `\`${typeName}\``;
   const linkedReference = `[${inlineCodeReference}](${EXTERNAL_TYPE_LINKS[typeName]})`;
   const unlinkedReference = new RegExp(
-    `(?<!\\[)${inlineCodeReference}(?!\\]\\()`,
+    String.raw`(?<!\[)${inlineCodeReference}(?!\]\()`,
     "g",
   );
 
