@@ -1,6 +1,6 @@
 import type { IncomingHttpHeaders } from "node:http";
-import * as v from "valibot";
 import type { Options, UppercaseHttpVerb } from "#/types/definition";
+import { parseSchema } from "#/validate";
 import { incomingHttpHeadersSchema } from "#/validation";
 
 export const getRedirectMethod = (
@@ -58,7 +58,7 @@ const getRedirectHeaders = (
       !(methodChanged && payloadHeaderNames.has(name.toLowerCase())),
   );
   return entries.length > 0
-    ? v.parse(incomingHttpHeadersSchema, Object.fromEntries(entries))
+    ? parseSchema(incomingHttpHeadersSchema, Object.fromEntries(entries))
     : undefined;
 };
 

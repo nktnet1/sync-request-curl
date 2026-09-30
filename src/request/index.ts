@@ -1,5 +1,4 @@
 import { URL } from "node:url";
-import * as v from "valibot";
 import { RequestError } from "#/errors";
 import { assertSupportedHttpUrl } from "#/http/url";
 import { createDeadline } from "#/request/deadline";
@@ -11,10 +10,11 @@ import type {
   Response,
   UppercaseHttpVerb,
 } from "#/types/definition";
+import { parseSchema } from "#/validate";
 import { httpVerbSchema, optionsSchema, requestUrlSchema } from "#/validation";
 
 const normalizeMethod = (method: HttpVerb): UppercaseHttpVerb =>
-  v.parse(httpVerbSchema, method);
+  parseSchema(httpVerbSchema, method);
 
 const getRedirectLimit = (maxRedirects: number | undefined): number => {
   if (
@@ -110,8 +110,8 @@ const request = (
   options: Options = {},
 ): Response => {
   const originalMethod = normalizeMethod(method);
-  const originalUrl = v.parse(requestUrlSchema, url);
-  const originalOptions = v.parse(
+  const originalUrl = parseSchema(requestUrlSchema, url);
+  const originalOptions = parseSchema(
     optionsSchema,
     normalizeLegacyOptions(options),
   );

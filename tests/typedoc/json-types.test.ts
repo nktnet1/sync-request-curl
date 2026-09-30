@@ -22,6 +22,18 @@ test("renders JSON serializers as callable properties in the API documentation",
       expect(markdown).toContain(`toJSON: () => ${type};`);
       expect(markdown).not.toContain(`toJSON: ${type};`);
     }
+
+    for (const reference of [
+      "[`URL`](https://nodejs.org/api/url.html#class-url)",
+      "[`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)",
+      "[`Blob`](https://nodejs.org/api/buffer.html#class-blob)",
+      "[`Agent`](https://nodejs.org/api/http.html#class-httpagent)",
+      "[`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders)",
+      "[`Error`](https://nodejs.org/api/errors.html#class-error)",
+      "[`ErrorOptions`](https://nodejs.org/api/errors.html#new-errormessage-options)",
+    ]) {
+      expect(markdown).toContain(reference);
+    }
   } finally {
     rmSync(output, { recursive: true, force: true });
   }

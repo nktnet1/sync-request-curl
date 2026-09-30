@@ -1,7 +1,7 @@
 import { validateHeaderName, validateHeaderValue } from "node:http";
-import * as v from "valibot";
 import { RequestError, RetryableRequestError } from "#/errors";
 import type { Options, Response } from "#/types/definition";
+import { parseSchema } from "#/validate";
 import { incomingHttpHeadersSchema } from "#/validation";
 
 const getRequestHeaderDelimiterIndex = (header: string): number => {
@@ -642,7 +642,10 @@ const parseResponseHeaderBlock = (
     parsedHeaders.set("content-length", contentLength);
   }
 
-  return v.parse(incomingHttpHeadersSchema, Object.fromEntries(parsedHeaders));
+  return parseSchema(
+    incomingHttpHeadersSchema,
+    Object.fromEntries(parsedHeaders),
+  );
 };
 
 /**

@@ -11,6 +11,7 @@ import {
   type NativePlatformKey,
   resolveNativePlatformKey,
 } from "#/native/platform-key";
+import { parseSchema } from "#/validate";
 import { uppercaseHttpVerbSchema } from "#/validation";
 
 export const nativeRequestOptionsSchema = v.object({
@@ -105,12 +106,12 @@ const rawNativeBindingSchema = v.custom<
   "Native addon must export request(), createConnectionPool(), and releaseConnectionPool()",
 );
 const parseNativeBinding = (input: unknown): NativeBinding => {
-  const binding = v.parse(rawNativeBindingSchema, input);
+  const binding = parseSchema(rawNativeBindingSchema, input);
   return {
     request: (options) =>
-      v.parse(nativeResponseSchema, binding.request(options)),
+      parseSchema(nativeResponseSchema, binding.request(options)),
     createConnectionPool: (maxConnections) =>
-      v.parse(
+      parseSchema(
         v.pipe(v.number(), v.integer(), v.minValue(1)),
         binding.createConnectionPool(maxConnections),
       ),

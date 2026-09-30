@@ -1,5 +1,6 @@
 import * as v from "valibot";
 import type { BufferEncoding, Response } from "#/types/definition";
+import { parseSchema } from "#/validate";
 
 /**
  * Stable transport-neutral error codes emitted by the TypeScript request layer.
@@ -68,7 +69,7 @@ export class RequestError extends Error {
   constructor(code: RequestErrorCode, message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "RequestError";
-    this.code = v.parse(requestErrorCodeSchema, code);
+    this.code = parseSchema(requestErrorCodeSchema, code);
   }
 }
 
