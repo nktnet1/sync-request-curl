@@ -165,6 +165,7 @@ describe("runtime validation", () => {
       v.safeParse(optionsSchema, {
         headers: { "x-test": ["one", "two"] },
         timeout: 100,
+        connectTimeout: 75,
         socketTimeout: 50,
         followRedirects: true,
         gzip: false,
@@ -177,6 +178,12 @@ describe("runtime validation", () => {
     ).toBe(true);
     expect(v.safeParse(optionsSchema, null).success).toBe(false);
     expect(v.safeParse(optionsSchema, { timeout: "fast" }).success).toBe(false);
+    expect(v.safeParse(optionsSchema, { connectTimeout: -1 }).success).toBe(
+      false,
+    );
+    expect(
+      v.safeParse(optionsSchema, { connectTimeout: Number.NaN }).success,
+    ).toBe(false);
     expect(v.safeParse(optionsSchema, { socketTimeout: -1 }).success).toBe(
       false,
     );

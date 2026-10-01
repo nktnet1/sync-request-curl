@@ -18,6 +18,7 @@ test("preserves multi-interface transport errors", () => {
       url: "unsupported-scheme://example.test",
       headers: [],
       timeout: 1000,
+      connectTimeout: 0,
       overallTimeout: 0,
       socketTimeout: 1000,
       noBody: false,

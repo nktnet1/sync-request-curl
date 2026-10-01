@@ -258,6 +258,7 @@ type Options = {
   body?: string | Buffer<ArrayBufferLike>;
   form?: FormData;
   timeout?: number;
+  connectTimeout?: number;
   overallTimeout?: number;
   socketTimeout?: number;
   followRedirects?: boolean;
@@ -297,6 +298,7 @@ supplied.
 | <a id="property-body-1"></a> `body?` | `string` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> | Raw string or [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) request body. |
 | <a id="property-form"></a> `form?` | [`FormData`](#formdata) | Synchronous multipart/form-data body. |
 | <a id="property-timeout"></a> `timeout?` | `number` | Maximum time to wait for response headers in milliseconds. Defaults to `0`, which disables it. |
+| <a id="property-connecttimeout"></a> `connectTimeout?` | `number` | Maximum time allowed for connection establishment in milliseconds. This includes DNS lookup, TCP connection, and TLS/protocol handshakes. Defaults to `0`, which uses libcurl's default connection timeout. |
 | <a id="property-overalltimeout"></a> `overallTimeout?` | `number` | Complete-operation deadline in milliseconds. Defaults to `0`, which disables it. |
 | <a id="property-sockettimeout"></a> `socketTimeout?` | `number` | Socket inactivity timeout in milliseconds. Defaults to `0`, which disables it. |
 | <a id="property-followredirects"></a> `followRedirects?` | `boolean` | Follow redirects automatically. Defaults to `true`. |
@@ -1155,7 +1157,8 @@ Error.constructor
   [`sync-request`](https://github.com/ForbesLindesay/sync-request),
   and can also take a keep-alive Node `Agent` for connection reuse.
 - `overallTimeout` sets a deadline for the whole operation, alongside the
-  response-header `timeout` and inactivity `socketTimeout` options.
+  response-header `timeout`, connection-establishment `connectTimeout`, and
+  inactivity `socketTimeout` options.
 - TLS, local network binding, and TCP keepalive have dedicated options.
 
 <a id="differences-from-sync-request-behavioural-differences"></a>

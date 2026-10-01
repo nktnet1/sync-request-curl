@@ -211,6 +211,8 @@ pub struct NativeRequestOptions {
   pub body: Option<Either<String, Buffer>>,
   pub form: Option<Vec<NativeFormDataEntry>>,
   pub timeout: Option<i64>,
+  #[napi(js_name = "connectTimeout")]
+  pub connect_timeout: Option<i64>,
   #[napi(js_name = "overallTimeout")]
   pub overall_timeout: Option<i64>,
   pub proxy: Option<String>,
@@ -976,6 +978,13 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
       false,
     ),
   );
+  keep_first_error(&mut code, unsafe {
+    curl_sys::curl_easy_setopt(
+      curl,
+      curl_sys::CURLOPT_CONNECTTIMEOUT_MS,
+      options.connect_timeout.unwrap_or_default() as c_long,
+    )
+  });
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(
       curl,

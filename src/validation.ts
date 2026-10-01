@@ -314,6 +314,14 @@ const optionsObjectSchema = v.object({
     v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(2_147_483_647)),
   ),
   /**
+   * Maximum time allowed for connection establishment in milliseconds. This
+   * includes DNS lookup, TCP connection, and TLS/protocol handshakes. Defaults
+   * to `0`, which uses libcurl's default connection timeout.
+   */
+  connectTimeout: v.optional(
+    v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(2_147_483_647)),
+  ),
+  /**
    * Complete-operation deadline in milliseconds. Defaults to `0`, which
    * disables it.
    */
