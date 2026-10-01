@@ -215,6 +215,7 @@ pub struct NativeRequestOptions {
   pub form: Option<Vec<NativeFormDataEntry>>,
   #[napi(js_name = "httpVersion")]
   pub http_version: Option<String>,
+  pub family: Option<i64>,
   pub timeout: Option<i64>,
   #[napi(js_name = "connectTimeout")]
   pub connect_timeout: Option<i64>,
@@ -913,6 +914,19 @@ fn parse_http_version(version: Option<&str>) -> Result<c_long> {
   }
 }
 
+// The public API follows Node's 0/4/6 family convention while libcurl uses
+// CURL_IPRESOLVE_WHATEVER/V4/V6 values 0/1/2.
+fn parse_ip_resolve(family: Option<i64>) -> Result<c_long> {
+  match family.unwrap_or(0) {
+    0 => Ok(curl_sys::CURL_IPRESOLVE_WHATEVER as c_long),
+    4 => Ok(curl_sys::CURL_IPRESOLVE_V4 as c_long),
+    6 => Ok(curl_sys::CURL_IPRESOLVE_V6 as c_long),
+    value => Err(Error::from_reason(format!(
+      "Unsupported IP address family: {value}"
+    ))),
+  }
+}
+
 fn get_string_info(curl: *mut CURL, info: curl_sys::CURLINFO) -> Option<String> {
   let mut value: *mut c_char = ptr::null_mut();
   unsafe {
@@ -945,6 +959,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   let no_body = options.no_body.unwrap_or(false);
 
   let http_version = parse_http_version(options.http_version.as_deref())?;
+  let ip_resolve = parse_ip_resolve(options.family)?;
   let easy = EasyHandle::new()?;
   let curl = easy.0;
   let mut state = Box::new(RequestState::default());
@@ -1004,6 +1019,9 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   );
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_HTTP_VERSION, http_version)
+  });
+  keep_first_error(&mut code, unsafe {
+    curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_IPRESOLVE, ip_resolve)
   });
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(

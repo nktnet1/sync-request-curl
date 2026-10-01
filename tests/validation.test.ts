@@ -21,6 +21,7 @@ import type {
   Headers,
   HttpVerb,
   HttpVersion,
+  IpFamily,
   JsonLike,
   JsonPrimitive,
   NestedJsonLike,
@@ -67,6 +68,7 @@ describe("schema-aligned types", () => {
     expectTypeOf<Options["httpVersion"]>().toEqualTypeOf<
       HttpVersion | undefined
     >();
+    expectTypeOf<Options["family"]>().toEqualTypeOf<IpFamily | undefined>();
     expectTypeOf<NestedJsonLike>().toMatchTypeOf<
       JsonLike | undefined | { toJSON(): NestedJsonLike }
     >();
@@ -299,5 +301,15 @@ describe("HTTP version validation", () => {
 
   test.each(["", "2.0", "http2", "4", 2, null])("rejects %j", (httpVersion) => {
     expect(v.is(optionsSchema, { httpVersion })).toBe(false);
+  });
+});
+
+describe("IP family validation", () => {
+  test.each([0, 4, 6] as const)("accepts %s", (family) => {
+    expect(v.is(optionsSchema, { family })).toBe(true);
+  });
+
+  test.each([-1, 1, 5, "4", null])("rejects %j", (family) => {
+    expect(v.is(optionsSchema, { family })).toBe(false);
   });
 });

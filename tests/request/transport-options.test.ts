@@ -94,6 +94,7 @@ describe("transport option validation", () => {
         rejectUnauthorized: false,
         caFile,
         localInterface: "lo",
+        family: 6,
         tcpKeepAlive: { idleSeconds: 30, intervalSeconds: 5 },
       }),
     ).toMatchObject({
@@ -104,6 +105,7 @@ describe("transport option validation", () => {
       caFile,
       networkInterface: "if!lo",
       httpVersion: "auto",
+      family: 6,
       tcpKeepAlive: true,
       tcpKeepIdle: 30,
       tcpKeepInterval: 5,
@@ -126,6 +128,9 @@ describe("transport option validation", () => {
     expect(usesCustomTransport({ caFile })).toBe(true);
     expect(usesCustomTransport({ httpVersion: "auto" })).toBe(false);
     expect(usesCustomTransport({ httpVersion: "2" })).toBe(true);
+    expect(usesCustomTransport({ family: 0 })).toBe(false);
+    expect(usesCustomTransport({ family: 4 })).toBe(true);
+    expect(usesCustomTransport({ family: 6 })).toBe(true);
   });
 
   test.each([
@@ -135,6 +140,7 @@ describe("transport option validation", () => {
     { tcpKeepAlive: { idleSeconds: 0 } },
     { tcpKeepAlive: { intervalSeconds: 1.5 } },
     { httpVersion: "4" } as unknown as Options,
+    { family: 5 } as unknown as Options,
   ])("rejects invalid public option %j", (options) => {
     expect(() => request("GET", SERVER_URL, options)).toThrow(
       "Invalid request options",
@@ -143,6 +149,10 @@ describe("transport option validation", () => {
 });
 
 describe("native transport controls", () => {
+  test("accepts an explicit IPv4 family selection", () => {
+    expect(request("GET", SERVER_URL, { family: 4 }).statusCode).toBe(200);
+  });
+
   test.each(["1.0", "1.1"] as const)(
     "requests HTTP/%s explicitly",
     (httpVersion) => {

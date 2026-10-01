@@ -94,6 +94,19 @@ export const httpVersionSchema = v.picklist([
   "3-only",
 ] as const satisfies readonly HttpVersion[]);
 
+/** IP address family used when resolving hostnames.
+ *
+ * `0` allows either IPv4 or IPv6, `4` restricts resolution to IPv4, and `6`
+ * restricts resolution to IPv6.
+ *
+ * @group Request
+ */
+export type IpFamily = 0 | 4 | 6;
+
+export const ipFamilySchema = v.picklist([
+  0, 4, 6,
+] as const satisfies readonly IpFamily[]);
+
 /**
  * An explicit HTTP/HTTPS proxy and optional Basic credentials.
  *
@@ -311,6 +324,11 @@ const optionsObjectSchema = v.object({
   localAddress: v.optional(nativeStringSchema),
   /** Source interface name. Mutually exclusive with `localAddress`. */
   localInterface: v.optional(nativeStringSchema),
+  /**
+   * IP address family used when resolving hostnames. `0` (default) allows
+   * either family, `4` restricts resolution to IPv4, and `6` to IPv6.
+   */
+  family: v.optional(ipFamilySchema),
   /**
    * Enable TCP keepalive, optionally with idle and interval controls. Defaults
    * to `false`.

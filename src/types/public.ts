@@ -12,6 +12,7 @@ export type {
   Headers,
   HttpVerb,
   HttpVersion,
+  IpFamily,
   JsonLike,
   JsonPrimitive,
   NestedJsonLike,
