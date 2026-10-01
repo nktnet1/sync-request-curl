@@ -16,6 +16,7 @@ export const tlsServer = createHttpsServer(
       JSON.stringify({
         address: req.socket.remoteAddress,
         proxyAuthorization: req.headers["proxy-authorization"] ?? null,
+        proxyTrace: req.headers["x-proxy-trace"] ?? null,
       }),
     );
   },
@@ -30,7 +31,16 @@ export const proxyServer = createServer((req, res) => {
   }
   const headers = { ...req.headers };
   const proxyAuth = headers["proxy-authorization"] ?? null;
+  const proxyTrace = headers["x-proxy-trace"] ?? null;
+  const requireProxyAuth = headers["x-proxy-require-auth"];
   delete headers["proxy-authorization"];
+  delete headers["x-proxy-trace"];
+  delete headers["x-proxy-require-auth"];
+  if (requireProxyAuth === "basic" && proxyAuth === null) {
+    res.writeHead(407, { "Proxy-Authenticate": 'Basic realm="test-proxy"' });
+    res.end();
+    return;
+  }
   const upstream = request(
     {
       hostname: HOST,
@@ -41,6 +51,7 @@ export const proxyServer = createServer((req, res) => {
     },
     (incoming) => {
       res.setHeader("x-proxy-auth", String(proxyAuth));
+      res.setHeader("x-proxy-trace", String(proxyTrace));
       res.writeHead(incoming.statusCode ?? 502);
       incoming.pipe(res);
     },

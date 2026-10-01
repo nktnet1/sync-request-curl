@@ -15,6 +15,7 @@ import { parseSchema } from "#/validate";
 import {
   httpVersionSchema,
   ipFamilySchema,
+  proxyAuthTypeSchema,
   uppercaseHttpVerbSchema,
 } from "#/validation";
 
@@ -38,6 +39,9 @@ export const nativeRequestOptionsSchema = v.object({
   proxy: v.optional(v.string()),
   proxyUsername: v.optional(v.string()),
   proxyPassword: v.optional(v.string()),
+  proxyAuth: v.optional(proxyAuthTypeSchema),
+  proxyNoProxy: v.optional(v.string()),
+  proxyHeaders: v.optional(v.array(v.string())),
   rejectUnauthorized: v.optional(v.boolean()),
   caFile: v.optional(v.string()),
   networkInterface: v.optional(v.string()),

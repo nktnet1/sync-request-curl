@@ -156,6 +156,11 @@ const res = request('GET', 'https://ipinfo.io/json', {
     url: 'http://your-proxy-url:port',
     username: 'proxyUsername',
     password: 'proxyPassword',
+    auth: 'any',
+    noProxy: ['localhost', '127.0.0.0/8'],
+    headers: {
+      'X-Proxy-Trace': 'trace-id',
+    },
   },
 });
 
@@ -163,6 +168,15 @@ console.log('Status Code:', res.statusCode);
 const jsonBody = res.getJSON();
 console.log(jsonBody);
 ```
+
+Proxy URLs can use `http://`, `https://`, `socks4://`, `socks4a://`,
+`socks5://`, or `socks5h://`. `auth` applies to HTTP(S) proxies and supports
+`basic`, `digest`, `ntlm`, `negotiate`, and `any`; NTLM and Negotiate depend on
+the capabilities compiled into the active libcurl build. `noProxy` is an
+explicit per-request bypass list and does not re-enable ambient proxy
+environment variables. Proxy-specific headers are kept separate from origin
+headers during HTTPS CONNECT tunnelling. CIDR entries in `noProxy` require
+libcurl 7.86.0 or newer.
 
 </details>
 
@@ -297,7 +311,7 @@ supplied.
 
 | Name | Type | Description |
 | ------ | ------ | ------ |
-| <a id="property-proxy"></a> `proxy?` | [`ProxyOptions`](#proxyoptions) | Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. Defaults to no proxy. |
+| <a id="property-proxy"></a> `proxy?` | [`ProxyOptions`](#proxyoptions) | Explicit HTTP(S) or SOCKS proxy configuration. Ambient proxy variables are ignored. Defaults to no proxy. |
 | <a id="property-httpversion"></a> `httpVersion?` | \| `"auto"` \| `"2"` \| `"3"` \| `"1.0"` \| `"1.1"` \| `"2-tls"` \| `"2-prior-knowledge"` \| `"3-only"` | HTTP protocol preference. Defaults to `"auto"`. HTTP/3 values require an HTTP/3-capable linked libcurl build. |
 | <a id="property-rejectunauthorized"></a> `rejectUnauthorized?` | `boolean` | Verify the origin certificate chain and hostname. Defaults to `true`. |
 | <a id="property-cafile"></a> `caFile?` | `string` | PEM CA bundle path for origin TLS verification. |
@@ -424,17 +438,34 @@ restricts resolution to IPv6.
 
 ***
 
+#### ProxyAuthType
+
+```ts
+type ProxyAuthType = "basic" | "digest" | "ntlm" | "negotiate" | "any";
+```
+
+HTTP proxy authentication method offered to libcurl.
+
+`"any"` lets libcurl negotiate the strongest method supported by both the
+proxy and the active libcurl build. NTLM and Negotiate remain dependent on
+how libcurl was built on the current platform.
+
+***
+
 #### ProxyOptions
 
-An explicit HTTP/HTTPS proxy and optional Basic credentials.
+Explicit HTTP(S) or SOCKS proxy configuration.
 
 ##### Properties
 
 | Property | Type | Description |
 | ------ | ------ | ------ |
-| <a id="property-url-2"></a> `url` | `string` | HTTP/HTTPS proxy origin URL. May contain URL-encoded credentials. |
+| <a id="property-url-2"></a> `url` | `string` | Proxy origin URL. Supported schemes are `http`, `https`, `socks4`, `socks4a`, `socks5`, and `socks5h`. May contain URL-encoded credentials. |
 | <a id="property-username"></a> `username?` | `string` | Overrides both URL credentials. An omitted password becomes an empty string. |
 | <a id="property-password"></a> `password?` | `string` | Proxy password. Requires an explicit username. Defaults to an empty string. |
+| <a id="property-auth"></a> `auth?` | [`ProxyAuthType`](#proxyauthtype) | HTTP(S) proxy authentication method. Defaults to libcurl's Basic mode. NTLM and Negotiate require support in the active libcurl build. |
+| <a id="property-noproxy"></a> `noProxy?` | `string`[] | Hosts, domains, IP addresses, or CIDR ranges that should bypass this proxy. `"*"` bypasses the proxy for every host. CIDR matching requires libcurl 7.86.0 or newer. |
+| <a id="property-headers-3"></a> `headers?` | [`Headers`](#headers) | Headers sent to an HTTP(S) proxy. For HTTPS origins these are used for the CONNECT request and are kept separate from origin request headers. |
 
 ***
 
@@ -488,7 +519,7 @@ Read the response body as a [`Buffer`](https://nodejs.org/api/buffer.html#class-
 | Property | Type | Description |
 | ------ | ------ | ------ |
 | <a id="property-statuscode-2"></a> `statusCode` | `number` | HTTP response status code. |
-| <a id="property-headers-3"></a> `headers` | [`Headers`](#headers) | Node-style response headers with lowercase keys. |
+| <a id="property-headers-4"></a> `headers` | [`Headers`](#headers) | Node-style response headers with lowercase keys. |
 | <a id="property-url-3"></a> `url` | `string` | Final effective URL for the completed attempt. |
 | <a id="property-body-3"></a> `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) | Buffered response body. |
 
@@ -506,7 +537,7 @@ does not modify the stored cache entry.
 | Property | Type | Description |
 | ------ | ------ | ------ |
 | <a id="property-statuscode-3"></a> `statusCode` | `number` | Cached HTTP response status code. |
-| <a id="property-headers-4"></a> `headers` | [`Headers`](#headers) | Cached Node-style response headers with lowercase keys. |
+| <a id="property-headers-5"></a> `headers` | [`Headers`](#headers) | Cached Node-style response headers with lowercase keys. |
 | <a id="property-body-4"></a> `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) | Buffered cached response body. |
 | <a id="property-requestheaders"></a> `requestHeaders` | [`Headers`](#headers) | Request headers stored with this cache variant. |
 | <a id="property-requesttimestamp"></a> `requestTimestamp` | `number` | Timestamp when the cached request started, in Unix milliseconds. |
@@ -594,7 +625,7 @@ Parse the buffered response body as JSON.
 | Property | Type | Description | Inherited from |
 | ------ | ------ | ------ | ------ |
 | <a id="property-statuscode-4"></a> `statusCode` | `number` | HTTP response status code. | [`RetryResponse`](#retryresponse).[`statusCode`](#property-statuscode-2) |
-| <a id="property-headers-5"></a> `headers` | [`Headers`](#headers) | Node-style response headers with lowercase keys. | [`RetryResponse`](#retryresponse).[`headers`](#property-headers-3) |
+| <a id="property-headers-6"></a> `headers` | [`Headers`](#headers) | Node-style response headers with lowercase keys. | [`RetryResponse`](#retryresponse).[`headers`](#property-headers-4) |
 | <a id="property-url-4"></a> `url` | `string` | Final effective URL for the completed attempt. | [`RetryResponse`](#retryresponse).[`url`](#property-url-3) |
 | <a id="property-body-5"></a> `body` | [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) | Buffered response body. | [`RetryResponse`](#retryresponse).[`body`](#property-body-3) |
 
@@ -1215,6 +1246,11 @@ Error.constructor
   the linked libcurl build to include HTTP/3 support.
 - `family` can leave address-family selection automatic or restrict hostname
   resolution to IPv4 or IPv6.
+- Explicit proxy configuration supports HTTP(S), SOCKS4/SOCKS4a, and
+  SOCKS5/SOCKS5h URL schemes. HTTP(S) proxies can select Basic, Digest, NTLM,
+  Negotiate, or automatic authentication, add proxy-only headers, and define a
+  per-request `noProxy` bypass list. NTLM and Negotiate remain dependent on the
+  active libcurl build. Ambient proxy environment variables remain disabled.
 
 <a id="differences-from-sync-request-behavioural-differences"></a>
 ### 4.2. Behavioural differences

@@ -500,7 +500,10 @@ export const throwForResponseHeaderTransportError = (
   }
 };
 
+// libcurl can internally retry authentication challenges and report both the
+// challenge and final response through the same header callback.
 const redirectStatusCodes = new Set([301, 302, 303, 307, 308]);
+const authenticationChallengeStatusCodes = new Set([401, 407]);
 
 interface ResponseHeaderSections {
   blocks: string[][];
@@ -536,7 +539,8 @@ const canFollowResponseHeaderBlock = (
 ): boolean =>
   statusCode !== undefined &&
   ((statusCode >= 100 && statusCode < 200) ||
-    redirectStatusCodes.has(statusCode));
+    redirectStatusCodes.has(statusCode) ||
+    authenticationChallengeStatusCodes.has(statusCode));
 
 const splitResponseHeaderSections = (
   headerLines: string[],

@@ -27,6 +27,11 @@
   the linked libcurl build to include HTTP/3 support.
 - `family` can leave address-family selection automatic or restrict hostname
   resolution to IPv4 or IPv6.
+- Explicit proxy configuration supports HTTP(S), SOCKS4/SOCKS4a, and
+  SOCKS5/SOCKS5h URL schemes. HTTP(S) proxies can select Basic, Digest, NTLM,
+  Negotiate, or automatic authentication, add proxy-only headers, and define a
+  per-request `noProxy` bypass list. NTLM and Negotiate remain dependent on the
+  active libcurl build. Ambient proxy environment variables remain disabled.
 
 ### Behavioural differences
 

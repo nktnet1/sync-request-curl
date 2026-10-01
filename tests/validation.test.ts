@@ -26,6 +26,7 @@ import type {
   JsonPrimitive,
   NestedJsonLike,
   Options,
+  ProxyAuthType,
   ProxyOptions,
   Response,
   UppercaseHttpVerb,
@@ -38,6 +39,7 @@ import {
   incomingHttpHeadersSchema,
   type jsonLikeSchema,
   optionsSchema,
+  type proxyAuthTypeSchema,
   type proxySchema,
   requestUrlSchema,
   type responseDataSchema,
@@ -107,6 +109,9 @@ describe("schema-aligned types", () => {
     >();
     expectTypeOf<ProxyOptions>().toEqualTypeOf<
       v.InferOutput<typeof proxySchema>
+    >();
+    expectTypeOf<ProxyAuthType>().toEqualTypeOf<
+      v.InferOutput<typeof proxyAuthTypeSchema>
     >();
     expectTypeOf<Options>().toEqualTypeOf<
       v.InferOutput<typeof optionsSchema>
@@ -256,10 +261,21 @@ describe("runtime validation", () => {
 describe("proxy object validation", () => {
   test.each([
     { url: "http://localhost:8080" },
+    { url: "https://localhost:8080", auth: "any" },
+    { url: "socks4://localhost:1080" },
+    { url: "socks4a://localhost:1080" },
+    { url: "socks5://localhost:1080" },
+    { url: "socks5h://localhost:1080" },
     { url: "http://localhost:8080", username: "user" },
     { url: "http://localhost:8080", username: "user", password: "secret" },
     { url: "http://localhost:8080", username: "", password: "" },
     { url: "http://localhost:8080", username: "", password: "secret" },
+    {
+      url: "http://localhost:8080",
+      auth: "digest",
+      noProxy: ["localhost", "127.0.0.0/8", "*"],
+      headers: { "x-proxy-trace": "trace-id" },
+    },
   ])("accepts proxy configuration %j", (proxy) => {
     expect(v.is(optionsSchema, { proxy })).toBe(true);
   });
@@ -275,6 +291,12 @@ describe("proxy object validation", () => {
     { url: "http://localhost:8080", username: "user", password: null },
     { url: "http://localhost:8080", username: "bad\0" },
     { url: "http://localhost:8080", username: "user", password: "bad\0" },
+    { url: "http://localhost:8080", auth: "bearer" },
+    { url: "http://localhost:8080", noProxy: "localhost" },
+    { url: "http://localhost:8080", noProxy: [""] },
+    { url: "http://localhost:8080", noProxy: ["localhost,example.com"] },
+    { url: "http://localhost:8080", noProxy: ["bad\0host"] },
+    { url: "http://localhost:8080", headers: { "x-test": 123 } },
   ])("rejects invalid proxy configuration %j", (proxy) => {
     expect(v.is(optionsSchema, { proxy })).toBe(false);
   });

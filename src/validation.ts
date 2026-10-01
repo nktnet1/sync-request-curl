@@ -107,18 +107,55 @@ export const ipFamilySchema = v.picklist([
   0, 4, 6,
 ] as const satisfies readonly IpFamily[]);
 
+/** HTTP proxy authentication method offered to libcurl.
+ *
+ * `"any"` lets libcurl negotiate the strongest method supported by both the
+ * proxy and the active libcurl build. NTLM and Negotiate remain dependent on
+ * how libcurl was built on the current platform.
+ *
+ * @group Request
+ */
+export type ProxyAuthType = "basic" | "digest" | "ntlm" | "negotiate" | "any";
+
+export const proxyAuthTypeSchema = v.picklist([
+  "basic",
+  "digest",
+  "ntlm",
+  "negotiate",
+  "any",
+] as const satisfies readonly ProxyAuthType[]);
+
 /**
- * An explicit HTTP/HTTPS proxy and optional Basic credentials.
+ * Explicit HTTP(S) or SOCKS proxy configuration.
  *
  * @group Request
  */
 export interface ProxyOptions {
-  /** HTTP/HTTPS proxy origin URL. May contain URL-encoded credentials. */
+  /**
+   * Proxy origin URL. Supported schemes are `http`, `https`, `socks4`,
+   * `socks4a`, `socks5`, and `socks5h`. May contain URL-encoded credentials.
+   */
   url: string;
   /** Overrides both URL credentials. An omitted password becomes an empty string. */
   username?: string;
   /** Proxy password. Requires an explicit username. Defaults to an empty string. */
   password?: string;
+  /**
+   * HTTP(S) proxy authentication method. Defaults to libcurl's Basic mode.
+   * NTLM and Negotiate require support in the active libcurl build.
+   */
+  auth?: ProxyAuthType;
+  /**
+   * Hosts, domains, IP addresses, or CIDR ranges that should bypass this
+   * proxy. `"*"` bypasses the proxy for every host. CIDR matching requires
+   * libcurl 7.86.0 or newer.
+   */
+  noProxy?: string[];
+  /**
+   * Headers sent to an HTTP(S) proxy. For HTTPS origins these are used for the
+   * CONNECT request and are kept separate from origin request headers.
+   */
+  headers?: Headers;
 }
 
 /**
@@ -292,10 +329,21 @@ const proxyCredentialSchema = v.pipe(
   v.check((value) => !value.includes("\0")),
 );
 
+const noProxyEntrySchema = v.pipe(
+  nativeStringSchema,
+  v.check(
+    (value) => !value.includes(","),
+    "noProxy entries must not contain commas",
+  ),
+);
+
 const proxyObjectSchema = v.object({
   url: nativeStringSchema,
   username: v.optional(proxyCredentialSchema),
   password: v.optional(proxyCredentialSchema),
+  auth: v.optional(proxyAuthTypeSchema),
+  noProxy: v.optional(v.array(noProxyEntrySchema)),
+  headers: v.optional(incomingHttpHeadersSchema),
 });
 
 export const proxySchema = v.custom<ProxyOptions>(
@@ -307,8 +355,8 @@ export const proxySchema = v.custom<ProxyOptions>(
 
 const optionsObjectSchema = v.object({
   /**
-   * Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored.
-   * Defaults to no proxy.
+   * Explicit HTTP(S) or SOCKS proxy configuration. Ambient proxy variables
+   * are ignored. Defaults to no proxy.
    */
   proxy: v.optional(proxySchema),
   /**
