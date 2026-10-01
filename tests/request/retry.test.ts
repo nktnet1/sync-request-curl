@@ -112,7 +112,7 @@ describe("single request execution", () => {
     expect(result.response.url).toBe("https://example.com/path");
   });
 
-  test("passes response, overall, and socket timeouts independently to native transport", () => {
+  test("passes response, connect, overall, and socket timeouts independently to native transport", () => {
     nativeRequest.mockReturnValueOnce({
       transportCode: 0,
       transportMessage: "",
@@ -126,13 +126,14 @@ describe("single request execution", () => {
     performRequest(
       "GET",
       "https://example.com/path",
-      { timeout: 900, socketTimeout: 125 },
+      { timeout: 900, connectTimeout: 300, socketTimeout: 125 },
       () => 450,
     );
 
     expect(nativeRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         timeout: 900,
+        connectTimeout: 300,
         overallTimeout: 450,
         socketTimeout: 125,
         maxResponseHeaderSize: maxHeaderSize,

@@ -21,6 +21,7 @@ export const nativeRequestOptionsSchema = v.object({
   body: v.optional(v.union([v.string(), v.instance(Buffer)])),
   form: v.optional(v.array(preparedFormDataEntrySchema)),
   timeout: v.number(),
+  connectTimeout: v.number(),
   overallTimeout: v.number(),
   socketTimeout: v.number(),
   maxResponseHeaderSize: v.optional(

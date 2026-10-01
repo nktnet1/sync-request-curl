@@ -88,6 +88,7 @@ const performTransportRequest = (
     headers: prepared.headers,
     ...(prepared.body === undefined ? {} : { body: prepared.body }),
     timeout: Math.ceil(options.timeout ?? 0),
+    connectTimeout: Math.ceil(options.connectTimeout ?? 0),
     overallTimeout: Math.ceil(remaining()),
     socketTimeout: Math.ceil(options.socketTimeout ?? 0),
     maxResponseHeaderSize: maxHeaderSize,

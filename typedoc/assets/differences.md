@@ -16,7 +16,8 @@
   [`sync-request`](https://github.com/ForbesLindesay/sync-request),
   and can also take a keep-alive Node `Agent` for connection reuse.
 - `overallTimeout` sets a deadline for the whole operation, alongside the
-  response-header `timeout` and inactivity `socketTimeout` options.
+  response-header `timeout`, connection-establishment `connectTimeout`, and
+  inactivity `socketTimeout` options.
 - TLS, local network binding, and TCP keepalive have dedicated options.
 
 ### Behavioural differences
