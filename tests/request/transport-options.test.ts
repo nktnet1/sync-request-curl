@@ -103,6 +103,7 @@ describe("transport option validation", () => {
       rejectUnauthorized: false,
       caFile,
       networkInterface: "if!lo",
+      httpVersion: "auto",
       tcpKeepAlive: true,
       tcpKeepIdle: 30,
       tcpKeepInterval: 5,
@@ -123,6 +124,8 @@ describe("transport option validation", () => {
     expect(usesCustomTransport({ tcpKeepAlive: true })).toBe(true);
     expect(usesCustomTransport({ tcpKeepAlive: {} })).toBe(true);
     expect(usesCustomTransport({ caFile })).toBe(true);
+    expect(usesCustomTransport({ httpVersion: "auto" })).toBe(false);
+    expect(usesCustomTransport({ httpVersion: "2" })).toBe(true);
   });
 
   test.each([
@@ -131,6 +134,7 @@ describe("transport option validation", () => {
     { proxy: { url: PROXY_URL, username: "", password: "bad\0" } },
     { tcpKeepAlive: { idleSeconds: 0 } },
     { tcpKeepAlive: { intervalSeconds: 1.5 } },
+    { httpVersion: "4" } as unknown as Options,
   ])("rejects invalid public option %j", (options) => {
     expect(() => request("GET", SERVER_URL, options)).toThrow(
       "Invalid request options",
@@ -139,6 +143,17 @@ describe("transport option validation", () => {
 });
 
 describe("native transport controls", () => {
+  test.each(["1.0", "1.1"] as const)(
+    "requests HTTP/%s explicitly",
+    (httpVersion) => {
+      expect(
+        request("GET", `${SERVER_URL}/request/http-version`, {
+          httpVersion,
+        }).getJSON<{ httpVersion: string }>().httpVersion,
+      ).toBe(httpVersion);
+    },
+  );
+
   test("verifies TLS by default, accepts explicit trust, and supports explicit opt-out", () => {
     expect(() => request("GET", TLS_URL)).toThrow();
     for (const options of [{ caFile }, { rejectUnauthorized: false }]) {

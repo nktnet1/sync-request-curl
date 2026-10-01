@@ -82,6 +82,7 @@ export const prepareTransportOptions = (options: Options) => {
     proxy,
     proxyUsername,
     proxyPassword,
+    httpVersion: options.httpVersion ?? "auto",
     rejectUnauthorized: options.rejectUnauthorized !== false,
     caFile: options.caFile,
     networkInterface: getNetworkInterface(options),
@@ -93,12 +94,13 @@ export const prepareTransportOptions = (options: Options) => {
   };
 };
 
-// Custom trust/routing/socket policy must not reuse sockets created under a
-// different policy. Default Agents retain their existing pool semantics.
+// Custom trust/routing/socket/protocol policy bypasses persistent cache reuse
+// and must not share sockets created under a different transport policy.
 export const usesCustomTransport = (options: Options): boolean =>
   options.proxy !== undefined ||
   options.rejectUnauthorized === false ||
   options.caFile !== undefined ||
   options.localAddress !== undefined ||
   options.localInterface !== undefined ||
+  (options.httpVersion !== undefined && options.httpVersion !== "auto") ||
   (options.tcpKeepAlive !== undefined && options.tcpKeepAlive !== false);

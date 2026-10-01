@@ -17,6 +17,7 @@ export type {
   CacheIsExpiredFunction,
   CacheIsMatchFunction,
   CachePolicyResponse,
+  HttpVersion,
   JsonLike,
   JsonPrimitive,
   NestedJsonLike,

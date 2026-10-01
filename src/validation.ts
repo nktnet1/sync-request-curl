@@ -67,6 +67,33 @@ export const incomingHttpHeadersSchema = v.custom<Headers>(
   "Invalid HTTP headers",
 );
 
+/** HTTP protocol preference passed to libcurl.
+ *
+ * HTTP/3 values require the linked libcurl build to include HTTP/3 support.
+ *
+ * @group Request
+ */
+export type HttpVersion =
+  | "auto"
+  | "1.0"
+  | "1.1"
+  | "2"
+  | "2-tls"
+  | "2-prior-knowledge"
+  | "3"
+  | "3-only";
+
+export const httpVersionSchema = v.picklist([
+  "auto",
+  "1.0",
+  "1.1",
+  "2",
+  "2-tls",
+  "2-prior-knowledge",
+  "3",
+  "3-only",
+] as const satisfies readonly HttpVersion[]);
+
 /**
  * An explicit HTTP/HTTPS proxy and optional Basic credentials.
  *
@@ -271,6 +298,11 @@ const optionsObjectSchema = v.object({
    * Defaults to no proxy.
    */
   proxy: v.optional(proxySchema),
+  /**
+   * HTTP protocol preference. Defaults to `"auto"`. HTTP/3 values require an
+   * HTTP/3-capable linked libcurl build.
+   */
+  httpVersion: v.optional(httpVersionSchema),
   /** Verify the origin certificate chain and hostname. Defaults to `true`. */
   rejectUnauthorized: v.optional(v.boolean()),
   /** PEM CA bundle path for origin TLS verification. */
