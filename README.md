@@ -254,6 +254,7 @@ type Options = {
   caFile?: string;
   localAddress?: string;
   localInterface?: string;
+  family?: 0 | 4 | 6;
   tcpKeepAlive?: boolean
      | {
      idleSeconds?: number;
@@ -301,6 +302,7 @@ supplied.
 | <a id="property-cafile"></a> `caFile?` | `string` | PEM CA bundle path for origin TLS verification. |
 | <a id="property-localaddress"></a> `localAddress?` | `string` | Source IPv4/IPv6 address. Hostnames are rejected. |
 | <a id="property-localinterface"></a> `localInterface?` | `string` | Source interface name. Mutually exclusive with `localAddress`. |
+| <a id="property-family"></a> `family?` | `0` \| `4` \| `6` | IP address family used when resolving hostnames. `0` (default) allows either family, `4` restricts resolution to IPv4, and `6` to IPv6. |
 | <a id="property-tcpkeepalive"></a> `tcpKeepAlive?` | \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; \} | Enable TCP keepalive, optionally with idle and interval controls. Defaults to `false`. |
 | <a id="property-cachenamespace"></a> `cacheNamespace?` | `string` | Private cache identity. Defaults to `process.cwd()`. |
 | <a id="property-headers-1"></a> `headers?` | [`Headers`](#headers) | Node-style request headers. |
@@ -405,6 +407,19 @@ type HttpVersion =
 HTTP protocol preference passed to libcurl.
 
 HTTP/3 values require the linked libcurl build to include HTTP/3 support.
+
+***
+
+#### IpFamily
+
+```ts
+type IpFamily = 0 | 4 | 6;
+```
+
+IP address family used when resolving hostnames.
+
+`0` allows either IPv4 or IPv6, `4` restricts resolution to IPv4, and `6`
+restricts resolution to IPv6.
 
 ***
 
@@ -1194,6 +1209,8 @@ Error.constructor
 - `httpVersion` can request HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/2 over TLS,
   HTTP/2 prior knowledge, HTTP/3, or HTTP/3-only behaviour. HTTP/3 requires
   the linked libcurl build to include HTTP/3 support.
+- `family` can leave address-family selection automatic or restrict hostname
+  resolution to IPv4 or IPv6.
 
 <a id="differences-from-sync-request-behavioural-differences"></a>
 ### 4.2. Behavioural differences

@@ -83,6 +83,7 @@ export const prepareTransportOptions = (options: Options) => {
     proxyUsername,
     proxyPassword,
     httpVersion: options.httpVersion ?? "auto",
+    family: options.family ?? 0,
     rejectUnauthorized: options.rejectUnauthorized !== false,
     caFile: options.caFile,
     networkInterface: getNetworkInterface(options),
@@ -103,4 +104,5 @@ export const usesCustomTransport = (options: Options): boolean =>
   options.localAddress !== undefined ||
   options.localInterface !== undefined ||
   (options.httpVersion !== undefined && options.httpVersion !== "auto") ||
+  (options.family !== undefined && options.family !== 0) ||
   (options.tcpKeepAlive !== undefined && options.tcpKeepAlive !== false);

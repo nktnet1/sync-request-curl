@@ -131,6 +131,7 @@ describe("single request execution", () => {
         connectTimeout: 300,
         socketTimeout: 125,
         httpVersion: "2",
+        family: 4,
       },
       () => 450,
     );
@@ -138,6 +139,7 @@ describe("single request execution", () => {
     expect(nativeRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         httpVersion: "2",
+        family: 4,
         timeout: 900,
         connectTimeout: 300,
         overallTimeout: 450,

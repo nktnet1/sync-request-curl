@@ -27,6 +27,7 @@ test.each([
     { form: {} },
     { caFile: "/ca.pem" },
     { httpVersion: "2" },
+    { family: 4 },
   ].map((options) => ({
     url: "http://example.com",
     headers: [],
@@ -45,6 +46,7 @@ test("ordinary anonymous requests can use a private application cache", () => {
     canUseRequestCache("http://example.com", [], {
       rejectUnauthorized: true,
       tcpKeepAlive: false,
+      family: 0,
     }),
   ).toBe(true);
 });

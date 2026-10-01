@@ -18,6 +18,7 @@ export type {
   CacheIsMatchFunction,
   CachePolicyResponse,
   HttpVersion,
+  IpFamily,
   JsonLike,
   JsonPrimitive,
   NestedJsonLike,
