@@ -42,8 +42,9 @@ remain dynamically linked; the dependency verifier permits this platform runtime
 while rejecting dynamically linked copies of the bundled native dependencies.
 
 The bundled libcurl supports TCP keepalive probe counts. System libcurl builds
-need libcurl 8.9.0 or newer for `tcpKeepAlive.probeCount`; older versions return
-a clear unsupported-option transport error instead of silently ignoring it.
+need libcurl 8.9.0 or newer for `tcpKeepAlive.probeCount`, and the active
+platform must implement the option. Unsupported linked libcurl/platform
+combinations return a clear transport error instead of silently ignoring it.
 
 The source builder accepts `--libcurl=system` and `--libcurl=bundled`. With no flag it
 keeps those platform defaults: system libcurl on macOS, bundled libcurl elsewhere.

@@ -60,7 +60,7 @@ const CURLOPT_TCP_KEEPCNT: CURLoption = 326;
 // curl-sys 0.4.90 does not currently export this constant.
 const CURL_HTTP_VERSION_3ONLY: c_long = 31;
 const TCP_KEEP_COUNT_UNSUPPORTED_ERROR: &str =
-  "TCP keepalive probeCount requires libcurl 8.9.0 or newer";
+  "TCP keepalive probeCount requires libcurl 8.9.0 or newer and platform support";
 static CURL_INIT: OnceLock<CURLcode> = OnceLock::new();
 static CONNECTION_POOLS: OnceLock<Mutex<HashMap<i64, Arc<Mutex<MultiHandle>>>>> =
   OnceLock::new();
@@ -1128,7 +1128,9 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     let next = unsafe {
       curl_sys::curl_easy_setopt(curl, CURLOPT_TCP_KEEPCNT, value as c_long)
     };
-    if code == CURLE_OK && next == curl_sys::CURLE_UNKNOWN_OPTION {
+    if code == CURLE_OK
+      && (next == curl_sys::CURLE_UNKNOWN_OPTION || next == CURLE_NOT_BUILT_IN)
+    {
       transport_error_override = Some(TCP_KEEP_COUNT_UNSUPPORTED_ERROR);
     }
     keep_first_error(&mut code, next);

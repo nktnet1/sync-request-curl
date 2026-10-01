@@ -234,19 +234,44 @@ describe("native transport controls", () => {
     expect(response.getJSON()).toMatchObject({ proxyAuthorization: null });
   });
 
-  test.each([
-    false,
-    true,
-    { idleSeconds: 1, intervalSeconds: 1, probeCount: 3 },
-  ])("supports local address binding and TCP keepalive %j", (tcpKeepAlive) => {
-    const options: Options = {
-      caFile,
-      localAddress: "127.0.0.1",
-      tcpKeepAlive,
-    };
-    expect(request("GET", TLS_URL, options).getJSON()).toMatchObject({
-      address: "127.0.0.1",
-    });
+  test.each([false, true, { idleSeconds: 1, intervalSeconds: 1 }])(
+    "supports local address binding and TCP keepalive %j",
+    (tcpKeepAlive) => {
+      const options: Options = {
+        caFile,
+        localAddress: "127.0.0.1",
+        tcpKeepAlive,
+      };
+      expect(request("GET", TLS_URL, options).getJSON()).toMatchObject({
+        address: "127.0.0.1",
+      });
+    },
+  );
+
+  test("handles TCP keepalive probe-count capability", () => {
+    const perform = () =>
+      request("GET", TLS_URL, {
+        caFile,
+        localAddress: "127.0.0.1",
+        tcpKeepAlive: { idleSeconds: 1, intervalSeconds: 1, probeCount: 3 },
+      });
+
+    // macOS intentionally uses the system libcurl, whose version varies by OS.
+    // Bundled builds on Linux and Windows use libcurl 8.21.0 and must support
+    // CURLOPT_TCP_KEEPCNT.
+    if (process.platform === "darwin") {
+      try {
+        expect(perform().getJSON()).toMatchObject({ address: "127.0.0.1" });
+      } catch (error) {
+        expect(error).toMatchObject({
+          message:
+            "Request failed: TCP keepalive probeCount requires libcurl 8.9.0 or newer and platform support",
+        });
+      }
+      return;
+    }
+
+    expect(perform().getJSON()).toMatchObject({ address: "127.0.0.1" });
   });
 
   test("custom trust does not reuse a socket opened with verification disabled", () => {
