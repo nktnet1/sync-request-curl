@@ -126,12 +126,18 @@ describe("single request execution", () => {
     performRequest(
       "GET",
       "https://example.com/path",
-      { timeout: 900, connectTimeout: 300, socketTimeout: 125 },
+      {
+        timeout: 900,
+        connectTimeout: 300,
+        socketTimeout: 125,
+        httpVersion: "2",
+      },
       () => 450,
     );
 
     expect(nativeRequest).toHaveBeenCalledWith(
       expect.objectContaining({
+        httpVersion: "2",
         timeout: 900,
         connectTimeout: 300,
         overallTimeout: 450,

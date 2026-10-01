@@ -11,6 +11,7 @@ export type {
   GetJSON,
   Headers,
   HttpVerb,
+  HttpVersion,
   JsonLike,
   JsonPrimitive,
   NestedJsonLike,

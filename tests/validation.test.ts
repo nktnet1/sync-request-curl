@@ -20,6 +20,7 @@ import type {
   BufferEncoding,
   Headers,
   HttpVerb,
+  HttpVersion,
   JsonLike,
   JsonPrimitive,
   NestedJsonLike,
@@ -62,6 +63,9 @@ describe("schema-aligned types", () => {
     >();
     expectTypeOf<JsonPrimitive>().toEqualTypeOf<
       string | number | boolean | null
+    >();
+    expectTypeOf<Options["httpVersion"]>().toEqualTypeOf<
+      HttpVersion | undefined
     >();
     expectTypeOf<NestedJsonLike>().toMatchTypeOf<
       JsonLike | undefined | { toJSON(): NestedJsonLike }
@@ -276,5 +280,24 @@ describe("proxy object validation", () => {
         proxyAuth: { username: "u", password: "p" },
       }),
     ).toBe(false);
+  });
+});
+
+describe("HTTP version validation", () => {
+  test.each([
+    "auto",
+    "1.0",
+    "1.1",
+    "2",
+    "2-tls",
+    "2-prior-knowledge",
+    "3",
+    "3-only",
+  ] as const)("accepts %s", (httpVersion) => {
+    expect(v.is(optionsSchema, { httpVersion })).toBe(true);
+  });
+
+  test.each(["", "2.0", "http2", "4", 2, null])("rejects %j", (httpVersion) => {
+    expect(v.is(optionsSchema, { httpVersion })).toBe(false);
   });
 });

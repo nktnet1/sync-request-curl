@@ -12,7 +12,7 @@ import {
   resolveNativePlatformKey,
 } from "#/native/platform-key";
 import { parseSchema } from "#/validate";
-import { uppercaseHttpVerbSchema } from "#/validation";
+import { httpVersionSchema, uppercaseHttpVerbSchema } from "#/validation";
 
 export const nativeRequestOptionsSchema = v.object({
   method: uppercaseHttpVerbSchema,
@@ -20,6 +20,7 @@ export const nativeRequestOptionsSchema = v.object({
   headers: v.array(v.string()),
   body: v.optional(v.union([v.string(), v.instance(Buffer)])),
   form: v.optional(v.array(preparedFormDataEntrySchema)),
+  httpVersion: v.optional(httpVersionSchema),
   timeout: v.number(),
   connectTimeout: v.number(),
   overallTimeout: v.number(),

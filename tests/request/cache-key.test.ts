@@ -21,13 +21,17 @@ test.each([
       options: {},
     }),
   ),
-  ...[{ body: "" }, { json: null }, { form: {} }, { caFile: "/ca.pem" }].map(
-    (options) => ({
-      url: "http://example.com",
-      headers: [],
-      options,
-    }),
-  ),
+  ...[
+    { body: "" },
+    { json: null },
+    { form: {} },
+    { caFile: "/ca.pem" },
+    { httpVersion: "2" },
+  ].map((options) => ({
+    url: "http://example.com",
+    headers: [],
+    options,
+  })),
 ])(
   "does not cache personalized or transport-specific requests %j",
   ({ url, headers, options }) => {

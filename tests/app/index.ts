@@ -216,6 +216,10 @@ app.get("/request/cookie", (c) => {
   return c.json({ cookie: c.req.header("cookie") ?? null });
 });
 
+app.get("/request/http-version", (c) => {
+  return c.json({ httpVersion: c.env.incoming.httpVersion });
+});
+
 app.post("/timeout", async (c) => {
   const body = v.parse(timeoutBodySchema, await c.req.json());
 

@@ -30,9 +30,13 @@ The build uses Cargo and produces:
 native/build/sync_request_curl_native.node
 ```
 
-`curl-sys` builds bundled libcurl with HTTP/2 enabled on Linux and Windows. Linux TLS
-uses vendored OpenSSL, Windows uses Schannel, and macOS links the system libcurl so
-certificate verification uses Apple's native trust configuration. zlib is forced
+`curl-sys` builds bundled libcurl with HTTP/2 enabled on Linux and Windows. The
+bundled build does not currently include an HTTP/3/QUIC backend, even though its
+libcurl version understands the HTTP/3 option values. System/custom libcurl builds
+can use `httpVersion: "3"` or `"3-only"` when that linked libcurl reports HTTP/3
+support. Linux TLS uses vendored OpenSSL, Windows uses Schannel, and macOS links
+the system libcurl so certificate verification uses Apple's native trust
+configuration. zlib is forced
 static in the prebuild path. The Linux GCC unwinding runtime (`libgcc_s`) may
 remain dynamically linked; the dependency verifier permits this platform runtime
 while rejecting dynamically linked copies of the bundled native dependencies.

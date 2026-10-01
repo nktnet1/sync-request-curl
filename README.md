@@ -240,6 +240,14 @@ expose the tunnel socket created by a successful CONNECT response.
 ```ts
 type Options = {
   proxy?: ProxyOptions;
+  httpVersion?: "auto"
+     | "2"
+     | "3"
+     | "1.0"
+     | "1.1"
+     | "2-tls"
+     | "2-prior-knowledge"
+     | "3-only";
   rejectUnauthorized?: boolean;
   caFile?: string;
   localAddress?: string;
@@ -286,6 +294,7 @@ supplied.
 | Name | Type | Description |
 | ------ | ------ | ------ |
 | <a id="property-proxy"></a> `proxy?` | [`ProxyOptions`](#proxyoptions) | Explicit HTTP/HTTPS proxy origin URL. Ambient proxy variables are ignored. Defaults to no proxy. |
+| <a id="property-httpversion"></a> `httpVersion?` | \| `"auto"` \| `"2"` \| `"3"` \| `"1.0"` \| `"1.1"` \| `"2-tls"` \| `"2-prior-knowledge"` \| `"3-only"` | HTTP protocol preference. Defaults to `"auto"`. HTTP/3 values require an HTTP/3-capable linked libcurl build. |
 | <a id="property-rejectunauthorized"></a> `rejectUnauthorized?` | `boolean` | Verify the origin certificate chain and hostname. Defaults to `true`. |
 | <a id="property-cafile"></a> `caFile?` | `string` | PEM CA bundle path for origin TLS verification. |
 | <a id="property-localaddress"></a> `localAddress?` | `string` | Source IPv4/IPv6 address. Hostnames are rejected. |
@@ -374,6 +383,26 @@ Values accepted for JSON request bodies.
 This intentionally follows practical `JSON.stringify()` inputs rather than
 only strict JSON syntax. `undefined` is allowed inside objects and arrays,
 and objects with `toJSON()` (for example `Date`) are supported.
+
+***
+
+#### HttpVersion
+
+```ts
+type HttpVersion =
+  | "auto"
+  | "1.0"
+  | "1.1"
+  | "2"
+  | "2-tls"
+  | "2-prior-knowledge"
+  | "3"
+  | "3-only";
+```
+
+HTTP protocol preference passed to libcurl.
+
+HTTP/3 values require the linked libcurl build to include HTTP/3 support.
 
 ***
 
@@ -1160,6 +1189,9 @@ Error.constructor
   response-header `timeout`, connection-establishment `connectTimeout`, and
   inactivity `socketTimeout` options.
 - TLS, local network binding, and TCP keepalive have dedicated options.
+- `httpVersion` can request HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/2 over TLS,
+  HTTP/2 prior knowledge, HTTP/3, or HTTP/3-only behaviour. HTTP/3 requires
+  the linked libcurl build to include HTTP/3 support.
 
 <a id="differences-from-sync-request-behavioural-differences"></a>
 ### 4.2. Behavioural differences

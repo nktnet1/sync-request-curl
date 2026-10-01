@@ -53,6 +53,9 @@ const RESPONSE_HEADER_OVERFLOW_ERROR: &str =
 const CURLOPT_MIMEPOST: CURLoption = CURLOPTTYPE_OBJECTPOINT + 269;
 // Public long-option ABI value, available since libcurl 7.54.0.
 const CURLOPT_SUPPRESS_CONNECT_HEADERS: CURLoption = 265;
+// Public CURL_HTTP_VERSION enum value, available since libcurl 7.88.0.
+// curl-sys 0.4.90 does not currently export this constant.
+const CURL_HTTP_VERSION_3ONLY: c_long = 31;
 static CURL_INIT: OnceLock<CURLcode> = OnceLock::new();
 static CONNECTION_POOLS: OnceLock<Mutex<HashMap<i64, Arc<Mutex<MultiHandle>>>>> =
   OnceLock::new();
@@ -210,6 +213,8 @@ pub struct NativeRequestOptions {
   pub headers: Option<Vec<String>>,
   pub body: Option<Either<String, Buffer>>,
   pub form: Option<Vec<NativeFormDataEntry>>,
+  #[napi(js_name = "httpVersion")]
+  pub http_version: Option<String>,
   pub timeout: Option<i64>,
   #[napi(js_name = "connectTimeout")]
   pub connect_timeout: Option<i64>,
@@ -890,6 +895,24 @@ fn perform_request(
   )
 }
 
+fn parse_http_version(version: Option<&str>) -> Result<c_long> {
+  match version.unwrap_or("auto") {
+    "auto" => Ok(curl_sys::CURL_HTTP_VERSION_NONE as c_long),
+    "1.0" => Ok(curl_sys::CURL_HTTP_VERSION_1_0 as c_long),
+    "1.1" => Ok(curl_sys::CURL_HTTP_VERSION_1_1 as c_long),
+    "2" => Ok(curl_sys::CURL_HTTP_VERSION_2_0 as c_long),
+    "2-tls" => Ok(curl_sys::CURL_HTTP_VERSION_2TLS as c_long),
+    "2-prior-knowledge" => Ok(
+      curl_sys::CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE as c_long,
+    ),
+    "3" => Ok(curl_sys::CURL_HTTP_VERSION_3 as c_long),
+    "3-only" => Ok(CURL_HTTP_VERSION_3ONLY),
+    value => Err(Error::from_reason(format!(
+      "Unsupported HTTP version preference: {value}"
+    ))),
+  }
+}
+
 fn get_string_info(curl: *mut CURL, info: curl_sys::CURLINFO) -> Option<String> {
   let mut value: *mut c_char = ptr::null_mut();
   unsafe {
@@ -921,6 +944,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     .any(|header| header_name_matches(header, "accept"));
   let no_body = options.no_body.unwrap_or(false);
 
+  let http_version = parse_http_version(options.http_version.as_deref())?;
   let easy = EasyHandle::new()?;
   let curl = easy.0;
   let mut state = Box::new(RequestState::default());
@@ -978,6 +1002,9 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
       false,
     ),
   );
+  keep_first_error(&mut code, unsafe {
+    curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_HTTP_VERSION, http_version)
+  });
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(
       curl,
