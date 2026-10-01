@@ -280,7 +280,7 @@ const nativeStringSchema = v.pipe(
   v.minLength(1),
   v.check((value) => !value.includes("\0")),
 );
-const keepAliveSecondsSchema = v.pipe(
+const positiveInt32Schema = v.pipe(
   v.number(),
   v.integer(),
   v.minValue(1),
@@ -330,17 +330,24 @@ const optionsObjectSchema = v.object({
    */
   family: v.optional(ipFamilySchema),
   /**
-   * Enable TCP keepalive, optionally with idle and interval controls. Defaults
-   * to `false`.
+   * Enable TCP keepalive, optionally with idle, interval, and probe-count
+   * controls. Defaults to `false`. `probeCount` requires libcurl 8.9.0 or
+   * newer and remains subject to operating-system support.
    */
   tcpKeepAlive: v.optional(
     v.union([
       v.boolean(),
       v.object({
         /** Idle time in seconds before keepalive probes begin. */
-        idleSeconds: v.optional(keepAliveSecondsSchema),
+        idleSeconds: v.optional(positiveInt32Schema),
         /** Interval in seconds between keepalive probes. */
-        intervalSeconds: v.optional(keepAliveSecondsSchema),
+        intervalSeconds: v.optional(positiveInt32Schema),
+        /**
+         * Maximum number of failed keepalive probes before the connection is
+         * dropped. Requires libcurl 8.9.0 or newer and remains subject to
+         * operating-system support.
+         */
+        probeCount: v.optional(positiveInt32Schema),
       }),
     ]),
   ),

@@ -69,6 +69,13 @@ describe("schema-aligned types", () => {
       HttpVersion | undefined
     >();
     expectTypeOf<Options["family"]>().toEqualTypeOf<IpFamily | undefined>();
+    expectTypeOf<
+      Exclude<Options["tcpKeepAlive"], boolean | undefined>
+    >().toEqualTypeOf<{
+      idleSeconds?: number;
+      intervalSeconds?: number;
+      probeCount?: number;
+    }>();
     expectTypeOf<NestedJsonLike>().toMatchTypeOf<
       JsonLike | undefined | { toJSON(): NestedJsonLike }
     >();
@@ -311,5 +318,29 @@ describe("IP family validation", () => {
 
   test.each([-1, 1, 5, "4", null])("rejects %j", (family) => {
     expect(v.is(optionsSchema, { family })).toBe(false);
+  });
+});
+
+describe("TCP keepalive validation", () => {
+  test.each([
+    true,
+    false,
+    {},
+    { idleSeconds: 1 },
+    { intervalSeconds: 1 },
+    { probeCount: 1 },
+    { idleSeconds: 30, intervalSeconds: 5, probeCount: 3 },
+  ])("accepts %j", (tcpKeepAlive) => {
+    expect(v.is(optionsSchema, { tcpKeepAlive })).toBe(true);
+  });
+
+  test.each([
+    { probeCount: 0 },
+    { probeCount: -1 },
+    { probeCount: 1.5 },
+    { probeCount: 2_147_483_648 },
+    { probeCount: "3" },
+  ])("rejects %j", (tcpKeepAlive) => {
+    expect(v.is(optionsSchema, { tcpKeepAlive })).toBe(false);
   });
 });

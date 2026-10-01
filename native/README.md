@@ -41,6 +41,11 @@ static in the prebuild path. The Linux GCC unwinding runtime (`libgcc_s`) may
 remain dynamically linked; the dependency verifier permits this platform runtime
 while rejecting dynamically linked copies of the bundled native dependencies.
 
+The bundled libcurl supports TCP keepalive probe counts. System libcurl builds
+need libcurl 8.9.0 or newer for `tcpKeepAlive.probeCount`, and the active
+platform must implement the option. Unsupported linked libcurl/platform
+combinations return a clear transport error instead of silently ignoring it.
+
 The source builder accepts `--libcurl=system` and `--libcurl=bundled`. With no flag it
 keeps those platform defaults: system libcurl on macOS, bundled libcurl elsewhere.
 `--libcurl=system` fails if `curl-sys` cannot discover a system libcurl instead of

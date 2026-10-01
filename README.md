@@ -259,6 +259,7 @@ type Options = {
      | {
      idleSeconds?: number;
      intervalSeconds?: number;
+     probeCount?: number;
    };
   cacheNamespace?: string;
   headers?: Headers;
@@ -303,7 +304,7 @@ supplied.
 | <a id="property-localaddress"></a> `localAddress?` | `string` | Source IPv4/IPv6 address. Hostnames are rejected. |
 | <a id="property-localinterface"></a> `localInterface?` | `string` | Source interface name. Mutually exclusive with `localAddress`. |
 | <a id="property-family"></a> `family?` | `0` \| `4` \| `6` | IP address family used when resolving hostnames. `0` (default) allows either family, `4` restricts resolution to IPv4, and `6` to IPv6. |
-| <a id="property-tcpkeepalive"></a> `tcpKeepAlive?` | \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; \} | Enable TCP keepalive, optionally with idle and interval controls. Defaults to `false`. |
+| <a id="property-tcpkeepalive"></a> `tcpKeepAlive?` | \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; `probeCount?`: `number`; \} | Enable TCP keepalive, optionally with idle, interval, and probe-count controls. Defaults to `false`. `probeCount` requires libcurl 8.9.0 or newer and remains subject to operating-system support. |
 | <a id="property-cachenamespace"></a> `cacheNamespace?` | `string` | Private cache identity. Defaults to `process.cwd()`. |
 | <a id="property-headers-1"></a> `headers?` | [`Headers`](#headers) | Node-style request headers. |
 | <a id="property-qs"></a> `qs?` | \{ \[`key`: `string`\]: `unknown`; \} | Query values merged with any existing query string. |
@@ -1205,7 +1206,10 @@ Error.constructor
 - `overallTimeout` sets a deadline for the whole operation, alongside the
   response-header `timeout`, connection-establishment `connectTimeout`, and
   inactivity `socketTimeout` options.
-- TLS, local network binding, and TCP keepalive have dedicated options.
+- TLS, local network binding, and TCP keepalive have dedicated options. TCP
+  keepalive probe counts require libcurl 8.9.0 or newer and operating-system
+  support. Unsupported linked libcurl/platform combinations return a transport
+  error rather than silently ignoring the setting.
 - `httpVersion` can request HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/2 over TLS,
   HTTP/2 prior knowledge, HTTP/3, or HTTP/3-only behaviour. HTTP/3 requires
   the linked libcurl build to include HTTP/3 support.
