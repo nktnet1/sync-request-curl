@@ -10,6 +10,8 @@ const readmePath = resolve(projectRoot, "README.md");
 const assetsDirectory = resolve(projectRoot, "typedoc/assets");
 const checkOnly = process.argv.includes("--check");
 
+const GENERATED_FILE_NOTICE =
+  "<!-- This file is auto-generated using TypeDoc. Do not edit README.md directly. -->";
 const API_SECTION = Symbol("API_SECTION");
 const sections = [
   "installation.md",
@@ -346,6 +348,7 @@ const buildReadme = (api: string): string => {
   );
 
   return `${[
+    GENERATED_FILE_NOTICE,
     readAsset("header.md"),
     toc,
     ...renderedSections.map(({ markdown }) => markdown),

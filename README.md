@@ -1,3 +1,5 @@
+<!-- This file is auto-generated using TypeDoc. Do not edit README.md directly. -->
+
 <div align="center">
 
 # [![Sync Request Curl](logo.svg)](https://github.com/nktnet1/sync-request-curl)
