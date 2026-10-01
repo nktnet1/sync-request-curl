@@ -44,6 +44,7 @@ export const nativeRequestOptionsSchema = v.object({
   tcpKeepAlive: v.optional(v.boolean()),
   tcpKeepIdle: v.optional(v.number()),
   tcpKeepInterval: v.optional(v.number()),
+  tcpKeepCount: v.optional(v.number()),
   connectionPoolId: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
 });
 

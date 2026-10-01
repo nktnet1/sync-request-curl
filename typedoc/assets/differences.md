@@ -18,7 +18,9 @@
 - `overallTimeout` sets a deadline for the whole operation, alongside the
   response-header `timeout`, connection-establishment `connectTimeout`, and
   inactivity `socketTimeout` options.
-- TLS, local network binding, and TCP keepalive have dedicated options.
+- TLS, local network binding, and TCP keepalive have dedicated options. TCP
+  keepalive probe counts require libcurl 8.9.0 or newer and operating-system
+  support.
 - `httpVersion` can request HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/2 over TLS,
   HTTP/2 prior knowledge, HTTP/3, or HTTP/3-only behaviour. HTTP/3 requires
   the linked libcurl build to include HTTP/3 support.

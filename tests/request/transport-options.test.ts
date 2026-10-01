@@ -95,7 +95,11 @@ describe("transport option validation", () => {
         caFile,
         localInterface: "lo",
         family: 6,
-        tcpKeepAlive: { idleSeconds: 30, intervalSeconds: 5 },
+        tcpKeepAlive: {
+          idleSeconds: 30,
+          intervalSeconds: 5,
+          probeCount: 3,
+        },
       }),
     ).toMatchObject({
       proxy: "https://localhost:8080/",
@@ -109,6 +113,7 @@ describe("transport option validation", () => {
       tcpKeepAlive: true,
       tcpKeepIdle: 30,
       tcpKeepInterval: 5,
+      tcpKeepCount: 3,
     });
     expect(
       prepareTransportOptions({ localAddress: "::1", tcpKeepAlive: true }),
@@ -125,6 +130,7 @@ describe("transport option validation", () => {
     expect(usesCustomTransport({ rejectUnauthorized: false })).toBe(true);
     expect(usesCustomTransport({ tcpKeepAlive: true })).toBe(true);
     expect(usesCustomTransport({ tcpKeepAlive: {} })).toBe(true);
+    expect(usesCustomTransport({ tcpKeepAlive: { probeCount: 3 } })).toBe(true);
     expect(usesCustomTransport({ caFile })).toBe(true);
     expect(usesCustomTransport({ httpVersion: "auto" })).toBe(false);
     expect(usesCustomTransport({ httpVersion: "2" })).toBe(true);
@@ -139,6 +145,8 @@ describe("transport option validation", () => {
     { proxy: { url: PROXY_URL, username: "", password: "bad\0" } },
     { tcpKeepAlive: { idleSeconds: 0 } },
     { tcpKeepAlive: { intervalSeconds: 1.5 } },
+    { tcpKeepAlive: { probeCount: 0 } },
+    { tcpKeepAlive: { probeCount: 1.5 } },
     { httpVersion: "4" } as unknown as Options,
     { family: 5 } as unknown as Options,
   ])("rejects invalid public option %j", (options) => {
@@ -226,19 +234,20 @@ describe("native transport controls", () => {
     expect(response.getJSON()).toMatchObject({ proxyAuthorization: null });
   });
 
-  test.each([false, true, { idleSeconds: 1, intervalSeconds: 1 }])(
-    "supports local address binding and TCP keepalive %j",
-    (tcpKeepAlive) => {
-      const options: Options = {
-        caFile,
-        localAddress: "127.0.0.1",
-        tcpKeepAlive,
-      };
-      expect(request("GET", TLS_URL, options).getJSON()).toMatchObject({
-        address: "127.0.0.1",
-      });
-    },
-  );
+  test.each([
+    false,
+    true,
+    { idleSeconds: 1, intervalSeconds: 1, probeCount: 3 },
+  ])("supports local address binding and TCP keepalive %j", (tcpKeepAlive) => {
+    const options: Options = {
+      caFile,
+      localAddress: "127.0.0.1",
+      tcpKeepAlive,
+    };
+    expect(request("GET", TLS_URL, options).getJSON()).toMatchObject({
+      address: "127.0.0.1",
+    });
+  });
 
   test("custom trust does not reuse a socket opened with verification disabled", () => {
     const agent = new Agent({ keepAlive: true });

@@ -53,9 +53,14 @@ const RESPONSE_HEADER_OVERFLOW_ERROR: &str =
 const CURLOPT_MIMEPOST: CURLoption = CURLOPTTYPE_OBJECTPOINT + 269;
 // Public long-option ABI value, available since libcurl 7.54.0.
 const CURLOPT_SUPPRESS_CONNECT_HEADERS: CURLoption = 265;
+// Public long-option ABI value, available since libcurl 8.9.0.
+// curl-sys 0.4.90 does not currently export this constant.
+const CURLOPT_TCP_KEEPCNT: CURLoption = 326;
 // Public CURL_HTTP_VERSION enum value, available since libcurl 7.88.0.
 // curl-sys 0.4.90 does not currently export this constant.
 const CURL_HTTP_VERSION_3ONLY: c_long = 31;
+const TCP_KEEP_COUNT_UNSUPPORTED_ERROR: &str =
+  "TCP keepalive probeCount requires libcurl 8.9.0 or newer";
 static CURL_INIT: OnceLock<CURLcode> = OnceLock::new();
 static CONNECTION_POOLS: OnceLock<Mutex<HashMap<i64, Arc<Mutex<MultiHandle>>>>> =
   OnceLock::new();
@@ -238,6 +243,8 @@ pub struct NativeRequestOptions {
   pub tcp_keep_idle: Option<i64>,
   #[napi(js_name = "tcpKeepInterval")]
   pub tcp_keep_interval: Option<i64>,
+  #[napi(js_name = "tcpKeepCount")]
+  pub tcp_keep_count: Option<i64>,
   #[napi(js_name = "socketTimeout")]
   pub socket_timeout: Option<i64>,
   #[napi(js_name = "maxResponseHeaderSize")]
@@ -1116,6 +1123,16 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
       });
     }
   }
+  let mut transport_error_override = None;
+  if let Some(value) = options.tcp_keep_count {
+    let next = unsafe {
+      curl_sys::curl_easy_setopt(curl, CURLOPT_TCP_KEEPCNT, value as c_long)
+    };
+    if code == CURLE_OK && next == curl_sys::CURLE_UNKNOWN_OPTION {
+      transport_error_override = Some(TCP_KEEP_COUNT_UNSUPPORTED_ERROR);
+    }
+    keep_first_error(&mut code, next);
+  }
 
   for header in request_headers {
     let next = headers.append(&header);
@@ -1201,6 +1218,8 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
 
   let transport_message = if state.response_header_overflow {
     RESPONSE_HEADER_OVERFLOW_ERROR.to_owned()
+  } else if let Some(message) = transport_error_override {
+    message.to_owned()
   } else {
     transport_error_message(code, &error_buffer)
   };

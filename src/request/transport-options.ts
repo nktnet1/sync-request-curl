@@ -92,6 +92,8 @@ export const prepareTransportOptions = (options: Options) => {
       typeof keepAlive === "object" ? keepAlive.idleSeconds : undefined,
     tcpKeepInterval:
       typeof keepAlive === "object" ? keepAlive.intervalSeconds : undefined,
+    tcpKeepCount:
+      typeof keepAlive === "object" ? keepAlive.probeCount : undefined,
   };
 };
 

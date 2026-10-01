@@ -28,6 +28,7 @@ test.each([
     { caFile: "/ca.pem" },
     { httpVersion: "2" },
     { family: 4 },
+    { tcpKeepAlive: { probeCount: 3 } },
   ].map((options) => ({
     url: "http://example.com",
     headers: [],

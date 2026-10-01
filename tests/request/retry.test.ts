@@ -132,6 +132,7 @@ describe("single request execution", () => {
         socketTimeout: 125,
         httpVersion: "2",
         family: 4,
+        tcpKeepAlive: { probeCount: 3 },
       },
       () => 450,
     );
@@ -140,6 +141,8 @@ describe("single request execution", () => {
       expect.objectContaining({
         httpVersion: "2",
         family: 4,
+        tcpKeepAlive: true,
+        tcpKeepCount: 3,
         timeout: 900,
         connectTimeout: 300,
         overallTimeout: 450,
