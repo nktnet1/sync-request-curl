@@ -112,6 +112,7 @@ test("built declarations expose the public root API without leaking Node header 
        type JsonPrimitive,
        type NestedJsonLike,
        type Options,
+       type ProxyAuthType,
        type ProxyOptions,
        type RequestErrorCode,
        type Response,
@@ -147,7 +148,13 @@ test("built declarations expose the public root API without leaking Node header 
      const primitive: JsonPrimitive = null;
      const json: JsonLike = primitive;
      const nested: NestedJsonLike = { value: json };
-     const proxy: ProxyOptions = { url: "http://localhost" };
+     const proxyAuth: ProxyAuthType = "digest";
+     const proxy: ProxyOptions = {
+       url: "http://localhost",
+       auth: proxyAuth,
+       noProxy: ["localhost"],
+       headers: { "x-proxy-trace": "trace-id" },
+     };
      const errorCode: RequestErrorCode = "ERR_REQUEST_FAILED";
      const isMatch: CacheIsMatchFunction = (_headers, cached, defaultValue) => {
        const copy: CachedResponse = cached;
@@ -183,6 +190,7 @@ test("built declarations expose the public root API without leaking Node header 
        responseError,
        encoding,
        nested,
+       proxyAuth,
        proxy,
        errorCode,
        isMatch,

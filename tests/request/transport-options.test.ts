@@ -70,13 +70,63 @@ describe("transport option validation", () => {
   });
 
   test.each([
-    { proxy: { url: "socks5://localhost" } },
+    "http://localhost:8080",
+    "https://localhost:8080",
+    "socks4://localhost:1080",
+    "socks4a://localhost:1080",
+    "socks5://localhost:1080",
+    "socks5h://localhost:1080",
+  ])("accepts proxy URL scheme %s", (url) => {
+    expect(prepareTransportOptions({ proxy: { url } }).proxy).toBe(
+      new URL(url).href,
+    );
+  });
+
+  test("maps HTTP proxy auth, bypass hosts, and proxy-only headers", () => {
+    expect(
+      prepareTransportOptions({
+        proxy: {
+          url: PROXY_URL,
+          username: "user",
+          password: "secret",
+          auth: "digest",
+          noProxy: ["localhost", "127.0.0.0/8"],
+          headers: {
+            "X-Proxy-Trace": "trace-id",
+            "X-Proxy-Multi": ["one", "two"],
+          },
+        },
+      }),
+    ).toMatchObject({
+      proxy: `${PROXY_URL}/`,
+      proxyUsername: "user",
+      proxyPassword: "secret",
+      proxyAuth: "digest",
+      proxyNoProxy: "localhost,127.0.0.0/8",
+      proxyHeaders: [
+        "X-Proxy-Trace: trace-id",
+        "X-Proxy-Multi: one",
+        "X-Proxy-Multi: two",
+      ],
+    });
+  });
+
+  test.each([
+    { proxy: { url: "ftp://localhost" } },
     { proxy: { url: "http://localhost/path" } },
+    { proxy: { url: "socks5://localhost/path" } },
     { proxy: { url: "http://localhost/?x=1" } },
     { proxy: { url: "http://localhost/#fragment" } },
     { proxy: { url: "http://u%00:p@localhost" } },
     { proxy: { url: "http://u:p%00@localhost" } },
     { proxy: { url: PROXY_URL, password: "p" } },
+    { proxy: { url: "socks5://localhost", auth: "basic" as const } },
+    {
+      proxy: {
+        url: "socks5://localhost",
+        headers: { "x-proxy-test": "value" },
+      },
+    },
     { localAddress: "localhost" },
     { localAddress: "127.0.0.1", localInterface: "lo" },
   ])("rejects unsupported transport configuration %j", (options) => {
@@ -90,6 +140,9 @@ describe("transport option validation", () => {
           url: "https://url-user:url-pass@localhost:8080",
           username: "explicit",
           password: "secret",
+          auth: "any",
+          noProxy: ["example.test"],
+          headers: { "x-proxy-trace": "trace-id" },
         },
         rejectUnauthorized: false,
         caFile,
@@ -105,6 +158,9 @@ describe("transport option validation", () => {
       proxy: "https://localhost:8080/",
       proxyUsername: "explicit",
       proxyPassword: "secret",
+      proxyAuth: "any",
+      proxyNoProxy: "example.test",
+      proxyHeaders: ["x-proxy-trace: trace-id"],
       rejectUnauthorized: false,
       caFile,
       networkInterface: "if!lo",
@@ -213,6 +269,39 @@ describe("native transport controls", () => {
     },
   );
 
+  test("supports a per-request proxy bypass list", () => {
+    const response = request("GET", SERVER_URL, {
+      proxy: { url: PROXY_URL, noProxy: ["127.0.0.1"] },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["x-proxy-auth"]).toBeUndefined();
+  });
+
+  test("sends proxy-specific headers to the HTTP proxy", () => {
+    const response = request("GET", SERVER_URL, {
+      proxy: {
+        url: PROXY_URL,
+        headers: { "x-proxy-trace": "trace-id" },
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["x-proxy-trace"]).toBe("trace-id");
+  });
+
+  test("lets libcurl negotiate an allowed HTTP proxy authentication method", () => {
+    const response = request("GET", SERVER_URL, {
+      proxy: {
+        url: PROXY_URL,
+        username: "user",
+        password: "secret",
+        auth: "any",
+        headers: { "x-proxy-require-auth": "basic" },
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["x-proxy-auth"]).toBe("Basic dXNlcjpzZWNyZXQ=");
+  });
+
   test("allows libcurl to omit authentication for all-empty credentials", () => {
     const response = request("GET", SERVER_URL, {
       proxy: {
@@ -228,10 +317,18 @@ describe("native transport controls", () => {
 
   test("tunnels HTTPS without passing proxy credentials to the origin", () => {
     const response = request("GET", TLS_URL, {
-      proxy: { url: PROXY_URL, username: "user", password: "secret" },
+      proxy: {
+        url: PROXY_URL,
+        username: "user",
+        password: "secret",
+        headers: { "x-proxy-trace": "trace-id" },
+      },
       caFile,
     });
-    expect(response.getJSON()).toMatchObject({ proxyAuthorization: null });
+    expect(response.getJSON()).toMatchObject({
+      proxyAuthorization: null,
+      proxyTrace: null,
+    });
   });
 
   test.each([false, true, { idleSeconds: 1, intervalSeconds: 1 }])(

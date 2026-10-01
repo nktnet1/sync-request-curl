@@ -22,6 +22,7 @@ export type {
   JsonLike,
   JsonPrimitive,
   NestedJsonLike,
+  ProxyAuthType,
   ProxyOptions,
   RetryDelayFunction,
   RetryFunction,

@@ -92,6 +92,11 @@ const res = request('GET', 'https://ipinfo.io/json', {
     url: 'http://your-proxy-url:port',
     username: 'proxyUsername',
     password: 'proxyPassword',
+    auth: 'any',
+    noProxy: ['localhost', '127.0.0.0/8'],
+    headers: {
+      'X-Proxy-Trace': 'trace-id',
+    },
   },
 });
 
@@ -99,6 +104,15 @@ console.log('Status Code:', res.statusCode);
 const jsonBody = res.getJSON();
 console.log(jsonBody);
 ```
+
+Proxy URLs can use `http://`, `https://`, `socks4://`, `socks4a://`,
+`socks5://`, or `socks5h://`. `auth` applies to HTTP(S) proxies and supports
+`basic`, `digest`, `ntlm`, `negotiate`, and `any`; NTLM and Negotiate depend on
+the capabilities compiled into the active libcurl build. `noProxy` is an
+explicit per-request bypass list and does not re-enable ambient proxy
+environment variables. Proxy-specific headers are kept separate from origin
+headers during HTTPS CONNECT tunnelling. CIDR entries in `noProxy` require
+libcurl 7.86.0 or newer.
 
 </details>
 

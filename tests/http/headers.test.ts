@@ -254,6 +254,30 @@ describe("parseResponseHeaders", () => {
     expect(headers["x-final"]).toBe("second");
   });
 
+  test.each([
+    ["401 Unauthorized", 'WWW-Authenticate: Basic realm="test"'],
+    [
+      "407 Proxy Authentication Required",
+      'Proxy-Authenticate: Basic realm="test"',
+    ],
+  ])(
+    "uses only the final header block after an authentication challenge: %s",
+    (challengeStatus, challengeHeader) => {
+      const headers = parseResponseHeaders([
+        `HTTP/1.1 ${challengeStatus}`,
+        challengeHeader,
+        "X-Challenge: first",
+        "",
+        "HTTP/1.1 200 OK",
+        "X-Final: second",
+        "",
+      ]);
+
+      expect(headers["x-challenge"]).toBeUndefined();
+      expect(headers["x-final"]).toBe("second");
+    },
+  );
+
   test("serializes ordinary arrays as repeated lines and empty values", () => {
     expect(
       serializeRequestHeaders({
