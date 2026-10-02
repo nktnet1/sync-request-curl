@@ -107,6 +107,46 @@ export const ipFamilySchema = v.picklist([
   0, 4, 6,
 ] as const satisfies readonly IpFamily[]);
 
+/** HTTP origin authentication method offered to libcurl.
+ *
+ * `"any"` lets libcurl probe the server challenge and select the strongest
+ * supported method from this set. NTLM and Negotiate remain dependent on how
+ * libcurl was built on the current platform.
+ *
+ * @group Request
+ */
+export type HttpAuthType = "basic" | "digest" | "ntlm" | "negotiate" | "any";
+
+export const httpAuthTypeSchema = v.picklist([
+  "basic",
+  "digest",
+  "ntlm",
+  "negotiate",
+  "any",
+] as const satisfies readonly HttpAuthType[]);
+
+/** High-level HTTP origin authentication configuration.
+ *
+ * Username/password authentication defaults to Basic when `type` is omitted.
+ * Bearer authentication uses libcurl's OAuth2 bearer support. Authentication
+ * configured here is never forwarded to a different origin during redirects.
+ *
+ * @group Request
+ */
+export type HttpAuthOptions =
+  | {
+      username: string;
+      password?: string;
+      type?: HttpAuthType;
+      bearer?: never;
+    }
+  | {
+      bearer: string;
+      username?: never;
+      password?: never;
+      type?: never;
+    };
+
 /** HTTP proxy authentication method offered to libcurl.
  *
  * `"any"` lets libcurl negotiate the strongest method supported by both the
@@ -329,6 +369,34 @@ const proxyCredentialSchema = v.pipe(
   v.check((value) => !value.includes("\0")),
 );
 
+const httpAuthCredentialSchema = v.pipe(
+  v.string(),
+  v.check((value) => !value.includes("\0")),
+);
+
+const httpCredentialAuthObjectSchema = v.object({
+  username: httpAuthCredentialSchema,
+  password: v.optional(httpAuthCredentialSchema),
+  type: v.optional(httpAuthTypeSchema),
+});
+
+const httpBearerAuthObjectSchema = v.object({
+  bearer: nativeStringSchema,
+});
+
+export const httpAuthSchema = v.custom<HttpAuthOptions>((input) => {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    return false;
+  }
+  return (
+    (v.is(httpCredentialAuthObjectSchema, input) && !("bearer" in input)) ||
+    (v.is(httpBearerAuthObjectSchema, input) &&
+      !("username" in input) &&
+      !("password" in input) &&
+      !("type" in input))
+  );
+}, "Invalid HTTP authentication configuration");
+
 const noProxyEntrySchema = v.pipe(
   nativeStringSchema,
   v.check(
@@ -354,6 +422,12 @@ export const proxySchema = v.custom<ProxyOptions>(
 );
 
 const optionsObjectSchema = v.object({
+  /**
+   * HTTP origin authentication. Username/password authentication defaults to
+   * Basic; Bearer tokens use libcurl's OAuth2 bearer support. Cannot be
+   * combined with an explicit `Authorization` header.
+   */
+  auth: v.optional(httpAuthSchema),
   /**
    * Explicit HTTP(S) or SOCKS proxy configuration. Ambient proxy variables
    * are ignored. Defaults to no proxy.

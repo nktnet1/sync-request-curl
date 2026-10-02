@@ -125,6 +125,14 @@ export const prepareRequest = (
 ): PreparedRequest => {
   const headers = serializeRequestHeaders(options.headers);
   validateRequestFraming(headers);
+  if (
+    options.auth !== undefined &&
+    hasRequestHeader(headers, "authorization")
+  ) {
+    invalidRequestSemantics(
+      "auth cannot be combined with an explicit Authorization header",
+    );
+  }
   if (method === "CONNECT") {
     invalidRequestSemantics(
       "CONNECT is not supported by the buffered request API",
@@ -138,8 +146,17 @@ export const prepareRequest = (
   const payload = preparePayload(method, options, headers);
   validateMethodSemantics(method, headers, payload);
 
+  const preparedUrl = prepareUrl(url, options);
+  const target = new URL(preparedUrl);
+  if (
+    options.auth !== undefined &&
+    (target.username !== "" || target.password !== "")
+  ) {
+    invalidRequestSemantics("auth cannot be combined with URL credentials");
+  }
+
   return {
-    url: prepareUrl(url, options),
+    url: preparedUrl,
     headers,
     ...payload,
   };

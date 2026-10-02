@@ -19,6 +19,8 @@ import type {
 import type {
   BufferEncoding,
   Headers,
+  HttpAuthOptions,
+  HttpAuthType,
   HttpVerb,
   HttpVersion,
   IpFamily,
@@ -34,6 +36,8 @@ import type {
 import { parseSchema } from "#/validate";
 import {
   type bufferEncodingSchema,
+  type httpAuthSchema,
+  type httpAuthTypeSchema,
   type httpVerbInputSchema,
   httpVerbSchema,
   incomingHttpHeadersSchema,
@@ -106,6 +110,12 @@ describe("schema-aligned types", () => {
     >().toEqualTypeOf<string>();
     expectTypeOf<BufferEncoding>().toEqualTypeOf<
       v.InferOutput<typeof bufferEncodingSchema>
+    >();
+    expectTypeOf<HttpAuthOptions>().toEqualTypeOf<
+      v.InferOutput<typeof httpAuthSchema>
+    >();
+    expectTypeOf<HttpAuthType>().toEqualTypeOf<
+      v.InferOutput<typeof httpAuthTypeSchema>
     >();
     expectTypeOf<ProxyOptions>().toEqualTypeOf<
       v.InferOutput<typeof proxySchema>
@@ -255,6 +265,37 @@ describe("runtime validation", () => {
     expect(
       v.safeParse(incomingHttpHeadersSchema, { "x-invalid": 123 }).success,
     ).toBe(false);
+  });
+});
+
+describe("HTTP authentication validation", () => {
+  test.each([
+    { username: "user" },
+    { username: "", password: "" },
+    { username: "user", password: "secret", type: "basic" },
+    { username: "user", password: "secret", type: "digest" },
+    { username: "user", password: "secret", type: "ntlm" },
+    { username: "user", password: "secret", type: "negotiate" },
+    { username: "user", password: "secret", type: "any" },
+    { bearer: "token" },
+  ])("accepts %j", (auth) => {
+    expect(v.is(optionsSchema, { auth })).toBe(true);
+  });
+
+  test.each([
+    null,
+    {},
+    { password: "secret" },
+    { type: "basic" },
+    { bearer: "" },
+    { bearer: "bad\0token" },
+    { username: "bad\0user" },
+    { username: "user", password: "bad\0password" },
+    { username: "user", type: "bearer" },
+    { username: "user", bearer: "token" },
+    { bearer: "token", type: "any" },
+  ])("rejects %j", (auth) => {
+    expect(v.is(optionsSchema, { auth })).toBe(false);
   });
 });
 

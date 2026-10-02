@@ -10,6 +10,8 @@ export type {
   GetBody,
   GetJSON,
   Headers,
+  HttpAuthOptions,
+  HttpAuthType,
   HttpVerb,
   HttpVersion,
   IpFamily,

@@ -255,6 +255,7 @@ expose the tunnel socket created by a successful CONNECT response.
 
 ```ts
 type Options = {
+  auth?: HttpAuthOptions;
   proxy?: ProxyOptions;
   httpVersion?: "auto"
      | "2"
@@ -311,6 +312,7 @@ supplied.
 
 | Name | Type | Description |
 | ------ | ------ | ------ |
+| <a id="property-auth"></a> `auth?` | [`HttpAuthOptions`](#httpauthoptions) | HTTP origin authentication. Username/password authentication defaults to Basic; Bearer tokens use libcurl's OAuth2 bearer support. Cannot be combined with an explicit `Authorization` header. |
 | <a id="property-proxy"></a> `proxy?` | [`ProxyOptions`](#proxyoptions) | Explicit HTTP(S) or SOCKS proxy configuration. Ambient proxy variables are ignored. Defaults to no proxy. |
 | <a id="property-httpversion"></a> `httpVersion?` | \| `"auto"` \| `"2"` \| `"3"` \| `"1.0"` \| `"1.1"` \| `"2-tls"` \| `"2-prior-knowledge"` \| `"3-only"` | HTTP protocol preference. Defaults to `"auto"`. HTTP/3 values require an HTTP/3-capable linked libcurl build. |
 | <a id="property-rejectunauthorized"></a> `rejectUnauthorized?` | `boolean` | Verify the origin certificate chain and hostname. Defaults to `true`. |
@@ -438,6 +440,46 @@ restricts resolution to IPv6.
 
 ***
 
+#### HttpAuthType
+
+```ts
+type HttpAuthType = "basic" | "digest" | "ntlm" | "negotiate" | "any";
+```
+
+HTTP origin authentication method offered to libcurl.
+
+`"any"` lets libcurl probe the server challenge and select the strongest
+supported method from this set. NTLM and Negotiate remain dependent on how
+libcurl was built on the current platform.
+
+***
+
+#### HttpAuthOptions
+
+```ts
+type HttpAuthOptions =
+  | {
+  username: string;
+  password?: string;
+  type?: HttpAuthType;
+  bearer?: never;
+}
+  | {
+  bearer: string;
+  username?: never;
+  password?: never;
+  type?: never;
+};
+```
+
+High-level HTTP origin authentication configuration.
+
+Username/password authentication defaults to Basic when `type` is omitted.
+Bearer authentication uses libcurl's OAuth2 bearer support. Authentication
+configured here is never forwarded to a different origin during redirects.
+
+***
+
 #### ProxyAuthType
 
 ```ts
@@ -463,7 +505,7 @@ Explicit HTTP(S) or SOCKS proxy configuration.
 | <a id="property-url-2"></a> `url` | `string` | Proxy origin URL. Supported schemes are `http`, `https`, `socks4`, `socks4a`, `socks5`, and `socks5h`. May contain URL-encoded credentials. |
 | <a id="property-username"></a> `username?` | `string` | Overrides both URL credentials. An omitted password becomes an empty string. |
 | <a id="property-password"></a> `password?` | `string` | Proxy password. Requires an explicit username. Defaults to an empty string. |
-| <a id="property-auth"></a> `auth?` | [`ProxyAuthType`](#proxyauthtype) | HTTP(S) proxy authentication method. Defaults to libcurl's Basic mode. NTLM and Negotiate require support in the active libcurl build. |
+| <a id="property-auth-1"></a> `auth?` | [`ProxyAuthType`](#proxyauthtype) | HTTP(S) proxy authentication method. Defaults to libcurl's Basic mode. NTLM and Negotiate require support in the active libcurl build. |
 | <a id="property-noproxy"></a> `noProxy?` | `string`[] | Hosts, domains, IP addresses, or CIDR ranges that should bypass this proxy. `"*"` bypasses the proxy for every host. CIDR matching requires libcurl 7.86.0 or newer. |
 | <a id="property-headers-3"></a> `headers?` | [`Headers`](#headers) | Headers sent to an HTTP(S) proxy. For HTTPS origins these are used for the CONNECT request and are kept separate from origin request headers. |
 
@@ -1251,6 +1293,11 @@ Error.constructor
   Negotiate, or automatic authentication, add proxy-only headers, and define a
   per-request `noProxy` bypass list. NTLM and Negotiate remain dependent on the
   active libcurl build. Ambient proxy environment variables remain disabled.
+- `auth` provides origin Basic, Digest, NTLM, Negotiate, automatic challenge
+  selection, and Bearer authentication through libcurl. High-level
+  authentication cannot be combined with another `Authorization` source and is
+  retained only across same-origin redirects. NTLM and Negotiate remain
+  dependent on the active libcurl build.
 
 <a id="differences-from-sync-request-behavioural-differences"></a>
 ### 4.2. Behavioural differences

@@ -17,6 +17,8 @@ export type {
   CacheIsExpiredFunction,
   CacheIsMatchFunction,
   CachePolicyResponse,
+  HttpAuthOptions,
+  HttpAuthType,
   HttpVersion,
   IpFamily,
   JsonLike,

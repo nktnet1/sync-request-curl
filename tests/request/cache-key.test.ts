@@ -25,6 +25,8 @@ test.each([
     { body: "" },
     { json: null },
     { form: {} },
+    { auth: { username: "user", password: "secret" } },
+    { auth: { bearer: "token" } },
     { caFile: "/ca.pem" },
     { httpVersion: "2" },
     { family: 4 },

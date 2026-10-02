@@ -32,6 +32,11 @@
   Negotiate, or automatic authentication, add proxy-only headers, and define a
   per-request `noProxy` bypass list. NTLM and Negotiate remain dependent on the
   active libcurl build. Ambient proxy environment variables remain disabled.
+- `auth` provides origin Basic, Digest, NTLM, Negotiate, automatic challenge
+  selection, and Bearer authentication through libcurl. High-level
+  authentication cannot be combined with another `Authorization` source and is
+  retained only across same-origin redirects. NTLM and Negotiate remain
+  dependent on the active libcurl build.
 
 ### Behavioural differences
 

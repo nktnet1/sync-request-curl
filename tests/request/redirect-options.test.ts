@@ -61,3 +61,15 @@ describe("redirect payload metadata", () => {
     expect(options.headers).toEqual(headers);
   });
 });
+
+describe("redirect authentication", () => {
+  const auth = { username: "user", password: "secret" } as const;
+
+  test("preserves high-level auth for same-origin redirects", () => {
+    expect(getRedirectOptions({ auth }, false, true).auth).toEqual(auth);
+  });
+
+  test("drops high-level auth for cross-origin redirects", () => {
+    expect(getRedirectOptions({ auth }, false, false).auth).toBeUndefined();
+  });
+});

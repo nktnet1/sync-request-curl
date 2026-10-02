@@ -73,6 +73,7 @@ const performRequestAttempt = (
     currentOptions = getRedirectOptions(
       currentOptions,
       nextMethod !== currentMethod,
+      new URL(currentUrl).origin === new URL(nextUrl).origin,
     );
     currentMethod = nextMethod;
     currentUrl = nextUrl;
