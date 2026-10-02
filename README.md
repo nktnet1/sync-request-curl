@@ -770,7 +770,11 @@ Parse the buffered response body as JSON.
 #### CacheIsMatchFunction
 
 ```ts
-type CacheIsMatchFunction = (requestHeaders, cachedResponse, defaultValue) => boolean;
+type CacheIsMatchFunction = (
+  requestHeaders: Headers,
+  cachedResponse: CachedResponse,
+  defaultValue: boolean,
+) => boolean;
 ```
 
 Override whether a stored cache variant matches the outgoing request.
@@ -794,7 +798,10 @@ Override whether a stored cache variant matches the outgoing request.
 #### CacheIsExpiredFunction
 
 ```ts
-type CacheIsExpiredFunction = (cachedResponse, defaultValue) => boolean;
+type CacheIsExpiredFunction = (
+  cachedResponse: CachedResponse,
+  defaultValue: boolean,
+) => boolean;
 ```
 
 Override whether a matched cached response is expired.
@@ -817,7 +824,10 @@ Override whether a matched cached response is expired.
 #### CacheCanCacheFunction
 
 ```ts
-type CacheCanCacheFunction = (response, defaultValue) => boolean;
+type CacheCanCacheFunction = (
+  response: CachePolicyResponse,
+  defaultValue: boolean,
+) => boolean;
 ```
 
 Override whether a completed origin response may be stored in the cache.
@@ -841,7 +851,11 @@ Override whether a completed origin response may be stored in the cache.
 #### RetryFunction
 
 ```ts
-type RetryFunction = (error, response, attemptNumber) => boolean;
+type RetryFunction = (
+  error: CurlError | RequestError | null,
+  response: RetryResponse | undefined,
+  attemptNumber: number,
+) => boolean;
 ```
 
 Decide whether a GET request should be retried after an error or response.
@@ -867,7 +881,11 @@ passed as `RequestError` instances.
 #### RetryDelayFunction
 
 ```ts
-type RetryDelayFunction = (error, response, attemptNumber) => number;
+type RetryDelayFunction = (
+  error: CurlError | RequestError | null,
+  response: RetryResponse | undefined,
+  attemptNumber: number,
+) => number;
 ```
 
 Return the delay in milliseconds before the next retry.
@@ -894,7 +912,7 @@ passed as `RequestError` instances.
 
 ```ts
 type GetBody = {
-  <Encoding>(encoding): string;
+  <Encoding extends BufferEncoding>(encoding: Encoding): string;
   (): Buffer;
 };
 ```
@@ -941,7 +959,7 @@ a string. A response with `statusCode >= 300` throws `ResponseError`.
 #### GetJSON
 
 ```ts
-type GetJSON = <T>(encoding?) => T;
+type GetJSON = <T = any>(encoding?: BufferEncoding) => T;
 ```
 
 Parse the current response body as JSON.
