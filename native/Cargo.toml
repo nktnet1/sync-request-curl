@@ -10,7 +10,7 @@ name = "sync_request_curl_native"
 crate-type = ["cdylib"]
 
 [features]
-default = []
+default = ["bundled-curl"]
 bundled-curl = ["curl-sys/http2", "curl-sys/ssl", "curl-sys/static-curl", "curl-sys/static-ssl"]
 system-curl = ["curl-sys/force-system-lib-on-osx"]
 

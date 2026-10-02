@@ -27,7 +27,7 @@ Options:
   --libcurl=system    Link against a system-provided libcurl and fail if unavailable.
   --libcurl=bundled   Build the libcurl bundled by curl-sys.
 
-Default: system libcurl for macOS targets. Bundled libcurl for other targets.`;
+Default: bundled libcurl on all targets. Use --libcurl=system to opt into a system-provided libcurl.`;
 
 const parseCliOptions = (args: readonly string[]): CliOptions => {
   if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) {
@@ -103,8 +103,7 @@ const buildNative = (requestedCurlSource?: CurlSource): void => {
       "Unable to determine Rust target; set CARGO_BUILD_TARGET explicitly.",
     );
   }
-  const curlSource =
-    requestedCurlSource ?? (target.includes("apple") ? "system" : "bundled");
+  const curlSource = requestedCurlSource ?? "bundled";
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     CARGO_TARGET_DIR: targetDir,
