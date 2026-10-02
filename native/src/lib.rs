@@ -69,6 +69,9 @@ const CURLAUTH_BEARER: c_long = 1 << 6;
 // Public CURL_HTTP_VERSION enum value, available since libcurl 7.88.0.
 // curl-sys 0.4.90 does not currently export this constant.
 const CURL_HTTP_VERSION_3ONLY: c_long = 31;
+// libcurl encodes CURL_SSLVERSION_MAX_* values by shifting the version enum
+// into the upper 16 bits; curl-sys 0.4.90 does not export those constants.
+const CURL_SSLVERSION_MAX_SHIFT: u32 = 16;
 const TCP_KEEP_COUNT_UNSUPPORTED_ERROR: &str =
   "TCP keepalive probeCount requires libcurl 8.9.0 or newer and platform support";
 static CURL_INIT: OnceLock<CURLcode> = OnceLock::new();
@@ -259,6 +262,18 @@ pub struct NativeRequestOptions {
   pub reject_unauthorized: Option<bool>,
   #[napi(js_name = "caFile")]
   pub ca_file: Option<String>,
+  #[napi(js_name = "tlsCertFile")]
+  pub tls_cert_file: Option<String>,
+  #[napi(js_name = "tlsCertType")]
+  pub tls_cert_type: Option<String>,
+  #[napi(js_name = "tlsKeyFile")]
+  pub tls_key_file: Option<String>,
+  #[napi(js_name = "tlsKeyPassphrase")]
+  pub tls_key_passphrase: Option<String>,
+  #[napi(js_name = "tlsMinVersion")]
+  pub tls_min_version: Option<String>,
+  #[napi(js_name = "tlsMaxVersion")]
+  pub tls_max_version: Option<String>,
   #[napi(js_name = "networkInterface")]
   pub network_interface: Option<String>,
   #[napi(js_name = "tcpKeepAlive")]
@@ -958,6 +973,48 @@ fn parse_ip_resolve(family: Option<i64>) -> Result<c_long> {
   }
 }
 
+fn parse_tls_cert_type(cert_type: Option<&str>) -> Result<Option<&'static str>> {
+  match cert_type {
+    Some("pem") => Ok(Some("PEM")),
+    Some("p12") => Ok(Some("P12")),
+    None => Ok(None),
+    Some(value) => Err(Error::from_reason(format!(
+      "Unsupported TLS client certificate type: {value}"
+    ))),
+  }
+}
+
+fn parse_tls_version(version: &str) -> Result<c_long> {
+  match version {
+    "TLSv1.2" => Ok(curl_sys::CURL_SSLVERSION_TLSv1_2 as c_long),
+    "TLSv1.3" => Ok(curl_sys::CURL_SSLVERSION_TLSv1_3 as c_long),
+    value => Err(Error::from_reason(format!(
+      "Unsupported TLS protocol version: {value}"
+    ))),
+  }
+}
+
+fn parse_tls_version_range(
+  min_version: Option<&str>,
+  max_version: Option<&str>,
+) -> Result<Option<c_long>> {
+  let min_value = min_version.map(parse_tls_version).transpose()?;
+  let max_value = max_version.map(parse_tls_version).transpose()?;
+  if min_value.zip(max_value).is_some_and(|(min, max)| min > max) {
+    return Err(Error::from_reason(
+      "TLS minimum version cannot exceed maximum version",
+    ));
+  }
+  if min_value.is_none() && max_value.is_none() {
+    return Ok(None);
+  }
+  let minimum = min_value.unwrap_or(curl_sys::CURL_SSLVERSION_DEFAULT as c_long);
+  let maximum = max_value
+    .map(|value| value << CURL_SSLVERSION_MAX_SHIFT)
+    .unwrap_or_default();
+  Ok(Some(minimum | maximum))
+}
+
 #[derive(Clone, Copy)]
 enum AuthTarget {
   Http,
@@ -1020,6 +1077,11 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
 
   let http_version = parse_http_version(options.http_version.as_deref())?;
   let ip_resolve = parse_ip_resolve(options.family)?;
+  let tls_cert_type = parse_tls_cert_type(options.tls_cert_type.as_deref())?;
+  let tls_version = parse_tls_version_range(
+    options.tls_min_version.as_deref(),
+    options.tls_max_version.as_deref(),
+  )?;
   let http_auth = parse_auth(options.auth_type.as_deref(), AuthTarget::Http)?;
   let proxy_auth = parse_auth(options.proxy_auth.as_deref(), AuthTarget::Proxy)?;
   let easy = EasyHandle::new()?;
@@ -1157,12 +1219,21 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     (curl_sys::CURLOPT_PROXYUSERNAME, options.proxy_username.as_deref()),
     (curl_sys::CURLOPT_PROXYPASSWORD, options.proxy_password.as_deref()),
     (curl_sys::CURLOPT_CAINFO, options.ca_file.as_deref()),
+    (curl_sys::CURLOPT_SSLCERT, options.tls_cert_file.as_deref()),
+    (curl_sys::CURLOPT_SSLCERTTYPE, tls_cert_type),
+    (curl_sys::CURLOPT_SSLKEY, options.tls_key_file.as_deref()),
+    (curl_sys::CURLOPT_KEYPASSWD, options.tls_key_passphrase.as_deref()),
     (curl_sys::CURLOPT_INTERFACE, options.network_interface.as_deref()),
   ] {
     keep_first_error(
       &mut code,
       set_string_option(curl, option, value, &mut keepalive, true),
     );
+  }
+  if let Some(value) = tls_version {
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_SSLVERSION, value)
+    });
   }
   if let Some(value) = http_auth {
     keep_first_error(&mut code, unsafe {

@@ -107,6 +107,15 @@ const prepareHttpAuthOptions = (
   };
 };
 
+const prepareTlsOptions = (tls?: Options["tls"]) => ({
+  tlsCertFile: tls?.certFile,
+  tlsCertType: tls?.certType,
+  tlsKeyFile: tls?.keyFile,
+  tlsKeyPassphrase: tls?.passphrase,
+  tlsMinVersion: tls?.minVersion,
+  tlsMaxVersion: tls?.maxVersion,
+});
+
 const validateLocalBinding = (options: Options): void => {
   if (options.localAddress !== undefined && isIP(options.localAddress) === 0) {
     throw new TypeError("localAddress must be an IP address");
@@ -133,11 +142,13 @@ const getNetworkInterface = (options: Options): string | undefined => {
 export const prepareTransportOptions = (options: Options) => {
   const preparedProxy = prepareProxyOptions(options.proxy);
   const preparedAuth = prepareHttpAuthOptions(options.auth);
+  const preparedTls = prepareTlsOptions(options.tls);
   validateLocalBinding(options);
   const keepAlive = options.tcpKeepAlive;
   return {
     ...preparedProxy,
     ...preparedAuth,
+    ...preparedTls,
     httpVersion: options.httpVersion ?? "auto",
     family: options.family ?? 0,
     rejectUnauthorized: options.rejectUnauthorized !== false,
@@ -161,6 +172,7 @@ export const usesCustomTransport = (options: Options): boolean =>
   options.proxy !== undefined ||
   options.rejectUnauthorized === false ||
   options.caFile !== undefined ||
+  options.tls !== undefined ||
   options.localAddress !== undefined ||
   options.localInterface !== undefined ||
   (options.httpVersion !== undefined && options.httpVersion !== "auto") ||

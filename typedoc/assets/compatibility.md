@@ -15,14 +15,22 @@ the peer certificate cannot be verified. `rejectUnauthorized: false` disables
 origin certificate and hostname verification and should only be used when that
 trade-off is intentional.
 
+The bundled Windows libcurl uses Schannel. For file-based mutual TLS, use a
+PKCS#12 client identity (`tls.certType: "p12"`); Schannel expects the private
+key to be part of that identity and ignores a separate `tls.keyFile`.
+
 ### macOS
 
 Prebuilt binaries are available for Apple Silicon (`arm64`) and Intel (`x64`) macOS.
+Client-certificate file formats and TLS-version capabilities follow the system
+libcurl and its selected TLS backend.
 
 ### Linux
 
 Prebuilt binaries are available for x64 and arm64 Linux on both glibc and musl.
-GNU/Linux release binaries require GLIBC 2.31 or newer.
+GNU/Linux release binaries require GLIBC 2.31 or newer. The bundled Linux
+libcurl uses OpenSSL and supports PEM certificate/key pairs and PKCS#12 client
+identities through the high-level `tls` option.
 
 ### Building from source
 

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { createServer, request } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
 import { connect } from "node:net";
+import type { TLSSocket } from "node:tls";
 import { HOST, PORT, SERVER_URL, TLS_PORT } from "#tests/app/config";
 
 // Test-only self-signed certificate and key; never used outside local fixtures.
@@ -9,14 +10,24 @@ export const tlsServer = createHttpsServer(
   {
     key: readFileSync(new URL("./fixtures/tls-key.pem", import.meta.url)),
     cert: readFileSync(new URL("./fixtures/tls-cert.pem", import.meta.url)),
+    ca: readFileSync(
+      new URL("./fixtures/tls-client-ca-cert.pem", import.meta.url),
+    ),
+    requestCert: true,
+    rejectUnauthorized: false,
   },
   (req, res) => {
+    const socket = req.socket as TLSSocket;
+    const peerCertificate = socket.getPeerCertificate();
     res.setHeader("Content-Type", "application/json");
     res.end(
       JSON.stringify({
         address: req.socket.remoteAddress,
         proxyAuthorization: req.headers["proxy-authorization"] ?? null,
         proxyTrace: req.headers["x-proxy-trace"] ?? null,
+        clientAuthorized: socket.authorized,
+        clientSubject: peerCertificate.subject?.CN ?? null,
+        tlsProtocol: socket.getProtocol(),
       }),
     );
   },

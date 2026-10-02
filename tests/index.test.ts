@@ -11,6 +11,7 @@ import request, {
   type HttpVerb as CommonJsRootHttpVerb,
   type Options as CommonJsRootOptions,
   type Response as CommonJsRootResponse,
+  type TlsOptions as CommonJsRootTlsOptions,
 } from "#/index";
 import esmRequest, {
   CurlError as RootCurlError,
@@ -21,9 +22,16 @@ import esmRequest, {
   type RequestErrorCode as RootRequestErrorCode,
   type Response as RootResponse,
   ResponseError as RootResponseError,
+  type TlsOptions as RootTlsOptions,
 } from "#/index-esm";
 import requestImplementation from "#/request/index";
-import type { Headers, HttpVerb, Options, Response } from "#/types/definition";
+import type {
+  Headers,
+  HttpVerb,
+  Options,
+  Response,
+  TlsOptions,
+} from "#/types/definition";
 
 describe("public entrypoint", () => {
   test("does not re-export Node's IncomingHttpHeaders type", () => {
@@ -66,12 +74,14 @@ describe("public entrypoint", () => {
     expectTypeOf<CommonJsRootHttpVerb>().toEqualTypeOf<HttpVerb>();
     expectTypeOf<CommonJsRootOptions>().toEqualTypeOf<Options>();
     expectTypeOf<CommonJsRootResponse>().toEqualTypeOf<Response>();
+    expectTypeOf<CommonJsRootTlsOptions>().toEqualTypeOf<TlsOptions>();
   });
 
   test("re-exports public types from the ESM root entry", () => {
     expectTypeOf<RootHeaders>().toEqualTypeOf<Headers>();
     expectTypeOf<RootOptions>().toEqualTypeOf<Options>();
     expectTypeOf<RootResponse>().toEqualTypeOf<Response>();
+    expectTypeOf<RootTlsOptions>().toEqualTypeOf<TlsOptions>();
     expectTypeOf<RootRequestErrorCode>().toEqualTypeOf<RequestErrorCode>();
   });
 });

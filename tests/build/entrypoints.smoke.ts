@@ -121,6 +121,9 @@ test("built declarations expose the public root API without leaking Node header 
        type RetryDelayFunction,
        type RetryFunction,
        type RetryResponse,
+       type TlsCertificateType,
+       type TlsOptions,
+       type TlsVersion,
      } from "sync-request-curl";
 
      const method: HttpVerb = "GET";
@@ -164,6 +167,14 @@ test("built declarations expose the public root API without leaking Node header 
        noProxy: ["localhost"],
        headers: { "x-proxy-trace": "trace-id" },
      };
+     const tlsVersion: TlsVersion = "TLSv1.2";
+     const tlsCertificateType: TlsCertificateType = "p12";
+     const tls: TlsOptions = {
+       certFile: "./client.p12",
+       certType: tlsCertificateType,
+       passphrase: "secret",
+       minVersion: tlsVersion,
+     };
      const errorCode: RequestErrorCode = "ERR_REQUEST_FAILED";
      const isMatch: CacheIsMatchFunction = (_headers, cached, defaultValue) => {
        const copy: CachedResponse = cached;
@@ -204,6 +215,9 @@ test("built declarations expose the public root API without leaking Node header 
        bearerAuth,
        proxyAuth,
        proxy,
+       tlsVersion,
+       tlsCertificateType,
+       tls,
        errorCode,
        isMatch,
        isExpired,

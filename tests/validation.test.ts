@@ -31,6 +31,9 @@ import type {
   ProxyAuthType,
   ProxyOptions,
   Response,
+  TlsCertificateType,
+  TlsOptions,
+  TlsVersion,
   UppercaseHttpVerb,
 } from "#/types/definition";
 import { parseSchema } from "#/validate";
@@ -47,6 +50,9 @@ import {
   type proxySchema,
   requestUrlSchema,
   type responseDataSchema,
+  type tlsCertificateTypeSchema,
+  type tlsSchema,
+  type tlsVersionSchema,
   uppercaseHttpVerbSchema,
 } from "#/validation";
 
@@ -123,6 +129,16 @@ describe("schema-aligned types", () => {
     expectTypeOf<ProxyAuthType>().toEqualTypeOf<
       v.InferOutput<typeof proxyAuthTypeSchema>
     >();
+    expectTypeOf<TlsOptions>().toEqualTypeOf<v.InferOutput<typeof tlsSchema>>();
+    expectTypeOf<TlsVersion>().toEqualTypeOf<
+      v.InferOutput<typeof tlsVersionSchema>
+    >();
+    expectTypeOf<TlsCertificateType>().toEqualTypeOf<
+      v.InferOutput<typeof tlsCertificateTypeSchema>
+    >();
+    expectTypeOf<
+      Extract<TlsOptions, { certType: "p12" }>["keyFile"]
+    >().toEqualTypeOf<undefined>();
     expectTypeOf<Options>().toEqualTypeOf<
       v.InferOutput<typeof optionsSchema>
     >();
@@ -352,6 +368,38 @@ describe("proxy object validation", () => {
         proxyAuth: { username: "u", password: "p" },
       }),
     ).toBe(false);
+  });
+});
+
+describe("TLS validation", () => {
+  test.each([
+    {},
+    { minVersion: "TLSv1.2" },
+    { maxVersion: "TLSv1.3" },
+    { minVersion: "TLSv1.2", maxVersion: "TLSv1.3" },
+    { certFile: "/client.pem" },
+    { certFile: "/client.pem", certType: "pem", keyFile: "/client-key.pem" },
+    { certFile: "/client.p12", certType: "p12", passphrase: "secret" },
+    { certFile: "/client.p12", certType: "p12", passphrase: "" },
+  ])("accepts TLS configuration %j", (tls) => {
+    expect(v.is(optionsSchema, { tls })).toBe(true);
+  });
+
+  test.each([
+    null,
+    "TLSv1.2",
+    { certFile: "" },
+    { certFile: "bad\0path" },
+    { certType: "pem" },
+    { keyFile: "/client-key.pem" },
+    { passphrase: "secret" },
+    { certFile: "/client.p12", certType: "p12", keyFile: "/client-key.pem" },
+    { certFile: "/client.pem", certType: "der" },
+    { minVersion: "TLSv1.1" },
+    { maxVersion: "TLSv1.4" },
+    { minVersion: "TLSv1.3", maxVersion: "TLSv1.2" },
+  ])("rejects invalid TLS configuration %j", (tls) => {
+    expect(v.is(optionsSchema, { tls })).toBe(false);
   });
 });
 

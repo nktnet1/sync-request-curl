@@ -29,6 +29,9 @@ export type {
   RetryDelayFunction,
   RetryFunction,
   RetryResponse,
+  TlsCertificateType,
+  TlsOptions,
+  TlsVersion,
 } from "#/validation";
 
 /** @internal */

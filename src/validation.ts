@@ -107,6 +107,73 @@ export const ipFamilySchema = v.picklist([
   0, 4, 6,
 ] as const satisfies readonly IpFamily[]);
 
+/** TLS protocol versions supported by the high-level version bounds.
+ *
+ * @group Request
+ */
+export type TlsVersion = "TLSv1.2" | "TLSv1.3";
+
+export const tlsVersionSchema = v.picklist([
+  "TLSv1.2",
+  "TLSv1.3",
+] as const satisfies readonly TlsVersion[]);
+
+/** Client certificate file formats supported by the high-level TLS API.
+ *
+ * PEM certificates use a separate `keyFile` when the TLS backend requires one.
+ * PKCS#12 files contain the certificate and private key together and can be
+ * unlocked with `passphrase`.
+ *
+ * @group Request
+ */
+export type TlsCertificateType = "pem" | "p12";
+
+export const tlsCertificateTypeSchema = v.picklist([
+  "pem",
+  "p12",
+] as const satisfies readonly TlsCertificateType[]);
+
+/** High-level origin TLS controls.
+ *
+ * Existing top-level `caFile` and `rejectUnauthorized` options remain separate
+ * for backwards compatibility. Client certificate format support depends on
+ * the active libcurl TLS backend; PKCS#12 is supported by the package's bundled
+ * OpenSSL and Schannel builds.
+ *
+ * @group Request
+ */
+export type TlsOptions = {
+  /** Minimum TLS protocol version accepted for the origin connection. */
+  minVersion?: TlsVersion;
+  /** Maximum TLS protocol version accepted for the origin connection. */
+  maxVersion?: TlsVersion;
+} & (
+  | {
+      certFile?: never;
+      certType?: never;
+      keyFile?: never;
+      passphrase?: never;
+    }
+  | {
+      /** Client certificate file path. */
+      certFile: string;
+      /** PEM certificate, or the active libcurl backend's default when omitted. */
+      certType?: "pem";
+      /** Separate private-key file path for PEM-style client certificates. */
+      keyFile?: string;
+      /** Passphrase used to unlock an encrypted private key. */
+      passphrase?: string;
+    }
+  | {
+      /** PKCS#12 client identity containing both certificate and private key. */
+      certFile: string;
+      certType: "p12";
+      keyFile?: never;
+      /** Passphrase used to unlock the PKCS#12 identity. */
+      passphrase?: string;
+    }
+);
+
 /** HTTP origin authentication method offered to libcurl.
  *
  * `"any"` lets libcurl probe the server challenge and select the strongest
@@ -374,6 +441,11 @@ const httpAuthCredentialSchema = v.pipe(
   v.check((value) => !value.includes("\0")),
 );
 
+const tlsPassphraseSchema = v.pipe(
+  v.string(),
+  v.check((value) => !value.includes("\0")),
+);
+
 const httpCredentialAuthObjectSchema = v.object({
   username: httpAuthCredentialSchema,
   password: v.optional(httpAuthCredentialSchema),
@@ -421,6 +493,41 @@ export const proxySchema = v.custom<ProxyOptions>(
   "Invalid proxy configuration: password requires username",
 );
 
+const tlsObjectSchema = v.object({
+  certFile: v.optional(nativeStringSchema),
+  certType: v.optional(tlsCertificateTypeSchema),
+  keyFile: v.optional(nativeStringSchema),
+  passphrase: v.optional(tlsPassphraseSchema),
+  minVersion: v.optional(tlsVersionSchema),
+  maxVersion: v.optional(tlsVersionSchema),
+});
+
+const tlsVersionRank = (version: TlsVersion): number =>
+  version === "TLSv1.2" ? 2 : 3;
+
+export const tlsSchema = v.custom<TlsOptions>((input) => {
+  if (!v.is(tlsObjectSchema, input)) {
+    return false;
+  }
+  if (input.certType !== undefined && input.certFile === undefined) {
+    return false;
+  }
+  if (input.keyFile !== undefined && input.certFile === undefined) {
+    return false;
+  }
+  if (input.passphrase !== undefined && input.certFile === undefined) {
+    return false;
+  }
+  if (input.certType === "p12" && input.keyFile !== undefined) {
+    return false;
+  }
+  return !(
+    input.minVersion !== undefined &&
+    input.maxVersion !== undefined &&
+    tlsVersionRank(input.minVersion) > tlsVersionRank(input.maxVersion)
+  );
+}, "Invalid TLS configuration");
+
 const optionsObjectSchema = v.object({
   /**
    * HTTP origin authentication. Username/password authentication defaults to
@@ -442,6 +549,8 @@ const optionsObjectSchema = v.object({
   rejectUnauthorized: v.optional(v.boolean()),
   /** PEM CA bundle path for origin TLS verification. */
   caFile: v.optional(nativeStringSchema),
+  /** Client certificate and TLS protocol-version controls for the origin. */
+  tls: v.optional(tlsSchema),
   /** Source IPv4/IPv6 address. Hostnames are rejected. */
   localAddress: v.optional(nativeStringSchema),
   /** Source interface name. Mutually exclusive with `localAddress`. */
