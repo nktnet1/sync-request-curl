@@ -73,3 +73,35 @@ describe("redirect authentication", () => {
     expect(getRedirectOptions({ auth }, false, false).auth).toBeUndefined();
   });
 });
+
+describe("redirect TLS client identity", () => {
+  const tls = {
+    certFile: "/client.pem",
+    certType: "pem" as const,
+    keyFile: "/client-key.pem",
+    passphrase: "secret",
+    minVersion: "TLSv1.2" as const,
+    maxVersion: "TLSv1.3" as const,
+  };
+
+  test("preserves client identity for same-origin redirects", () => {
+    expect(getRedirectOptions({ tls }, false, true).tls).toEqual(tls);
+  });
+
+  test("drops client identity but keeps version policy across origins", () => {
+    expect(getRedirectOptions({ tls }, false, false).tls).toEqual({
+      minVersion: "TLSv1.2",
+      maxVersion: "TLSv1.3",
+    });
+  });
+
+  test("removes TLS options entirely when only client identity was set", () => {
+    expect(
+      getRedirectOptions(
+        { tls: { certFile: "/client.pem", keyFile: "/client-key.pem" } },
+        false,
+        false,
+      ).tls,
+    ).toBeUndefined();
+  });
+});

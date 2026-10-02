@@ -114,6 +114,31 @@ environment variables. Proxy-specific headers are kept separate from origin
 headers during HTTPS CONNECT tunnelling. CIDR entries in `noProxy` require
 libcurl 7.86.0 or newer.
 
+Mutual TLS with a client certificate
+
+```typescript
+import request from 'sync-request-curl';
+
+const res = request('GET', 'https://service.example', {
+  caFile: './service-ca.pem',
+  tls: {
+    certFile: './client.pem',
+    keyFile: './client-key.pem',
+    minVersion: 'TLSv1.2',
+  },
+});
+
+console.log('Status Code:', res.statusCode);
+```
+
+For a PKCS#12 identity, set `certType: 'p12'` and provide the `.p12` file as
+`certFile`; `passphrase` unlocks either a PKCS#12 identity or an encrypted
+private key. A separate `keyFile` is intentionally not accepted with `p12`.
+The active libcurl TLS backend determines which client-certificate formats are
+supported. The bundled Windows build uses Schannel, where PKCS#12 is the
+portable file-based client-certificate form and a separate `keyFile` is not
+used. `minVersion` and `maxVersion` currently accept `TLSv1.2` and `TLSv1.3`.
+
 </details>
 
 <br/>

@@ -17,6 +17,8 @@ import {
   httpVersionSchema,
   ipFamilySchema,
   proxyAuthTypeSchema,
+  tlsCertificateTypeSchema,
+  tlsVersionSchema,
   uppercaseHttpVerbSchema,
 } from "#/validation";
 
@@ -49,6 +51,12 @@ export const nativeRequestOptionsSchema = v.object({
   proxyHeaders: v.optional(v.array(v.string())),
   rejectUnauthorized: v.optional(v.boolean()),
   caFile: v.optional(v.string()),
+  tlsCertFile: v.optional(v.string()),
+  tlsCertType: v.optional(tlsCertificateTypeSchema),
+  tlsKeyFile: v.optional(v.string()),
+  tlsKeyPassphrase: v.optional(v.string()),
+  tlsMinVersion: v.optional(tlsVersionSchema),
+  tlsMaxVersion: v.optional(tlsVersionSchema),
   networkInterface: v.optional(v.string()),
   tcpKeepAlive: v.optional(v.boolean()),
   tcpKeepIdle: v.optional(v.number()),

@@ -178,6 +178,31 @@ environment variables. Proxy-specific headers are kept separate from origin
 headers during HTTPS CONNECT tunnelling. CIDR entries in `noProxy` require
 libcurl 7.86.0 or newer.
 
+Mutual TLS with a client certificate
+
+```typescript
+import request from 'sync-request-curl';
+
+const res = request('GET', 'https://service.example', {
+  caFile: './service-ca.pem',
+  tls: {
+    certFile: './client.pem',
+    keyFile: './client-key.pem',
+    minVersion: 'TLSv1.2',
+  },
+});
+
+console.log('Status Code:', res.statusCode);
+```
+
+For a PKCS#12 identity, set `certType: 'p12'` and provide the `.p12` file as
+`certFile`; `passphrase` unlocks either a PKCS#12 identity or an encrypted
+private key. A separate `keyFile` is intentionally not accepted with `p12`.
+The active libcurl TLS backend determines which client-certificate formats are
+supported. The bundled Windows build uses Schannel, where PKCS#12 is the
+portable file-based client-certificate form and a separate `keyFile` is not
+used. `minVersion` and `maxVersion` currently accept `TLSv1.2` and `TLSv1.3`.
+
 </details>
 
 <br/>
@@ -267,6 +292,7 @@ type Options = {
      | "3-only";
   rejectUnauthorized?: boolean;
   caFile?: string;
+  tls?: TlsOptions;
   localAddress?: string;
   localInterface?: string;
   family?: 0 | 4 | 6;
@@ -317,6 +343,7 @@ supplied.
 | <a id="property-httpversion"></a> `httpVersion?` | \| `"auto"` \| `"2"` \| `"3"` \| `"1.0"` \| `"1.1"` \| `"2-tls"` \| `"2-prior-knowledge"` \| `"3-only"` | HTTP protocol preference. Defaults to `"auto"`. HTTP/3 values require an HTTP/3-capable linked libcurl build. |
 | <a id="property-rejectunauthorized"></a> `rejectUnauthorized?` | `boolean` | Verify the origin certificate chain and hostname. Defaults to `true`. |
 | <a id="property-cafile"></a> `caFile?` | `string` | PEM CA bundle path for origin TLS verification. |
+| <a id="property-tls"></a> `tls?` | [`TlsOptions`](#tlsoptions) | Client certificate and TLS protocol-version controls for the origin. |
 | <a id="property-localaddress"></a> `localAddress?` | `string` | Source IPv4/IPv6 address. Hostnames are rejected. |
 | <a id="property-localinterface"></a> `localInterface?` | `string` | Source interface name. Mutually exclusive with `localAddress`. |
 | <a id="property-family"></a> `family?` | `0` \| `4` \| `6` | IP address family used when resolving hostnames. `0` (default) allows either family, `4` restricts resolution to IPv4, and `6` to IPv6. |
@@ -437,6 +464,73 @@ IP address family used when resolving hostnames.
 
 `0` allows either IPv4 or IPv6, `4` restricts resolution to IPv4, and `6`
 restricts resolution to IPv6.
+
+***
+
+#### TlsVersion
+
+```ts
+type TlsVersion = "TLSv1.2" | "TLSv1.3";
+```
+
+TLS protocol versions supported by the high-level version bounds.
+
+***
+
+#### TlsCertificateType
+
+```ts
+type TlsCertificateType = "pem" | "p12";
+```
+
+Client certificate file formats supported by the high-level TLS API.
+
+PEM certificates use a separate `keyFile` when the TLS backend requires one.
+PKCS#12 files contain the certificate and private key together and can be
+unlocked with `passphrase`.
+
+***
+
+#### TlsOptions
+
+```ts
+type TlsOptions = {
+  minVersion?: TlsVersion;
+  maxVersion?: TlsVersion;
+} &
+  | {
+  certFile?: never;
+  certType?: never;
+  keyFile?: never;
+  passphrase?: never;
+}
+  | {
+  certFile: string;
+  certType?: "pem";
+  keyFile?: string;
+  passphrase?: string;
+}
+  | {
+  certFile: string;
+  certType: "p12";
+  keyFile?: never;
+  passphrase?: string;
+};
+```
+
+High-level origin TLS controls.
+
+Existing top-level `caFile` and `rejectUnauthorized` options remain separate
+for backwards compatibility. Client certificate format support depends on
+the active libcurl TLS backend; PKCS#12 is supported by the package's bundled
+OpenSSL and Schannel builds.
+
+##### Type Declaration
+
+| Name | Type | Description |
+| ------ | ------ | ------ |
+| `minVersion?` | [`TlsVersion`](#tlsversion) | Minimum TLS protocol version accepted for the origin connection. |
+| `maxVersion?` | [`TlsVersion`](#tlsversion) | Maximum TLS protocol version accepted for the origin connection. |
 
 ***
 
@@ -1279,10 +1373,14 @@ Error.constructor
 - `overallTimeout` sets a deadline for the whole operation, alongside the
   response-header `timeout`, connection-establishment `connectTimeout`, and
   inactivity `socketTimeout` options.
-- TLS, local network binding, and TCP keepalive have dedicated options. TCP
-  keepalive probe counts require libcurl 8.9.0 or newer and operating-system
-  support. Unsupported linked libcurl/platform combinations return a transport
-  error rather than silently ignoring the setting.
+- TLS, local network binding, and TCP keepalive have dedicated options. The
+  `tls` object adds file-based client certificates for mutual TLS plus TLS 1.2
+  and TLS 1.3 minimum/maximum version bounds without moving the existing
+  `caFile` or `rejectUnauthorized` fields. Client certificate identity is
+  retained only across same-origin redirects. TCP keepalive probe counts
+  require libcurl 8.9.0 or newer and operating-system support. Unsupported
+  linked libcurl/platform combinations return a transport error rather than
+  silently ignoring the setting.
 - `httpVersion` can request HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/2 over TLS,
   HTTP/2 prior knowledge, HTTP/3, or HTTP/3-only behaviour. HTTP/3 requires
   the linked libcurl build to include HTTP/3 support.
@@ -1365,16 +1463,24 @@ the peer certificate cannot be verified. `rejectUnauthorized: false` disables
 origin certificate and hostname verification and should only be used when that
 trade-off is intentional.
 
+The bundled Windows libcurl uses Schannel. For file-based mutual TLS, use a
+PKCS#12 client identity (`tls.certType: "p12"`); Schannel expects the private
+key to be part of that identity and ignores a separate `tls.keyFile`.
+
 <a id="compatibility-macos"></a>
 ### 6.2. macOS
 
 Prebuilt binaries are available for Apple Silicon (`arm64`) and Intel (`x64`) macOS.
+Client-certificate file formats and TLS-version capabilities follow the system
+libcurl and its selected TLS backend.
 
 <a id="compatibility-linux"></a>
 ### 6.3. Linux
 
 Prebuilt binaries are available for x64 and arm64 Linux on both glibc and musl.
-GNU/Linux release binaries require GLIBC 2.31 or newer.
+GNU/Linux release binaries require GLIBC 2.31 or newer. The bundled Linux
+libcurl uses OpenSSL and supports PEM certificate/key pairs and PKCS#12 client
+identities through the high-level `tls` option.
 
 <a id="compatibility-building-from-source"></a>
 ### 6.4. Building from source

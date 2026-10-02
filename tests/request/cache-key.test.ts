@@ -28,6 +28,8 @@ test.each([
     { auth: { username: "user", password: "secret" } },
     { auth: { bearer: "token" } },
     { caFile: "/ca.pem" },
+    { tls: { maxVersion: "TLSv1.2" } },
+    { tls: { certFile: "/client.pem", keyFile: "/client-key.pem" } },
     { httpVersion: "2" },
     { family: 4 },
     { tcpKeepAlive: { probeCount: 3 } },

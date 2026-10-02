@@ -40,6 +40,22 @@ const payloadHeaderNames = new Set([
   "expect",
 ]);
 
+const getRedirectTls = (
+  tls: Options["tls"],
+  sameOrigin: boolean,
+): Options["tls"] => {
+  if (tls === undefined || sameOrigin) {
+    return tls;
+  }
+  if (tls.minVersion === undefined && tls.maxVersion === undefined) {
+    return undefined;
+  }
+  return {
+    minVersion: tls.minVersion,
+    maxVersion: tls.maxVersion,
+  };
+};
+
 const getRedirectHeaders = (
   headers: Headers | undefined,
   allowRedirectHeaders: string[] | undefined,
@@ -69,6 +85,7 @@ export const getRedirectOptions = (
 ): Options => ({
   ...(methodChanged ? withoutPayload(options) : options),
   auth: sameOrigin ? options.auth : undefined,
+  tls: getRedirectTls(options.tls, sameOrigin),
   qs: undefined,
   headers: getRedirectHeaders(
     options.headers,

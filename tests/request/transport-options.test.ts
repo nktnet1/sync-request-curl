@@ -12,8 +12,43 @@ import { PROXY_URL, SERVER_URL, TLS_URL } from "#tests/app/config";
 const caFile = fileURLToPath(
   new URL("../app/fixtures/tls-cert.pem", import.meta.url),
 );
+const clientCertFile = fileURLToPath(
+  new URL("../app/fixtures/tls-client-cert.pem", import.meta.url),
+);
+const clientKeyFile = fileURLToPath(
+  new URL("../app/fixtures/tls-client-key.pem", import.meta.url),
+);
+const encryptedClientKeyFile = fileURLToPath(
+  new URL("../app/fixtures/tls-client-key-encrypted.pem", import.meta.url),
+);
+const clientP12File = fileURLToPath(
+  new URL("../app/fixtures/tls-client.p12", import.meta.url),
+);
+const clientPassphrase = "test-passphrase";
 
 describe("transport option validation", () => {
+  test("maps origin TLS controls", () => {
+    expect(
+      prepareTransportOptions({
+        tls: {
+          certFile: clientCertFile,
+          certType: "pem",
+          keyFile: clientKeyFile,
+          passphrase: clientPassphrase,
+          minVersion: "TLSv1.2",
+          maxVersion: "TLSv1.3",
+        },
+      }),
+    ).toMatchObject({
+      tlsCertFile: clientCertFile,
+      tlsCertType: "pem",
+      tlsKeyFile: clientKeyFile,
+      tlsKeyPassphrase: clientPassphrase,
+      tlsMinVersion: "TLSv1.2",
+      tlsMaxVersion: "TLSv1.3",
+    });
+  });
+
   test("maps origin credentials and bearer authentication", () => {
     expect(
       prepareTransportOptions({
@@ -212,6 +247,8 @@ describe("transport option validation", () => {
     expect(usesCustomTransport({ tcpKeepAlive: {} })).toBe(true);
     expect(usesCustomTransport({ tcpKeepAlive: { probeCount: 3 } })).toBe(true);
     expect(usesCustomTransport({ caFile })).toBe(true);
+    expect(usesCustomTransport({ tls: {} })).toBe(true);
+    expect(usesCustomTransport({ tls: { maxVersion: "TLSv1.2" } })).toBe(true);
     expect(usesCustomTransport({ httpVersion: "auto" })).toBe(false);
     expect(usesCustomTransport({ httpVersion: "2" })).toBe(true);
     expect(usesCustomTransport({ family: 0 })).toBe(false);
@@ -219,8 +256,16 @@ describe("transport option validation", () => {
     expect(usesCustomTransport({ family: 6 })).toBe(true);
   });
 
-  test.each([
+  const invalidPublicOptions: Options[] = [
     { caFile: "bad\0path" },
+    { tls: { certFile: "bad\0path" } },
+    { tls: { keyFile: clientKeyFile } } as unknown as Options,
+    { tls: { certType: "p12" } } as unknown as Options,
+    { tls: { passphrase: clientPassphrase } } as unknown as Options,
+    {
+      tls: { certFile: clientP12File, certType: "p12", keyFile: clientKeyFile },
+    } as unknown as Options,
+    { tls: { minVersion: "TLSv1.3", maxVersion: "TLSv1.2" } },
     { proxy: { url: PROXY_URL, username: "bad\0", password: "" } },
     { proxy: { url: PROXY_URL, username: "", password: "bad\0" } },
     { tcpKeepAlive: { idleSeconds: 0 } },
@@ -229,11 +274,16 @@ describe("transport option validation", () => {
     { tcpKeepAlive: { probeCount: 1.5 } },
     { httpVersion: "4" } as unknown as Options,
     { family: 5 } as unknown as Options,
-  ])("rejects invalid public option %j", (options) => {
-    expect(() => request("GET", SERVER_URL, options)).toThrow(
-      "Invalid request options",
-    );
-  });
+  ];
+
+  test.each(invalidPublicOptions)(
+    "rejects invalid public option %j",
+    (options) => {
+      expect(() => request("GET", SERVER_URL, options)).toThrow(
+        "Invalid request options",
+      );
+    },
+  );
 });
 
 describe("native transport controls", () => {
@@ -310,6 +360,53 @@ describe("native transport controls", () => {
     expect(() =>
       request("GET", TLS_URL, { caFile: `${caFile}.missing` }),
     ).toThrow();
+  });
+
+  test.runIf(process.platform !== "darwin")(
+    "presents a PKCS#12 client certificate for mutual TLS",
+    () => {
+      expect(
+        request("GET", TLS_URL, {
+          caFile,
+          tls: {
+            certFile: clientP12File,
+            certType: "p12",
+            passphrase: clientPassphrase,
+          },
+        }).getJSON(),
+      ).toMatchObject({
+        clientAuthorized: true,
+        clientSubject: "sync-request-curl-client",
+      });
+    },
+  );
+
+  test.runIf(process.platform === "linux")(
+    "unlocks an encrypted PEM client key with a passphrase",
+    () => {
+      expect(
+        request("GET", TLS_URL, {
+          caFile,
+          tls: {
+            certFile: clientCertFile,
+            keyFile: encryptedClientKeyFile,
+            passphrase: clientPassphrase,
+          },
+        }).getJSON(),
+      ).toMatchObject({
+        clientAuthorized: true,
+        clientSubject: "sync-request-curl-client",
+      });
+    },
+  );
+
+  test("can cap the negotiated origin TLS version", () => {
+    expect(
+      request("GET", TLS_URL, {
+        caFile,
+        tls: { maxVersion: "TLSv1.2" },
+      }).getJSON(),
+    ).toMatchObject({ tlsProtocol: "TLSv1.2" });
   });
 
   test.each([
