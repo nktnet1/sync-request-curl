@@ -81,6 +81,10 @@ describe("schema-aligned types", () => {
       HttpVersion | undefined
     >();
     expectTypeOf<Options["family"]>().toEqualTypeOf<IpFamily | undefined>();
+    expectTypeOf<Options["localPort"]>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<Options["localPortRange"]>().toEqualTypeOf<
+      number | undefined
+    >();
     expectTypeOf<
       Exclude<Options["tcpKeepAlive"], boolean | undefined>
     >().toEqualTypeOf<{
@@ -429,6 +433,32 @@ describe("IP family validation", () => {
 
   test.each([-1, 1, 5, "4", null])("rejects %j", (family) => {
     expect(v.is(optionsSchema, { family })).toBe(false);
+  });
+});
+
+describe("local port validation", () => {
+  test.each([
+    { localPort: 1 },
+    { localPort: 65_535 },
+    { localPort: 40_000, localPortRange: 0 },
+    { localPort: 40_000, localPortRange: 1 },
+    { localPort: 40_000, localPortRange: 10 },
+  ])("accepts %j", (options) => {
+    expect(v.is(optionsSchema, options)).toBe(true);
+  });
+
+  test.each([
+    { localPort: 0 },
+    { localPort: -1 },
+    { localPort: 65_536 },
+    { localPort: 1.5 },
+    { localPort: "40000" },
+    { localPortRange: 2 },
+    { localPort: 40_000, localPortRange: -1 },
+    { localPort: 40_000, localPortRange: 1.5 },
+    { localPort: 65_535, localPortRange: 2 },
+  ])("rejects %j", (options) => {
+    expect(v.is(optionsSchema, options)).toBe(false);
   });
 });
 

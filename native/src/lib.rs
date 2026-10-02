@@ -276,6 +276,10 @@ pub struct NativeRequestOptions {
   pub tls_max_version: Option<String>,
   #[napi(js_name = "networkInterface")]
   pub network_interface: Option<String>,
+  #[napi(js_name = "localPort")]
+  pub local_port: Option<i64>,
+  #[napi(js_name = "localPortRange")]
+  pub local_port_range: Option<i64>,
   #[napi(js_name = "tcpKeepAlive")]
   pub tcp_keep_alive: Option<bool>,
   #[napi(js_name = "tcpKeepIdle")]
@@ -1273,6 +1277,8 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   for (option, value) in [
     (curl_sys::CURLOPT_SSL_VERIFYPEER, Some(if verify { 1 } else { 0 })),
     (curl_sys::CURLOPT_SSL_VERIFYHOST, Some(if verify { 2 } else { 0 })),
+    (curl_sys::CURLOPT_LOCALPORT, options.local_port),
+    (curl_sys::CURLOPT_LOCALPORTRANGE, options.local_port_range),
     (
       curl_sys::CURLOPT_TCP_KEEPALIVE,
       Some(if options.tcp_keep_alive.unwrap_or(false) { 1 } else { 0 }),

@@ -14,12 +14,12 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { parseArgs, styleText } from "node:util";
 import { getNativePackageName } from "#/native/platform-key-core";
+import { reserveLoopbackPort } from "#scripts/loopback-port";
 import { getCurrentPlatformKey } from "#scripts/native-platform";
 import { canRun, run } from "#scripts/process";
 import {
@@ -94,27 +94,6 @@ const detail = (message: string): void => {
 const writeJson = (path: string, value: unknown): void => {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 };
-
-const reservePort = (): Promise<number> =>
-  new Promise((resolvePort, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        server.close();
-        reject(new Error("Unable to allocate a local Verdaccio port"));
-        return;
-      }
-      server.close((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolvePort(address.port);
-      });
-    });
-  });
 
 const stagePackages = (): void => {
   if (!existsSync(join(root, "dist"))) {
@@ -246,7 +225,7 @@ const waitForVerdaccio = async (registry: string): Promise<void> => {
 };
 
 const startSmokeServer = async (): Promise<string> => {
-  const port = await reservePort();
+  const port = await reserveLoopbackPort();
   const serverUrl = `http://127.0.0.1:${port}`;
   const serverPath = join(temporaryRoot, "request-smoke-server.mjs");
   writeFileSync(
@@ -552,7 +531,7 @@ const main = async (): Promise<void> => {
   requireCommand(pnpmCommand);
   success("npm and pnpm are available");
 
-  const port = await reservePort();
+  const port = await reserveLoopbackPort();
   const registry = `http://127.0.0.1:${port}`;
   const mainPackageSpec = `${packageJson.name}@${packageJson.version}`;
   const nativePackageSpec = `${nativePackageName}@${packageJson.version}`;

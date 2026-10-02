@@ -7,6 +7,7 @@ import {
   usesCustomTransport,
 } from "#/request/transport-options";
 import type { Options } from "#/types/definition";
+import { reserveLoopbackPort } from "#scripts/loopback-port";
 import { PROXY_URL, SERVER_URL, TLS_URL } from "#tests/app/config";
 
 const caFile = fileURLToPath(
@@ -186,6 +187,8 @@ describe("transport option validation", () => {
     },
     { localAddress: "localhost" },
     { localAddress: "127.0.0.1", localInterface: "lo" },
+    { localPortRange: 2 },
+    { localPort: 65_535, localPortRange: 2 },
   ])("rejects unsupported transport configuration %j", (options) => {
     expect(() => prepareTransportOptions(options)).toThrow();
   });
@@ -204,6 +207,8 @@ describe("transport option validation", () => {
         rejectUnauthorized: false,
         caFile,
         localInterface: "lo",
+        localPort: 40_000,
+        localPortRange: 10,
         family: 6,
         tcpKeepAlive: {
           idleSeconds: 30,
@@ -221,6 +226,8 @@ describe("transport option validation", () => {
       rejectUnauthorized: false,
       caFile,
       networkInterface: "if!lo",
+      localPort: 40_000,
+      localPortRange: 10,
       httpVersion: "auto",
       family: 6,
       tcpKeepAlive: true,
@@ -254,6 +261,10 @@ describe("transport option validation", () => {
     expect(usesCustomTransport({ family: 0 })).toBe(false);
     expect(usesCustomTransport({ family: 4 })).toBe(true);
     expect(usesCustomTransport({ family: 6 })).toBe(true);
+    expect(usesCustomTransport({ localPort: 40_000 })).toBe(true);
+    expect(usesCustomTransport({ localPort: 40_000, localPortRange: 10 })).toBe(
+      true,
+    );
   });
 
   const invalidPublicOptions: Options[] = [
@@ -274,6 +285,10 @@ describe("transport option validation", () => {
     { tcpKeepAlive: { probeCount: 1.5 } },
     { httpVersion: "4" } as unknown as Options,
     { family: 5 } as unknown as Options,
+    { localPort: 0 },
+    { localPort: 65_536 },
+    { localPort: 40_000.5 },
+    { localPort: 40_000, localPortRange: -1 },
   ];
 
   test.each(invalidPublicOptions)(
@@ -339,6 +354,17 @@ describe("native transport controls", () => {
 
   test("accepts an explicit IPv4 family selection", () => {
     expect(request("GET", SERVER_URL, { family: 4 }).statusCode).toBe(200);
+  });
+
+  test("binds an explicit local source port", async () => {
+    const localPort = await reserveLoopbackPort();
+    expect(
+      request("GET", TLS_URL, {
+        caFile,
+        localAddress: "127.0.0.1",
+        localPort,
+      }).getJSON(),
+    ).toMatchObject({ address: "127.0.0.1", port: localPort });
   });
 
   test.each(["1.0", "1.1"] as const)(

@@ -126,6 +126,15 @@ const validateLocalBinding = (options: Options): void => {
   ) {
     throw new TypeError("Use either localAddress or localInterface, not both");
   }
+  if (options.localPortRange !== undefined) {
+    if (options.localPort === undefined) {
+      throw new TypeError("localPortRange requires localPort");
+    }
+    const attempts = Math.max(1, options.localPortRange);
+    if (options.localPort + attempts - 1 > 65_535) {
+      throw new TypeError("localPortRange must not extend beyond port 65535");
+    }
+  }
 };
 
 const getNetworkInterface = (options: Options): string | undefined => {
@@ -154,6 +163,8 @@ export const prepareTransportOptions = (options: Options) => {
     rejectUnauthorized: options.rejectUnauthorized !== false,
     caFile: options.caFile,
     networkInterface: getNetworkInterface(options),
+    localPort: options.localPort,
+    localPortRange: options.localPortRange,
     tcpKeepAlive: keepAlive !== undefined && keepAlive !== false,
     tcpKeepIdle:
       typeof keepAlive === "object" ? keepAlive.idleSeconds : undefined,
@@ -175,6 +186,8 @@ export const usesCustomTransport = (options: Options): boolean =>
   options.tls !== undefined ||
   options.localAddress !== undefined ||
   options.localInterface !== undefined ||
+  options.localPort !== undefined ||
+  options.localPortRange !== undefined ||
   (options.httpVersion !== undefined && options.httpVersion !== "auto") ||
   (options.family !== undefined && options.family !== 0) ||
   (options.tcpKeepAlive !== undefined && options.tcpKeepAlive !== false);
