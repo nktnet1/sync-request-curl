@@ -220,6 +220,32 @@ app.get("/request/http-version", (c) => {
   return c.json({ httpVersion: c.env.incoming.httpVersion });
 });
 
+app.get("/auth/echo", (c) => {
+  return c.json({ authorization: c.req.header("authorization") ?? null });
+});
+
+app.get("/auth/basic-challenge", (c) => {
+  const authorization = c.req.header("authorization");
+  if (authorization === undefined) {
+    c.header("WWW-Authenticate", 'Basic realm="sync-request-curl"');
+    return c.body(null, 401);
+  }
+  return c.json({ authorization });
+});
+
+app.get("/auth/redirect/same-origin", (c) => {
+  return c.redirect("/auth/echo", 302);
+});
+
+app.get("/auth/redirect/cross-origin", (c) => {
+  const destination = new URL(c.req.url);
+  destination.hostname =
+    destination.hostname === "localhost" ? "127.0.0.1" : "localhost";
+  destination.pathname = "/auth/echo";
+  destination.search = "";
+  return c.redirect(destination.href, 302);
+});
+
 app.post("/timeout", async (c) => {
   const body = v.parse(timeoutBodySchema, await c.req.json());
 

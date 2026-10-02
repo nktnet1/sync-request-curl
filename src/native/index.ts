@@ -13,6 +13,7 @@ import {
 } from "#/native/platform-key";
 import { parseSchema } from "#/validate";
 import {
+  httpAuthTypeSchema,
   httpVersionSchema,
   ipFamilySchema,
   proxyAuthTypeSchema,
@@ -36,6 +37,10 @@ export const nativeRequestOptionsSchema = v.object({
   ),
   noBody: v.boolean(),
   stopOnRedirectHeaders: v.optional(v.boolean()),
+  authType: v.optional(v.union([httpAuthTypeSchema, v.literal("bearer")])),
+  authUsername: v.optional(v.string()),
+  authPassword: v.optional(v.string()),
+  authBearer: v.optional(v.string()),
   proxy: v.optional(v.string()),
   proxyUsername: v.optional(v.string()),
   proxyPassword: v.optional(v.string()),

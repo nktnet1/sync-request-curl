@@ -107,6 +107,8 @@ test("built declarations expose the public root API without leaking Node header 
        type GetBody,
        type GetJSON,
        type Headers,
+       type HttpAuthOptions,
+       type HttpAuthType,
        type HttpVerb,
        type JsonLike,
        type JsonPrimitive,
@@ -148,6 +150,13 @@ test("built declarations expose the public root API without leaking Node header 
      const primitive: JsonPrimitive = null;
      const json: JsonLike = primitive;
      const nested: NestedJsonLike = { value: json };
+     const httpAuthType: HttpAuthType = "digest";
+     const httpAuth: HttpAuthOptions = {
+       username: "user",
+       password: "secret",
+       type: httpAuthType,
+     };
+     const bearerAuth: HttpAuthOptions = { bearer: "token" };
      const proxyAuth: ProxyAuthType = "digest";
      const proxy: ProxyOptions = {
        url: "http://localhost",
@@ -190,6 +199,9 @@ test("built declarations expose the public root API without leaking Node header 
        responseError,
        encoding,
        nested,
+       httpAuthType,
+       httpAuth,
+       bearerAuth,
        proxyAuth,
        proxy,
        errorCode,

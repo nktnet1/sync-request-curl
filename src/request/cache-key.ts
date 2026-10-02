@@ -28,6 +28,7 @@ export const canUseRequestCache = (
     options.body === undefined &&
     options.json === undefined &&
     options.form === undefined &&
+    options.auth === undefined &&
     !usesCustomTransport(options)
   );
 };

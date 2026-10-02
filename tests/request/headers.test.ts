@@ -300,6 +300,28 @@ test("explicit Authorization wins over URL credentials", () => {
   });
 });
 
+test("rejects high-level auth combined with an Authorization header", () => {
+  expect(() =>
+    request("GET", `${SERVER_URL}/compat/echo`, {
+      auth: { username: "user", password: "secret" },
+      headers: { Authorization: "Bearer explicit" },
+    }),
+  ).toThrow(
+    "Request failed: Invalid request semantics: auth cannot be combined with an explicit Authorization header",
+  );
+});
+
+test("rejects high-level auth combined with URL credentials", () => {
+  const url = `${SERVER_URL.replace("//", "//url-user:url-pass@")}/compat/echo`;
+  expect(() =>
+    request("GET", url, {
+      auth: { username: "option-user", password: "option-pass" },
+    }),
+  ).toThrow(
+    "Request failed: Invalid request semantics: auth cannot be combined with URL credentials",
+  );
+});
+
 test("explicit Accept-Encoding is not expanded by gzip defaults", () => {
   const response = request("GET", `${SERVER_URL}/compat/echo`, {
     headers: { "Accept-Encoding": "identity, gzip;q=0" },

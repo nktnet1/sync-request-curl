@@ -11,6 +11,13 @@ interface PreparedProxyOptions {
   proxyHeaders?: string[];
 }
 
+interface PreparedHttpAuthOptions {
+  authType?: NonNullable<NonNullable<Options["auth"]>["type"]> | "bearer";
+  authUsername?: string;
+  authPassword?: string;
+  authBearer?: string;
+}
+
 const HTTP_PROXY_PROTOCOLS = new Set(["http:", "https:"]);
 const SOCKS_PROXY_PROTOCOLS = new Set([
   "socks4:",
@@ -84,6 +91,22 @@ const prepareProxyOptions = (
   };
 };
 
+const prepareHttpAuthOptions = (
+  auth?: Options["auth"],
+): PreparedHttpAuthOptions => {
+  if (auth === undefined) {
+    return {};
+  }
+  if ("bearer" in auth) {
+    return { authType: "bearer", authBearer: auth.bearer };
+  }
+  return {
+    authType: auth.type ?? "basic",
+    authUsername: auth.username,
+    authPassword: auth.password ?? "",
+  };
+};
+
 const validateLocalBinding = (options: Options): void => {
   if (options.localAddress !== undefined && isIP(options.localAddress) === 0) {
     throw new TypeError("localAddress must be an IP address");
@@ -109,10 +132,12 @@ const getNetworkInterface = (options: Options): string | undefined => {
 /** Validate portable transport controls before cache lookup or native I/O. */
 export const prepareTransportOptions = (options: Options) => {
   const preparedProxy = prepareProxyOptions(options.proxy);
+  const preparedAuth = prepareHttpAuthOptions(options.auth);
   validateLocalBinding(options);
   const keepAlive = options.tcpKeepAlive;
   return {
     ...preparedProxy,
+    ...preparedAuth,
     httpVersion: options.httpVersion ?? "auto",
     family: options.family ?? 0,
     rejectUnauthorized: options.rejectUnauthorized !== false,
@@ -128,9 +153,11 @@ export const prepareTransportOptions = (options: Options) => {
   };
 };
 
-// Custom trust/routing/socket/protocol policy bypasses persistent cache reuse
-// and must not share sockets created under a different transport policy.
+// Authentication and custom trust/routing/socket/protocol policy bypass
+// persistent cache reuse and must not share sockets created under a different
+// security or transport policy.
 export const usesCustomTransport = (options: Options): boolean =>
+  options.auth !== undefined ||
   options.proxy !== undefined ||
   options.rejectUnauthorized === false ||
   options.caFile !== undefined ||

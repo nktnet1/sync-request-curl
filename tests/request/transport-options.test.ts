@@ -14,6 +14,28 @@ const caFile = fileURLToPath(
 );
 
 describe("transport option validation", () => {
+  test("maps origin credentials and bearer authentication", () => {
+    expect(
+      prepareTransportOptions({
+        auth: { username: "user", password: "secret", type: "digest" },
+      }),
+    ).toMatchObject({
+      authType: "digest",
+      authUsername: "user",
+      authPassword: "secret",
+    });
+    expect(
+      prepareTransportOptions({ auth: { username: "user" } }),
+    ).toMatchObject({
+      authType: "basic",
+      authUsername: "user",
+      authPassword: "",
+    });
+    expect(
+      prepareTransportOptions({ auth: { bearer: "token" } }),
+    ).toMatchObject({ authType: "bearer", authBearer: "token" });
+  });
+
   test.each([
     { proxy: PROXY_URL, username: undefined, password: undefined },
     {
@@ -181,6 +203,8 @@ describe("transport option validation", () => {
       prepareTransportOptions({ tcpKeepAlive: {} }).tcpKeepIdle,
     ).toBeUndefined();
     expect(usesCustomTransport({})).toBe(false);
+    expect(usesCustomTransport({ auth: { username: "user" } })).toBe(true);
+    expect(usesCustomTransport({ auth: { bearer: "token" } })).toBe(true);
     expect(usesCustomTransport({ rejectUnauthorized: true })).toBe(false);
     expect(usesCustomTransport({ tcpKeepAlive: false })).toBe(false);
     expect(usesCustomTransport({ rejectUnauthorized: false })).toBe(true);
@@ -213,6 +237,56 @@ describe("transport option validation", () => {
 });
 
 describe("native transport controls", () => {
+  test("supports Basic HTTP authentication", () => {
+    const response = request("GET", `${SERVER_URL}/auth/echo`, {
+      auth: { username: "user", password: "secret" },
+    });
+
+    expect(response.getJSON()).toEqual({
+      authorization: "Basic dXNlcjpzZWNyZXQ=",
+    });
+  });
+
+  test("lets libcurl negotiate an allowed HTTP authentication method", () => {
+    const response = request("GET", `${SERVER_URL}/auth/basic-challenge`, {
+      auth: { username: "user", password: "secret", type: "any" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.getJSON()).toEqual({
+      authorization: "Basic dXNlcjpzZWNyZXQ=",
+    });
+  });
+
+  test("supports Bearer authentication through libcurl", () => {
+    const response = request("GET", `${SERVER_URL}/auth/echo`, {
+      auth: { bearer: "test-token" },
+    });
+
+    expect(response.getJSON()).toEqual({
+      authorization: "Bearer test-token",
+    });
+  });
+
+  test("preserves high-level auth only across same-origin redirects", () => {
+    const auth = { username: "user", password: "secret" } as const;
+    const sameOrigin = request(
+      "GET",
+      `${SERVER_URL}/auth/redirect/same-origin`,
+      { auth },
+    );
+    const crossOrigin = request(
+      "GET",
+      `${SERVER_URL}/auth/redirect/cross-origin`,
+      { auth },
+    );
+
+    expect(sameOrigin.getJSON()).toEqual({
+      authorization: "Basic dXNlcjpzZWNyZXQ=",
+    });
+    expect(crossOrigin.getJSON()).toEqual({ authorization: null });
+  });
+
   test("accepts an explicit IPv4 family selection", () => {
     expect(request("GET", SERVER_URL, { family: 4 }).statusCode).toBe(200);
   });

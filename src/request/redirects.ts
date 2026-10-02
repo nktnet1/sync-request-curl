@@ -65,8 +65,10 @@ const getRedirectHeaders = (
 export const getRedirectOptions = (
   options: Options,
   methodChanged: boolean,
+  sameOrigin = false,
 ): Options => ({
   ...(methodChanged ? withoutPayload(options) : options),
+  auth: sameOrigin ? options.auth : undefined,
   qs: undefined,
   headers: getRedirectHeaders(
     options.headers,

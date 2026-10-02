@@ -51,6 +51,9 @@ const RESPONSE_HEADER_OVERFLOW_ERROR: &str =
   "Response headers exceeded the configured size limit";
 
 const CURLOPT_MIMEPOST: CURLoption = CURLOPTTYPE_OBJECTPOINT + 269;
+// Public string-option ABI value, available since libcurl 7.33.0.
+// curl-sys 0.4.90 leaves this constant commented out.
+const CURLOPT_XOAUTH2_BEARER: CURLoption = CURLOPTTYPE_OBJECTPOINT + 220;
 // Public long-option ABI value, available since libcurl 7.54.0.
 const CURLOPT_SUPPRESS_CONNECT_HEADERS: CURLoption = 265;
 // Public long-option ABI value, available since libcurl 7.37.0.
@@ -60,6 +63,9 @@ const CURLOPT_HEADEROPT: CURLoption = 229;
 // curl-sys 0.4.90 does not currently export this constant.
 const CURLOPT_TCP_KEEPCNT: CURLoption = 326;
 const CURLHEADER_SEPARATE: c_long = 1;
+// Public CURLAUTH bit, available since libcurl 7.33.0. curl-sys 0.4.90 does not
+// export it even though the linked libcurl headers do.
+const CURLAUTH_BEARER: c_long = 1 << 6;
 // Public CURL_HTTP_VERSION enum value, available since libcurl 7.88.0.
 // curl-sys 0.4.90 does not currently export this constant.
 const CURL_HTTP_VERSION_3ONLY: c_long = 31;
@@ -230,6 +236,14 @@ pub struct NativeRequestOptions {
   pub connect_timeout: Option<i64>,
   #[napi(js_name = "overallTimeout")]
   pub overall_timeout: Option<i64>,
+  #[napi(js_name = "authType")]
+  pub auth_type: Option<String>,
+  #[napi(js_name = "authUsername")]
+  pub auth_username: Option<String>,
+  #[napi(js_name = "authPassword")]
+  pub auth_password: Option<String>,
+  #[napi(js_name = "authBearer")]
+  pub auth_bearer: Option<String>,
   pub proxy: Option<String>,
   #[napi(js_name = "proxyUsername")]
   pub proxy_username: Option<String>,
@@ -962,6 +976,25 @@ fn parse_proxy_auth(auth: Option<&str>) -> Result<Option<c_long>> {
   Ok(Some(auth))
 }
 
+fn parse_http_auth(auth: Option<&str>) -> Result<Option<c_long>> {
+  let auth = match auth {
+    Some("basic") => curl_sys::CURLAUTH_BASIC as c_long,
+    Some("digest") => curl_sys::CURLAUTH_DIGEST as c_long,
+    Some("ntlm") => curl_sys::CURLAUTH_NTLM as c_long,
+    // curl-sys 0.4.90 exposes libcurl's deprecated alias for CURLAUTH_NEGOTIATE.
+    Some("negotiate") => curl_sys::CURLAUTH_GSSNEGOTIATE as c_long,
+    Some("any") => curl_sys::CURLAUTH_ANY as c_long,
+    Some("bearer") => CURLAUTH_BEARER,
+    None => return Ok(None),
+    Some(value) => {
+      return Err(Error::from_reason(format!(
+        "Unsupported HTTP authentication method: {value}"
+      )))
+    }
+  };
+  Ok(Some(auth))
+}
+
 fn get_string_info(curl: *mut CURL, info: curl_sys::CURLINFO) -> Option<String> {
   let mut value: *mut c_char = ptr::null_mut();
   unsafe {
@@ -995,6 +1028,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
 
   let http_version = parse_http_version(options.http_version.as_deref())?;
   let ip_resolve = parse_ip_resolve(options.family)?;
+  let http_auth = parse_http_auth(options.auth_type.as_deref())?;
   let proxy_auth = parse_proxy_auth(options.proxy_auth.as_deref())?;
   let easy = EasyHandle::new()?;
   let curl = easy.0;
@@ -1117,10 +1151,13 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
       keep_first_error(&mut code, capath_code);
     }
   }
-  // Explicit routing also overrides ambient NO_PROXY. The caller can supply a
-  // per-request bypass list, while an empty string means every host uses the
-  // configured proxy. Separate credentials are only used for the proxy hop.
+  // Authentication credentials are kept separate for the origin and proxy.
+  // Explicit proxy routing also overrides ambient NO_PROXY; an empty bypass
+  // string means every host uses the configured proxy.
   for (option, value) in [
+    (curl_sys::CURLOPT_USERNAME, options.auth_username.as_deref()),
+    (curl_sys::CURLOPT_PASSWORD, options.auth_password.as_deref()),
+    (CURLOPT_XOAUTH2_BEARER, options.auth_bearer.as_deref()),
     (
       curl_sys::CURLOPT_NOPROXY,
       Some(options.proxy_no_proxy.as_deref().unwrap_or("")),
@@ -1134,6 +1171,11 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
       &mut code,
       set_string_option(curl, option, value, &mut keepalive, true),
     );
+  }
+  if let Some(value) = http_auth {
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_HTTPAUTH, value)
+    });
   }
   if let Some(value) = proxy_auth {
     keep_first_error(&mut code, unsafe {
