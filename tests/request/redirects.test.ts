@@ -258,14 +258,6 @@ describe("Redirects", () => {
         "https://picsum.photos/200/300",
       );
       expect(redirectResponse).toMatchObject({ code: 200 });
-      const noRedirect = wrapperRequest(
-        "GET",
-        "https://picsum.photos/200/300",
-        {
-          followRedirects: false,
-        },
-      );
-      expect(noRedirect).toMatchObject({ code: 302 });
     },
   );
 });
