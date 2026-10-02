@@ -23,6 +23,7 @@ export const tlsServer = createHttpsServer(
     res.end(
       JSON.stringify({
         address: req.socket.remoteAddress,
+        port: req.socket.remotePort,
         proxyAuthorization: req.headers["proxy-authorization"] ?? null,
         proxyTrace: req.headers["x-proxy-trace"] ?? null,
         clientAuthorized: socket.authorized,

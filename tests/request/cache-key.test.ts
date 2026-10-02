@@ -32,6 +32,8 @@ test.each([
     { tls: { certFile: "/client.pem", keyFile: "/client-key.pem" } },
     { httpVersion: "2" },
     { family: 4 },
+    { localPort: 40_000 },
+    { localPort: 40_000, localPortRange: 10 },
     { tcpKeepAlive: { probeCount: 3 } },
   ].map((options) => ({
     url: "http://example.com",

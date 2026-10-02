@@ -430,6 +430,18 @@ const positiveInt32Schema = v.pipe(
   v.minValue(1),
   v.maxValue(2_147_483_647),
 );
+const localPortSchema = v.pipe(
+  v.number(),
+  v.integer(),
+  v.minValue(1),
+  v.maxValue(65_535),
+);
+const localPortRangeSchema = v.pipe(
+  v.number(),
+  v.integer(),
+  v.minValue(0),
+  v.maxValue(65_535),
+);
 
 const proxyCredentialSchema = v.pipe(
   v.string(),
@@ -555,6 +567,16 @@ const optionsObjectSchema = v.object({
   localAddress: v.optional(nativeStringSchema),
   /** Source interface name. Mutually exclusive with `localAddress`. */
   localInterface: v.optional(nativeStringSchema),
+  /**
+   * Preferred local TCP source port. Valid values are 1-65535. When set,
+   * `localPortRange` can allow consecutive fallback ports.
+   */
+  localPort: v.optional(localPortSchema),
+  /**
+   * Number of consecutive local ports libcurl may try, beginning at
+   * `localPort`. Requires `localPort`; `0` or `1` means the exact port only.
+   */
+  localPortRange: v.optional(localPortRangeSchema),
   /**
    * IP address family used when resolving hostnames. `0` (default) allows
    * either family, `4` restricts resolution to IPv4, and `6` to IPv6.
@@ -685,13 +707,23 @@ const optionsObjectSchema = v.object({
 
 export const optionsSchema = v.custom<
   v.InferOutput<typeof optionsObjectSchema>
->(
-  (input) =>
-    !Array.isArray(input) &&
-    v.is(optionsObjectSchema, input) &&
-    !("proxyAuth" in input),
-  "Invalid request options",
-);
+>((input) => {
+  if (
+    Array.isArray(input) ||
+    !v.is(optionsObjectSchema, input) ||
+    "proxyAuth" in input
+  ) {
+    return false;
+  }
+  if (input.localPortRange === undefined) {
+    return true;
+  }
+  if (input.localPort === undefined) {
+    return false;
+  }
+  const attempts = Math.max(1, input.localPortRange);
+  return input.localPort + attempts - 1 <= 65_535;
+}, "Invalid request options");
 
 const httpMethodTokenSchema = v.pipe(
   v.string(),

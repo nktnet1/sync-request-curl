@@ -58,6 +58,12 @@ export const nativeRequestOptionsSchema = v.object({
   tlsMinVersion: v.optional(tlsVersionSchema),
   tlsMaxVersion: v.optional(tlsVersionSchema),
   networkInterface: v.optional(v.string()),
+  localPort: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(65_535)),
+  ),
+  localPortRange: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(65_535)),
+  ),
   tcpKeepAlive: v.optional(v.boolean()),
   tcpKeepIdle: v.optional(v.number()),
   tcpKeepInterval: v.optional(v.number()),
