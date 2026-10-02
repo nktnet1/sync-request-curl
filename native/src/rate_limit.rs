@@ -23,7 +23,6 @@ impl RateLimitAllowance {
   pub(crate) fn update(
     &mut self,
     transferred: i64,
-    complete: bool,
     now: Instant,
   ) -> bool {
     let transferred = u64::try_from(transferred).unwrap_or_default();
@@ -34,9 +33,12 @@ impl RateLimitAllowance {
     }
     let delta = transferred - self.transferred;
     self.transferred = transferred;
-    if self.bytes_per_second == 0 || complete {
+    if self.bytes_per_second == 0 {
       self.allowance = Duration::ZERO;
     } else if delta > 0 {
+      // Include the final burst: libcurl can pause for its rate limit after
+      // reporting all upload bytes, before reading the response. Repeated
+      // callbacks with the same counter neither renew nor discard this debt.
       let nanos = (u128::from(delta) * 1_000_000_000)
         .div_ceil(u128::from(self.bytes_per_second));
       let earned = Duration::new(
@@ -72,9 +74,9 @@ mod tests {
   fn only_new_bytes_extend_the_allowance() {
     let start = Instant::now();
     let mut limit = RateLimitAllowance::new(1_000, start);
-    assert!(limit.update(500, false, start));
+    assert!(limit.update(500, start));
     assert_eq!(limit.idle_elapsed(start + Duration::from_millis(499)), Some(Duration::ZERO));
-    assert!(!limit.update(500, false, start + Duration::from_millis(600)));
+    assert!(!limit.update(500, start + Duration::from_millis(600)));
     assert_eq!(
       limit.idle_elapsed(start + Duration::from_millis(700)),
       Some(Duration::from_millis(200)),
@@ -85,13 +87,13 @@ mod tests {
   fn bursts_accumulate_but_elapsed_time_is_not_earned_twice() {
     let start = Instant::now();
     let mut limit = RateLimitAllowance::new(1_000, start);
-    limit.update(500, false, start);
-    limit.update(750, false, start + Duration::from_millis(100));
+    limit.update(500, start);
+    limit.update(750, start + Duration::from_millis(100));
     assert_eq!(
       limit.idle_elapsed(start + Duration::from_millis(800)),
       Some(Duration::from_millis(50)),
     );
-    limit.update(1_000, false, start + Duration::from_secs(1));
+    limit.update(1_000, start + Duration::from_secs(1));
     assert_eq!(
       limit.idle_elapsed(start + Duration::from_millis(1_300)),
       Some(Duration::from_millis(50)),
@@ -99,16 +101,32 @@ mod tests {
   }
 
   #[test]
-  fn completion_and_authentication_counter_resets_clear_allowance() {
+  fn final_burst_allowance_expires_without_further_progress() {
+    let start = Instant::now();
+    let mut limit = RateLimitAllowance::new(65_536, start);
+    limit.update(65_536, start);
+    limit.update(131_072, start + Duration::from_secs(1));
+    for millis in [1_100, 1_500, 2_000, 2_200] {
+      assert!(!limit.update(131_072, start + Duration::from_millis(millis)));
+    }
+    assert_eq!(
+      limit.idle_elapsed(start + Duration::from_millis(1_999)),
+      Some(Duration::ZERO),
+    );
+    assert_eq!(
+      limit.idle_elapsed(start + Duration::from_millis(2_200)),
+      Some(Duration::from_millis(200)),
+    );
+  }
+
+  #[test]
+  fn authentication_counter_resets_clear_allowance() {
     let start = Instant::now();
     let mut limit = RateLimitAllowance::new(1, start);
-    limit.update(100, false, start);
-    limit.update(100, true, start);
+    limit.update(200, start);
+    limit.update(0, start);
     assert_eq!(limit.idle_elapsed(start), None);
-    limit.update(200, false, start);
-    limit.update(0, false, start);
-    assert_eq!(limit.idle_elapsed(start), None);
-    limit.update(1, false, start);
+    limit.update(1, start);
     assert_eq!(
       limit.idle_elapsed(start + Duration::from_secs(2)),
       Some(Duration::from_secs(1)),
@@ -120,7 +138,7 @@ mod tests {
     let start = Instant::now();
     for rate in [0, -1] {
       let mut limit = RateLimitAllowance::new(rate, start);
-      limit.update(10_000, false, start);
+      limit.update(10_000, start);
       assert_eq!(limit.idle_elapsed(start), None);
     }
   }
@@ -129,14 +147,14 @@ mod tests {
   fn fractional_nanoseconds_round_up_and_large_counters_do_not_overflow() {
     let start = Instant::now();
     let mut limit = RateLimitAllowance::new(i64::MAX, start);
-    limit.update(1, false, start);
+    limit.update(1, start);
     assert_eq!(limit.idle_elapsed(start), Some(Duration::ZERO));
     assert_eq!(
       limit.idle_elapsed(start + Duration::from_nanos(2)),
       Some(Duration::from_nanos(1)),
     );
     let mut limit = RateLimitAllowance::new(1, start);
-    limit.update(i64::MAX, false, start);
+    limit.update(i64::MAX, start);
     assert_eq!(limit.idle_elapsed(start + Duration::from_secs(1)), Some(Duration::ZERO));
   }
 }

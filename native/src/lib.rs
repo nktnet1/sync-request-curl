@@ -714,7 +714,7 @@ extern "C" fn transfer_progress_callback(
   user_data: *mut c_void,
   _download_total: curl_off_t,
   downloaded: curl_off_t,
-  upload_total: curl_off_t,
+  _upload_total: curl_off_t,
   uploaded: curl_off_t,
 ) -> c_int {
   if user_data.is_null() {
@@ -723,12 +723,8 @@ extern "C" fn transfer_progress_callback(
   catch_unwind(AssertUnwindSafe(|| {
     let state = unsafe { &mut *user_data.cast::<RequestState>() };
     let now = Instant::now();
-    let received = state.download_allowance.update(downloaded, false, now);
-    let sent = state.upload_allowance.update(
-      uploaded,
-      upload_total > 0 && uploaded >= upload_total,
-      now,
-    );
+    let received = state.download_allowance.update(downloaded, now);
+    let sent = state.upload_allowance.update(uploaded, now);
     if received || sent {
       state.last_activity = now;
     }
@@ -1657,6 +1653,44 @@ mod regression_tests {
     assert!(safe_auth_username(""));
     assert!(safe_auth_username("caf\u{e9}"));
     assert!(safe_bearer_token("a.b_c-~+/=="));
+  }
+
+  #[test]
+  fn final_upload_progress_retains_bounded_allowance_without_renewal() {
+    let bytes: curl_off_t = 128 * 1024;
+    // Unknown totals must behave the same as a known, completed upload.
+    for total in [0, bytes] {
+      let mut state = RequestState::default();
+      state.upload_allowance = RateLimitAllowance::new(64 * 1024, Instant::now());
+      let state_pointer = (&mut state as *mut RequestState).cast::<c_void>();
+      assert_eq!(
+        transfer_progress_callback(state_pointer, 0, 0, total, bytes),
+        0,
+      );
+      let uploaded_at = state.last_activity;
+      assert_eq!(
+        state.upload_allowance
+          .idle_elapsed(uploaded_at + Duration::from_millis(1_999)),
+        Some(Duration::ZERO),
+      );
+      // A later callback reporting completion again must not clear the debt,
+      // earn it twice, or masquerade as fresh socket activity.
+      assert_eq!(
+        transfer_progress_callback(state_pointer, 0, 0, total, bytes),
+        0,
+      );
+      assert_eq!(state.last_activity, uploaded_at);
+      assert_eq!(
+        state.upload_allowance
+          .idle_elapsed(uploaded_at + Duration::from_millis(1_999)),
+        Some(Duration::ZERO),
+      );
+      assert_eq!(
+        state.upload_allowance
+          .idle_elapsed(uploaded_at + Duration::from_millis(2_200)),
+        Some(Duration::from_millis(200)),
+      );
+    }
   }
 
   #[test]

@@ -43,7 +43,9 @@ complete, body transfers are governed by `socketTimeout` and `overallTimeout`.
 When transfer speed limits are enabled, `socketTimeout` allows bounded additional
 time for local throttling. Each newly transferred byte earns at most its
 configured transmission time as an inactivity allowance. Repeated progress
-callbacks without new bytes do not extend the allowance, and completed uploads
-no longer earn upload allowance while waiting for a response. A stalled transfer
-still times out after its remaining allowance and inactivity budget expire.
+callbacks without new bytes do not extend the allowance. Reaching the final
+upload byte preserves the allowance already earned, including that final burst:
+libcurl can still pause for its upload rate limit before reading the response.
+Without further progress, this allowance expires normally; a server that never
+responds still times out after the remaining allowance and inactivity budget expire.
 `overallTimeout` includes both throttling and authentication and is never extended.

@@ -118,6 +118,10 @@ export const handleRegressionRequest = (
       bytes += chunk.length;
     });
     req.once("end", () => {
+      if (url.searchParams.has("stall")) {
+        later(res, 3_000, () => res.destroy());
+        return;
+      }
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ bytes }));
     });
