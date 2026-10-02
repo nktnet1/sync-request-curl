@@ -20,7 +20,7 @@ napi-derive = "=3.6.3"
 # Keep the macro crate on the backend release it was published against.
 # napi-derive-backend 6.1.4 moved to convert_case 0.12 while napi-derive 3.6.3 still uses 0.11.
 napi-derive-backend = "=6.1.2"
-curl-sys = { version = "=0.4.90", default-features = false }
+curl-sys = { package = "nktnet-curl-sys", version = "=0.4.91-nktnet.1", default-features = false }
 
 [target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
 openssl-probe = "=0.2.1"
