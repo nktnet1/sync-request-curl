@@ -159,6 +159,12 @@ jobs:
       - name: Run tests with coverage
         run: pnpm test --coverage
 
+      - name: Test external HTTPS with Apple SecTrust
+        if: matrix.os == 'macos-latest' && matrix.node-version == '24.x'
+        env:
+          RUN_EXTERNAL_TEST: "1"
+        run: pnpm exec vitest run tests/request/redirects.test.ts -t "External URL redirect"
+
       - name: Upload coverage reports to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == '24.x' && github.ref_name == 'main'
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
