@@ -442,6 +442,13 @@ const localPortRangeSchema = v.pipe(
   v.minValue(0),
   v.maxValue(65_535),
 );
+export const transferSpeedLimitSchema = v.pipe(
+  v.number(),
+  v.finite(),
+  v.integer(),
+  v.minValue(0),
+  v.maxValue(Number.MAX_SAFE_INTEGER),
+);
 
 const proxyCredentialSchema = v.pipe(
   v.string(),
@@ -577,6 +584,16 @@ const optionsObjectSchema = v.object({
    * `localPort`. Requires `localPort`; `0` or `1` means the exact port only.
    */
   localPortRange: v.optional(localPortRangeSchema),
+  /**
+   * Maximum download transfer rate in bytes per second. `0` (default) leaves
+   * download speed unlimited.
+   */
+  maxDownloadSpeed: v.optional(transferSpeedLimitSchema),
+  /**
+   * Maximum upload transfer rate in bytes per second. `0` (default) leaves
+   * upload speed unlimited.
+   */
+  maxUploadSpeed: v.optional(transferSpeedLimitSchema),
   /**
    * IP address family used when resolving hostnames. `0` (default) allows
    * either family, `4` restricts resolution to IPv4, and `6` to IPv6.

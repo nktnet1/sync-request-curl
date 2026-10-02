@@ -85,6 +85,12 @@ describe("schema-aligned types", () => {
     expectTypeOf<Options["localPortRange"]>().toEqualTypeOf<
       number | undefined
     >();
+    expectTypeOf<Options["maxDownloadSpeed"]>().toEqualTypeOf<
+      number | undefined
+    >();
+    expectTypeOf<Options["maxUploadSpeed"]>().toEqualTypeOf<
+      number | undefined
+    >();
     expectTypeOf<
       Exclude<Options["tcpKeepAlive"], boolean | undefined>
     >().toEqualTypeOf<{
@@ -457,6 +463,35 @@ describe("local port validation", () => {
     { localPort: 40_000, localPortRange: -1 },
     { localPort: 40_000, localPortRange: 1.5 },
     { localPort: 65_535, localPortRange: 2 },
+  ])("rejects %j", (options) => {
+    expect(v.is(optionsSchema, options)).toBe(false);
+  });
+});
+
+describe("transfer speed validation", () => {
+  test.each([
+    { maxDownloadSpeed: 0 },
+    { maxDownloadSpeed: 1 },
+    { maxDownloadSpeed: Number.MAX_SAFE_INTEGER },
+    { maxUploadSpeed: 0 },
+    { maxUploadSpeed: 1 },
+    { maxUploadSpeed: Number.MAX_SAFE_INTEGER },
+    { maxDownloadSpeed: 1_000_000, maxUploadSpeed: 500_000 },
+  ])("accepts %j", (options) => {
+    expect(v.is(optionsSchema, options)).toBe(true);
+  });
+
+  test.each([
+    { maxDownloadSpeed: -1 },
+    { maxDownloadSpeed: 1.5 },
+    { maxDownloadSpeed: Number.POSITIVE_INFINITY },
+    { maxDownloadSpeed: Number.MAX_SAFE_INTEGER + 1 },
+    { maxDownloadSpeed: "1000" },
+    { maxUploadSpeed: -1 },
+    { maxUploadSpeed: 1.5 },
+    { maxUploadSpeed: Number.NaN },
+    { maxUploadSpeed: Number.MAX_SAFE_INTEGER + 1 },
+    { maxUploadSpeed: "1000" },
   ])("rejects %j", (options) => {
     expect(v.is(optionsSchema, options)).toBe(false);
   });

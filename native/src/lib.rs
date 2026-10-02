@@ -280,6 +280,10 @@ pub struct NativeRequestOptions {
   pub local_port: Option<i64>,
   #[napi(js_name = "localPortRange")]
   pub local_port_range: Option<i64>,
+  #[napi(js_name = "maxDownloadSpeed")]
+  pub max_download_speed: Option<i64>,
+  #[napi(js_name = "maxUploadSpeed")]
+  pub max_upload_speed: Option<i64>,
   #[napi(js_name = "tcpKeepAlive")]
   pub tcp_keep_alive: Option<bool>,
   #[napi(js_name = "tcpKeepIdle")]
@@ -1289,6 +1293,22 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     if let Some(value) = value {
       keep_first_error(&mut code, unsafe {
         curl_sys::curl_easy_setopt(curl, option, value as c_long)
+      });
+    }
+  }
+  for (option, value) in [
+    (
+      curl_sys::CURLOPT_MAX_RECV_SPEED_LARGE,
+      options.max_download_speed,
+    ),
+    (
+      curl_sys::CURLOPT_MAX_SEND_SPEED_LARGE,
+      options.max_upload_speed,
+    ),
+  ] {
+    if let Some(value) = value {
+      keep_first_error(&mut code, unsafe {
+        curl_sys::curl_easy_setopt(curl, option, value as curl_off_t)
       });
     }
   }

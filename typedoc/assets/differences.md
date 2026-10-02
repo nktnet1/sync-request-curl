@@ -24,10 +24,12 @@
   `caFile` or `rejectUnauthorized` fields. `localAddress` / `localInterface`
   select the source address or interface, while `localPort` and
   `localPortRange` can pin the source TCP port or allow consecutive fallback
-  ports. Client certificate identity is retained only across same-origin
-  redirects. TCP keepalive probe counts require libcurl 8.9.0 or newer and
-  operating-system support. Unsupported linked libcurl/platform combinations
-  return a transport error rather than silently ignoring the setting.
+  ports. `maxDownloadSpeed` and `maxUploadSpeed` can cap network transfer rates
+  in bytes per second without changing cache identity or connection pooling.
+  Client certificate identity is retained only across same-origin redirects.
+  TCP keepalive probe counts require libcurl 8.9.0 or newer and operating-system
+  support. Unsupported linked libcurl/platform combinations return a transport
+  error rather than silently ignoring the setting.
 - `httpVersion` can request HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/2 over TLS,
   HTTP/2 prior knowledge, HTTP/3, or HTTP/3-only behaviour. HTTP/3 requires
   the linked libcurl build to include HTTP/3 support.

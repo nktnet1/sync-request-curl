@@ -165,6 +165,8 @@ export const prepareTransportOptions = (options: Options) => {
     networkInterface: getNetworkInterface(options),
     localPort: options.localPort,
     localPortRange: options.localPortRange,
+    maxDownloadSpeed: options.maxDownloadSpeed,
+    maxUploadSpeed: options.maxUploadSpeed,
     tcpKeepAlive: keepAlive !== undefined && keepAlive !== false,
     tcpKeepIdle:
       typeof keepAlive === "object" ? keepAlive.idleSeconds : undefined,
@@ -177,7 +179,8 @@ export const prepareTransportOptions = (options: Options) => {
 
 // Authentication and custom trust/routing/socket/protocol policy bypass
 // persistent cache reuse and must not share sockets created under a different
-// security or transport policy.
+// security or transport policy. Per-transfer speed caps are intentionally not
+// included: they do not alter response identity or connection compatibility.
 export const usesCustomTransport = (options: Options): boolean =>
   options.auth !== undefined ||
   options.proxy !== undefined ||

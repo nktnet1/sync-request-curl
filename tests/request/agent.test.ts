@@ -39,6 +39,18 @@ describe("agent", () => {
     expect(getConnectionId(agent)).toBe(getConnectionId(agent));
   });
 
+  test("keeps pooling when transfer speed limits are set", () => {
+    const agent = new Agent({ keepAlive: true });
+    const getRateLimitedConnectionId = (): number =>
+      request("GET", `${SERVER_URL}/connection/id`, {
+        agent,
+        maxDownloadSpeed: 10_000_000,
+        maxUploadSpeed: 10_000_000,
+      }).getJSON<{ connectionId: number }>().connectionId;
+
+    expect(getRateLimitedConnectionId()).toBe(getRateLimitedConnectionId());
+  });
+
   test("keeps pooling with explicit default-equivalent transport options", () => {
     const agent = new Agent({ keepAlive: true });
     const getDefaultEquivalentConnectionId = (): number =>
