@@ -3,6 +3,7 @@ import { URL } from "node:url";
 import * as v from "valibot";
 import type { CurlError, RequestError } from "#/errors";
 import { FormData } from "#/form-data";
+import { isSafeAuthUsername, isSafeBearerToken } from "#/http/auth";
 import type { Headers } from "#/types/headers";
 
 /** Primitive JSON values accepted in request bodies.
@@ -197,6 +198,9 @@ export const httpAuthTypeSchema = v.picklist([
  * Username/password authentication defaults to Basic when `type` is omitted.
  * Bearer authentication uses libcurl's OAuth2 bearer support. Authentication
  * configured here is never forwarded to a different origin during redirects.
+ * Usernames cannot contain ASCII control characters; bearer tokens must use
+ * RFC 6750 b64token syntax. Negotiated authentication is not supported with
+ * HEAD payloads; omit the payload or use preemptive Basic/Bearer authentication.
  *
  * @group Request
  */
@@ -450,15 +454,18 @@ export const transferSpeedLimitSchema = v.pipe(
   v.maxValue(Number.MAX_SAFE_INTEGER),
 );
 
-const proxyCredentialSchema = v.pipe(
+export const authUsernameSchema = v.pipe(
+  v.string(),
+  v.check(isSafeAuthUsername),
+);
+
+// Passwords are encoded/hashed by libcurl, not copied into HTTP headers.
+export const authPasswordSchema = v.pipe(
   v.string(),
   v.check((value) => !value.includes("\0")),
 );
 
-const httpAuthCredentialSchema = v.pipe(
-  v.string(),
-  v.check((value) => !value.includes("\0")),
-);
+export const authBearerSchema = v.pipe(v.string(), v.check(isSafeBearerToken));
 
 const tlsPassphraseSchema = v.pipe(
   v.string(),
@@ -466,13 +473,13 @@ const tlsPassphraseSchema = v.pipe(
 );
 
 const httpCredentialAuthObjectSchema = v.object({
-  username: httpAuthCredentialSchema,
-  password: v.optional(httpAuthCredentialSchema),
+  username: authUsernameSchema,
+  password: v.optional(authPasswordSchema),
   type: v.optional(httpAuthTypeSchema),
 });
 
 const httpBearerAuthObjectSchema = v.object({
-  bearer: nativeStringSchema,
+  bearer: authBearerSchema,
 });
 
 export const httpAuthSchema = v.custom<HttpAuthOptions>((input) => {
@@ -498,8 +505,8 @@ const noProxyEntrySchema = v.pipe(
 
 const proxyObjectSchema = v.object({
   url: nativeStringSchema,
-  username: v.optional(proxyCredentialSchema),
-  password: v.optional(proxyCredentialSchema),
+  username: v.optional(authUsernameSchema),
+  password: v.optional(authPasswordSchema),
   auth: v.optional(proxyAuthTypeSchema),
   noProxy: v.optional(v.array(noProxyEntrySchema)),
   headers: v.optional(incomingHttpHeadersSchema),
@@ -635,7 +642,7 @@ const optionsObjectSchema = v.object({
   form: v.optional(v.instance(FormData)),
   /**
    * Maximum time to wait for response headers in milliseconds. Defaults to `0`,
-   * which disables it.
+   * which disables it. Authentication retries reuse the original deadline.
    */
   timeout: v.optional(
     v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(2_147_483_647)),
@@ -657,7 +664,8 @@ const optionsObjectSchema = v.object({
   ),
   /**
    * Socket inactivity timeout in milliseconds. Defaults to `0`, which disables
-   * it.
+   * it. Speed-limited transfers receive bounded inactivity allowance for newly
+   * transferred bytes; local throttling does not extend `overallTimeout`.
    */
   socketTimeout: v.optional(
     v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(2_147_483_647)),

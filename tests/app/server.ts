@@ -10,6 +10,7 @@ import {
   TLS_PORT,
 } from "#tests/app/config";
 import app from "#tests/app/index";
+import { handleRegressionRequest } from "#tests/app/regressions";
 import { proxyServer, tlsServer } from "#tests/app/transport";
 
 let listeningServers = 0;
@@ -36,6 +37,9 @@ const server = serve(
 
 const framingServer = createServer((request, response) => {
   response.setHeader("Connection", "close");
+  if (handleRegressionRequest(request, response)) {
+    return;
+  }
 
   switch (request.url) {
     case "/content-length/identical":

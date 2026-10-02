@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { isSafeAuthUsername } from "#/http/auth";
 import { serializeRequestHeaders } from "#/http/headers";
 import type { Options } from "#/types/definition";
 
@@ -25,6 +26,26 @@ const SOCKS_PROXY_PROTOCOLS = new Set([
   "socks5:",
   "socks5h:",
 ]);
+
+const readProxyUrlCredentials = (
+  url: URL,
+): Pick<PreparedProxyOptions, "proxyUsername" | "proxyPassword"> => {
+  // Empty CURLOPT_PROXYUSERNAME/PROXYPASSWORD can enable Basic ':' auth.
+  // Leave both unset unless the URL actually supplies credentials.
+  if (!url.username && !url.password) {
+    return {};
+  }
+
+  const proxyUsername = decodeURIComponent(url.username);
+  const proxyPassword = decodeURIComponent(url.password);
+  if (proxyUsername.includes("\0") || proxyPassword.includes("\0")) {
+    throw new TypeError("Proxy credentials cannot contain NUL");
+  }
+  if (!isSafeAuthUsername(proxyUsername)) {
+    throw new TypeError("Proxy usernames cannot contain control characters");
+  }
+  return { proxyUsername, proxyPassword };
+};
 
 const prepareProxyOptions = (
   proxy?: Options["proxy"],
@@ -56,17 +77,7 @@ const prepareProxyOptions = (
     throw new TypeError("proxy.headers are only supported for HTTP(S) proxies");
   }
 
-  let proxyUsername: string | undefined;
-  let proxyPassword: string | undefined;
-  // Empty CURLOPT_PROXYUSERNAME/PROXYPASSWORD can enable Basic ':' auth.
-  // Leave both unset unless the URL actually supplies credentials.
-  if (url.username || url.password) {
-    proxyUsername = decodeURIComponent(url.username);
-    proxyPassword = decodeURIComponent(url.password);
-    if (proxyUsername.includes("\0") || proxyPassword.includes("\0")) {
-      throw new TypeError("Proxy credentials cannot contain NUL");
-    }
-  }
+  let { proxyUsername, proxyPassword } = readProxyUrlCredentials(url);
 
   if (proxy.password !== undefined && proxy.username === undefined) {
     throw new TypeError("proxy.password requires proxy.username");

@@ -140,6 +140,44 @@ describe("transport option validation", () => {
     );
   });
 
+  test.each(["http", "https", "socks4", "socks4a", "socks5", "socks5h"])(
+    "decodes and strips %s proxy URL credentials",
+    (scheme) => {
+      expect(
+        prepareTransportOptions({
+          proxy: { url: `${scheme}://us%40er:p%3Ass%25@localhost:8080` },
+        }),
+      ).toMatchObject({
+        proxy: new URL(`${scheme}://localhost:8080`).href,
+        proxyUsername: "us@er",
+        proxyPassword: "p:ss%",
+      });
+    },
+  );
+
+  test.each([
+    "us%00er:secret",
+    "us%0Der:secret",
+    "us%0Aer:secret",
+    "us%7Fer:secret",
+    "user:sec%00ret",
+    "us%er:secret",
+    "user:sec%ret",
+  ])(
+    "validates URL credentials before explicit overrides: %s",
+    (credentials) => {
+      expect(() =>
+        prepareTransportOptions({
+          proxy: {
+            url: PROXY_URL.replace("://", `://${credentials}@`),
+            username: "explicit",
+            password: "secret",
+          },
+        }),
+      ).toThrow();
+    },
+  );
+
   test("maps HTTP proxy auth, bypass hosts, and proxy-only headers", () => {
     expect(
       prepareTransportOptions({

@@ -53,6 +53,8 @@ A high-performance Node.js alternative to [sync-request](https://github.com/Forb
   - [6.3. Linux](#compatibility-linux)
   - [6.4. Building from source](#compatibility-building-from-source)
 - [7. Caveats](#caveats)
+  - [7.1. Authentication and HEAD payloads](#caveats-authentication-and-head-payloads)
+  - [7.2. Timeouts with authentication and transfer limits](#caveats-timeouts-with-authentication-and-transfer-limits)
 
 <a id="installation"></a>
 ## 1. Installation
@@ -363,10 +365,10 @@ supplied.
 | <a id="property-json"></a> `json?` | [`JsonLike`](#jsonlike) | JSON-compatible request body. Adds `application/json` when needed. |
 | <a id="property-body-1"></a> `body?` | `string` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> | Raw string or [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer) request body. |
 | <a id="property-form"></a> `form?` | [`FormData`](#formdata) | Synchronous multipart/form-data body. |
-| <a id="property-timeout"></a> `timeout?` | `number` | Maximum time to wait for response headers in milliseconds. Defaults to `0`, which disables it. |
+| <a id="property-timeout"></a> `timeout?` | `number` | Maximum time to wait for response headers in milliseconds. Defaults to `0`, which disables it. Authentication retries reuse the original deadline. |
 | <a id="property-connecttimeout"></a> `connectTimeout?` | `number` | Maximum time allowed for connection establishment in milliseconds. This includes DNS lookup, TCP connection, and TLS/protocol handshakes. Defaults to `0`, which uses libcurl's default connection timeout. |
 | <a id="property-overalltimeout"></a> `overallTimeout?` | `number` | Complete-operation deadline in milliseconds. Defaults to `0`, which disables it. |
-| <a id="property-sockettimeout"></a> `socketTimeout?` | `number` | Socket inactivity timeout in milliseconds. Defaults to `0`, which disables it. |
+| <a id="property-sockettimeout"></a> `socketTimeout?` | `number` | Socket inactivity timeout in milliseconds. Defaults to `0`, which disables it. Speed-limited transfers receive bounded inactivity allowance for newly transferred bytes; local throttling does not extend `overallTimeout`. |
 | <a id="property-followredirects"></a> `followRedirects?` | `boolean` | Follow redirects automatically. Defaults to `true`. |
 | <a id="property-maxredirects"></a> `maxRedirects?` | `number` | Maximum redirects to follow. Defaults to no limit. Negative values and infinities also mean no limit; `NaN` is invalid. |
 | <a id="property-allowredirectheaders"></a> `allowRedirectHeaders?` | `string`[] | Caller headers allowed to be forwarded to redirect hops. Defaults to none. |
@@ -580,6 +582,9 @@ High-level HTTP origin authentication configuration.
 Username/password authentication defaults to Basic when `type` is omitted.
 Bearer authentication uses libcurl's OAuth2 bearer support. Authentication
 configured here is never forwarded to a different origin during redirects.
+Usernames cannot contain ASCII control characters; bearer tokens must use
+RFC 6750 b64token syntax. Negotiated authentication is not supported with
+HEAD payloads; omit the payload or use preemptive Basic/Bearer authentication.
 
 ***
 
@@ -1502,8 +1507,12 @@ key to be part of that identity and ignores a separate `tls.keyFile`.
 ### 6.2. macOS
 
 Prebuilt binaries are available for Apple Silicon (`arm64`) and Intel (`x64`) macOS.
-Client-certificate file formats and TLS-version capabilities follow the system
-libcurl and its selected TLS backend.
+The default bundled libcurl uses OpenSSL, with Apple SecTrust for native
+certificate verification. File-based mutual TLS supports PEM certificate/key
+pairs and PKCS#12 identities through the high-level `tls` option.
+
+Only explicit `--libcurl=system` builds inherit the client-certificate formats
+and TLS-version capabilities of the selected system libcurl and TLS backend.
 
 <a id="compatibility-linux"></a>
 ### 6.3. Linux
@@ -1587,3 +1596,37 @@ JavaScript for novice programmers, hence its synchronous nature. However, we
 recommend to always use an
 [asynchronous alternative](https://blog.appsignal.com/2024/09/11/top-5-http-request-libraries-for-nodejs.html)
 where possible.
+
+<a id="caveats-authentication-and-head-payloads"></a>
+### 7.1. Authentication and HEAD payloads
+
+Authentication usernames must not contain ASCII control characters (including
+CR, LF, and DEL). Bearer tokens must use the RFC 6750 `b64token` syntax. Passwords
+may contain CR/LF because libcurl encodes or hashes them, but cannot contain NUL.
+The same username rules apply to percent-decoded proxy URL credentials.
+
+HEAD requests with a payload cannot use negotiated origin or proxy authentication
+(`any`, `digest`, `ntlm`, or `negotiate`). This combination is rejected before
+network I/O, rather than returning an intermediate challenge as a successful
+transfer or waiting for a HEAD response body that will never arrive. Omit the
+payload to use negotiated authentication with HEAD, or use preemptive Basic or
+Bearer authentication when supported by the server. This restriction also applies
+to empty explicit payloads and multipart forms.
+
+<a id="caveats-timeouts-with-authentication-and-transfer-limits"></a>
+### 7.2. Timeouts with authentication and transfer limits
+
+`timeout` remains a response-header deadline across libcurl's internal
+requests, including authentication retries. A new request reactivates the same
+deadline; it does not receive a fresh timeout budget. Once response headers are
+complete, body transfers are governed by `socketTimeout` and `overallTimeout`.
+
+When transfer speed limits are enabled, `socketTimeout` allows bounded additional
+time for local throttling. Each newly transferred byte earns at most its
+configured transmission time as an inactivity allowance. Repeated progress
+callbacks without new bytes do not extend the allowance. Reaching the final
+upload byte preserves the allowance already earned, including that final burst:
+libcurl can still pause for its upload rate limit before reading the response.
+Without further progress, this allowance expires normally; a server that never
+responds still times out after the remaining allowance and inactivity budget expire.
+`overallTimeout` includes both throttling and authentication and is never extended.

@@ -17,6 +17,19 @@ use napi::bindgen_prelude::{Buffer, Either};
 use napi::{Error, Result};
 use napi_derive::napi;
 
+mod rate_limit;
+use rate_limit::RateLimitAllowance;
+
+// Public callback ABI (libcurl 7.32.0); older curl-sys bindings omit it.
+const CURLOPT_XFERINFOFUNCTION: CURLoption = 20_000 + 219;
+type CurlXferInfoCallback = extern "C" fn(
+  *mut c_void,
+  curl_off_t,
+  curl_off_t,
+  curl_off_t,
+  curl_off_t,
+) -> c_int;
+
 // curl-sys intentionally exposes the older form API but not libcurl's MIME API.
 // The MIME symbols are part of libcurl's public ABI; keep this small bridge here
 // for multipart requests without exposing transport-specific APIs to JavaScript.
@@ -85,6 +98,12 @@ struct RequestState {
   body: Vec<u8>,
   headers: Vec<String>,
   last_activity: Instant,
+  easy_handle: *mut CURL,
+  response_started: Instant,
+  response_timeout: Option<Duration>,
+  response_timed_out: bool,
+  download_allowance: RateLimitAllowance,
+  upload_allowance: RateLimitAllowance,
   final_headers_received: bool,
   stop_after_final_headers: bool,
   stop_after_redirect_headers: bool,
@@ -102,6 +121,12 @@ impl Default for RequestState {
       body: Vec::new(),
       headers: Vec::new(),
       last_activity: Instant::now(),
+      easy_handle: ptr::null_mut(),
+      response_started: Instant::now(),
+      response_timeout: None,
+      response_timed_out: false,
+      download_allowance: RateLimitAllowance::new(0, Instant::now()),
+      upload_allowance: RateLimitAllowance::new(0, Instant::now()),
       final_headers_received: false,
       stop_after_final_headers: false,
       stop_after_redirect_headers: false,
@@ -118,6 +143,27 @@ impl Default for RequestState {
 impl RequestState {
   fn mark_activity(&mut self) {
     self.last_activity = Instant::now();
+  }
+
+  fn socket_idle_elapsed(&self) -> Duration {
+    let now = Instant::now();
+    let mut elapsed = now.saturating_duration_since(self.last_activity);
+    for allowance in [&self.download_allowance, &self.upload_allowance] {
+      if let Some(idle) = allowance.idle_elapsed(now) {
+        elapsed = elapsed.min(idle);
+      }
+    }
+    elapsed
+  }
+
+  fn check_response_timeout(&mut self) -> bool {
+    if !self.final_headers_received
+      && self.response_timeout
+        .is_some_and(|timeout| self.response_started.elapsed() >= timeout)
+    {
+      self.response_timed_out = true;
+    }
+    self.response_timed_out
   }
 }
 
@@ -597,6 +643,7 @@ fn process_header_chunk(state: &mut RequestState, chunk: &[u8], bytes: usize) ->
   let line = strip_header_line_ending(chunk);
 
   if let Some(status_code) = parse_http_status_code(line) {
+    state.final_headers_received = false;
     state.current_response_header_bytes = 0;
     state.current_status_code = Some(status_code);
     state.current_response_has_location = false;
@@ -613,6 +660,11 @@ fn process_header_chunk(state: &mut RequestState, chunk: &[u8], bytes: usize) ->
     }
   }
 
+  // Check inside the callback too: an entire late response can arrive in one
+  // multi_perform() call, otherwise hiding the expired deadline from its loop.
+  if state.check_response_timeout() {
+    return 0;
+  }
   state.headers.push(header_bytes_to_latin1(line));
 
   if line.is_empty()
@@ -634,6 +686,52 @@ fn process_header_chunk(state: &mut RequestState, chunk: &[u8], bytes: usize) ->
 }
 
 define_request_callback!(header_callback, process_header_chunk);
+
+extern "C" fn request_debug_callback(
+  curl: *mut CURL,
+  kind: curl_sys::curl_infotype,
+  _data: *mut c_char,
+  _size: usize,
+  user_data: *mut c_void,
+) -> c_int {
+  // Consume ALL debug events without logging or retaining credentials/body
+  // data. HEADER_OUT observes internal auth retries before any response arrives.
+  if !user_data.is_null() && kind == curl_sys::CURLINFO_HEADER_OUT {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+      let state = unsafe { &mut *user_data.cast::<RequestState>() };
+      // Recent libcurl versions can call this for an internal easy handle.
+      if state.easy_handle == curl {
+        state.final_headers_received = false;
+        state.check_response_timeout();
+        state.mark_activity();
+      }
+    }));
+  }
+  0
+}
+
+extern "C" fn transfer_progress_callback(
+  user_data: *mut c_void,
+  _download_total: curl_off_t,
+  downloaded: curl_off_t,
+  _upload_total: curl_off_t,
+  uploaded: curl_off_t,
+) -> c_int {
+  if user_data.is_null() {
+    return 1;
+  }
+  catch_unwind(AssertUnwindSafe(|| {
+    let state = unsafe { &mut *user_data.cast::<RequestState>() };
+    let now = Instant::now();
+    let received = state.download_allowance.update(downloaded, now);
+    let sent = state.upload_allowance.update(uploaded, now);
+    if received || sent {
+      state.last_activity = now;
+    }
+    0
+  }))
+  .unwrap_or(1)
+}
 
 fn build_mime(
   curl: *mut CURL,
@@ -837,6 +935,8 @@ fn perform_with_multi(
   let response_started = Instant::now();
   unsafe {
     (*state).last_activity = response_started;
+    (*state).response_started = response_started;
+    (*state).response_timeout = response_timeout;
   }
 
   let add_code = unsafe { curl_sys::curl_multi_add_handle(multi, curl) };
@@ -851,7 +951,7 @@ fn perform_with_multi(
       return multi_error_to_curl(code);
     }
     while running_handles > 0 {
-      let socket_elapsed = unsafe { (*state).last_activity.elapsed() };
+      let socket_elapsed = unsafe { (*state).socket_idle_elapsed() };
       if socket_timeout.is_some_and(|timeout| socket_elapsed >= timeout) {
         return CURLE_OPERATION_TIMEDOUT;
       }
@@ -884,7 +984,7 @@ fn perform_with_multi(
       }
 
       if socket_timeout.is_some_and(|timeout| unsafe {
-        (*state).last_activity.elapsed() >= timeout
+        (*state).socket_idle_elapsed() >= timeout
       }) {
         return CURLE_OPERATION_TIMEDOUT;
       }
@@ -901,7 +1001,11 @@ fn perform_with_multi(
       }
     }
 
-    read_multi_result(multi, curl)
+    if unsafe { (*state).response_timed_out } {
+      CURLE_OPERATION_TIMEDOUT
+    } else {
+      read_multi_result(multi, curl)
+    }
   })();
 
   unsafe {
@@ -1052,6 +1156,54 @@ fn parse_auth(auth: Option<&str>, target: AuthTarget) -> Result<Option<c_long>> 
   Ok(Some(auth))
 }
 
+fn safe_auth_username(value: &str) -> bool {
+  !value.bytes().any(|byte| byte < 0x20 || byte == 0x7f)
+}
+
+fn safe_bearer_token(value: &str) -> bool {
+  let token = value.trim_end_matches('=');
+  !token.is_empty()
+    && token.bytes().all(|byte| {
+      byte.is_ascii_alphanumeric()
+        || matches!(byte, b'-' | b'.' | b'_' | b'~' | b'+' | b'/')
+    })
+}
+
+fn validate_auth_credentials(options: &NativeRequestOptions) -> Result<()> {
+  // Do not let direct native callers bypass the public schema and inject
+  // headers or silently truncate credentials at a CString NUL boundary.
+  for username in [&options.auth_username, &options.proxy_username]
+    .into_iter()
+    .flatten()
+  {
+    if !safe_auth_username(username) {
+      return Err(Error::from_reason(
+        "Authentication usernames cannot contain control characters",
+      ));
+    }
+  }
+  for password in [&options.auth_password, &options.proxy_password]
+    .into_iter()
+    .flatten()
+  {
+    if password.contains('\0') {
+      return Err(Error::from_reason(
+        "Authentication passwords cannot contain NUL",
+      ));
+    }
+  }
+  if options.auth_bearer.as_deref()
+    .is_some_and(|token| !safe_bearer_token(token))
+  {
+    return Err(Error::from_reason("Invalid Bearer token"));
+  }
+  Ok(())
+}
+
+fn uses_negotiated_auth(auth: Option<&str>) -> bool {
+  matches!(auth, Some("any" | "digest" | "ntlm" | "negotiate"))
+}
+
 fn get_string_info(curl: *mut CURL, info: curl_sys::CURLINFO) -> Option<String> {
   let mut value: *mut c_char = ptr::null_mut();
   unsafe {
@@ -1066,6 +1218,16 @@ fn get_string_info(curl: *mut CURL, info: curl_sys::CURLINFO) -> Option<String> 
 
 #[napi]
 pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
+  validate_auth_credentials(&options)?;
+  if options.no_body.unwrap_or(false)
+    && (options.body.is_some() || options.form.is_some())
+    && (uses_negotiated_auth(options.auth_type.as_deref())
+      || uses_negotiated_auth(options.proxy_auth.as_deref()))
+  {
+    return Err(Error::from_reason(
+      "HEAD requests with a payload cannot use negotiated authentication; omit the payload or use preemptive Basic/Bearer authentication",
+    ));
+  }
   ensure_curl_initialized()?;
 
   // Keep the original Node Buffer alive for the whole synchronous transfer.
@@ -1092,9 +1254,20 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   )?;
   let http_auth = parse_auth(options.auth_type.as_deref(), AuthTarget::Http)?;
   let proxy_auth = parse_auth(options.proxy_auth.as_deref(), AuthTarget::Proxy)?;
+  // Callback state must also outlive curl_easy_cleanup(), which can emit
+  // debug events. Locals are dropped in reverse declaration order.
+  let mut state = Box::new(RequestState::default());
   let easy = EasyHandle::new()?;
   let curl = easy.0;
-  let mut state = Box::new(RequestState::default());
+  state.easy_handle = curl;
+  state.download_allowance = RateLimitAllowance::new(
+    options.max_download_speed.unwrap_or_default(),
+    Instant::now(),
+  );
+  state.upload_allowance = RateLimitAllowance::new(
+    options.max_upload_speed.unwrap_or_default(),
+    Instant::now(),
+  );
   state.stop_after_final_headers = no_body && has_request_payload;
   state.stop_after_redirect_headers = options.stop_on_redirect_headers.unwrap_or(false);
   state.max_response_header_bytes = options
@@ -1201,6 +1374,39 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_HEADERDATA, state_pointer)
   });
+  if options.timeout.unwrap_or_default() > 0 {
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(
+        curl,
+        curl_sys::CURLOPT_DEBUGFUNCTION,
+        request_debug_callback as curl_sys::curl_debug_callback,
+      )
+    });
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_DEBUGDATA, state_pointer)
+    });
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_VERBOSE, 1 as c_long)
+    });
+  }
+  if options.socket_timeout.unwrap_or_default() > 0
+    && (options.max_download_speed.unwrap_or_default() > 0
+      || options.max_upload_speed.unwrap_or_default() > 0)
+  {
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(
+        curl,
+        CURLOPT_XFERINFOFUNCTION,
+        transfer_progress_callback as CurlXferInfoCallback,
+      )
+    });
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_PROGRESSDATA, state_pointer)
+    });
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_NOPROGRESS, 0 as c_long)
+    });
+  }
   if options.ca_file.is_none() {
     keep_first_error(&mut code, configure_default_ca(curl, &mut keepalive));
   } else {
@@ -1388,7 +1594,9 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
       options.socket_timeout.unwrap_or_default(),
       options.connection_pool_id,
     );
-    if code == CURLE_WRITE_ERROR && state.stopped_after_final_headers {
+    if state.response_timed_out {
+      code = CURLE_OPERATION_TIMEDOUT;
+    } else if code == CURLE_WRITE_ERROR && state.stopped_after_final_headers {
       code = CURLE_OK;
     }
   }
@@ -1407,7 +1615,9 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   let _mime = mime;
   let _keepalive = keepalive;
 
-  let transport_message = if state.response_header_overflow {
+  let transport_message = if state.response_timed_out {
+    "Response header timeout exceeded".to_owned()
+  } else if state.response_header_overflow {
     RESPONSE_HEADER_OVERFLOW_ERROR.to_owned()
   } else if let Some(message) = transport_error_override {
     message.to_owned()
@@ -1424,4 +1634,92 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     headers: std::mem::take(&mut state.headers),
     body: std::mem::take(&mut state.body).into(),
   })
+}
+
+
+#[cfg(test)]
+mod regression_tests {
+  use super::*;
+
+  #[test]
+  fn native_credentials_enforce_header_safe_syntax() {
+    for control in ['\0', '\r', '\n', '\t', '\x1f', '\x7f'] {
+      assert!(!safe_auth_username(&format!("user{control}")));
+      assert!(!safe_bearer_token(&format!("token{control}")));
+    }
+    for token in ["", "=", "token space", "to=ken", "token=\n"] {
+      assert!(!safe_bearer_token(token));
+    }
+    assert!(safe_auth_username(""));
+    assert!(safe_auth_username("caf\u{e9}"));
+    assert!(safe_bearer_token("a.b_c-~+/=="));
+  }
+
+  #[test]
+  fn final_upload_progress_retains_bounded_allowance_without_renewal() {
+    let bytes: curl_off_t = 128 * 1024;
+    // Unknown totals must behave the same as a known, completed upload.
+    for total in [0, bytes] {
+      let mut state = RequestState::default();
+      state.upload_allowance = RateLimitAllowance::new(64 * 1024, Instant::now());
+      let state_pointer = (&mut state as *mut RequestState).cast::<c_void>();
+      assert_eq!(
+        transfer_progress_callback(state_pointer, 0, 0, total, bytes),
+        0,
+      );
+      let uploaded_at = state.last_activity;
+      assert_eq!(
+        state.upload_allowance
+          .idle_elapsed(uploaded_at + Duration::from_millis(1_999)),
+        Some(Duration::ZERO),
+      );
+      // A later callback reporting completion again must not clear the debt,
+      // earn it twice, or masquerade as fresh socket activity.
+      assert_eq!(
+        transfer_progress_callback(state_pointer, 0, 0, total, bytes),
+        0,
+      );
+      assert_eq!(state.last_activity, uploaded_at);
+      assert_eq!(
+        state.upload_allowance
+          .idle_elapsed(uploaded_at + Duration::from_millis(1_999)),
+        Some(Duration::ZERO),
+      );
+      assert_eq!(
+        state.upload_allowance
+          .idle_elapsed(uploaded_at + Duration::from_millis(2_200)),
+        Some(Duration::from_millis(200)),
+      );
+    }
+  }
+
+  #[test]
+  fn response_deadline_rearms_before_the_next_status_line() {
+    let mut state = RequestState::default();
+    state.response_timeout = Some(Duration::from_millis(10));
+    state.response_started = Instant::now() - Duration::from_secs(1);
+    state.final_headers_received = true;
+    assert!(!state.check_response_timeout());
+    let state_pointer = (&mut state as *mut RequestState).cast::<c_void>();
+    request_debug_callback(
+      ptr::null_mut(),
+      curl_sys::CURLINFO_HEADER_OUT,
+      ptr::null_mut(),
+      0,
+      state_pointer,
+    );
+    assert!(!state.final_headers_received);
+    assert!(state.response_timed_out);
+  }
+
+  #[test]
+  fn header_callback_cannot_hide_an_expired_deadline() {
+    let mut state = RequestState::default();
+    state.response_timeout = Some(Duration::from_millis(10));
+    state.response_started = Instant::now() - Duration::from_secs(1);
+    let line = b"HTTP/1.1 200 OK\r\n";
+    assert_eq!(process_header_chunk(&mut state, line, line.len()), 0);
+    assert!(state.response_timed_out);
+    assert!(!state.stopped_after_final_headers);
+  }
 }

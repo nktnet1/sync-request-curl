@@ -1,5 +1,6 @@
 import * as v from "valibot";
 import { RequestError } from "#/errors";
+import { usesNegotiatedAuth } from "#/http/auth";
 import {
   hasNonEmptyRequestHeader,
   hasRequestHeader,
@@ -145,6 +146,17 @@ export const prepareRequest = (
 
   const payload = preparePayload(method, options, headers);
   validateMethodSemantics(method, headers, payload);
+  if (
+    method === "HEAD" &&
+    payload.body !== undefined &&
+    (usesNegotiatedAuth(options.auth?.type) ||
+      usesNegotiatedAuth(options.proxy?.auth))
+  ) {
+    invalidRequestSemantics(
+      "HEAD requests with a payload cannot use negotiated authentication; " +
+        "omit the payload or use preemptive Basic/Bearer authentication",
+    );
+  }
 
   const preparedUrl = prepareUrl(url, options);
   const target = new URL(preparedUrl);
