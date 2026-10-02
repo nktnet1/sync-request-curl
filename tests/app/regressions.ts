@@ -3,15 +3,34 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 const realm = "transport-regression";
 const basic = `Basic ${Buffer.from("user:secret").toString("base64")}`;
+// Test-only RFC 2617 interoperability: fixed, public dummy credentials, not
+// password storage or a security boundary. Keep MD5 for legacy Digest clients
+// (including Windows SSPI); do not replace it with an incompatible challenge.
 const md5 = (value: string): string =>
-  createHash("md5").update(value).digest("hex");
+  createHash("md5").update(value).digest("hex"); // NOSONAR: reviewed test-only legacy Digest computation.
 
-const digestFields = (authorization: string): Record<string, string> => {
-  const fields: Record<string, string> = {};
-  for (const match of authorization.matchAll(
-    /(\w+)=(?:"([^"]*)"|([^,\s]+))/g,
-  )) {
-    fields[match[1] ?? ""] = match[2] ?? match[3] ?? "";
+export const digestFields = (authorization: string): Record<string, string> => {
+  const fields: Record<string, string> = Object.create(null);
+  if (!authorization.startsWith("Digest ")) {
+    return fields;
+  }
+  // Sticky matching consumes the next parameter or fails immediately; it never
+  // retries a long malformed key at each subsequent character. The quoted and
+  // unquoted alternatives are disjoint, as are the quoted-string escape cases.
+  const parameter =
+    /[ \t]*([\w-]+)[ \t]*=[ \t]*(?:"((?:[^"\\\r\n]|\\[^\r\n])*)"|([^",\s]+))[ \t]*(?:,|$)/y;
+  let offset = "Digest ".length;
+  while (offset < authorization.length) {
+    parameter.lastIndex = offset;
+    const match = parameter.exec(authorization);
+    if (!match || Object.hasOwn(fields, match[1].toLowerCase())) {
+      return {};
+    }
+    fields[match[1].toLowerCase()] =
+      match[2] === undefined
+        ? match[3]
+        : match[2].replace(/\\([^\r\n])/g, "$1");
+    offset = parameter.lastIndex;
   }
   return fields;
 };

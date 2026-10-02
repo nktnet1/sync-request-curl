@@ -11,9 +11,13 @@ export const isSafeAuthUsername = (value: string): boolean => {
 
 /** RFC 6750 b64token: one or more token characters, then optional padding. */
 export const isSafeBearerToken = (value: string): boolean => {
-  const token = value.replace(/=+$/, "");
+  // Scan the padding once instead of retrying a suffix regex at every '='.
+  let tokenEnd = value.length;
+  while (tokenEnd > 0 && value[tokenEnd - 1] === "=") {
+    tokenEnd -= 1;
+  }
   // A negative character class also rejects a final LF, unlike a JS $ anchor.
-  return token.length > 0 && !/[^A-Za-z0-9._~+/-]/.test(token);
+  return tokenEnd > 0 && !/[^A-Za-z0-9._~+/-]/.test(value.slice(0, tokenEnd));
 };
 
 export const usesNegotiatedAuth = (type: string | undefined): boolean =>
