@@ -12,15 +12,20 @@ From a clean checkout with pnpm, Rust, and native build tools installed:
 
 ```sh
 pnpm release:beta --dry-run
-pnpm release:beta --publish
+pnpm release:beta --base 5.0.1 --dry-run
+pnpm release:beta --base 5.0.1 --publish
 ```
 
-The preview is read-only. The second command selects the next unused numbered
-v5 beta using the manifest, npm versions, and local/remote tags. It runs release
-checks, commits the manifest, creates an annotated tag, and atomically pushes the
-branch and tag to origin. Release commits use the version label itself (for
-example, `v5.0.0-beta.3`) so they stand out in Git history. Branch permissions
-must permit that push.
+The preview is read-only. Without `--base`, the command continues the manifest's
+current beta series. If that stable base has already been released, choose the
+next base explicitly with `--base <version>`; the script never guesses whether
+the next release should be a patch or minor version. Both `5.0.1` and `v5.1.0`
+forms are accepted. The command selects the next unused numbered beta using npm
+versions and local/remote tags. With `--publish`, it runs release checks, commits
+the manifest, creates an annotated tag, and atomically pushes the branch and tag
+to origin. Release commits use the version label itself (for example,
+`v5.0.1-beta.3`) so they stand out in Git history. Branch permissions must permit
+that push.
 
 For preparation without committing or pushing, use `pnpm release:beta` instead.
 Do not follow that with `--publish` on the dirty checkout. Review and commit the

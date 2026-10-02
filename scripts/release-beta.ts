@@ -8,6 +8,7 @@ import { releaseLabel } from "#scripts/release-policy";
 const { values } = parseArgs({
   options: {
     publish: { type: "boolean", default: false },
+    base: { type: "string" },
     "dry-run": { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
@@ -15,9 +16,11 @@ const { values } = parseArgs({
 
 const main = (): void => {
   if (values.help) {
-    console.log(`Usage: pnpm release:beta [--dry-run | --publish]
+    console.log(`Usage: pnpm release:beta [--base <version>] [--dry-run | --publish]
 
-Default: select the next v5 beta, update package.json, and run release checks.
+Default: continue the manifest's v5 beta series, update package.json, and run release checks.
+--base: explicitly choose the stable v5 base for a new beta series, for example
+        5.0.1 or v5.1.0. The command never guesses patch vs minor.
 --dry-run: show the next version without changing files or running checks.
 --publish: also commit package.json, create an annotated tag, and atomically
            push the current branch and tag to origin, triggering release CI.
@@ -72,10 +75,12 @@ Run --publish from a clean checkout, not after an uncommitted preparation run.`)
   const remoteTags = git(["ls-remote", "--tags", "--refs", "origin"])
     .split("\n")
     .map((line) => line.split("refs/tags/")[1] ?? "");
-  const version = nextBetaVersion(manifest.version, versions, [
-    ...git(["tag", "--list"]).split("\n"),
-    ...remoteTags,
-  ]);
+  const version = nextBetaVersion(
+    manifest.version,
+    versions,
+    [...git(["tag", "--list"]).split("\n"), ...remoteTags],
+    values.base,
+  );
   const tag = releaseLabel(version);
   console.log(`${manifest.version} -> ${version} (npm tag: beta)`);
   if (values["dry-run"]) return;
