@@ -159,26 +159,9 @@ jobs:
       - name: Run tests with coverage
         run: pnpm test --coverage
 
-      - name: Test bundled curl with Apple SecTrust
+      - name: Test built package with Apple SecTrust
         if: matrix.os == 'macos-latest' && matrix.node-version == '24.x'
-        env:
-          RUN_APPLE_SECTRUST_TEST: '1'
-          NO_PROXY: 127.0.0.1,localhost
-          no_proxy: 127.0.0.1,localhost
-        run: |
-          cert="$PWD/tests/app/fixtures/tls-cert.pem"
-
-          cleanup() {
-            sudo security remove-trusted-cert -d "$cert" >/dev/null 2>&1 || true
-          }
-          trap cleanup EXIT
-          cleanup
-
-          sudo security add-trusted-cert -d -r trustRoot \
-            -k /Library/Keychains/System.keychain "$cert"
-
-          unset CURL_CA_BUNDLE SSL_CERT_FILE SSL_CERT_DIR
-          pnpm exec vitest run tests/request/apple-sectrust.test.ts
+        run: pnpm test:apple-sectrust:e2e
 
       - name: Upload coverage reports to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == '24.x' && github.ref_name == 'main'
