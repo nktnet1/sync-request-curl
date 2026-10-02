@@ -52,25 +52,25 @@ const RESPONSE_HEADER_OVERFLOW_ERROR: &str =
 
 const CURLOPT_MIMEPOST: CURLoption = CURLOPTTYPE_OBJECTPOINT + 269;
 // Public string-option ABI value, available since libcurl 7.33.0.
-// curl-sys 0.4.90 leaves this constant commented out.
+// The current curl-sys bindings leave this constant commented out.
 const CURLOPT_XOAUTH2_BEARER: CURLoption = CURLOPTTYPE_OBJECTPOINT + 220;
 // Public long-option ABI value, available since libcurl 7.54.0.
 const CURLOPT_SUPPRESS_CONNECT_HEADERS: CURLoption = 265;
 // Public long-option ABI value, available since libcurl 7.37.0.
-// curl-sys 0.4.90 does not currently export this constant.
+// The current curl-sys bindings do not export this constant.
 const CURLOPT_HEADEROPT: CURLoption = 229;
 // Public long-option ABI value, available since libcurl 8.9.0.
-// curl-sys 0.4.90 does not currently export this constant.
+// The current curl-sys bindings do not export this constant.
 const CURLOPT_TCP_KEEPCNT: CURLoption = 326;
 const CURLHEADER_SEPARATE: c_long = 1;
-// Public CURLAUTH bit, available since libcurl 7.33.0. curl-sys 0.4.90 does not
-// export it even though the linked libcurl headers do.
+// Public CURLAUTH bit, available since libcurl 7.33.0. The current curl-sys
+// bindings do not export it even though the linked libcurl headers do.
 const CURLAUTH_BEARER: c_long = 1 << 6;
 // Public CURL_HTTP_VERSION enum value, available since libcurl 7.88.0.
-// curl-sys 0.4.90 does not currently export this constant.
+// The current curl-sys bindings do not export this constant.
 const CURL_HTTP_VERSION_3ONLY: c_long = 31;
 // libcurl encodes CURL_SSLVERSION_MAX_* values by shifting the version enum
-// into the upper 16 bits; curl-sys 0.4.90 does not export those constants.
+// into the upper 16 bits; the current curl-sys bindings do not export them.
 const CURL_SSLVERSION_MAX_SHIFT: u32 = 16;
 const TCP_KEEP_COUNT_UNSUPPORTED_ERROR: &str =
   "TCP keepalive probeCount requires libcurl 8.9.0 or newer and platform support";

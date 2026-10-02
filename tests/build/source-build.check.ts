@@ -98,9 +98,7 @@ for (const mode of [
         const features = args.at(args.indexOf("--features") + 1);
         assert.equal(
           features,
-          mode === "system" || mode === "macos-default"
-            ? "system-curl"
-            : "bundled-curl",
+          mode === "system" ? "system-curl" : "bundled-curl",
         );
         assert.equal(args.at(-1), target);
         assert.equal(options?.env?.CARGO_TARGET_DIR, join(native, "target"));
@@ -176,7 +174,7 @@ test("source builder CLI displays help without a compiler", () => {
   assert.match(result.stdout, /Usage: sync-request-curl-build/);
   assert.match(result.stdout, /--libcurl=system/);
   assert.match(result.stdout, /--libcurl=bundled/);
-  assert.match(result.stdout, /system libcurl for macOS targets/);
+  assert.match(result.stdout, /bundled libcurl on all targets/);
 });
 
 test("source builder CLI rejects unknown arguments before compiling", () => {
