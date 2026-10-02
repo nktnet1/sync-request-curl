@@ -14,25 +14,47 @@ export const digestFields = (authorization: string): Record<string, string> => {
   if (!authorization.startsWith("Digest ")) {
     return fields;
   }
-  // Sticky matching consumes the next parameter or fails immediately; it never
-  // retries a long malformed key at each subsequent character. The quoted and
-  // unquoted alternatives are disjoint, as are the quoted-string escape cases.
-  const parameter =
-    /[ \t]*([\w-]+)[ \t]*=[ \t]*(?:"((?:[^"\\\r\n]|\\[^\r\n])*)"|([^",\s]+))[ \t]*(?:,|$)/y;
+  // Parse names and values separately to keep both patterns small. Sticky
+  // matching never skips malformed input. The value alternatives are disjoint,
+  // as are the quoted-string escape cases, so long invalid inputs stay linear.
+  const parameterName = /[ \t]*([\w-]+)[ \t]*=[ \t]*/y;
+  const parameterValue =
+    /(?:"((?:[^"\\\r\n]|\\[^\r\n])*)"|([^",\s]+))[ \t]*(?:,|$)/y;
   let offset = "Digest ".length;
   while (offset < authorization.length) {
-    parameter.lastIndex = offset;
-    const match = parameter.exec(authorization);
-    if (!match || Object.hasOwn(fields, match[1].toLowerCase())) {
+    parameterName.lastIndex = offset;
+    const name = parameterName.exec(authorization);
+    if (!name) {
       return {};
     }
-    fields[match[1].toLowerCase()] =
-      match[2] === undefined
-        ? match[3]
-        : match[2].replace(/\\([^\r\n])/g, "$1");
-    offset = parameter.lastIndex;
+    const key = name[1].toLowerCase();
+    if (Object.hasOwn(fields, key)) {
+      return {};
+    }
+    parameterValue.lastIndex = parameterName.lastIndex;
+    const value = parameterValue.exec(authorization);
+    if (!value) {
+      return {};
+    }
+    fields[key] =
+      value[1] === undefined
+        ? value[2]
+        : value[1].replace(/\\([^\r\n])/g, "$1");
+    offset = parameterValue.lastIndex;
   }
   return fields;
+};
+
+const createAuthChallenge = (
+  scheme: string,
+  nonce: string,
+  stale: boolean,
+): string => {
+  if (scheme !== "digest") {
+    return `Basic realm="${realm}"`;
+  }
+  const staleParameter = stale ? ", stale=true" : "";
+  return `Digest realm="${realm}", nonce="${nonce}", algorithm=MD5, qop="auth"${staleParameter}`;
 };
 
 const validCredentials = (req: IncomingMessage, scheme: string): boolean => {
@@ -81,7 +103,8 @@ export const handleRegressionRequest = (
   req: IncomingMessage,
   res: ServerResponse,
 ): boolean => {
-  const url = new URL(req.url ?? "/", "http://fixture.invalid");
+  // Only the path and query are used; this base never opens a connection.
+  const url = new URL(req.url ?? "/", "https://fixture.invalid");
   if (!url.pathname.startsWith("/regressions/")) {
     return false;
   }
@@ -105,9 +128,7 @@ export const handleRegressionRequest = (
         if (rejected) {
           res.setHeader(
             "WWW-Authenticate",
-            scheme === "digest"
-              ? `Digest realm="${realm}", nonce="${nonce}", algorithm=MD5, qop="auth"${stale ? ", stale=true" : ""}`
-              : `Basic realm="${realm}"`,
+            createAuthChallenge(scheme, nonce, stale),
           );
         }
         const body = rejected ? "denied" : "authenticated";

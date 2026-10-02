@@ -48,6 +48,11 @@ describe("Digest regression fixture parsing", () => {
     "Digest missing_equals",
     "Digest =value",
     "Digest username=",
+    "Digest username=,qop=auth",
+    'Digest username="user", qop =',
+    'Digest username="user", !qop=auth',
+    'Digest username="user", qop=auth extra',
+    'Digest username="user", qop="auth"extra',
     'Digest username="unterminated',
     'Digest username="dangling\\',
     'Digest username="user"suffix',
@@ -92,6 +97,8 @@ describe("Digest regression fixture parsing", () => {
   test("rejects long malformed keys and unterminated quoted values", () => {
     const longValue = "a".repeat(100_000);
     expect(digestFields(`Digest ${longValue}`)).toEqual({});
+    expect(digestFields(`Digest ${longValue}=`)).toEqual({});
+    expect(digestFields(`Digest username=${longValue}"`)).toEqual({});
     expect(digestFields(`Digest username="${longValue}`)).toEqual({});
     expect(
       digestFields(`Digest username="user", ${longValue}, qop=auth`),

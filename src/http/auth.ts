@@ -1,8 +1,8 @@
 /** Usernames can be interpolated into Digest headers; passwords are not. */
 export const isSafeAuthUsername = (value: string): boolean => {
   for (const character of value) {
-    const code = character.charCodeAt(0);
-    if (code < 0x20 || code === 0x7f) {
+    const code = character.codePointAt(0);
+    if (code === undefined || code < 0x20 || code === 0x7f) {
       return false;
     }
   }

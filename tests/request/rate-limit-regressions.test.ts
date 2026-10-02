@@ -113,6 +113,6 @@ describe("transfer limits and inactivity", () => {
       socketTimeout: 200,
       overallTimeout: 2_000,
     });
-    expect(response.body.length).toBe(bytes);
+    expect(response.body).toHaveLength(bytes);
   });
 });

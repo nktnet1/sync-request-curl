@@ -1,8 +1,32 @@
 import { describe, expect, test } from "vitest";
-import { isSafeBearerToken } from "#/http/auth";
+import { isSafeAuthUsername, isSafeBearerToken } from "#/http/auth";
 
 const alphabet =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~+/";
+
+describe("authentication username validation", () => {
+  test.each([
+    "",
+    "user",
+    "caf\u00e9",
+    "\u4e2d\u6587",
+    "\u{1f600}",
+    "\u{10ffff}",
+  ])("preserves empty, ASCII, and Unicode usernames: %j", (username) => {
+    expect(isSafeAuthUsername(username)).toBe(true);
+  });
+
+  test("rejects ASCII controls before or after supplementary characters", () => {
+    const controls = Array.from({ length: 0x20 }, (_, code) => code);
+    controls.push(0x7f);
+    for (const code of controls) {
+      const control = String.fromCodePoint(code);
+      expect(isSafeAuthUsername(control)).toBe(false);
+      expect(isSafeAuthUsername(`user${control}\u{1f600}`)).toBe(false);
+      expect(isSafeAuthUsername(`\u{1f600}${control}user`)).toBe(false);
+    }
+  });
+});
 
 describe("bearer token validation", () => {
   test.each(["", "=", "===="])(
@@ -17,7 +41,7 @@ describe("bearer token validation", () => {
 
   test("rejects every other single-byte character and interior padding", () => {
     for (let code = 0; code <= 0xff; code += 1) {
-      const character = String.fromCharCode(code);
+      const character = String.fromCodePoint(code);
       const allowed = alphabet.includes(character);
       expect(isSafeBearerToken(character)).toBe(allowed);
       expect(isSafeBearerToken(`a${character}b`)).toBe(allowed);

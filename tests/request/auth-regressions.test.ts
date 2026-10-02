@@ -232,7 +232,7 @@ describe("HEAD authentication boundaries", () => {
         },
       );
       expect(response.statusCode).toBe(200);
-      expect(response.body.length).toBe(0);
+      expect(response.body).toHaveLength(0);
       expect(response.headers["content-length"]).not.toBe("0");
     },
   );
@@ -247,7 +247,7 @@ describe("HEAD authentication boundaries", () => {
       });
       expect(response.statusCode).toBe(200);
       expect(response.headers["x-request-body-hex"]).toBe(body.toString("hex"));
-      expect(response.body.length).toBe(0);
+      expect(response.body).toHaveLength(0);
     },
   );
 });
