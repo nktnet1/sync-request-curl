@@ -22,8 +22,12 @@ key to be part of that identity and ignores a separate `tls.keyFile`.
 ### macOS
 
 Prebuilt binaries are available for Apple Silicon (`arm64`) and Intel (`x64`) macOS.
-Client-certificate file formats and TLS-version capabilities follow the system
-libcurl and its selected TLS backend.
+The default bundled libcurl uses OpenSSL, with Apple SecTrust for native
+certificate verification. File-based mutual TLS supports PEM certificate/key
+pairs and PKCS#12 identities through the high-level `tls` option.
+
+Only explicit `--libcurl=system` builds inherit the client-certificate formats
+and TLS-version capabilities of the selected system libcurl and TLS backend.
 
 ### Linux
 

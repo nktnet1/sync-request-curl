@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { isSafeAuthUsername } from "#/http/auth";
 import { serializeRequestHeaders } from "#/http/headers";
 import type { Options } from "#/types/definition";
 
@@ -65,6 +66,9 @@ const prepareProxyOptions = (
     proxyPassword = decodeURIComponent(url.password);
     if (proxyUsername.includes("\0") || proxyPassword.includes("\0")) {
       throw new TypeError("Proxy credentials cannot contain NUL");
+    }
+    if (!isSafeAuthUsername(proxyUsername)) {
+      throw new TypeError("Proxy usernames cannot contain control characters");
     }
   }
 

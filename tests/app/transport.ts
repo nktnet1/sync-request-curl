@@ -3,7 +3,14 @@ import { createServer, request } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
 import { connect } from "node:net";
 import type { TLSSocket } from "node:tls";
-import { HOST, PORT, SERVER_URL, TLS_PORT } from "#tests/app/config";
+import {
+  FRAMING_PORT,
+  FRAMING_SERVER_URL,
+  HOST,
+  PORT,
+  SERVER_URL,
+  TLS_PORT,
+} from "#tests/app/config";
 
 // Test-only self-signed certificate and key; never used outside local fixtures.
 export const tlsServer = createHttpsServer(
@@ -36,7 +43,7 @@ export const tlsServer = createHttpsServer(
 
 export const proxyServer = createServer((req, res) => {
   const target = new URL(req.url ?? "");
-  if (target.origin !== SERVER_URL) {
+  if (target.origin !== SERVER_URL && target.origin !== FRAMING_SERVER_URL) {
     res.writeHead(403);
     res.end();
     return;
@@ -56,7 +63,7 @@ export const proxyServer = createServer((req, res) => {
   const upstream = request(
     {
       hostname: HOST,
-      port: PORT,
+      port: target.origin === FRAMING_SERVER_URL ? FRAMING_PORT : PORT,
       path: `${target.pathname}${target.search}`,
       method: req.method,
       headers,

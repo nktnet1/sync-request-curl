@@ -13,6 +13,9 @@ import {
 } from "#/native/platform-key";
 import { parseSchema } from "#/validate";
 import {
+  authBearerSchema,
+  authPasswordSchema,
+  authUsernameSchema,
   httpAuthTypeSchema,
   httpVersionSchema,
   ipFamilySchema,
@@ -41,12 +44,12 @@ export const nativeRequestOptionsSchema = v.object({
   noBody: v.boolean(),
   stopOnRedirectHeaders: v.optional(v.boolean()),
   authType: v.optional(v.union([httpAuthTypeSchema, v.literal("bearer")])),
-  authUsername: v.optional(v.string()),
-  authPassword: v.optional(v.string()),
-  authBearer: v.optional(v.string()),
+  authUsername: v.optional(authUsernameSchema),
+  authPassword: v.optional(authPasswordSchema),
+  authBearer: v.optional(authBearerSchema),
   proxy: v.optional(v.string()),
-  proxyUsername: v.optional(v.string()),
-  proxyPassword: v.optional(v.string()),
+  proxyUsername: v.optional(authUsernameSchema),
+  proxyPassword: v.optional(authPasswordSchema),
   proxyAuth: v.optional(proxyAuthTypeSchema),
   proxyNoProxy: v.optional(v.string()),
   proxyHeaders: v.optional(v.array(v.string())),
