@@ -1,5 +1,4 @@
 import { Agent } from "node:http";
-import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import request from "#/index";
@@ -8,6 +7,7 @@ import {
   usesCustomTransport,
 } from "#/request/transport-options";
 import type { Options } from "#/types/definition";
+import { reserveLoopbackPort } from "#scripts/loopback-port";
 import { PROXY_URL, SERVER_URL, TLS_URL } from "#tests/app/config";
 
 const caFile = fileURLToPath(
@@ -26,27 +26,6 @@ const clientP12File = fileURLToPath(
   new URL("../app/fixtures/tls-client.p12", import.meta.url),
 );
 const clientPassphrase = "test-passphrase";
-
-const getUnusedLoopbackPort = async (): Promise<number> =>
-  new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (address === null || typeof address === "string") {
-        server.close();
-        reject(new Error("Failed to allocate a loopback test port"));
-        return;
-      }
-      server.close((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(address.port);
-      });
-    });
-  });
 
 describe("transport option validation", () => {
   test("maps origin TLS controls", () => {
@@ -378,7 +357,7 @@ describe("native transport controls", () => {
   });
 
   test("binds an explicit local source port", async () => {
-    const localPort = await getUnusedLoopbackPort();
+    const localPort = await reserveLoopbackPort();
     expect(
       request("GET", TLS_URL, {
         caFile,
