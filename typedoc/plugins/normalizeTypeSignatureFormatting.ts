@@ -9,9 +9,40 @@ const normalizeTypeScriptLine = (line: string): string =>
     .replace(/^(\s*[A-Za-z_$][\w$]*\??:) {3}\| /, "$1 ")
     .replace(/^<([^>]+)> {2,}\(/, "  <$1>(");
 
+const groupLeadingUnionIntersection = (
+  lines: string[],
+  intersectionIndex: number,
+): void => {
+  const intersectionLine = lines[intersectionIndex];
+  const nextLine = lines[intersectionIndex + 1];
+
+  if (
+    !intersectionLine?.trimEnd().endsWith("} &") ||
+    !nextLine?.trimStart().startsWith("| {")
+  ) {
+    return;
+  }
+
+  let closingIndex: number | undefined;
+  for (let index = intersectionIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (line?.trim() === "};") {
+      closingIndex = index;
+      break;
+    }
+  }
+
+  if (closingIndex === undefined) {
+    return;
+  }
+
+  lines[intersectionIndex] = `${intersectionLine.trimEnd()} (`;
+  lines[closingIndex] = (lines[closingIndex] ?? "").replace("};", "});");
+};
+
 /**
- * Fix small whitespace artefacts emitted by typedoc-plugin-markdown in
- * generated TypeScript signatures without changing the represented types.
+ * Fix formatting artefacts emitted by typedoc-plugin-markdown in generated
+ * TypeScript signatures without changing the represented types.
  */
 export function normalizeTypeSignatureFormatting(app: Application): void {
   const markdownApp = app as MarkdownApplication;
@@ -40,6 +71,7 @@ export function normalizeTypeSignatureFormatting(app: Application): void {
       }
 
       lines[index] = normalizeTypeScriptLine(line);
+      groupLeadingUnionIntersection(lines, index);
     }
 
     page.contents = lines.join("\n");

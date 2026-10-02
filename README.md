@@ -497,7 +497,7 @@ unlocked with `passphrase`.
 type TlsOptions = {
   minVersion?: TlsVersion;
   maxVersion?: TlsVersion;
-} &
+} & (
   | {
   certFile?: never;
   certType?: never;
@@ -515,7 +515,7 @@ type TlsOptions = {
   certType: "p12";
   keyFile?: never;
   passphrase?: string;
-};
+});
 ```
 
 High-level origin TLS controls.

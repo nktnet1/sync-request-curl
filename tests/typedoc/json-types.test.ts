@@ -39,6 +39,22 @@ test("renders JSON serializers as callable properties in the API documentation",
       expect(markdown).toContain(`\`${property}\` | [\`Headers\`](#headers)`);
     }
 
+    expect(markdown).toContain(
+      [
+        "type TlsOptions = {",
+        "  minVersion?: TlsVersion;",
+        "  maxVersion?: TlsVersion;",
+        "} & (",
+        "  | {",
+      ].join("\n"),
+    );
+    expect(markdown).not.toContain("} &\n  | {");
+
+    const tlsOptionsStart = markdown.indexOf("type TlsOptions = {");
+    expect(tlsOptionsStart).toBeGreaterThanOrEqual(0);
+    const tlsOptionsEnd = markdown.indexOf("\n```", tlsOptionsStart);
+    expect(markdown.slice(tlsOptionsStart, tlsOptionsEnd)).toMatch(/\n\}\);$/);
+
     const headersDeclaration = "type Headers = IncomingHttpHeaders;";
     const headersStart = markdown.indexOf(headersDeclaration);
     expect(headersStart).toBeGreaterThanOrEqual(0);
