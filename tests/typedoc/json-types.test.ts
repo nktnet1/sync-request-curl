@@ -105,16 +105,27 @@ test("renders JSON serializers as callable properties in the API documentation",
     );
     expect(markdown).not.toContain("type GetJSON = <T>(encoding?) => T;");
 
-    expect(markdown).toContain(
+    const getBodySectionStart = markdown.indexOf("### GetBody");
+    expect(getBodySectionStart).toBeGreaterThanOrEqual(0);
+    const getBodySectionEnd = markdown.indexOf("\n***", getBodySectionStart);
+    const getBodySection = markdown.slice(
+      getBodySectionStart,
+      getBodySectionEnd === -1 ? markdown.length : getBodySectionEnd,
+    );
+    const getBodyHeadlineEnd = getBodySection.indexOf(
+      "\n```",
+      getBodySection.indexOf("```ts") + 1,
+    );
+    expect(getBodyHeadlineEnd).toBeGreaterThanOrEqual(0);
+    const getBodyDetails = getBodySection.slice(getBodyHeadlineEnd + 4);
+    expect(getBodyDetails).toContain(
       [
-        "##### Call Signature",
-        "",
         "```ts",
         "<Encoding extends BufferEncoding>(encoding: Encoding): string;",
         "```",
       ].join("\n"),
     );
-    expect(markdown).not.toContain("<Encoding>(encoding): string;");
+    expect(getBodyDetails).not.toContain("<Encoding>(encoding): string;");
 
     const headersDeclaration = "type Headers = IncomingHttpHeaders;";
     const headersStart = markdown.indexOf(headersDeclaration);

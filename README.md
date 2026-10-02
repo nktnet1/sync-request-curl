@@ -925,7 +925,7 @@ a string. A response with `statusCode >= 300` throws `ResponseError`.
 ##### Call Signature
 
 ```ts
-<Encoding>(encoding): string;
+<Encoding extends BufferEncoding>(encoding: Encoding): string;
 ```
 
 ###### Type Parameters
