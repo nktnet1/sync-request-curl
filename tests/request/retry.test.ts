@@ -112,7 +112,7 @@ describe("single request execution", () => {
     expect(result.response.url).toBe("https://example.com/path");
   });
 
-  test("passes response, connect, overall, and socket timeouts independently to native transport", () => {
+  test("passes timing and transfer speed controls independently to native transport", () => {
     nativeRequest.mockReturnValueOnce({
       transportCode: 0,
       transportMessage: "",
@@ -132,6 +132,8 @@ describe("single request execution", () => {
         socketTimeout: 125,
         httpVersion: "2",
         family: 4,
+        maxDownloadSpeed: 2_000_000,
+        maxUploadSpeed: 1_000_000,
         tcpKeepAlive: { probeCount: 3 },
       },
       () => 450,
@@ -141,6 +143,8 @@ describe("single request execution", () => {
       expect.objectContaining({
         httpVersion: "2",
         family: 4,
+        maxDownloadSpeed: 2_000_000,
+        maxUploadSpeed: 1_000_000,
         tcpKeepAlive: true,
         tcpKeepCount: 3,
         timeout: 900,

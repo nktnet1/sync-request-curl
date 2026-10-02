@@ -297,6 +297,8 @@ type Options = {
   localInterface?: string;
   localPort?: number;
   localPortRange?: number;
+  maxDownloadSpeed?: number;
+  maxUploadSpeed?: number;
   family?: 0 | 4 | 6;
   tcpKeepAlive?: boolean
      | {
@@ -350,6 +352,8 @@ supplied.
 | <a id="property-localinterface"></a> `localInterface?` | `string` | Source interface name. Mutually exclusive with `localAddress`. |
 | <a id="property-localport"></a> `localPort?` | `number` | Preferred local TCP source port. Valid values are 1-65535. When set, `localPortRange` can allow consecutive fallback ports. |
 | <a id="property-localportrange"></a> `localPortRange?` | `number` | Number of consecutive local ports libcurl may try, beginning at `localPort`. Requires `localPort`; `0` or `1` means the exact port only. |
+| <a id="property-maxdownloadspeed"></a> `maxDownloadSpeed?` | `number` | Maximum download transfer rate in bytes per second. `0` (default) leaves download speed unlimited. |
+| <a id="property-maxuploadspeed"></a> `maxUploadSpeed?` | `number` | Maximum upload transfer rate in bytes per second. `0` (default) leaves upload speed unlimited. |
 | <a id="property-family"></a> `family?` | `0` \| `4` \| `6` | IP address family used when resolving hostnames. `0` (default) allows either family, `4` restricts resolution to IPv4, and `6` to IPv6. |
 | <a id="property-tcpkeepalive"></a> `tcpKeepAlive?` | \| `boolean` \| \{ `idleSeconds?`: `number`; `intervalSeconds?`: `number`; `probeCount?`: `number`; \} | Enable TCP keepalive, optionally with idle, interval, and probe-count controls. Defaults to `false`. `probeCount` requires libcurl 8.9.0 or newer and remains subject to operating-system support. |
 | <a id="property-cachenamespace"></a> `cacheNamespace?` | `string` | Private cache identity. Defaults to `process.cwd()`. |
@@ -1401,10 +1405,12 @@ Error.constructor
   `caFile` or `rejectUnauthorized` fields. `localAddress` / `localInterface`
   select the source address or interface, while `localPort` and
   `localPortRange` can pin the source TCP port or allow consecutive fallback
-  ports. Client certificate identity is retained only across same-origin
-  redirects. TCP keepalive probe counts require libcurl 8.9.0 or newer and
-  operating-system support. Unsupported linked libcurl/platform combinations
-  return a transport error rather than silently ignoring the setting.
+  ports. `maxDownloadSpeed` and `maxUploadSpeed` can cap network transfer rates
+  in bytes per second without changing cache identity or connection pooling.
+  Client certificate identity is retained only across same-origin redirects.
+  TCP keepalive probe counts require libcurl 8.9.0 or newer and operating-system
+  support. Unsupported linked libcurl/platform combinations return a transport
+  error rather than silently ignoring the setting.
 - `httpVersion` can request HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/2 over TLS,
   HTTP/2 prior knowledge, HTTP/3, or HTTP/3-only behaviour. HTTP/3 requires
   the linked libcurl build to include HTTP/3 support.

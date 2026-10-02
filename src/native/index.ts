@@ -19,6 +19,7 @@ import {
   proxyAuthTypeSchema,
   tlsCertificateTypeSchema,
   tlsVersionSchema,
+  transferSpeedLimitSchema,
   uppercaseHttpVerbSchema,
 } from "#/validation";
 
@@ -64,6 +65,8 @@ export const nativeRequestOptionsSchema = v.object({
   localPortRange: v.optional(
     v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(65_535)),
   ),
+  maxDownloadSpeed: v.optional(transferSpeedLimitSchema),
+  maxUploadSpeed: v.optional(transferSpeedLimitSchema),
   tcpKeepAlive: v.optional(v.boolean()),
   tcpKeepIdle: v.optional(v.number()),
   tcpKeepInterval: v.optional(v.number()),

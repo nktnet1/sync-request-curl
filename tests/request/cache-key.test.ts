@@ -54,6 +54,8 @@ test("ordinary anonymous requests can use a private application cache", () => {
       rejectUnauthorized: true,
       tcpKeepAlive: false,
       family: 0,
+      maxDownloadSpeed: 1_000_000,
+      maxUploadSpeed: 500_000,
     }),
   ).toBe(true);
 });

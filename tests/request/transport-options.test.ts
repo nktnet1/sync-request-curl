@@ -209,6 +209,8 @@ describe("transport option validation", () => {
         localInterface: "lo",
         localPort: 40_000,
         localPortRange: 10,
+        maxDownloadSpeed: 2_000_000,
+        maxUploadSpeed: 1_000_000,
         family: 6,
         tcpKeepAlive: {
           idleSeconds: 30,
@@ -228,6 +230,8 @@ describe("transport option validation", () => {
       networkInterface: "if!lo",
       localPort: 40_000,
       localPortRange: 10,
+      maxDownloadSpeed: 2_000_000,
+      maxUploadSpeed: 1_000_000,
       httpVersion: "auto",
       family: 6,
       tcpKeepAlive: true,
@@ -265,6 +269,8 @@ describe("transport option validation", () => {
     expect(usesCustomTransport({ localPort: 40_000, localPortRange: 10 })).toBe(
       true,
     );
+    expect(usesCustomTransport({ maxDownloadSpeed: 1_000_000 })).toBe(false);
+    expect(usesCustomTransport({ maxUploadSpeed: 1_000_000 })).toBe(false);
   });
 
   const invalidPublicOptions: Options[] = [
@@ -289,6 +295,10 @@ describe("transport option validation", () => {
     { localPort: 65_536 },
     { localPort: 40_000.5 },
     { localPort: 40_000, localPortRange: -1 },
+    { maxDownloadSpeed: -1 },
+    { maxDownloadSpeed: 1.5 },
+    { maxUploadSpeed: -1 },
+    { maxUploadSpeed: Number.MAX_SAFE_INTEGER + 1 },
   ];
 
   test.each(invalidPublicOptions)(
@@ -365,6 +375,15 @@ describe("native transport controls", () => {
         localPort,
       }).getJSON(),
     ).toMatchObject({ address: "127.0.0.1", port: localPort });
+  });
+
+  test("accepts transfer speed limits", () => {
+    expect(
+      request("GET", SERVER_URL, {
+        maxDownloadSpeed: 10_000_000,
+        maxUploadSpeed: 10_000_000,
+      }).statusCode,
+    ).toBe(200);
   });
 
   test.each(["1.0", "1.1"] as const)(
