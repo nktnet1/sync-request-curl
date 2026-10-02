@@ -6,8 +6,11 @@ import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import { streamText } from "hono/streaming";
 import * as v from "valibot";
+import { HOST, PORT } from "#tests/app/config";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
+const CROSS_ORIGIN_HOST = HOST === "localhost" ? "127.0.0.1" : "localhost";
+const CROSS_ORIGIN_SERVER_URL = `http://${CROSS_ORIGIN_HOST}:${PORT}`;
 const connectionIds = new WeakMap<object, number>();
 let nextConnectionId = 1;
 const cacheOriginHits = new Map<string, number>();
@@ -175,12 +178,10 @@ app.get("/redirect/headers/same-origin", (c) => {
 });
 
 app.get("/redirect/headers/cross-origin", (c) => {
-  const destination = new URL(c.req.url);
-  destination.hostname =
-    destination.hostname === "localhost" ? "127.0.0.1" : "localhost";
-  destination.pathname = "/redirect/headers/destination";
-  destination.search = "";
-  return c.redirect(destination.href, 302);
+  return c.redirect(
+    `${CROSS_ORIGIN_SERVER_URL}/redirect/headers/destination`,
+    302,
+  );
 });
 
 app.get("/redirect/headers/destination", (c) => {
@@ -238,12 +239,7 @@ app.get("/auth/redirect/same-origin", (c) => {
 });
 
 app.get("/auth/redirect/cross-origin", (c) => {
-  const destination = new URL(c.req.url);
-  destination.hostname =
-    destination.hostname === "localhost" ? "127.0.0.1" : "localhost";
-  destination.pathname = "/auth/echo";
-  destination.search = "";
-  return c.redirect(destination.href, 302);
+  return c.redirect(`${CROSS_ORIGIN_SERVER_URL}/auth/echo`, 302);
 });
 
 app.post("/timeout", async (c) => {

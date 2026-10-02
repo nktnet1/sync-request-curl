@@ -958,25 +958,13 @@ fn parse_ip_resolve(family: Option<i64>) -> Result<c_long> {
   }
 }
 
-fn parse_proxy_auth(auth: Option<&str>) -> Result<Option<c_long>> {
-  let auth = match auth {
-    Some("basic") => curl_sys::CURLAUTH_BASIC as c_long,
-    Some("digest") => curl_sys::CURLAUTH_DIGEST as c_long,
-    Some("ntlm") => curl_sys::CURLAUTH_NTLM as c_long,
-    // curl-sys 0.4.90 exposes libcurl's deprecated alias for CURLAUTH_NEGOTIATE.
-    Some("negotiate") => curl_sys::CURLAUTH_GSSNEGOTIATE as c_long,
-    Some("any") => curl_sys::CURLAUTH_ANY as c_long,
-    None => return Ok(None),
-    Some(value) => {
-      return Err(Error::from_reason(format!(
-        "Unsupported proxy authentication method: {value}"
-      )))
-    }
-  };
-  Ok(Some(auth))
+#[derive(Clone, Copy)]
+enum AuthTarget {
+  Http,
+  Proxy,
 }
 
-fn parse_http_auth(auth: Option<&str>) -> Result<Option<c_long>> {
+fn parse_auth(auth: Option<&str>, target: AuthTarget) -> Result<Option<c_long>> {
   let auth = match auth {
     Some("basic") => curl_sys::CURLAUTH_BASIC as c_long,
     Some("digest") => curl_sys::CURLAUTH_DIGEST as c_long,
@@ -984,12 +972,16 @@ fn parse_http_auth(auth: Option<&str>) -> Result<Option<c_long>> {
     // curl-sys 0.4.90 exposes libcurl's deprecated alias for CURLAUTH_NEGOTIATE.
     Some("negotiate") => curl_sys::CURLAUTH_GSSNEGOTIATE as c_long,
     Some("any") => curl_sys::CURLAUTH_ANY as c_long,
-    Some("bearer") => CURLAUTH_BEARER,
+    Some("bearer") if matches!(target, AuthTarget::Http) => CURLAUTH_BEARER,
     None => return Ok(None),
     Some(value) => {
+      let target_name = match target {
+        AuthTarget::Http => "HTTP",
+        AuthTarget::Proxy => "proxy",
+      };
       return Err(Error::from_reason(format!(
-        "Unsupported HTTP authentication method: {value}"
-      )))
+        "Unsupported {target_name} authentication method: {value}"
+      )));
     }
   };
   Ok(Some(auth))
@@ -1028,8 +1020,8 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
 
   let http_version = parse_http_version(options.http_version.as_deref())?;
   let ip_resolve = parse_ip_resolve(options.family)?;
-  let http_auth = parse_http_auth(options.auth_type.as_deref())?;
-  let proxy_auth = parse_proxy_auth(options.proxy_auth.as_deref())?;
+  let http_auth = parse_auth(options.auth_type.as_deref(), AuthTarget::Http)?;
+  let proxy_auth = parse_auth(options.proxy_auth.as_deref(), AuthTarget::Proxy)?;
   let easy = EasyHandle::new()?;
   let curl = easy.0;
   let mut state = Box::new(RequestState::default());
