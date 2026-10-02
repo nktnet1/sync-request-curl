@@ -569,21 +569,8 @@ describe("native transport controls", () => {
         tcpKeepAlive: { idleSeconds: 1, intervalSeconds: 1, probeCount: 3 },
       });
 
-    // macOS intentionally uses the system libcurl, whose version varies by OS.
-    // Bundled builds on Linux and Windows use libcurl 8.21.0 and must support
-    // CURLOPT_TCP_KEEPCNT.
-    if (process.platform === "darwin") {
-      try {
-        expect(perform().getJSON()).toMatchObject({ address: "127.0.0.1" });
-      } catch (error) {
-        expect(error).toMatchObject({
-          message:
-            "Request failed: TCP keepalive probeCount requires libcurl 8.9.0 or newer and platform support",
-        });
-      }
-      return;
-    }
-
+    // Default builds use the pinned bundled libcurl on every supported platform,
+    // so CURLOPT_TCP_KEEPCNT must be available consistently.
     expect(perform().getJSON()).toMatchObject({ address: "127.0.0.1" });
   });
 

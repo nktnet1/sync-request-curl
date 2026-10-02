@@ -30,14 +30,14 @@ The build uses Cargo and produces:
 native/build/sync_request_curl_native.node
 ```
 
-`curl-sys` builds bundled libcurl with HTTP/2 enabled on Linux and Windows. The
-bundled build does not currently include an HTTP/3/QUIC backend, even though its
-libcurl version understands the HTTP/3 option values. System/custom libcurl builds
-can use `httpVersion: "3"` or `"3-only"` when that linked libcurl reports HTTP/3
-support. Linux TLS uses vendored OpenSSL, Windows uses Schannel, and macOS links
-the system libcurl so certificate verification uses Apple's native trust
-configuration. zlib is forced
-static in the prebuild path. The Linux GCC unwinding runtime (`libgcc_s`) may
+`curl-sys` builds bundled libcurl with HTTP/2 enabled on all supported platforms.
+Linux and macOS use vendored OpenSSL; macOS additionally enables Apple SecTrust so
+certificate verification uses Apple's native trust configuration. Windows uses
+Schannel. The bundled build does not currently include an HTTP/3/QUIC backend,
+even though its libcurl version understands the HTTP/3 option values. System/custom
+libcurl builds can use `httpVersion: "3"` or `"3-only"` when that linked libcurl
+reports HTTP/3 support. zlib is forced static in the prebuild path. The Linux GCC
+unwinding runtime (`libgcc_s`) may
 remain dynamically linked; the dependency verifier permits this platform runtime
 while rejecting dynamically linked copies of the bundled native dependencies.
 
@@ -47,7 +47,8 @@ platform must implement the option. Unsupported linked libcurl/platform
 combinations return a clear transport error instead of silently ignoring it.
 
 The source builder accepts `--libcurl=system` and `--libcurl=bundled`. With no flag it
-keeps those platform defaults: system libcurl on macOS, bundled libcurl elsewhere.
+uses bundled libcurl on all supported platforms. On macOS, the bundled build uses
+Apple SecTrust for native certificate verification.
 `--libcurl=system` fails if `curl-sys` cannot discover a system libcurl instead of
 allowing its normal bundled fallback. Both modes still use `curl-sys` for the Rust
 FFI bindings.

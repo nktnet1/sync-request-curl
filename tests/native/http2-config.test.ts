@@ -24,11 +24,11 @@ const section = (name: string): string => {
 };
 
 describe("native libcurl build contract", () => {
-  test("bundled libcurl enables HTTP/2 and static TLS", () => {
+  test("bundled libcurl enables HTTP/2, static TLS, and Apple SecTrust", () => {
     const features = section("features");
 
     expect(features).toContain(
-      'bundled-curl = ["curl-sys/http2", "curl-sys/ssl", "curl-sys/static-curl", "curl-sys/static-ssl"]',
+      'bundled-curl = ["curl-sys/http2", "curl-sys/ssl", "curl-sys/static-curl", "curl-sys/static-ssl", "curl-sys/apple-sectrust"]',
     );
   });
 

@@ -47,9 +47,9 @@ yarn run sync-request-curl-build
 Run the build with the same Node.js architecture that will use the library. Run
 `sync-request-curl-build --help` for the current prerequisites.
 
-Source builds keep the release defaults: macOS links the system libcurl, while
-Linux and Windows build the libcurl bundled by `curl-sys`. Override that choice
-explicitly when needed:
+Source builds use the libcurl bundled by `curl-sys` by default on all supported
+platforms. On macOS, the bundled OpenSSL backend uses Apple SecTrust for native
+certificate verification. Override the libcurl source explicitly when needed:
 
 ```sh
 npm exec --no -- sync-request-curl-build --libcurl=system
