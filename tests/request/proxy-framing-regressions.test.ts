@@ -44,3 +44,52 @@ describe("proxy request framing", () => {
     expect(serializeProxyHeaders({ "Content-Length": [] })).toHaveLength(0);
   });
 });
+
+describe("proxy credential header isolation", () => {
+  test.each(["Authorization", "aUtHoRiZaTiOn", "Cookie", "cOoKiE"])(
+    "rejects %s before a cross-origin redirect can forward it",
+    (name) => {
+      const call = vi.spyOn(native, "request").mockImplementation(() => {
+        throw new Error("Unexpected native I/O");
+      });
+      expect(() =>
+        request("GET", `${SERVER_URL}/auth/redirect/cross-origin`, {
+          proxy: { url: PROXY_URL, headers: { [name]: "secret" } },
+        }),
+      ).toThrow("Authorization and Cookie cannot be supplied in proxy.headers");
+      expect(call).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each([
+    { url: PROXY_URL, username: "user" },
+    { url: PROXY_URL.replace("://", "://user:secret@") },
+    { url: PROXY_URL, auth: "negotiate" as const },
+  ])("rejects Proxy-Authorization with structured proxy auth %j", (proxy) => {
+    const call = vi.spyOn(native, "request").mockImplementation(() => {
+      throw new Error("Unexpected native I/O");
+    });
+    expect(() =>
+      request("GET", SERVER_URL, {
+        proxy: {
+          ...proxy,
+          headers: { "Proxy-Authorization": "Basic dXNlcjpwYXNz" },
+        },
+      }),
+    ).toThrow(
+      "Proxy-Authorization cannot be combined with structured proxy authentication",
+    );
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  test("allows an explicit Proxy-Authorization header without structured auth", () => {
+    const authorization = "Basic dXNlcjpwYXNz";
+    const response = request("GET", SERVER_URL, {
+      proxy: {
+        url: PROXY_URL,
+        headers: { "Proxy-Authorization": authorization },
+      },
+    });
+    expect(response.headers["x-proxy-auth"]).toBe(authorization);
+  });
+});

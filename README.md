@@ -583,8 +583,9 @@ High-level HTTP origin authentication configuration.
 Username/password authentication defaults to Basic when `type` is omitted.
 Bearer authentication uses libcurl's OAuth2 bearer support. Authentication
 configured here is never forwarded to a different origin during redirects.
-Usernames cannot contain ASCII control characters; bearer tokens must use
-RFC 6750 b64token syntax. Negotiated authentication is not supported with
+Usernames cannot contain ASCII control characters. Basic, Digest, and Any
+also reject `:` in usernames and ASCII controls in passwords. Bearer tokens
+must use RFC 6750 b64token syntax. Negotiated authentication is not supported with
 HEAD payloads; omit the payload or use preemptive Basic/Bearer authentication.
 
 ***
@@ -612,11 +613,11 @@ Explicit HTTP(S) or SOCKS proxy configuration.
 | Property | Type | Description |
 | ------ | ------ | ------ |
 | <a id="property-url-2"></a> `url` | `string` | Proxy origin URL. Supported schemes are `http`, `https`, `socks4`, `socks4a`, `socks5`, and `socks5h`. May contain URL-encoded credentials. |
-| <a id="property-username"></a> `username?` | `string` | Overrides both URL credentials. An omitted password becomes an empty string. |
-| <a id="property-password"></a> `password?` | `string` | Proxy password. Requires an explicit username. Defaults to an empty string. |
+| <a id="property-username"></a> `username?` | `string` | Overrides both URL credentials. An omitted password becomes an empty string. HTTP Basic, Digest, and Any authentication reject `:` in usernames. |
+| <a id="property-password"></a> `password?` | `string` | Proxy password. Requires an explicit username. Defaults to an empty string. HTTP Basic, Digest, and Any authentication reject ASCII controls. |
 | <a id="property-auth-1"></a> `auth?` | [`ProxyAuthType`](#proxyauthtype) | HTTP(S) proxy authentication method. Defaults to libcurl's Basic mode. NTLM and Negotiate require support in the active libcurl build. |
 | <a id="property-noproxy"></a> `noProxy?` | `string`[] | Hosts, domains, IP addresses, or CIDR ranges that should bypass this proxy. `"*"` bypasses the proxy for every host. CIDR matching requires libcurl 7.86.0 or newer. |
-| <a id="property-headers-3"></a> `headers?` | [`Headers`](#headers) | Headers sent to an HTTP(S) proxy. For HTTPS origins these are used for the CONNECT request and are kept separate from origin request headers. Content-Length and Transfer-Encoding are rejected, including empty values; body framing cannot be overridden through a separate proxy header list. |
+| <a id="property-headers-3"></a> `headers?` | [`Headers`](#headers) | Headers sent to an HTTP(S) proxy. For HTTPS origins these are used for the CONNECT request and are kept separate from origin request headers. Content-Length, Transfer-Encoding, Authorization, and Cookie are rejected, including empty values. Proxy-Authorization cannot be combined with URL or structured proxy authentication credentials. |
 
 ***
 

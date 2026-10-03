@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { isSafeAuthUsername, isSafeBearerToken } from "#/http/auth";
+import {
+  hasSafeAuthCredentials,
+  isSafeAuthUsername,
+  isSafeBearerToken,
+} from "#/http/auth";
 
 const alphabet =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~+/";
@@ -26,6 +30,27 @@ describe("authentication username validation", () => {
       expect(isSafeAuthUsername(`\u{1f600}${control}user`)).toBe(false);
     }
   });
+
+  test.each([undefined, "basic", "digest", "any"])(
+    "rejects Basic/Digest-compatible separators and password controls for %s",
+    (type) => {
+      expect(hasSafeAuthCredentials("user:name", "secret", type)).toBe(false);
+      expect(hasSafeAuthCredentials("user", "secret\n", type)).toBe(false);
+      expect(hasSafeAuthCredentials("user", "secret\t", type)).toBe(false);
+      expect(hasSafeAuthCredentials("user", "p:a:ss", type)).toBe(true);
+    },
+  );
+
+  test.each(["ntlm", "negotiate"])(
+    "keeps non-HTTP credential syntax for %s while rejecting native NULs",
+    (type) => {
+      expect(hasSafeAuthCredentials("user:name", "secret\n", type)).toBe(true);
+      expect(hasSafeAuthCredentials("user\n", "secret", type)).toBe(false);
+      expect(hasSafeAuthCredentials("user", "secret\0suffix", type)).toBe(
+        false,
+      );
+    },
+  );
 });
 
 describe("bearer token validation", () => {

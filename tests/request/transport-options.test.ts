@@ -73,6 +73,24 @@ describe("transport option validation", () => {
   });
 
   test.each([
+    {
+      auth: { username: "user:name", password: "secret" },
+      authentication: "basic",
+    },
+    {
+      auth: { username: "user", password: "secret\n", type: "digest" as const },
+      authentication: "digest",
+    },
+  ])(
+    "rejects unsafe $authentication credentials at the transport boundary",
+    ({ auth, authentication }) => {
+      expect(() => prepareTransportOptions({ auth })).toThrow(
+        `Invalid HTTP credentials for ${authentication} authentication`,
+      );
+    },
+  );
+
+  test.each([
     { proxy: PROXY_URL, username: undefined, password: undefined },
     {
       proxy: PROXY_URL.replace("://", "://user@"),
@@ -139,6 +157,52 @@ describe("transport option validation", () => {
       new URL(url).href,
     );
   });
+
+  test.each(["http", "https"])(
+    "rejects ambiguous Basic proxy credentials for %s",
+    (scheme) => {
+      expect(() =>
+        prepareTransportOptions({
+          proxy: { url: `${scheme}://localhost:8080`, username: "user:name" },
+        }),
+      ).toThrow();
+      expect(() =>
+        prepareTransportOptions({
+          proxy: {
+            url: `${scheme}://user:secret%0Avalue@localhost:8080`,
+          },
+        }),
+      ).toThrow();
+    },
+  );
+
+  test.each(["socks5", "socks5h"])(
+    "preserves colon-delimited credentials for %s proxies",
+    (scheme) => {
+      expect(
+        prepareTransportOptions({
+          proxy: {
+            url: `${scheme}://localhost:1080`,
+            username: "user:name",
+            password: "p:a:ss",
+          },
+        }),
+      ).toMatchObject({
+        proxyUsername: "user:name",
+        proxyPassword: "p:a:ss",
+      });
+      expect(
+        prepareTransportOptions({
+          proxy: {
+            url: `${scheme}://user%3Aname:p%3Aa%3Ass@localhost:1080`,
+          },
+        }),
+      ).toMatchObject({
+        proxyUsername: "user:name",
+        proxyPassword: "p:a:ss",
+      });
+    },
+  );
 
   test.each(["http", "https", "socks4", "socks4a", "socks5", "socks5h"])(
     "decodes and strips %s proxy URL credentials",

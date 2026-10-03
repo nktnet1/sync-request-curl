@@ -1213,8 +1213,58 @@ fn parse_auth(auth: Option<&str>, target: AuthTarget) -> Result<Option<c_long>> 
   Ok(Some(auth))
 }
 
-fn safe_auth_username(value: &str) -> bool {
-  !value.bytes().any(|byte| byte < 0x20 || byte == 0x7f)
+fn has_ascii_control(value: &str) -> bool {
+  value.bytes().any(|byte| byte < 0x20 || byte == 0x7f)
+}
+
+fn uses_http_credential_restrictions(auth: Option<&str>) -> bool {
+  matches!(auth, None | Some("basic" | "digest" | "any"))
+}
+
+fn safe_opaque_username(value: &str) -> bool {
+  !has_ascii_control(value)
+}
+
+fn safe_opaque_password(value: &str) -> bool {
+  !value.contains('\0')
+}
+
+fn safe_auth_username(value: &str, auth: Option<&str>) -> bool {
+  safe_opaque_username(value)
+    && !(uses_http_credential_restrictions(auth) && value.contains(':'))
+}
+
+fn safe_auth_password(value: &str, auth: Option<&str>) -> bool {
+  safe_opaque_password(value)
+    && !(uses_http_credential_restrictions(auth) && has_ascii_control(value))
+}
+
+fn safe_proxy_username(value: &str, auth: Option<&str>, is_socks: bool) -> bool {
+  if is_socks {
+    safe_opaque_username(value)
+  } else {
+    safe_auth_username(value, auth)
+  }
+}
+
+fn safe_proxy_password(value: &str, auth: Option<&str>, is_socks: bool) -> bool {
+  if is_socks {
+    safe_opaque_password(value)
+  } else {
+    safe_auth_password(value, auth)
+  }
+}
+
+fn is_socks_proxy(proxy: Option<&str>) -> bool {
+  let Some(proxy) = proxy else {
+    return false;
+  };
+  let Some((scheme, _)) = proxy.split_once("://") else {
+    return false;
+  };
+  ["socks4", "socks4a", "socks5", "socks5h"]
+    .iter()
+    .any(|candidate| scheme.eq_ignore_ascii_case(candidate))
 }
 
 fn safe_bearer_token(value: &str) -> bool {
@@ -1228,26 +1278,39 @@ fn safe_bearer_token(value: &str) -> bool {
 
 fn validate_auth_credentials(options: &NativeRequestOptions) -> Result<()> {
   // Do not let direct native callers bypass the public schema and inject
-  // headers or silently truncate credentials at a CString NUL boundary.
-  for username in [&options.auth_username, &options.proxy_username]
-    .into_iter()
-    .flatten()
+  // headers, silently truncate credentials, or misparse Basic/Digest names.
+  if options
+    .auth_username
+    .as_deref()
+    .is_some_and(|value| !safe_auth_username(value, options.auth_type.as_deref()))
   {
-    if !safe_auth_username(username) {
-      return Err(Error::from_reason(
-        "Authentication usernames cannot contain control characters",
-      ));
-    }
+    return Err(Error::from_reason(
+      "Invalid authentication username for the selected method",
+    ));
   }
-  for password in [&options.auth_password, &options.proxy_password]
-    .into_iter()
-    .flatten()
+  if options
+    .auth_password
+    .as_deref()
+    .is_some_and(|value| !safe_auth_password(value, options.auth_type.as_deref()))
   {
-    if password.contains('\0') {
-      return Err(Error::from_reason(
-        "Authentication passwords cannot contain NUL",
-      ));
-    }
+    return Err(Error::from_reason(
+      "Invalid authentication password for the selected method",
+    ));
+  }
+  let proxy_is_socks = is_socks_proxy(options.proxy.as_deref());
+  if options.proxy_username.as_deref().is_some_and(|value| {
+    !safe_proxy_username(value, options.proxy_auth.as_deref(), proxy_is_socks)
+  }) {
+    return Err(Error::from_reason(
+      "Invalid proxy username for the selected method",
+    ));
+  }
+  if options.proxy_password.as_deref().is_some_and(|value| {
+    !safe_proxy_password(value, options.proxy_auth.as_deref(), proxy_is_socks)
+  }) {
+    return Err(Error::from_reason(
+      "Invalid proxy password for the selected method",
+    ));
   }
   if options.auth_bearer.as_deref()
     .is_some_and(|token| !safe_bearer_token(token))
@@ -1257,7 +1320,10 @@ fn validate_auth_credentials(options: &NativeRequestOptions) -> Result<()> {
   Ok(())
 }
 
-fn validate_proxy_headers(headers: &[String]) -> Result<()> {
+fn validate_proxy_headers(
+  headers: &[String],
+  has_structured_auth: bool,
+) -> Result<()> {
   for header in headers {
     // Direct native callers must not smuggle another field behind a safe name.
     if header.bytes().any(|byte| matches!(byte, b'\r' | b'\n' | 0)) {
@@ -1270,12 +1336,28 @@ fn validate_proxy_headers(headers: &[String]) -> Result<()> {
         "Content-Length and Transfer-Encoding cannot be supplied in proxy.headers",
       ));
     }
+    if header_name_matches(header, "authorization")
+      || header_name_matches(header, "cookie")
+    {
+      return Err(Error::from_reason(
+        "Authorization and Cookie cannot be supplied in proxy.headers",
+      ));
+    }
+    if has_structured_auth && header_name_matches(header, "proxy-authorization") {
+      return Err(Error::from_reason(
+        "Proxy-Authorization cannot be combined with structured proxy authentication",
+      ));
+    }
   }
   Ok(())
 }
 
 fn uses_negotiated_auth(auth: Option<&str>) -> bool {
   matches!(auth, Some("any" | "digest" | "ntlm" | "negotiate"))
+}
+
+fn needs_response_tracking(auth: Option<&str>, proxy_auth: Option<&str>) -> bool {
+  uses_negotiated_auth(auth) || uses_negotiated_auth(proxy_auth)
 }
 
 fn get_string_info(curl: *mut CURL, info: curl_sys::CURLINFO) -> Option<String> {
@@ -1293,7 +1375,13 @@ fn get_string_info(curl: *mut CURL, info: curl_sys::CURLINFO) -> Option<String> 
 #[napi]
 pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   validate_auth_credentials(&options)?;
-  validate_proxy_headers(options.proxy_headers.as_deref().unwrap_or_default())?;
+  let has_structured_proxy_auth = options.proxy_username.is_some()
+    || options.proxy_password.is_some()
+    || options.proxy_auth.is_some();
+  validate_proxy_headers(
+    options.proxy_headers.as_deref().unwrap_or_default(),
+    has_structured_proxy_auth,
+  )?;
   if options.no_body.unwrap_or(false)
     && (options.body.is_some() || options.form.is_some())
     && (uses_negotiated_auth(options.auth_type.as_deref())
@@ -1335,9 +1423,12 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   let easy = EasyHandle::new()?;
   let curl = easy.0;
   state.easy_handle = curl;
-  state.requires_debug_text = options.timeout.unwrap_or_default() > 0
-    && (uses_negotiated_auth(options.auth_type.as_deref())
-      || uses_negotiated_auth(options.proxy_auth.as_deref()));
+  let response_tracking_enabled = needs_response_tracking(
+    options.auth_type.as_deref(),
+    options.proxy_auth.as_deref(),
+  );
+  state.requires_debug_text =
+    options.timeout.unwrap_or_default() > 0 && response_tracking_enabled;
   state.download_allowance = RateLimitAllowance::new(
     options.max_download_speed.unwrap_or_default(),
     Instant::now(),
@@ -1452,21 +1543,24 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_HEADERDATA, state_pointer)
   });
-  // Request boundaries are needed even without a timeout: a successful auth
-  // probe may precede the real upload. The callback suppresses all trace output.
-  keep_first_error(&mut code, unsafe {
-    curl_sys::curl_easy_setopt(
-      curl,
-      curl_sys::CURLOPT_DEBUGFUNCTION,
-      request_debug_callback as curl_sys::curl_debug_callback,
-    )
-  });
-  keep_first_error(&mut code, unsafe {
-    curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_DEBUGDATA, state_pointer)
-  });
-  keep_first_error(&mut code, unsafe {
-    curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_VERBOSE, 1 as c_long)
-  });
+  // Negotiated authentication can produce multiple request/response exchanges
+  // inside one easy transfer. Trace only those requests: ordinary transfers do
+  // not need verbose callbacks and avoid their per-chunk overhead.
+  if response_tracking_enabled {
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(
+        curl,
+        curl_sys::CURLOPT_DEBUGFUNCTION,
+        request_debug_callback as curl_sys::curl_debug_callback,
+      )
+    });
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_DEBUGDATA, state_pointer)
+    });
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_VERBOSE, 1 as c_long)
+    });
+  }
   if options.socket_timeout.unwrap_or_default() > 0
     && (options.max_download_speed.unwrap_or_default() > 0
       || options.max_upload_speed.unwrap_or_default() > 0)
@@ -1807,20 +1901,58 @@ mod regression_tests {
   }
 
   #[test]
-  fn native_proxy_headers_cannot_override_request_framing() {
+  fn native_proxy_headers_cannot_override_request_framing_or_origin_secrets() {
     for header in [
       "Content-Length: 3",
       "content-length;",
       "TRANSFER-ENCODING: chunked",
       "Transfer-Encoding:",
+      "Authorization: Bearer secret",
+      "Cookie: session=secret",
       "X-Proxy: safe\r\nContent-Length: 999",
       "X-Proxy: safe\nTransfer-Encoding: chunked",
       "X-Proxy: value\0",
     ] {
-      assert!(validate_proxy_headers(&[header.to_owned()]).is_err());
+      assert!(validate_proxy_headers(&[header.to_owned()], false).is_err());
     }
-    assert!(validate_proxy_headers(&["X-Proxy: value".to_owned()]).is_ok());
-    assert!(validate_proxy_headers(&[]).is_ok());
+    let proxy_authorization =
+      ["Proxy-Authorization: Basic dXNlcjpwYXNz".to_owned()];
+    assert!(validate_proxy_headers(&proxy_authorization, false).is_ok());
+    assert!(validate_proxy_headers(&proxy_authorization, true).is_err());
+    assert!(
+      validate_proxy_headers(&["X-Proxy: value".to_owned()], false).is_ok()
+    );
+    assert!(validate_proxy_headers(&[], false).is_ok());
+  }
+
+  #[test]
+  fn auth_credential_rules_match_the_selected_method() {
+    for auth in [None, Some("basic"), Some("digest"), Some("any")] {
+      assert!(!safe_auth_username("user:name", auth));
+      assert!(!safe_auth_password("secret\n", auth));
+    }
+    for auth in [Some("ntlm"), Some("negotiate")] {
+      assert!(safe_auth_username("user:name", auth));
+      assert!(safe_auth_password("secret\n", auth));
+    }
+    assert!(!safe_auth_username("user\n", Some("ntlm")));
+    assert!(!safe_auth_password("secret\0suffix", Some("ntlm")));
+    assert!(safe_proxy_username("user:name", None, true));
+    assert!(safe_proxy_password("p:a:ss", None, true));
+    assert!(!safe_proxy_username("user\n", None, true));
+    assert!(!safe_proxy_password("secret\0suffix", None, true));
+  }
+
+  #[test]
+  fn response_tracking_is_limited_to_negotiated_authentication() {
+    for auth in [Some("any"), Some("digest"), Some("ntlm"), Some("negotiate")] {
+      assert!(needs_response_tracking(auth, None));
+      assert!(needs_response_tracking(None, auth));
+    }
+    for auth in [None, Some("basic"), Some("bearer")] {
+      assert!(!needs_response_tracking(auth, None));
+      assert!(!needs_response_tracking(None, auth));
+    }
   }
 
   #[test]

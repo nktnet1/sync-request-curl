@@ -59,10 +59,47 @@ describe("authentication credential boundaries", () => {
     },
   );
 
-  test("preserves empty/Unicode usernames and encoded password characters", () => {
+  test.each([undefined, "basic", "digest", "any"] as const)(
+    "rejects ambiguous usernames and password controls for %s before native I/O",
+    (type) => {
+      const call = vi.spyOn(native, "request").mockImplementation(() => {
+        throw new Error("Unexpected native I/O");
+      });
+      for (const options of [
+        { auth: { username: "user:name", password: "secret", type } },
+        { auth: { username: "user", password: "secret\n", type } },
+        { proxy: { url: PROXY_URL, username: "user:name", auth: type } },
+        {
+          proxy: {
+            url: PROXY_URL,
+            username: "user",
+            password: "secret\t",
+            auth: type,
+          },
+        },
+        {
+          proxy: {
+            url: PROXY_URL.replace("://", "://user%3Aname:secret@"),
+            auth: type,
+          },
+        },
+        {
+          proxy: {
+            url: PROXY_URL.replace("://", "://user:secret%0Avalue@"),
+            auth: type,
+          },
+        },
+      ] satisfies Options[]) {
+        expect(() => request("GET", authEndpoint, options)).toThrow();
+      }
+      expect(call).not.toHaveBeenCalled();
+    },
+  );
+
+  test("preserves empty/Unicode usernames and valid password punctuation", () => {
     expect(isSafeAuthUsername("")).toBe(true);
     expect(isSafeAuthUsername("caf\u00e9")).toBe(true);
-    const password = "secret\r\nwith-controls";
+    const password = "secret:with=punc";
     const response = request("GET", `${SERVER_URL}/auth/echo`, {
       auth: { username: "user", password },
     });
