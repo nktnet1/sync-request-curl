@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import { RequestError } from "#/errors";
-import { usesNegotiatedAuth } from "#/http/auth";
+import { hasSafeAuthCredentials, usesNegotiatedAuth } from "#/http/auth";
 import {
   hasNonEmptyRequestHeader,
   hasRequestHeader,
@@ -14,6 +14,7 @@ import {
   appendQueryString,
   assertSupportedHttpUrl,
   normalizeUrlHostname,
+  stripUrlCredentials,
 } from "#/http/url";
 import type { NativeRequestOptions } from "#/native/index";
 import type { Options, UppercaseHttpVerb } from "#/types/definition";
@@ -158,13 +159,25 @@ export const prepareRequest = (
     );
   }
 
-  const preparedUrl = prepareUrl(url, options);
+  let preparedUrl = prepareUrl(url, options);
   const target = new URL(preparedUrl);
-  if (
-    options.auth !== undefined &&
-    (target.username !== "" || target.password !== "")
-  ) {
+  const hasUrlCredentials = target.username !== "" || target.password !== "";
+  if (options.auth !== undefined && hasUrlCredentials) {
     invalidRequestSemantics("auth cannot be combined with URL credentials");
+  }
+  if (hasRequestHeader(headers, "authorization")) {
+    // Explicit Authorization wins. Discard dormant Basic credentials before
+    // libcurl can retain them in the effective URL used for relative redirects.
+    preparedUrl = stripUrlCredentials(preparedUrl);
+  } else if (
+    hasUrlCredentials &&
+    !hasSafeAuthCredentials(
+      decodeURIComponent(target.username),
+      decodeURIComponent(target.password),
+      "basic",
+    )
+  ) {
+    invalidRequestSemantics("Invalid URL credentials for basic authentication");
   }
 
   return {

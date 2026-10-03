@@ -333,6 +333,35 @@ test("explicit Authorization wins over URL credentials", () => {
   });
 });
 
+test("dropping Authorization on a relative redirect does not restore URL Basic auth", () => {
+  const url = `${SERVER_URL.replace("://", "://user:secret@")}/auth/redirect/same-origin`;
+  const response = request("GET", url, {
+    headers: { Authorization: "Bearer explicit" },
+  });
+  expect(response.getJSON()).toMatchObject({ authorization: null });
+  expect(response.url).toBe(`${SERVER_URL}/auth/echo`);
+});
+
+test("allow-listed Authorization remains active after removing dormant URL credentials", () => {
+  const url = `${SERVER_URL.replace("://", "://user:secret@")}/auth/redirect/same-origin`;
+  const response = request("GET", url, {
+    headers: { Authorization: "Bearer explicit" },
+    allowRedirectHeaders: ["authorization"],
+  });
+  expect(response.getJSON()).toMatchObject({
+    authorization: "Bearer explicit",
+  });
+  expect(response.url).toBe(`${SERVER_URL}/auth/echo`);
+});
+
+test("active URL Basic credentials survive a same-origin relative redirect", () => {
+  const url = `${SERVER_URL.replace("://", "://user:p%40ss@")}/auth/redirect/same-origin`;
+  const response = request("GET", url);
+  expect(response.getJSON()).toMatchObject({
+    authorization: `Basic ${Buffer.from("user:p@ss").toString("base64")}`,
+  });
+});
+
 test("rejects high-level auth combined with an Authorization header", () => {
   expect(() =>
     request("GET", `${SERVER_URL}/compat/echo`, {

@@ -173,6 +173,20 @@ fn is_socks_proxy(proxy: Option<&str>) -> bool {
     .any(|candidate| scheme.eq_ignore_ascii_case(candidate))
 }
 
+pub(crate) fn proxy_url_has_credentials(proxy: Option<&str>) -> bool {
+  let Some(proxy) = proxy else {
+    return false;
+  };
+  // libcurl also accepts a proxy without a scheme. Only an '@' in its
+  // authority denotes userinfo; path, query, and fragment data do not.
+  let authority = proxy.split_once("://").map_or(proxy, |(_, rest)| rest);
+  authority
+    .split(['/', '?', '#'])
+    .next()
+    .unwrap_or_default()
+    .contains('@')
+}
+
 fn safe_bearer_token(value: &str) -> bool {
   let token = value.trim_end_matches('=');
   !token.is_empty()
@@ -269,6 +283,40 @@ pub(crate) fn needs_auth_response_tracking(auth: Option<&str>, proxy_auth: Optio
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn proxy_url_credentials_conflict_with_manual_proxy_authorization() {
+    let headers = ["Proxy-Authorization: Basic dXNlcjpwYXNz".to_owned()];
+    for proxy in [
+      "http://user:secret@proxy:8080/",
+      "HTTPS://user:p%40ss@proxy/",
+      "socks5h://user:secret@[::1]:1080",
+      "http://user@proxy/",
+      "http://:secret@proxy/",
+      "http://@proxy/",
+      "user:secret@proxy:8080",
+      "user:secret@[::1]:8080",
+    ] {
+      let has_credentials = proxy_url_has_credentials(Some(proxy));
+      assert!(has_credentials, "{proxy}");
+      assert!(validate_proxy_headers(&headers, has_credentials).is_err());
+    }
+    for proxy in [
+      None,
+      Some(""),
+      Some("http://proxy:8080/"),
+      Some("proxy:8080"),
+      Some("http://[::1]:8080/"),
+      Some("http://proxy/path@value"),
+      Some("http://proxy?value=user@host"),
+      Some("http://proxy#user@host"),
+      Some("http://proxy%40name:8080/"),
+    ] {
+      let has_credentials = proxy_url_has_credentials(proxy);
+      assert!(!has_credentials, "{proxy:?}");
+      assert!(validate_proxy_headers(&headers, has_credentials).is_ok());
+    }
+  }
 
   #[test]
   fn native_credentials_enforce_header_safe_syntax() {

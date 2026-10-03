@@ -55,7 +55,7 @@ A high-performance Node.js alternative to [sync-request](https://github.com/Forb
 - [7. Caveats](#caveats)
   - [7.1. Authentication and HEAD payloads](#caveats-authentication-and-head-payloads)
   - [7.2. Timeouts with authentication and transfer limits](#caveats-timeouts-with-authentication-and-transfer-limits)
-  - [7.3. Proxy request framing](#caveats-proxy-request-framing)
+  - [7.3. Proxy request headers](#caveats-proxy-request-headers)
 
 <a id="installation"></a>
 ## 1. Installation
@@ -1608,7 +1608,12 @@ usernames and ASCII control characters in passwords. NTLM and Negotiate
 passwords may contain CR/LF, but no authentication method accepts NUL in a
 password. Bearer tokens must use the RFC 6750 `b64token` syntax. These rules also
 apply to percent-decoded HTTP(S) proxy URL credentials; SOCKS usernames must
-not contain ASCII controls, and SOCKS passwords must not contain NUL.
+not contain ASCII controls, and SOCKS passwords must not contain NUL. Origin URL
+credentials are percent-decoded and checked using the Basic authentication rules.
+An explicit `Authorization` header takes precedence over origin URL credentials,
+which are removed before transport so they cannot become active when a redirect
+drops the header. `auth` cannot be combined with origin URL credentials or an
+explicit `Authorization` header.
 
 HEAD requests with a payload cannot use negotiated origin or proxy authentication
 (`any`, `digest`, `ntlm`, or `negotiate`). This combination is rejected before
@@ -1649,11 +1654,15 @@ responds still times out after the remaining allowance and inactivity budget exp
 `overallTimeout` includes both throttling and authentication and is never extended.
 
 
-<a id="caveats-proxy-request-framing"></a>
-### 7.3. Proxy request framing
+<a id="caveats-proxy-request-headers"></a>
+### 7.3. Proxy request headers
 
 `proxy.headers` cannot supply `Content-Length` or `Transfer-Encoding`, including
 explicit empty values. Body framing is managed by the request implementation;
 non-tunnelled HTTP proxy requests combine the origin and proxy header lists.
-Both the public API and the native entry point reject proxy framing overrides
-before network I/O. Other proxy headers retain ordinary header validation.
+`proxy.headers` also rejects `Authorization` and `Cookie`; these origin-sensitive
+headers belong in the main request headers. `Proxy-Authorization` cannot be
+combined with proxy URL credentials, `proxy.username`, `proxy.password`, or
+`proxy.auth`. Both the public API and the native entry point reject these
+combinations and framing overrides before network I/O. Other proxy headers retain
+ordinary header validation.

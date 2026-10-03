@@ -71,6 +71,22 @@ const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
   };
 };
 
+/** Remove userinfo without normalizing a conventional absolute URL. */
+export const stripUrlCredentials = (url: string): string => {
+  const parts = splitAbsoluteUrl(url);
+  if (!parts) {
+    const parsed = new URL(url);
+    parsed.username = "";
+    parsed.password = "";
+    return parsed.href;
+  }
+
+  const userInfoEnd = parts.authority.lastIndexOf("@");
+  return userInfoEnd < 0
+    ? url
+    : `${parts.prefix}${parts.authority.slice(userInfoEnd + 1)}${parts.remainder}`;
+};
+
 /**
  * Converts only an internationalized hostname to ASCII/Punycode while leaving
  * the rest of the URL byte-for-byte unchanged.

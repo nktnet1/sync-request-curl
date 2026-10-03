@@ -11,7 +11,7 @@ use crate::callbacks::{header_callback, request_debug_callback, transfer_progres
 use crate::curl_utils::{configure_default_ca, curl_header_string, ensure_curl_initialized, keep_first_error, set_string_option, transport_error_message, EasyHandle, CURLE_NOT_BUILT_IN};
 use crate::mime::{build_mime, Mime};
 use crate::multi::perform_request;
-use crate::options::{header_name_matches, needs_auth_response_tracking, parse_auth, parse_http_version, parse_ip_resolve, parse_tls_cert_type, parse_tls_version_range, uses_negotiated_auth, validate_auth_credentials, validate_proxy_headers, AuthTarget};
+use crate::options::{header_name_matches, needs_auth_response_tracking, parse_auth, parse_http_version, parse_ip_resolve, parse_tls_cert_type, parse_tls_version_range, proxy_url_has_credentials, uses_negotiated_auth, validate_auth_credentials, validate_proxy_headers, AuthTarget};
 use crate::rate_limit::RateLimitAllowance;
 use crate::types::{NativeRequestOptions, NativeResponse};
 
@@ -63,7 +63,8 @@ pub(crate) fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   validate_auth_credentials(&options)?;
   let has_structured_proxy_auth = options.proxy_username.is_some()
     || options.proxy_password.is_some()
-    || options.proxy_auth.is_some();
+    || options.proxy_auth.is_some()
+    || proxy_url_has_credentials(options.proxy.as_deref());
   validate_proxy_headers(
     options.proxy_headers.as_deref().unwrap_or_default(),
     has_structured_proxy_auth,
