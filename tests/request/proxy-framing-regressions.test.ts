@@ -1,10 +1,8 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import { serializeProxyHeaders } from "#/http/headers";
 import request from "#/index";
-import native from "#/native/index";
 import { PROXY_URL, SERVER_URL } from "#tests/app/config";
-
-afterEach(() => vi.restoreAllMocks());
+import { expectRejectedBeforeNativeIo } from "./helpers";
 
 const framingHeaders = [
   "Content-Length",
@@ -15,22 +13,18 @@ const framingHeaders = [
 
 describe("proxy request framing", () => {
   test.each(framingHeaders)("rejects %s before native I/O", (name) => {
-    const call = vi.spyOn(native, "request").mockImplementation(() => {
-      throw new Error("Unexpected native I/O");
-    });
     for (const value of ["999", "chunked", "", ["0", "1"]]) {
       for (const method of ["GET", "POST"] as const) {
-        expect(() =>
-          request(method, SERVER_URL, {
-            body: method === "POST" ? "abc" : undefined,
-            proxy: { url: PROXY_URL, headers: { [name]: value } },
-          }),
-        ).toThrow(
+        expectRejectedBeforeNativeIo(
+          () =>
+            request(method, SERVER_URL, {
+              body: method === "POST" ? "abc" : undefined,
+              proxy: { url: PROXY_URL, headers: { [name]: value } },
+            }),
           "Content-Length and Transfer-Encoding cannot be supplied in proxy.headers",
         );
       }
     }
-    expect(call).not.toHaveBeenCalled();
   });
 
   test("uses ordinary header serialization for safe proxy headers", () => {
@@ -49,15 +43,13 @@ describe("proxy credential header isolation", () => {
   test.each(["Authorization", "aUtHoRiZaTiOn", "Cookie", "cOoKiE"])(
     "rejects %s before a cross-origin redirect can forward it",
     (name) => {
-      const call = vi.spyOn(native, "request").mockImplementation(() => {
-        throw new Error("Unexpected native I/O");
-      });
-      expect(() =>
-        request("GET", `${SERVER_URL}/auth/redirect/cross-origin`, {
-          proxy: { url: PROXY_URL, headers: { [name]: "secret" } },
-        }),
-      ).toThrow("Authorization and Cookie cannot be supplied in proxy.headers");
-      expect(call).not.toHaveBeenCalled();
+      expectRejectedBeforeNativeIo(
+        () =>
+          request("GET", `${SERVER_URL}/auth/redirect/cross-origin`, {
+            proxy: { url: PROXY_URL, headers: { [name]: "secret" } },
+          }),
+        "Authorization and Cookie cannot be supplied in proxy.headers",
+      );
     },
   );
 
@@ -66,20 +58,16 @@ describe("proxy credential header isolation", () => {
     { url: PROXY_URL.replace("://", "://user:secret@") },
     { url: PROXY_URL, auth: "negotiate" as const },
   ])("rejects Proxy-Authorization with structured proxy auth %j", (proxy) => {
-    const call = vi.spyOn(native, "request").mockImplementation(() => {
-      throw new Error("Unexpected native I/O");
-    });
-    expect(() =>
-      request("GET", SERVER_URL, {
-        proxy: {
-          ...proxy,
-          headers: { "Proxy-Authorization": "Basic dXNlcjpwYXNz" },
-        },
-      }),
-    ).toThrow(
+    expectRejectedBeforeNativeIo(
+      () =>
+        request("GET", SERVER_URL, {
+          proxy: {
+            ...proxy,
+            headers: { "Proxy-Authorization": "Basic dXNlcjpwYXNz" },
+          },
+        }),
       "Proxy-Authorization cannot be combined with structured proxy authentication",
     );
-    expect(call).not.toHaveBeenCalled();
   });
 
   test("allows an explicit Proxy-Authorization header without structured auth", () => {
