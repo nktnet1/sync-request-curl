@@ -1,18 +1,12 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { CurlError } from "#/errors";
 import { FormData } from "#/form-data";
 import { isSafeAuthUsername, isSafeBearerToken } from "#/http/auth";
 import request from "#/index";
 import native from "#/native/index";
 import type { Options } from "#/types/definition";
 import { FRAMING_SERVER_URL, PROXY_URL, SERVER_URL } from "#tests/app/config";
+import { authEndpoint, credentials } from "./helpers";
 
-const credentials = {
-  username: "user",
-  password: "secret",
-  type: "any",
-} as const;
-const endpoint = `${FRAMING_SERVER_URL}/regressions/auth`;
 afterEach(() => vi.restoreAllMocks());
 
 describe("authentication credential boundaries", () => {
@@ -38,7 +32,7 @@ describe("authentication credential boundaries", () => {
           },
         },
       ] satisfies Options[]) {
-        expect(() => request("GET", endpoint, options)).toThrow();
+        expect(() => request("GET", authEndpoint, options)).toThrow();
       }
       expect(call).not.toHaveBeenCalled();
     },
@@ -57,12 +51,14 @@ describe("authentication credential boundaries", () => {
   ])("rejects malformed bearer tokens %j", (token) => {
     expect(isSafeBearerToken(token)).toBe(false);
   });
+
   test.each(["token", "a.b_c-~+/==", "abc=", "abc==="])(
     "accepts RFC 6750 bearer syntax %j",
     (token) => {
       expect(isSafeBearerToken(token)).toBe(true);
     },
   );
+
   test("preserves empty/Unicode usernames and encoded password characters", () => {
     expect(isSafeAuthUsername("")).toBe(true);
     expect(isSafeAuthUsername("caf\u00e9")).toBe(true);
@@ -76,116 +72,45 @@ describe("authentication credential boundaries", () => {
   });
 });
 
-describe("authentication response-header deadlines", () => {
-  test.each(["secret", "wrong"])(
-    "verifies negotiated Digest credentials (password=%s)",
-    (password) => {
-      const response = request("GET", `${endpoint}?scheme=digest`, {
-        auth: { ...credentials, type: "digest", password },
-        timeout: 1_000,
-        overallTimeout: 2_000,
-      });
-      const authenticated = password === "secret";
-      expect(response.statusCode).toBe(authenticated ? 200 : 401);
-      expect(response.body.toString()).toBe(
-        authenticated ? "authenticated" : "denied",
-      );
+describe.each([
+  { name: "default persistence", headers: {}, connection: "keep-alive" },
+  {
+    name: "explicit closure",
+    headers: { Connection: "close" },
+    connection: "close",
+  },
+])("authentication fixture connections: $name", ({ headers, connection }) => {
+  test.each([
+    {
+      name: "origin challenge",
+      path: "auth?scheme=digest",
+      status: 401,
+      body: "denied",
     },
-  );
-
-  test("completes Digest stale-nonce retries within the deadline", () => {
-    const response = request("GET", `${endpoint}?scheme=digest&stale=1`, {
-      auth: { ...credentials, type: "digest" },
-      timeout: 1_000,
-      overallTimeout: 2_000,
-    });
-    expect(response.statusCode).toBe(200);
-    expect(response.body.toString()).toBe("authenticated");
-  });
-
-  test.each(["any", "digest"] as const)(
-    "keeps timeout active after %s challenges",
-    (type) => {
-      let failure: unknown;
-      try {
-        request(
-          "GET",
-          `${endpoint}?scheme=${type === "digest" ? "digest" : "basic"}&headersDelay=900`,
-          {
-            auth: { ...credentials, type },
-            timeout: 250,
-            overallTimeout: 2_000,
-          },
-        );
-      } catch (error) {
-        failure = error;
-      }
-      expect(failure).toBeInstanceOf(CurlError);
-      expect(failure).toMatchObject({ code: 28 });
+    {
+      name: "proxy challenge",
+      path: "auth?target=proxy&scheme=digest",
+      status: 407,
+      body: "denied",
     },
-  );
-
-  test("reuses one deadline across Digest stale-nonce retries", () => {
-    expect(() =>
-      request(
-        "GET",
-        `${endpoint}?scheme=digest&stale=1&challengeDelay=180&headersDelay=180`,
-        {
-          auth: { ...credentials, type: "digest" },
-          timeout: 400,
-          overallTimeout: 2_000,
-        },
-      ),
-    ).toThrow(expect.objectContaining({ code: 28 }));
-  });
-
-  test("rearms the deadline after a proxy challenge", () => {
-    expect(() =>
-      request("GET", `${FRAMING_SERVER_URL}/regressions/delayed-headers`, {
-        proxy: {
-          url: PROXY_URL,
-          username: "user",
-          password: "secret",
-          auth: "any",
-          headers: { "x-proxy-require-auth": "basic" },
-        },
-        timeout: 250,
-        overallTimeout: 2_000,
-      }),
-    ).toThrow(expect.objectContaining({ code: 28 }));
-  });
-
-  test.each([false, true])(
-    "does not apply header timeout to a terminal response body (rejected=%s)",
-    (reject) => {
-      const response = request(
-        "GET",
-        `${endpoint}?bodyDelay=450${reject ? "&reject=1" : ""}`,
-        {
-          // Preemptive Basic makes the rejected response unambiguously terminal.
-          auth: { ...credentials, type: "basic" },
-          timeout: 250,
-          overallTimeout: 2_000,
-        },
-      );
-      expect(response.statusCode).toBe(reject ? 401 : 200);
-      expect(response.body.toString()).toBe(
-        reject ? "denied" : "authenticated",
-      );
+    {
+      name: "accepted upload probe",
+      path: "rate/upload",
+      status: 200,
+      body: JSON.stringify({ bytes: 0 }),
     },
-  );
-
-  test("allows successful negotiated responses and preserves a failed authentication", () => {
-    expect(
-      request("GET", endpoint, { auth: credentials, timeout: 1_000 })
-        .statusCode,
-    ).toBe(200);
-    const denied = request("GET", endpoint, {
-      auth: { ...credentials, password: "wrong" },
-      timeout: 1_000,
-    });
-    expect(denied.statusCode).toBe(401);
-    expect(denied.body.toString()).toBe("denied");
+  ])("$name", ({ path, status, body }) => {
+    const response = request(
+      "GET",
+      `${FRAMING_SERVER_URL}/regressions/${path}`,
+      { headers, timeout: 1_000, overallTimeout: 2_000 },
+    );
+    expect(response.statusCode).toBe(status);
+    expect(response.headers.connection).toBe(connection);
+    expect(response.headers["content-length"]).toBe(
+      String(Buffer.byteLength(body)),
+    );
+    expect(response.body.toString()).toBe(body);
   });
 });
 
@@ -209,7 +134,7 @@ describe("HEAD authentication boundaries", () => {
           { proxy: { url: PROXY_URL, username: "user", auth: type } },
         ]) {
           expect(() =>
-            request("HEAD", endpoint, { ...payload, ...auth }),
+            request("HEAD", authEndpoint, { ...payload, ...auth }),
           ).toThrow(
             "HEAD requests with a payload cannot use negotiated authentication",
           );
@@ -224,7 +149,7 @@ describe("HEAD authentication boundaries", () => {
     (type) => {
       const response = request(
         "HEAD",
-        `${endpoint}?scheme=${type === "digest" ? "digest" : "basic"}`,
+        `${authEndpoint}?scheme=${type === "digest" ? "digest" : "basic"}`,
         {
           auth: { ...credentials, type },
           timeout: 1_000,

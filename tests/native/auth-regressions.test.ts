@@ -86,3 +86,59 @@ test("authentication timeouts do not poison a reusable native connection pool", 
     native.releaseConnectionPool(connectionPoolId);
   }
 });
+
+describe("native proxy framing and response boundaries", () => {
+  test.each([
+    "Content-Length: 3",
+    "content-length;",
+    "Transfer-Encoding: chunked",
+    "TRANSFER-ENCODING:",
+  ])("rejects framing outside the public validation layer: %s", (header) => {
+    expect(() =>
+      native.request({
+        ...base,
+        proxy: FRAMING_SERVER_URL,
+        proxyHeaders: [header],
+      }),
+    ).toThrow(
+      "Content-Length and Transfer-Encoding cannot be supplied in proxy.headers",
+    );
+  });
+
+  test.each([
+    "X-Proxy: safe\r\nContent-Length: 999",
+    "X-Proxy: safe\nTransfer-Encoding: chunked",
+    "X-Proxy: value\0",
+  ])("rejects injected native proxy header lines: %j", (header) => {
+    expect(() =>
+      native.request({
+        ...base,
+        proxy: FRAMING_SERVER_URL,
+        proxyHeaders: [header],
+      }),
+    ).toThrow("Invalid proxy header line");
+  });
+
+  test.each([0, 1_000])(
+    "reports accepted Digest probe boundaries with timeout=%i",
+    (timeout) => {
+      const response = native.request({
+        ...base,
+        method: "POST",
+        url: `${FRAMING_SERVER_URL}/regressions/rate/upload`,
+        body: "abc",
+        authType: "digest",
+        authUsername: "user",
+        authPassword: "secret",
+        timeout,
+      });
+      expect(response.transportCode).toBe(0);
+      expect(response.body.toString()).toBe(JSON.stringify({ bytes: 3 }));
+      expect(response.requestHeaderOffsets).toHaveLength(2);
+      expect(response.requestHeaderOffsets?.[0]).toBe(0);
+      for (const offset of response.requestHeaderOffsets ?? []) {
+        expect(response.headers[offset]).toMatch(/^HTTP\/\S+ 200/);
+      }
+    },
+  );
+});

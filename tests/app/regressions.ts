@@ -57,8 +57,12 @@ const createAuthChallenge = (
   return `Digest realm="${realm}", nonce="${nonce}", algorithm=MD5, qop="auth"${staleParameter}`;
 };
 
-const validCredentials = (req: IncomingMessage, scheme: string): boolean => {
-  const authorization = req.headers.authorization ?? "";
+const validCredentials = (
+  req: IncomingMessage,
+  scheme: string,
+  authorization: string,
+  requestUri: string | undefined,
+): boolean => {
   if (scheme === "bearer") {
     return authorization === "Bearer token";
   }
@@ -70,7 +74,7 @@ const validCredentials = (req: IncomingMessage, scheme: string): boolean => {
     !authorization.startsWith("Digest ") ||
     fields.username !== "user" ||
     fields.realm !== realm ||
-    fields.uri !== req.url ||
+    fields.uri !== requestUri ||
     fields.qop !== "auth" ||
     !["first-nonce", "second-nonce"].includes(fields.nonce ?? "")
   ) {
@@ -98,6 +102,78 @@ const later = (
   res.once("close", () => clearTimeout(timer));
 };
 
+const responseBodyDelay = (params: URLSearchParams, initial: boolean): number =>
+  Number(
+    (initial ? params.get("initialBodyDelay") : null) ??
+      params.get("bodyDelay") ??
+      0,
+  );
+
+const sendResponseBody = (
+  req: IncomingMessage,
+  res: ServerResponse,
+  body: string,
+  delay: number,
+): void => {
+  // Nonzero metadata length and keep-alive expose HEAD framing mistakes.
+  res.setHeader("Content-Length", Buffer.byteLength(body));
+  if (req.method === "HEAD") {
+    res.removeHeader("Connection");
+    res.end();
+    return;
+  }
+  res.flushHeaders();
+  later(res, delay, () => res.end(body));
+};
+
+const handleAuthRequest = (
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: URL,
+): void => {
+  const params = url.searchParams;
+  const proxy = params.get("target") === "proxy";
+  const authorization =
+    req.headers[proxy ? "proxy-authorization" : "authorization"] ?? "";
+  const scheme = params.get("scheme") ?? "basic";
+  // libcurl hashes origin-form paths for proxy Digest, even though the HTTP
+  // proxy request line itself uses an absolute-form target.
+  const requestUri = proxy ? `${url.pathname}${url.search}` : req.url;
+  const authorized = validCredentials(req, scheme, authorization, requestUri);
+  const stale =
+    authorized &&
+    scheme === "digest" &&
+    params.has("stale") &&
+    digestFields(authorization).nonce === "first-nonce";
+  const rejected = !authorized || stale || params.has("reject");
+  const headerDelay = Number(
+    params.get(rejected ? "challengeDelay" : "headersDelay") ?? 0,
+  );
+  req.resume();
+  req.once("end", () =>
+    later(res, headerDelay, () => {
+      res.statusCode = 200;
+      if (rejected) {
+        res.statusCode = proxy ? 407 : 401;
+        res.setHeader(
+          proxy ? "Proxy-Authenticate" : "WWW-Authenticate",
+          createAuthChallenge(
+            scheme,
+            stale ? "second-nonce" : "first-nonce",
+            stale,
+          ),
+        );
+      }
+      sendResponseBody(
+        req,
+        res,
+        rejected ? "denied" : "authenticated",
+        responseBodyDelay(params, authorization === ""),
+      );
+    }),
+  );
+};
+
 /** Raw HTTP fixtures: no framework buffering or automatic HEAD conversion. */
 export const handleRegressionRequest = (
   req: IncomingMessage,
@@ -109,42 +185,7 @@ export const handleRegressionRequest = (
     return false;
   }
   if (url.pathname === "/regressions/auth") {
-    const scheme = url.searchParams.get("scheme") ?? "basic";
-    const authorized = validCredentials(req, scheme);
-    const stale =
-      authorized &&
-      scheme === "digest" &&
-      url.searchParams.has("stale") &&
-      digestFields(req.headers.authorization ?? "").nonce === "first-nonce";
-    const rejected = !authorized || stale || url.searchParams.has("reject");
-    const nonce = stale ? "second-nonce" : "first-nonce";
-    const headerDelay = Number(
-      url.searchParams.get(rejected ? "challengeDelay" : "headersDelay") ?? 0,
-    );
-    req.resume();
-    req.once("end", () =>
-      later(res, headerDelay, () => {
-        res.statusCode = rejected ? 401 : 200;
-        if (rejected) {
-          res.setHeader(
-            "WWW-Authenticate",
-            createAuthChallenge(scheme, nonce, stale),
-          );
-        }
-        const body = rejected ? "denied" : "authenticated";
-        // Nonzero metadata length and keep-alive expose HEAD framing mistakes.
-        res.setHeader("Content-Length", Buffer.byteLength(body));
-        if (req.method === "HEAD") {
-          res.removeHeader("Connection");
-          res.end();
-          return;
-        }
-        res.flushHeaders();
-        later(res, Number(url.searchParams.get("bodyDelay") ?? 0), () =>
-          res.end(body),
-        );
-      }),
-    );
+    handleAuthRequest(req, res, url);
     return true;
   }
   if (url.pathname === "/regressions/delayed-headers") {
@@ -163,7 +204,13 @@ export const handleRegressionRequest = (
         return;
       }
       res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ bytes }));
+      res.setHeader("X-Received-Bytes", bytes);
+      sendResponseBody(
+        req,
+        res,
+        JSON.stringify({ bytes }),
+        responseBodyDelay(url.searchParams, bytes === 0),
+      );
     });
     return true;
   }

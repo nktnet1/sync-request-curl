@@ -88,6 +88,11 @@ const nativeResponseObjectSchema = v.object({
   effectiveUrl: v.nullable(v.string()),
   redirectUrl: v.nullable(v.string()),
   headers: v.array(v.string()),
+  // Optional for older addons and test doubles. These indexes are produced by
+  // the native debug callback, never inferred from untrusted response text.
+  requestHeaderOffsets: v.optional(
+    v.array(v.pipe(v.number(), v.integer(), v.minValue(0))),
+  ),
   body: v.instance(Buffer),
 });
 

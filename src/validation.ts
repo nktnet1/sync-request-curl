@@ -265,6 +265,8 @@ export interface ProxyOptions {
   /**
    * Headers sent to an HTTP(S) proxy. For HTTPS origins these are used for the
    * CONNECT request and are kept separate from origin request headers.
+   * Content-Length and Transfer-Encoding are rejected, including empty values;
+   * body framing cannot be overridden through a separate proxy header list.
    */
   headers?: Headers;
 }

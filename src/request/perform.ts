@@ -106,7 +106,10 @@ const performTransportRequest = (
     result.transportCode,
     result.transportMessage,
   );
-  const responseHeaders = parseResponseHeaders(result.headers);
+  const responseHeaders = parseResponseHeaders(
+    result.headers,
+    result.requestHeaderOffsets,
+  );
   throwForResponseFramingTransportError(
     result.transportCode,
     result.transportMessage,
