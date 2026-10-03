@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import request from "#/index";
-import { rate, rateEndpoint } from "./rate-limit-regressions.helpers";
+import { rate, rateEndpoint } from "./helpers";
 
 describe("transfer limits and inactivity", () => {
   test("still times out a silent server after a completed upload", () => {

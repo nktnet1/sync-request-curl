@@ -5,7 +5,7 @@ import request from "#/index";
 import native from "#/native/index";
 import type { Options } from "#/types/definition";
 import { FRAMING_SERVER_URL, PROXY_URL, SERVER_URL } from "#tests/app/config";
-import { authEndpoint, credentials } from "./auth-regressions.helpers";
+import { authEndpoint, credentials } from "./helpers";
 
 afterEach(() => vi.restoreAllMocks());
 

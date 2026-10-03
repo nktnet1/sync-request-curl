@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { FormData } from "#/form-data";
 import request from "#/index";
 import { FRAMING_SERVER_URL } from "#tests/app/config";
-import { credentials, expectHeaderDeadline } from "./auth-regressions.helpers";
+import { credentials, expectHeaderDeadline } from "./helpers";
 
 describe("successful Digest upload probes", () => {
   const upload = `${FRAMING_SERVER_URL}/regressions/rate/upload`;

@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { CurlError } from "#/errors";
 import request from "#/index";
 import { FRAMING_SERVER_URL, PROXY_URL } from "#tests/app/config";
-import { authEndpoint, credentials } from "./auth-regressions.helpers";
+import { authEndpoint, credentials } from "./helpers";
 
 describe("authentication response-header deadlines", () => {
   test.each(["secret", "wrong"])(
