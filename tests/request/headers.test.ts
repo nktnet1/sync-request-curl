@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import request from "#/index";
 import { prepareRequest } from "#/request/prepare";
-import { SERVER_URL } from "#tests/app/config";
+import { FRAMING_SERVER_URL, SERVER_URL } from "#tests/app/config";
 import { wrapperRequest } from "#tests/request/helpers";
 
 describe("Headers", () => {
@@ -75,6 +75,39 @@ describe("Correctly set content-length", () => {
 });
 
 describe("Transport request headers", () => {
+  test("preserves Latin-1 request headers, cookies, and cache validators", () => {
+    const value = "caf\u00e9\u0080\u00ff";
+    const cookie = `session=${value}`;
+    const validator = `"${value}"`;
+    const response = request(
+      "GET",
+      `${FRAMING_SERVER_URL}/regressions/header-echo`,
+      {
+        headers: {
+          "X-Test": value,
+          Cookie: cookie,
+          "If-None-Match": validator,
+        },
+      },
+    );
+    expect(response.getJSON()).toMatchObject({ value, cookie, validator });
+  });
+
+  test("preserves Latin-1 proxy header values", () => {
+    const proxyTrace = "caf\u00e9\u0080\u00ff";
+    const response = request(
+      "GET",
+      `${FRAMING_SERVER_URL}/regressions/header-echo`,
+      {
+        proxy: {
+          url: FRAMING_SERVER_URL,
+          headers: { "X-Proxy-Trace": proxyTrace },
+        },
+      },
+    );
+    expect(response.getJSON()).toMatchObject({ proxyTrace });
+  });
+
   test("does not invent an Accept header", () => {
     const response = request("GET", `${SERVER_URL}/request/headers`);
 

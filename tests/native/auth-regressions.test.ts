@@ -185,15 +185,18 @@ describe("native proxy framing and response boundaries", () => {
         proxyPassword: "secret",
       },
     },
-  ])("does not trace ordinary $name requests", ({ options }) => {
-    const response = native.request({
-      ...base,
-      url: `${SERVER_URL}/auth/echo`,
-      ...options,
-    });
-    expect(response.transportCode).toBe(0);
-    expect(response.requestHeaderOffsets).toHaveLength(0);
-  });
+  ])(
+    "reports request boundaries for ordinary $name requests",
+    ({ options }) => {
+      const response = native.request({
+        ...base,
+        url: `${SERVER_URL}/auth/echo`,
+        ...options,
+      });
+      expect(response.transportCode).toBe(0);
+      expect(response.requestHeaderOffsets).toStrictEqual([0]);
+    },
+  );
 
   test.each([0, 1_000])(
     "reports accepted Digest probe boundaries with timeout=%i",

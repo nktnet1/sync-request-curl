@@ -262,7 +262,7 @@ pub(crate) fn uses_negotiated_auth(auth: Option<&str>) -> bool {
   matches!(auth, Some("any" | "digest" | "ntlm" | "negotiate"))
 }
 
-pub(crate) fn needs_response_tracking(auth: Option<&str>, proxy_auth: Option<&str>) -> bool {
+pub(crate) fn needs_auth_response_tracking(auth: Option<&str>, proxy_auth: Option<&str>) -> bool {
   uses_negotiated_auth(auth) || uses_negotiated_auth(proxy_auth)
 }
 
@@ -328,14 +328,14 @@ mod tests {
   }
 
   #[test]
-  fn response_tracking_is_limited_to_negotiated_authentication() {
+  fn authentication_timeout_tracking_is_limited_to_negotiated_authentication() {
     for auth in [Some("any"), Some("digest"), Some("ntlm"), Some("negotiate")] {
-      assert!(needs_response_tracking(auth, None));
-      assert!(needs_response_tracking(None, auth));
+      assert!(needs_auth_response_tracking(auth, None));
+      assert!(needs_auth_response_tracking(None, auth));
     }
     for auth in [None, Some("basic"), Some("bearer")] {
-      assert!(!needs_response_tracking(auth, None));
-      assert!(!needs_response_tracking(None, auth));
+      assert!(!needs_auth_response_tracking(auth, None));
+      assert!(!needs_auth_response_tracking(None, auth));
     }
   }
 }

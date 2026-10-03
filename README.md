@@ -1603,9 +1603,12 @@ where possible.
 ### 7.1. Authentication and HEAD payloads
 
 Authentication usernames must not contain ASCII control characters (including
-CR, LF, and DEL). Bearer tokens must use the RFC 6750 `b64token` syntax. Passwords
-may contain CR/LF because libcurl encodes or hashes them, but cannot contain NUL.
-The same username rules apply to percent-decoded proxy URL credentials.
+CR, LF, and DEL). Basic, Digest, and Any authentication also reject colons in
+usernames and ASCII control characters in passwords. NTLM and Negotiate
+passwords may contain CR/LF, but no authentication method accepts NUL in a
+password. Bearer tokens must use the RFC 6750 `b64token` syntax. These rules also
+apply to percent-decoded HTTP(S) proxy URL credentials; SOCKS usernames must
+not contain ASCII controls, and SOCKS passwords must not contain NUL.
 
 HEAD requests with a payload cannot use negotiated origin or proxy authentication
 (`any`, `digest`, `ntlm`, or `negotiate`). This combination is rejected before

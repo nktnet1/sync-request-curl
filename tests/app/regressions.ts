@@ -214,6 +214,19 @@ export const handleRegressionRequest = (
     });
     return true;
   }
+  if (url.pathname === "/regressions/header-echo") {
+    req.resume();
+    res.setHeader("Content-Type", "application/json");
+    res.end(
+      JSON.stringify({
+        value: req.headers["x-test"] ?? null,
+        cookie: req.headers.cookie ?? null,
+        validator: req.headers["if-none-match"] ?? null,
+        proxyTrace: req.headers["x-proxy-trace"] ?? null,
+      }),
+    );
+    return true;
+  }
   if (url.pathname === "/regressions/rate/download") {
     res.end(Buffer.alloc(128 * 1024, "x"));
     return true;

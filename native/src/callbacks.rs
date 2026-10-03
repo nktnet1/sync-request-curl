@@ -297,9 +297,11 @@ pub(crate) extern "C" fn request_debug_callback(
   size: usize,
   user_data: *mut c_void,
 ) -> c_int {
-  // Consume every debug event without logging or retaining credentials/body
-  // data. Only HEADER_OUT and libcurl's own retry notification affect state.
-  if !user_data.is_null() {
+  // Discard body/TLS events before accessing callback state. No request
+  // headers, credentials, or body data are logged or retained.
+  if matches!(kind, curl_sys::CURLINFO_HEADER_OUT | curl_sys::CURLINFO_TEXT)
+    && !user_data.is_null()
+  {
     let _ = catch_unwind(AssertUnwindSafe(|| {
       let state = unsafe { &mut *user_data.cast::<RequestState>() };
       // libcurl can invoke the callback for an internal easy handle as well.
