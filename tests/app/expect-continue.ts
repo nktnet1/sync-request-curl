@@ -18,7 +18,7 @@ export const expectContinueServer = createServer((socket) => {
       const headers = headerBytes.subarray(0, headerEnd).toString("latin1");
       const remaining = headerBytes.length - headerEnd - 4;
       headerBytes = Buffer.alloc(0);
-      expectation = /^Expect:[ \t]*(.*)$/im.exec(headers)?.[1].trim() ?? null;
+      expectation = /^Expect:(.*)$/im.exec(headers)?.[1].trim() ?? null;
       if (expectation?.toLowerCase() === "100-continue") {
         socket.write(
           "HTTP/1.1 417 Expectation Failed\r\nContent-Length: 0\r\nX-Rejected-Expectation: yes\r\n\r\n",
