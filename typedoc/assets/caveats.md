@@ -37,8 +37,20 @@ to empty explicit payloads and multipart forms.
 
 `timeout` remains a response-header deadline across libcurl's internal
 requests, including authentication retries. A new request reactivates the same
-deadline; it does not receive a fresh timeout budget. Once response headers are
-complete, body transfers are governed by `socketTimeout` and `overallTimeout`.
+deadline; it does not receive a fresh timeout budget. Draining an intermediate
+authentication response, including an accepted empty upload probe, still counts
+towards this deadline. Only terminal response bodies (including a final 401/407)
+are governed by `socketTimeout` and `overallTimeout` instead.
+
+The native transport tracks outgoing request boundaries separately from received
+header text, so accepted Digest probes do not discard validation of earlier
+responses or permit forged status lines in trailers. Pending-body detection uses
+libcurl's `Ignoring the response-body` diagnostic notification without logging or
+retaining debug data. Custom/system builds with verbose strings disabled cannot
+provide this signal: negotiated authentication with a positive `timeout` fails
+explicitly with libcurl error 4 rather than silently losing timeout protection.
+Use the bundled libcurl build for this combination. Changes to libcurl diagnostic
+notifications must be verified against the authentication regression tests.
 
 When transfer speed limits are enabled, `socketTimeout` allows bounded additional
 time for local throttling. Each newly transferred byte earns at most its
@@ -49,3 +61,12 @@ libcurl can still pause for its upload rate limit before reading the response.
 Without further progress, this allowance expires normally; a server that never
 responds still times out after the remaining allowance and inactivity budget expire.
 `overallTimeout` includes both throttling and authentication and is never extended.
+
+
+### Proxy request framing
+
+`proxy.headers` cannot supply `Content-Length` or `Transfer-Encoding`, including
+explicit empty values. Body framing is managed by the request implementation;
+non-tunnelled HTTP proxy requests combine the origin and proxy header lists.
+Both the public API and the native entry point reject proxy framing overrides
+before network I/O. Other proxy headers retain ordinary header validation.

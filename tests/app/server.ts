@@ -36,10 +36,13 @@ const server = serve(
 );
 
 const framingServer = createServer((request, response) => {
-  response.setHeader("Connection", "close");
+  // Authentication fixtures need persistent connections: libcurl skips
+  // intermediate response bodies on closing connections instead of draining
+  // them. Keep the forced-close policy local to the framing cases below.
   if (handleRegressionRequest(request, response)) {
     return;
   }
+  response.setHeader("Connection", "close");
 
   switch (request.url) {
     case "/content-length/identical":

@@ -76,6 +76,127 @@ describe("authentication credential boundaries", () => {
   });
 });
 
+describe.each([
+  { name: "default persistence", headers: {}, connection: "keep-alive" },
+  {
+    name: "explicit closure",
+    headers: { Connection: "close" },
+    connection: "close",
+  },
+])("authentication fixture connections: $name", ({ headers, connection }) => {
+  test.each([
+    {
+      name: "origin challenge",
+      path: "auth?scheme=digest",
+      status: 401,
+      body: "denied",
+    },
+    {
+      name: "proxy challenge",
+      path: "auth?target=proxy&scheme=digest",
+      status: 407,
+      body: "denied",
+    },
+    {
+      name: "accepted upload probe",
+      path: "rate/upload",
+      status: 200,
+      body: JSON.stringify({ bytes: 0 }),
+    },
+  ])("$name", ({ path, status, body }) => {
+    const response = request(
+      "GET",
+      `${FRAMING_SERVER_URL}/regressions/${path}`,
+      { headers, timeout: 1_000, overallTimeout: 2_000 },
+    );
+    expect(response.statusCode).toBe(status);
+    expect(response.headers.connection).toBe(connection);
+    expect(response.headers["content-length"]).toBe(
+      String(Buffer.byteLength(body)),
+    );
+    expect(response.body.toString()).toBe(body);
+  });
+});
+
+const expectHeaderDeadline = (url: string, options: Options): void => {
+  const started = performance.now();
+  expect(() =>
+    request("GET", url, {
+      ...options,
+      timeout: 200,
+      overallTimeout: 3_000,
+    }),
+  ).toThrow(expect.objectContaining({ code: 28 }));
+  // An eventual timeout after draining the 1.5-second fixture body is a bug.
+  // The generous scheduling margin avoids demanding millisecond precision.
+  expect(performance.now() - started).toBeLessThan(1_000);
+};
+
+const negotiatedOptions = (
+  target: "origin" | "proxy",
+  type: "any" | "digest",
+  password = "secret",
+): Options => {
+  if (target === "proxy") {
+    return {
+      proxy: {
+        url: FRAMING_SERVER_URL,
+        username: "user",
+        password,
+        auth: type,
+      },
+    };
+  }
+  return { auth: { ...credentials, type, password } };
+};
+
+const authTargets = ["origin", "proxy"] as const;
+
+describe.each(authTargets)("%s authentication response bodies", (target) => {
+  test.each(["any", "digest"] as const)(
+    "cancels while draining a %s challenge, not after the body arrives",
+    (type) => {
+      const scheme = type === "digest" ? "digest" : "basic";
+      expectHeaderDeadline(
+        `${endpoint}?target=${target}&scheme=${scheme}&bodyDelay=1500`,
+        negotiatedOptions(target, type),
+      );
+    },
+  );
+
+  test("cancels while draining a stale Digest nonce challenge", () => {
+    expectHeaderDeadline(
+      `${endpoint}?target=${target}&scheme=digest&stale=1&initialBodyDelay=0&bodyDelay=1500`,
+      negotiatedOptions(target, "digest"),
+    );
+  });
+
+  test.each(["any", "digest"] as const)(
+    "preserves slow terminal response bodies after %s negotiation",
+    (type) => {
+      for (const password of ["secret", "wrong"]) {
+        const scheme = type === "digest" ? "digest" : "basic";
+        const response = request(
+          "GET",
+          `${endpoint}?target=${target}&scheme=${scheme}&initialBodyDelay=0&bodyDelay=450`,
+          {
+            ...negotiatedOptions(target, type, password),
+            timeout: 250,
+            overallTimeout: 2_000,
+          },
+        );
+        const rejectionStatus = target === "proxy" ? 407 : 401;
+        expect(response.statusCode).toBe(
+          password === "secret" ? 200 : rejectionStatus,
+        );
+        expect(response.body.toString()).toBe(
+          password === "secret" ? "authenticated" : "denied",
+        );
+      }
+    },
+  );
+});
+
 describe("authentication response-header deadlines", () => {
   test.each(["secret", "wrong"])(
     "verifies negotiated Digest credentials (password=%s)",
@@ -250,4 +371,69 @@ describe("HEAD authentication boundaries", () => {
       expect(response.body).toHaveLength(0);
     },
   );
+});
+
+describe("successful Digest upload probes", () => {
+  const upload = `${FRAMING_SERVER_URL}/regressions/rate/upload`;
+  const auth = { ...credentials, type: "digest" } as const;
+
+  test.each(["POST", "PUT", "GET"] as const)(
+    "returns only the real %s upload response after an accepted empty probe",
+    (method) => {
+      for (const timeout of [0, 1_000]) {
+        const response = request(method, upload, {
+          body: "abc",
+          auth,
+          timeout,
+          overallTimeout: 2_000,
+        });
+        expect(response.statusCode).toBe(200);
+        expect(response.getJSON()).toStrictEqual({ bytes: 3 });
+        expect(response.headers["x-received-bytes"]).toBe("3");
+      }
+    },
+  );
+
+  test("preserves binary, JSON, and multipart payloads", () => {
+    const form = new FormData();
+    form.append("field", "value");
+    for (const payload of [
+      { body: Buffer.from([0, 1, 255]) },
+      { json: { value: true } },
+      { form },
+    ]) {
+      const response = request("POST", upload, {
+        ...payload,
+        auth,
+        timeout: 1_000,
+        overallTimeout: 2_000,
+      });
+      expect(response.statusCode).toBe(200);
+      const bytes = Number(response.headers["x-received-bytes"]);
+      expect(bytes).toBeGreaterThan(0);
+      expect(response.getJSON()).toStrictEqual({ bytes });
+    }
+  });
+
+  test("keeps the deadline while draining an accepted probe", () => {
+    expectHeaderDeadline(`${upload}?initialBodyDelay=1500`, {
+      body: "abc",
+      auth,
+    });
+  });
+
+  test("does not time out the real upload response body", () => {
+    const response = request(
+      "POST",
+      `${upload}?initialBodyDelay=0&bodyDelay=450`,
+      {
+        body: "abc",
+        auth,
+        timeout: 250,
+        overallTimeout: 2_000,
+      },
+    );
+    expect(response.statusCode).toBe(200);
+    expect(response.getJSON()).toStrictEqual({ bytes: 3 });
+  });
 });

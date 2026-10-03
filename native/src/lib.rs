@@ -18,7 +18,9 @@ use napi::{Error, Result};
 use napi_derive::napi;
 
 mod rate_limit;
+mod response_tracking;
 use rate_limit::RateLimitAllowance;
+use response_tracking::ignores_response_body;
 
 // Public callback ABI (libcurl 7.32.0); older curl-sys bindings omit it.
 const CURLOPT_XFERINFOFUNCTION: CURLoption = 20_000 + 219;
@@ -62,6 +64,8 @@ const CURLE_NOT_BUILT_IN: CURLcode = 4;
 const DEFAULT_MAX_RESPONSE_HEADER_SIZE: usize = 16 * 1024;
 const RESPONSE_HEADER_OVERFLOW_ERROR: &str =
   "Response headers exceeded the configured size limit";
+const RESPONSE_TRACKING_UNAVAILABLE_ERROR: &str =
+  "Response header timeouts with negotiated authentication require libcurl verbose strings; use the bundled libcurl build";
 
 const CURLOPT_MIMEPOST: CURLoption = CURLOPTTYPE_OBJECTPOINT + 269;
 // Public string-option ABI value, available since libcurl 7.33.0.
@@ -97,6 +101,11 @@ static CA_PROBE: OnceLock<openssl_probe::ProbeResult> = OnceLock::new();
 struct RequestState {
   body: Vec<u8>,
   headers: Vec<String>,
+  request_header_offsets: Vec<i64>,
+  response_body_ignored: bool,
+  debug_text_seen: bool,
+  requires_debug_text: bool,
+  response_tracking_unavailable: bool,
   last_activity: Instant,
   easy_handle: *mut CURL,
   response_started: Instant,
@@ -120,6 +129,11 @@ impl Default for RequestState {
     Self {
       body: Vec::new(),
       headers: Vec::new(),
+      request_header_offsets: Vec::new(),
+      response_body_ignored: false,
+      debug_text_seen: false,
+      requires_debug_text: false,
+      response_tracking_unavailable: false,
       last_activity: Instant::now(),
       easy_handle: ptr::null_mut(),
       response_started: Instant::now(),
@@ -363,6 +377,8 @@ pub struct NativeResponse {
   #[napi(js_name = "redirectUrl")]
   pub redirect_url: Option<String>,
   pub headers: Vec<String>,
+  #[napi(js_name = "requestHeaderOffsets")]
+  pub request_header_offsets: Vec<i64>,
   pub body: Buffer,
 }
 
@@ -647,6 +663,7 @@ fn process_header_chunk(state: &mut RequestState, chunk: &[u8], bytes: usize) ->
     state.current_response_header_bytes = 0;
     state.current_status_code = Some(status_code);
     state.current_response_has_location = false;
+    state.response_body_ignored = false;
   } else if !line.is_empty() {
     state.current_response_header_bytes = state
       .current_response_header_bytes
@@ -672,11 +689,19 @@ fn process_header_chunk(state: &mut RequestState, chunk: &[u8], bytes: usize) ->
       .current_status_code
       .is_some_and(|status_code| !(100..200).contains(&status_code))
   {
-    state.final_headers_received = true;
+    // Fail explicitly on stripped-verbose system builds instead of silently
+    // disabling the deadline during an authentication challenge's body.
+    if state.requires_debug_text && !state.debug_text_seen {
+      state.response_tracking_unavailable = true;
+      return 0;
+    }
+    state.final_headers_received = !state.response_body_ignored;
     let should_stop_for_redirect = state.stop_after_redirect_headers
       && state.current_response_has_location
       && state.current_status_code.is_some_and(is_redirect_status);
-    if state.stop_after_final_headers || should_stop_for_redirect {
+    if state.final_headers_received
+      && (state.stop_after_final_headers || should_stop_for_redirect)
+    {
       state.stopped_after_final_headers = true;
       return 0;
     }
@@ -687,24 +712,60 @@ fn process_header_chunk(state: &mut RequestState, chunk: &[u8], bytes: usize) ->
 
 define_request_callback!(header_callback, process_header_chunk);
 
+fn process_debug_event(
+  state: &mut RequestState,
+  kind: curl_sys::curl_infotype,
+  data: &[u8],
+) {
+  match kind {
+    curl_sys::CURLINFO_HEADER_OUT => {
+      let offset = state.headers.len() as i64;
+      // Suppressed CONNECT replies or retries before any response can have
+      // the same offset. They must not introduce empty response sections.
+      if state.request_header_offsets.last() != Some(&offset) {
+        state.request_header_offsets.push(offset);
+      }
+      state.response_body_ignored = false;
+      state.final_headers_received = false;
+      state.check_response_timeout();
+      state.mark_activity();
+    }
+    curl_sys::CURLINFO_TEXT => {
+      state.debug_text_seen |= !data.is_empty();
+      if ignores_response_body(data) {
+        // Keep the original deadline during draining, not just when the next
+        // request is sent. This notification also covers successful probes.
+        state.response_body_ignored = true;
+        state.final_headers_received = false;
+        state.check_response_timeout();
+      }
+    }
+    _ => {}
+  }
+}
+
 extern "C" fn request_debug_callback(
   curl: *mut CURL,
   kind: curl_sys::curl_infotype,
-  _data: *mut c_char,
-  _size: usize,
+  data: *mut c_char,
+  size: usize,
   user_data: *mut c_void,
 ) -> c_int {
-  // Consume ALL debug events without logging or retaining credentials/body
-  // data. HEADER_OUT observes internal auth retries before any response arrives.
-  if !user_data.is_null() && kind == curl_sys::CURLINFO_HEADER_OUT {
+  // Consume every debug event without logging or retaining credentials/body
+  // data. Only HEADER_OUT and libcurl's own retry notification affect state.
+  if !user_data.is_null() {
     let _ = catch_unwind(AssertUnwindSafe(|| {
       let state = unsafe { &mut *user_data.cast::<RequestState>() };
-      // Recent libcurl versions can call this for an internal easy handle.
-      if state.easy_handle == curl {
-        state.final_headers_received = false;
-        state.check_response_timeout();
-        state.mark_activity();
+      // libcurl can invoke the callback for an internal easy handle as well.
+      if state.easy_handle != curl {
+        return;
       }
+      let chunk = if kind == curl_sys::CURLINFO_TEXT && !data.is_null() {
+        unsafe { std::slice::from_raw_parts(data.cast::<u8>(), size) }
+      } else {
+        &[]
+      };
+      process_debug_event(state, kind, chunk);
     }));
   }
   0
@@ -958,9 +1019,7 @@ fn perform_with_multi(
 
       let waiting_for_headers = unsafe { !(*state).final_headers_received };
       let response_elapsed = response_started.elapsed();
-      if waiting_for_headers
-        && response_timeout.is_some_and(|timeout| response_elapsed >= timeout)
-      {
+      if unsafe { (*state).check_response_timeout() } {
         return CURLE_OPERATION_TIMEDOUT;
       }
 
@@ -994,9 +1053,7 @@ fn perform_with_multi(
         return multi_error_to_curl(code);
       }
 
-      if response_timeout.is_some_and(|timeout| unsafe {
-        !(*state).final_headers_received && response_started.elapsed() >= timeout
-      }) {
+      if unsafe { (*state).check_response_timeout() } {
         return CURLE_OPERATION_TIMEDOUT;
       }
     }
@@ -1200,6 +1257,23 @@ fn validate_auth_credentials(options: &NativeRequestOptions) -> Result<()> {
   Ok(())
 }
 
+fn validate_proxy_headers(headers: &[String]) -> Result<()> {
+  for header in headers {
+    // Direct native callers must not smuggle another field behind a safe name.
+    if header.bytes().any(|byte| matches!(byte, b'\r' | b'\n' | 0)) {
+      return Err(Error::from_reason("Invalid proxy header line"));
+    }
+    if header_name_matches(header, "content-length")
+      || header_name_matches(header, "transfer-encoding")
+    {
+      return Err(Error::from_reason(
+        "Content-Length and Transfer-Encoding cannot be supplied in proxy.headers",
+      ));
+    }
+  }
+  Ok(())
+}
+
 fn uses_negotiated_auth(auth: Option<&str>) -> bool {
   matches!(auth, Some("any" | "digest" | "ntlm" | "negotiate"))
 }
@@ -1219,6 +1293,7 @@ fn get_string_info(curl: *mut CURL, info: curl_sys::CURLINFO) -> Option<String> 
 #[napi]
 pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   validate_auth_credentials(&options)?;
+  validate_proxy_headers(options.proxy_headers.as_deref().unwrap_or_default())?;
   if options.no_body.unwrap_or(false)
     && (options.body.is_some() || options.form.is_some())
     && (uses_negotiated_auth(options.auth_type.as_deref())
@@ -1260,6 +1335,9 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   let easy = EasyHandle::new()?;
   let curl = easy.0;
   state.easy_handle = curl;
+  state.requires_debug_text = options.timeout.unwrap_or_default() > 0
+    && (uses_negotiated_auth(options.auth_type.as_deref())
+      || uses_negotiated_auth(options.proxy_auth.as_deref()));
   state.download_allowance = RateLimitAllowance::new(
     options.max_download_speed.unwrap_or_default(),
     Instant::now(),
@@ -1374,21 +1452,21 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_HEADERDATA, state_pointer)
   });
-  if options.timeout.unwrap_or_default() > 0 {
-    keep_first_error(&mut code, unsafe {
-      curl_sys::curl_easy_setopt(
-        curl,
-        curl_sys::CURLOPT_DEBUGFUNCTION,
-        request_debug_callback as curl_sys::curl_debug_callback,
-      )
-    });
-    keep_first_error(&mut code, unsafe {
-      curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_DEBUGDATA, state_pointer)
-    });
-    keep_first_error(&mut code, unsafe {
-      curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_VERBOSE, 1 as c_long)
-    });
-  }
+  // Request boundaries are needed even without a timeout: a successful auth
+  // probe may precede the real upload. The callback suppresses all trace output.
+  keep_first_error(&mut code, unsafe {
+    curl_sys::curl_easy_setopt(
+      curl,
+      curl_sys::CURLOPT_DEBUGFUNCTION,
+      request_debug_callback as curl_sys::curl_debug_callback,
+    )
+  });
+  keep_first_error(&mut code, unsafe {
+    curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_DEBUGDATA, state_pointer)
+  });
+  keep_first_error(&mut code, unsafe {
+    curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_VERBOSE, 1 as c_long)
+  });
   if options.socket_timeout.unwrap_or_default() > 0
     && (options.max_download_speed.unwrap_or_default() > 0
       || options.max_upload_speed.unwrap_or_default() > 0)
@@ -1596,6 +1674,8 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     );
     if state.response_timed_out {
       code = CURLE_OPERATION_TIMEDOUT;
+    } else if state.response_tracking_unavailable {
+      code = CURLE_NOT_BUILT_IN;
     } else if code == CURLE_WRITE_ERROR && state.stopped_after_final_headers {
       code = CURLE_OK;
     }
@@ -1617,6 +1697,8 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
 
   let transport_message = if state.response_timed_out {
     "Response header timeout exceeded".to_owned()
+  } else if state.response_tracking_unavailable {
+    RESPONSE_TRACKING_UNAVAILABLE_ERROR.to_owned()
   } else if state.response_header_overflow {
     RESPONSE_HEADER_OVERFLOW_ERROR.to_owned()
   } else if let Some(message) = transport_error_override {
@@ -1632,6 +1714,7 @@ pub fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     effective_url,
     redirect_url,
     headers: std::mem::take(&mut state.headers),
+    request_header_offsets: std::mem::take(&mut state.request_header_offsets),
     body: std::mem::take(&mut state.body).into(),
   })
 }
@@ -1721,5 +1804,127 @@ mod regression_tests {
     assert_eq!(process_header_chunk(&mut state, line, line.len()), 0);
     assert!(state.response_timed_out);
     assert!(!state.stopped_after_final_headers);
+  }
+
+  #[test]
+  fn native_proxy_headers_cannot_override_request_framing() {
+    for header in [
+      "Content-Length: 3",
+      "content-length;",
+      "TRANSFER-ENCODING: chunked",
+      "Transfer-Encoding:",
+      "X-Proxy: safe\r\nContent-Length: 999",
+      "X-Proxy: safe\nTransfer-Encoding: chunked",
+      "X-Proxy: value\0",
+    ] {
+      assert!(validate_proxy_headers(&[header.to_owned()]).is_err());
+    }
+    assert!(validate_proxy_headers(&["X-Proxy: value".to_owned()]).is_ok());
+    assert!(validate_proxy_headers(&[]).is_ok());
+  }
+
+  #[test]
+  fn request_offsets_are_deduplicated_and_do_not_require_a_timeout() {
+    let mut state = RequestState::default();
+    process_debug_event(&mut state, curl_sys::CURLINFO_HEADER_OUT, &[]);
+    for line in ["HTTP/1.1 200 OK\r\n", "X-Probe: first\r\n", "\r\n"] {
+      assert_eq!(
+        process_header_chunk(&mut state, line.as_bytes(), line.len()),
+        line.len(),
+      );
+    }
+    assert!(state.final_headers_received);
+    process_debug_event(&mut state, curl_sys::CURLINFO_HEADER_OUT, &[]);
+    process_debug_event(&mut state, curl_sys::CURLINFO_HEADER_OUT, &[]);
+    assert_eq!(state.request_header_offsets, vec![0, 3]);
+    assert!(!state.final_headers_received);
+    assert!(!state.response_timed_out);
+  }
+
+  #[test]
+  fn ignored_bodies_keep_the_deadline_but_terminal_bodies_do_not() {
+    for status in [
+      "200 OK",
+      "401 Unauthorized",
+      "407 Proxy Authentication Required",
+    ] {
+      for ignored in [false, true] {
+        let mut state = RequestState::default();
+        state.response_timeout = Some(Duration::from_secs(10));
+        let line = format!("HTTP/1.1 {status}\r\n");
+        assert_eq!(
+          process_header_chunk(&mut state, line.as_bytes(), line.len()),
+          line.len(),
+        );
+        if ignored {
+          // libcurl sends this before the final blank header callback.
+          process_debug_event(
+            &mut state,
+            curl_sys::CURLINFO_TEXT,
+            b"Ignoring the response-body\n",
+          );
+        }
+        assert_eq!(process_header_chunk(&mut state, b"\r\n", 2), 2);
+        assert_eq!(state.final_headers_received, !ignored);
+        state.response_started = Instant::now() - Duration::from_secs(11);
+        assert_eq!(state.check_response_timeout(), ignored);
+      }
+    }
+  }
+
+  #[test]
+  fn stripped_verbose_builds_fail_explicitly_when_tracking_is_required() {
+    for has_debug_text in [false, true] {
+      let mut state = RequestState::default();
+      state.requires_debug_text = true;
+      state.current_status_code = Some(401);
+      if has_debug_text {
+        process_debug_event(&mut state, curl_sys::CURLINFO_TEXT, b"Connected\n");
+      }
+      let result = process_header_chunk(&mut state, b"\r\n", 2);
+      assert_eq!(state.response_tracking_unavailable, !has_debug_text);
+      assert_eq!(result, if has_debug_text { 2 } else { 0 });
+    }
+  }
+
+  #[test]
+  fn only_own_handle_informational_events_can_mark_an_ignored_body() {
+    let mut state = RequestState::default();
+    state.final_headers_received = true;
+    let state_pointer = (&mut state as *mut RequestState).cast::<c_void>();
+    let mut message = b"Ignoring the response-body\n".to_vec();
+    let mut foreign_handle_storage = 0_u8;
+    let foreign_handle = (&mut foreign_handle_storage as *mut u8).cast::<CURL>();
+    for (handle, kind) in [
+      (foreign_handle, curl_sys::CURLINFO_TEXT),
+      (ptr::null_mut(), curl_sys::CURLINFO_HEADER_IN),
+      (ptr::null_mut(), curl_sys::CURLINFO_DATA_IN),
+    ] {
+      assert_eq!(
+        request_debug_callback(
+          handle,
+          kind,
+          message.as_mut_ptr().cast(),
+          message.len(),
+          state_pointer,
+        ),
+        0,
+      );
+      assert!(!state.response_body_ignored);
+      assert!(state.final_headers_received);
+      assert!(!state.debug_text_seen);
+    }
+    assert_eq!(
+      request_debug_callback(
+        ptr::null_mut(),
+        curl_sys::CURLINFO_TEXT,
+        message.as_mut_ptr().cast(),
+        message.len(),
+        state_pointer,
+      ),
+      0,
+    );
+    assert!(state.response_body_ignored);
+    assert!(!state.final_headers_received);
   }
 }

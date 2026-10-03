@@ -234,6 +234,22 @@ export const serializeRequestHeaders = (
   return serialized;
 };
 
+/** Proxy header lists must not override the origin request's body framing. */
+export const serializeProxyHeaders = (
+  headers: NonNullable<Options["headers"]>,
+): string[] => {
+  const serialized = serializeRequestHeaders(headers);
+  if (
+    hasRequestHeader(serialized, "content-length") ||
+    hasRequestHeader(serialized, "transfer-encoding")
+  ) {
+    invalidRequestFraming(
+      "Content-Length and Transfer-Encoding cannot be supplied in proxy.headers",
+    );
+  }
+  return serialized;
+};
+
 const isAsciiDigit = (character: string): boolean =>
   character >= "0" && character <= "9";
 
@@ -536,14 +552,17 @@ const canStartResponseHeaderBlock = (
 
 const canFollowResponseHeaderBlock = (
   statusCode: number | undefined,
+  hasRequestBoundaries: boolean,
 ): boolean =>
   statusCode !== undefined &&
   ((statusCode >= 100 && statusCode < 200) ||
-    redirectStatusCodes.has(statusCode) ||
-    authenticationChallengeStatusCodes.has(statusCode));
+    (!hasRequestBoundaries &&
+      (redirectStatusCodes.has(statusCode) ||
+        authenticationChallengeStatusCodes.has(statusCode))));
 
 const splitResponseHeaderSections = (
   headerLines: string[],
+  requestHeaderOffsets: readonly number[] | undefined,
 ): ResponseHeaderSections => {
   if (!headerLines.some(isHttpStatusLine)) {
     return splitHeaderLinesWithoutStatus(headerLines);
@@ -554,13 +573,18 @@ const splitResponseHeaderSections = (
   let currentHeaders: string[] | undefined;
   let currentStatusCode: number | undefined;
   let allowAnotherResponseBlock = true;
+  // Only native HEADER_OUT events can authorize a new exchange after a final
+  // response (including a successful Digest probe). Wire header/trailer text
+  // cannot create these boundaries. Keep validating every preceding block.
+  // Only legacy native results without metadata use status-based retry guesses.
+  const requestStarts = new Set(requestHeaderOffsets);
 
-  for (const line of headerLines) {
+  for (const [index, line] of headerLines.entries()) {
     const statusCode = getHttpStatusCode(line);
     if (
       canStartResponseHeaderBlock(
         statusCode,
-        allowAnotherResponseBlock,
+        allowAnotherResponseBlock || requestStarts.has(index),
         currentHeaders,
       )
     ) {
@@ -574,8 +598,10 @@ const splitResponseHeaderSections = (
         continue;
       }
       blocks.push(currentHeaders);
-      allowAnotherResponseBlock =
-        canFollowResponseHeaderBlock(currentStatusCode);
+      allowAnotherResponseBlock = canFollowResponseHeaderBlock(
+        currentStatusCode,
+        requestHeaderOffsets !== undefined,
+      );
       currentHeaders = undefined;
       currentStatusCode = undefined;
       continue;
@@ -658,8 +684,12 @@ const parseResponseHeaderBlock = (
  */
 export const parseResponseHeaders = (
   headerLines: string[],
+  requestHeaderOffsets?: readonly number[],
 ): Response["headers"] => {
-  const { blocks, detachedLines } = splitResponseHeaderSections(headerLines);
+  const { blocks, detachedLines } = splitResponseHeaderSections(
+    headerLines,
+    requestHeaderOffsets,
+  );
   let finalHeaders: Response["headers"] = {};
 
   for (const block of blocks) {

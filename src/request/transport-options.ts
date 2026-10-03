@@ -1,6 +1,6 @@
 import { isIP } from "node:net";
 import { isSafeAuthUsername } from "#/http/auth";
-import { serializeRequestHeaders } from "#/http/headers";
+import { serializeProxyHeaders } from "#/http/headers";
 import type { Options } from "#/types/definition";
 
 interface PreparedProxyOptions {
@@ -98,7 +98,7 @@ const prepareProxyOptions = (
     proxyHeaders:
       proxy.headers === undefined
         ? undefined
-        : serializeRequestHeaders(proxy.headers),
+        : serializeProxyHeaders(proxy.headers),
   };
 };
 

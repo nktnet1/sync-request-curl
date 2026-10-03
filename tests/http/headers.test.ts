@@ -415,3 +415,109 @@ describe("parseResponseHeaders", () => {
     ).toBe("value");
   });
 });
+
+describe("native response request boundaries", () => {
+  const probe = ["HTTP/1.1 200 OK", "X-Probe: first", "Content-Length: 11", ""];
+  const final = [
+    "HTTP/1.1 200 OK",
+    "X-Final: second",
+    "Content-Length: 11",
+    "",
+  ];
+  const offsets = [0, probe.length];
+
+  test("allows a real new request after a successful probe", () => {
+    const headers = parseResponseHeaders([...probe, ...final], offsets);
+    expect(headers["x-probe"]).toBeUndefined();
+    expect(headers["x-final"]).toBe("second");
+  });
+
+  test.each([{ boundaries: undefined }, { boundaries: [0] }])(
+    "rejects an unproven second success with offsets $boundaries",
+    ({ boundaries }) => {
+      expect(() =>
+        parseResponseHeaders([...probe, ...final], boundaries),
+      ).toThrow(RequestError);
+    },
+  );
+
+  test("allows informational responses within the new request", () => {
+    const hints = ["HTTP/1.1 103 Early Hints", "Link: </style.css>", ""];
+    const headers = parseResponseHeaders(
+      [...probe, ...hints, ...final],
+      offsets,
+    );
+    expect(headers["x-final"]).toBe("second");
+    expect(headers.link).toBeUndefined();
+  });
+
+  test("does not expose valid trailers as final headers", () => {
+    const headers = parseResponseHeaders(
+      [...probe, ...final, "X-Trailer: ignored", ""],
+      offsets,
+    );
+    expect(headers["x-final"]).toBe("second");
+    expect(headers["x-trailer"]).toBeUndefined();
+  });
+
+  test.each([
+    [["HTTP/1.1 200 Forged", "X-Forged: trailer", ""]],
+    [["Bad Trailer"]],
+    [["X-Trailer: injected\r\nHeader: value"]],
+  ])("still validates detached trailer lines %j", (trailers) => {
+    expect(() =>
+      parseResponseHeaders([...probe, ...final, ...trailers], offsets),
+    ).toThrow(RequestError);
+  });
+
+  test.each([
+    [["Content-Length: 1", "Content-Length: 2"]],
+    [["Content-Length: 1", "Transfer-Encoding: chunked"]],
+    [["Bad Header: value"]],
+  ])("still validates preceding response headers %j", (invalid) => {
+    const previous = ["HTTP/1.1 200 OK", ...invalid, ""];
+    expect(() =>
+      parseResponseHeaders([...previous, ...final], [0, previous.length]),
+    ).toThrow(RequestError);
+  });
+
+  test("does not let metadata terminate an unfinished header block", () => {
+    expect(() =>
+      parseResponseHeaders(
+        ["HTTP/1.1 200 OK", "X-Probe: first", ...final],
+        [0, 2],
+      ),
+    ).toThrow(RequestError);
+  });
+
+  test.each([
+    "200 OK",
+    "401 Unauthorized",
+    "407 Proxy Authentication Required",
+    "302 Found",
+  ])(
+    "rejects forged later responses after terminal %s when metadata is available",
+    (status) => {
+      expect(() =>
+        parseResponseHeaders(
+          [`HTTP/1.1 ${status}`, "X-Terminal: first", "", ...final],
+          [0],
+        ),
+      ).toThrow(RequestError);
+    },
+  );
+
+  test("accepts a native authentication retry boundary", () => {
+    const challenge = [
+      "HTTP/1.1 401 Unauthorized",
+      'WWW-Authenticate: Basic realm="test"',
+      "",
+    ];
+    const headers = parseResponseHeaders(
+      [...challenge, ...final],
+      [0, challenge.length],
+    );
+    expect(headers["x-final"]).toBe("second");
+    expect(headers["www-authenticate"]).toBeUndefined();
+  });
+});
