@@ -150,6 +150,27 @@ describe("native proxy framing and response boundaries", () => {
   });
 
   test.each([
+    PROXY_URL.replace("://", "://user:secret@"),
+    PROXY_URL.replace("://", "://user:p%40ss@"),
+    PROXY_URL.replace("://", "://user@"),
+    PROXY_URL.replace("://", "://:secret@"),
+    PROXY_URL.replace(/^http:\/\//, "user:secret@"),
+  ])(
+    "rejects manual Proxy-Authorization alongside native proxy URL credentials: %s",
+    (proxy) => {
+      expect(() =>
+        native.request({
+          ...base,
+          proxy,
+          proxyHeaders: ["proxy-authorization: Basic dXNlcjpwYXNz"],
+        }),
+      ).toThrow(
+        "Proxy-Authorization cannot be combined with structured proxy authentication",
+      );
+    },
+  );
+
+  test.each([
     "X-Proxy: safe\r\nContent-Length: 999",
     "X-Proxy: safe\nTransfer-Encoding: chunked",
     "X-Proxy: value\0",
@@ -185,15 +206,18 @@ describe("native proxy framing and response boundaries", () => {
         proxyPassword: "secret",
       },
     },
-  ])("does not trace ordinary $name requests", ({ options }) => {
-    const response = native.request({
-      ...base,
-      url: `${SERVER_URL}/auth/echo`,
-      ...options,
-    });
-    expect(response.transportCode).toBe(0);
-    expect(response.requestHeaderOffsets).toHaveLength(0);
-  });
+  ])(
+    "reports request boundaries for ordinary $name requests",
+    ({ options }) => {
+      const response = native.request({
+        ...base,
+        url: `${SERVER_URL}/auth/echo`,
+        ...options,
+      });
+      expect(response.transportCode).toBe(0);
+      expect(response.requestHeaderOffsets).toStrictEqual([0]);
+    },
+  );
 
   test.each([0, 1_000])(
     "reports accepted Digest probe boundaries with timeout=%i",

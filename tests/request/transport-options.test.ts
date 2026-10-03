@@ -130,6 +130,44 @@ describe("transport option validation", () => {
     expect(options.proxyPassword).toBe("");
   });
 
+  test.each([
+    "old%3Auser:secret",
+    "old:secret%0Avalue",
+    "old%0Auser:secret",
+    "old:secret%00suffix",
+    "%FF:secret",
+    "old:%",
+  ])("does not validate discarded URL credentials: %s", (userinfo) => {
+    for (const username of ["user", ""]) {
+      const proxy = {
+        url: PROXY_URL.replace("://", `://${userinfo}@`),
+        username,
+        password: "safe",
+      };
+      expect(prepareTransportOptions({ proxy })).toMatchObject({
+        proxy: `${PROXY_URL}/`,
+        proxyUsername: username,
+        proxyPassword: "safe",
+      });
+      expect(
+        prepareTransportOptions({ proxy: { ...proxy, password: undefined } }),
+      ).toMatchObject({ proxyUsername: username, proxyPassword: "" });
+      expect(() =>
+        prepareTransportOptions({
+          proxy: { ...proxy, username: "unsafe:name" },
+        }),
+      ).toThrow();
+      expect(() =>
+        prepareTransportOptions({ proxy: { ...proxy, username: undefined } }),
+      ).toThrow("proxy.password requires proxy.username");
+    }
+    expect(() =>
+      prepareTransportOptions({
+        proxy: { url: PROXY_URL.replace("://", `://${userinfo}@`) },
+      }),
+    ).toThrow();
+  });
+
   test("clears URL credentials when an explicit empty username is supplied", () => {
     expect(
       prepareTransportOptions({
@@ -228,14 +266,12 @@ describe("transport option validation", () => {
     "us%er:secret",
     "user:sec%ret",
   ])(
-    "validates URL credentials before explicit overrides: %s",
+    "rejects unsafe URL credentials when no explicit override is supplied: %s",
     (credentials) => {
       expect(() =>
         prepareTransportOptions({
           proxy: {
             url: PROXY_URL.replace("://", `://${credentials}@`),
-            username: "explicit",
-            password: "secret",
           },
         }),
       ).toThrow();

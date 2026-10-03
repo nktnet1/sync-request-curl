@@ -35,6 +35,18 @@ pub(crate) fn curl_string(value: &str) -> CString {
   CString::new(&bytes[..end]).expect("NUL was removed from curl string")
 }
 
+pub(crate) fn curl_header_string(value: &str) -> Result<CString> {
+  // HTTP obs-text is a byte range, not UTF-8. Match Node's Latin-1 header
+  // encoding while keeping URLs, credentials, and request bodies in UTF-8.
+  let bytes = value
+    .chars()
+    .map(|character| u8::try_from(u32::from(character)))
+    .collect::<std::result::Result<Vec<_>, _>>()
+    .map_err(|_| Error::from_reason("Request headers must contain only Latin-1 characters"))?;
+  CString::new(bytes)
+    .map_err(|_| Error::from_reason("Request headers cannot contain NUL"))
+}
+
 pub(crate) fn curl_error_message(code: CURLcode) -> String {
   let message = unsafe { curl_sys::curl_easy_strerror(code) };
   if message.is_null() {
@@ -142,4 +154,27 @@ pub(crate) fn configure_default_ca(
   _keepalive: &mut Vec<CString>,
 ) -> CURLcode {
   CURLE_OK
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn headers_preserve_latin1_bytes_without_changing_other_curl_strings() {
+    let header = "X-Test: caf\u{e9}\u{80}\u{ff}";
+    assert_eq!(
+      curl_header_string(header).unwrap().as_bytes(),
+      b"X-Test: caf\xe9\x80\xff",
+    );
+    assert_eq!(curl_string(header).as_bytes(), header.as_bytes());
+    assert_eq!(curl_header_string("X-Empty;").unwrap().as_bytes(), b"X-Empty;");
+  }
+
+  #[test]
+  fn headers_reject_unrepresentable_or_truncated_values() {
+    for header in ["X-Test: \u{100}", "X-Test: \u{1f600}", "X-Test: value\0suffix"] {
+      assert!(curl_header_string(header).is_err());
+    }
+  }
 }

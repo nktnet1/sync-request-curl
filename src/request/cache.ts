@@ -252,6 +252,13 @@ const requestMatchesEntry = (
   );
 };
 
+const getResponseDate = (entry: CacheEntry): number => {
+  const dateHeader = getHeaderValue(entry.headers, "date");
+  const responseDate =
+    dateHeader === undefined ? Number.NaN : Date.parse(dateHeader);
+  return Number.isFinite(responseDate) ? responseDate : entry.responseTimestamp;
+};
+
 const getFreshnessLifetime = (entry: CacheEntry): number => {
   const cacheControl = parseCacheControl(
     getHeaderValue(entry.headers, "cache-control"),
@@ -276,22 +283,14 @@ const getFreshnessLifetime = (entry: CacheEntry): number => {
     return 0;
   }
 
-  const dateHeader = getHeaderValue(entry.headers, "date");
-  const responseDate =
-    dateHeader === undefined ? Number.NaN : Date.parse(dateHeader);
-  const freshnessBase = Number.isFinite(responseDate)
-    ? responseDate
-    : entry.responseTimestamp;
-  return Math.max(0, expiresAt - freshnessBase);
+  return Math.max(0, expiresAt - getResponseDate(entry));
 };
 
 const getCurrentAge = (entry: CacheEntry, now: number): number => {
-  const dateHeader = getHeaderValue(entry.headers, "date");
-  const responseDate =
-    dateHeader === undefined ? Number.NaN : Date.parse(dateHeader);
-  const apparentAge = Number.isFinite(responseDate)
-    ? Math.max(0, entry.responseTimestamp - responseDate)
-    : 0;
+  const apparentAge = Math.max(
+    0,
+    entry.responseTimestamp - getResponseDate(entry),
+  );
   const ageHeaderSeconds = parseDeltaSeconds(
     getHeaderValue(entry.headers, "age"),
   );
@@ -451,20 +450,28 @@ export const prepareCacheLookup = (
     return base;
   }
 
-  const entry = readCacheEntries(url, cache).find((candidate) => {
-    if (candidate.decompress !== decompress) {
-      return false;
-    }
+  // Different Vary definitions can overlap. RFC 9111 selects the most recent
+  // matching response by Date, which can differ from local arrival order.
+  const entry = readCacheEntries(url, cache)
+    .filter((candidate) => {
+      if (candidate.decompress !== decompress) {
+        return false;
+      }
 
-    const defaultValue = requestMatchesEntry(candidate, requestHeaders);
-    return policy.isMatch
-      ? policy.isMatch(
-          copyRequestHeaders(requestHeaders),
-          toCachedResponse(candidate),
-          defaultValue,
-        )
-      : defaultValue;
-  });
+      const defaultValue = requestMatchesEntry(candidate, requestHeaders);
+      return policy.isMatch
+        ? policy.isMatch(
+            copyRequestHeaders(requestHeaders),
+            toCachedResponse(candidate),
+            defaultValue,
+          )
+        : defaultValue;
+    })
+    .sort(
+      (left, right) =>
+        getResponseDate(right) - getResponseDate(left) ||
+        right.responseTimestamp - left.responseTimestamp,
+    )[0];
   if (!entry) {
     return base;
   }

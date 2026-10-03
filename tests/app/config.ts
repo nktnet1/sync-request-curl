@@ -23,3 +23,5 @@ export const TLS_PORT = PORT + 2;
 export const PROXY_PORT = PORT + 3;
 export const TLS_URL = `https://${HOST}:${TLS_PORT}`;
 export const PROXY_URL = `http://${HOST}:${PROXY_PORT}`;
+export const EXPECT_CONTINUE_PORT = PORT + 4;
+export const EXPECT_CONTINUE_SERVER_URL = `http://${HOST}:${EXPECT_CONTINUE_PORT}`;

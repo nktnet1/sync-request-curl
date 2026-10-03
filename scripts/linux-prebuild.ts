@@ -80,14 +80,15 @@ const runInContainer = (): void => {
     "/workspace",
   ];
 
-  if (mode === "build") {
+  if (mode === "build" || mode === "test") {
     dockerArgs.push(
       "--mount",
       "type=volume,destination=/workspace/native/build",
       "--mount",
       "type=volume,destination=/workspace/native/target",
     );
-  } else if (mode === "test") {
+  }
+  if (mode === "test") {
     const pnpmStore = join(
       homedir(),
       ".cache",
@@ -254,7 +255,10 @@ const testInsideContainer = (targetLibc: LinuxLibc): void => {
   run("pnpm", ["install", "--frozen-lockfile", "--store-dir=/pnpm-store"], {
     cwd: root,
   });
-  run("pnpm", ["test"], { cwd: root });
+  run("pnpm", ["test"], {
+    cwd: root,
+    env: { ...process.env, SYNC_REQUEST_CURL_NATIVE_PATH: prebuild },
+  });
 };
 
 if (!values.inside) {

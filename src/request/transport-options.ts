@@ -115,15 +115,11 @@ const prepareProxyOptions = (
     throw new TypeError("proxy.headers are only supported for HTTP(S) proxies");
   }
 
-  let { proxyUsername, proxyPassword } = readProxyUrlCredentials(
-    url,
-    proxy.auth,
-    isHttpProxy,
-  );
-
   if (proxy.password !== undefined && proxy.username === undefined) {
     throw new TypeError("proxy.password requires proxy.username");
   }
+  let proxyUsername: string | undefined;
+  let proxyPassword: string | undefined;
   if (proxy.username !== undefined) {
     proxyUsername = proxy.username;
     proxyPassword = proxy.password ?? "";
@@ -133,6 +129,14 @@ const prepareProxyOptions = (
       proxy.auth,
       isHttpProxy,
     );
+  } else {
+    // Explicit credentials replace both URL fields. Discarded userinfo must
+    // not be decoded or validated before that replacement takes effect.
+    ({ proxyUsername, proxyPassword } = readProxyUrlCredentials(
+      url,
+      proxy.auth,
+      isHttpProxy,
+    ));
   }
 
   const proxyHeaders =
