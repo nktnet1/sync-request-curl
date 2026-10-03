@@ -92,3 +92,14 @@ export const expectTerminalAuthenticationBodies = (
     );
   }
 };
+export const authenticationAssertions = (target: AuthenticationTarget) => ({
+  challengeDrainDeadline: (type: NegotiatedAuthenticationType): void => {
+    expectChallengeDrainDeadline(target, type);
+  },
+  staleDigestDrainDeadline: (): void => {
+    expectStaleDigestDrainDeadline(target);
+  },
+  terminalBodies: (type: NegotiatedAuthenticationType): void => {
+    expectTerminalAuthenticationBodies(target, type);
+  },
+});

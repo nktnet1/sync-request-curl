@@ -1,14 +1,9 @@
-import { describe, test } from "vitest";
-import {
-  authenticationTypes,
-  expectTerminalAuthenticationBodies,
-} from "./helpers";
+import { test } from "vitest";
+import { authenticationAssertions, authenticationTypes } from "./helpers";
 
-describe("proxy authentication terminal response bodies", () => {
-  test.each(authenticationTypes)(
-    "preserves slow terminal response bodies after %s negotiation",
-    (type) => {
-      expectTerminalAuthenticationBodies("proxy", type);
-    },
-  );
-});
+const proxy = authenticationAssertions("proxy");
+
+test.each(authenticationTypes)(
+  "proxy authentication terminal response bodies: preserves slow terminal response bodies after %s negotiation",
+  proxy.terminalBodies,
+);
