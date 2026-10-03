@@ -234,7 +234,9 @@ export const serializeRequestHeaders = (
   return serialized;
 };
 
-/** Proxy header lists must not override the origin request's body framing. */
+const originSensitiveProxyHeaders = new Set(["authorization", "cookie"]);
+
+/** Proxy header lists must not override origin framing or carry origin secrets. */
 export const serializeProxyHeaders = (
   headers: NonNullable<Options["headers"]>,
 ): string[] => {
@@ -246,6 +248,13 @@ export const serializeProxyHeaders = (
     invalidRequestFraming(
       "Content-Length and Transfer-Encoding cannot be supplied in proxy.headers",
     );
+  }
+  for (const name of originSensitiveProxyHeaders) {
+    if (hasRequestHeader(serialized, name)) {
+      throw new TypeError(
+        "Authorization and Cookie cannot be supplied in proxy.headers",
+      );
+    }
   }
   return serialized;
 };

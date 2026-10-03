@@ -1,19 +1,14 @@
-import { describe, test } from "vitest";
-import {
-  authenticationTypes,
-  expectChallengeDrainDeadline,
-  expectStaleDigestDrainDeadline,
-} from "./helpers";
+import { test } from "vitest";
+import { authenticationAssertions, authenticationTypes } from "./helpers";
 
-describe("proxy authentication response bodies", () => {
-  test.each(authenticationTypes)(
-    "cancels while draining a %s challenge, not after the body arrives",
-    (type) => {
-      expectChallengeDrainDeadline("proxy", type);
-    },
-  );
+const proxy = authenticationAssertions("proxy");
 
-  test("cancels while draining a stale Digest nonce challenge", () => {
-    expectStaleDigestDrainDeadline("proxy");
-  });
-});
+test.each(authenticationTypes)(
+  "proxy authentication response bodies: cancels while draining a %s challenge, not after the body arrives",
+  proxy.challengeDrainDeadline,
+);
+
+test(
+  "proxy authentication response bodies: cancels while draining a stale Digest nonce challenge",
+  proxy.staleDigestDrainDeadline,
+);

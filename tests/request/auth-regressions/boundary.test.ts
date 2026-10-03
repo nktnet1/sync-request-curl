@@ -1,21 +1,16 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import { FormData } from "#/form-data";
 import { isSafeAuthUsername, isSafeBearerToken } from "#/http/auth";
 import request from "#/index";
-import native from "#/native/index";
 import type { Options } from "#/types/definition";
 import { FRAMING_SERVER_URL, PROXY_URL, SERVER_URL } from "#tests/app/config";
+import { expectRejectedBeforeNativeIo } from "../helpers";
 import { authEndpoint, credentials } from "./helpers";
-
-afterEach(() => vi.restoreAllMocks());
 
 describe("authentication credential boundaries", () => {
   test.each(["\r", "\n", "\r\nX-Injected: yes", "\0", "\t", "\x1f", "\x7f"])(
     "rejects control characters before native I/O: %j",
     (control) => {
-      const call = vi.spyOn(native, "request").mockImplementation(() => {
-        throw new Error("Unexpected native I/O");
-      });
       for (const options of [
         { auth: { bearer: `token${control}` } },
         { auth: { username: `user${control}`, type: "digest" } },
@@ -32,9 +27,10 @@ describe("authentication credential boundaries", () => {
           },
         },
       ] satisfies Options[]) {
-        expect(() => request("GET", authEndpoint, options)).toThrow();
+        expectRejectedBeforeNativeIo(() =>
+          request("GET", authEndpoint, options),
+        );
       }
-      expect(call).not.toHaveBeenCalled();
     },
   );
 
@@ -59,10 +55,45 @@ describe("authentication credential boundaries", () => {
     },
   );
 
-  test("preserves empty/Unicode usernames and encoded password characters", () => {
+  test.each([undefined, "basic", "digest", "any"] as const)(
+    "rejects ambiguous usernames and password controls for %s before native I/O",
+    (type) => {
+      for (const options of [
+        { auth: { username: "user:name", password: "secret", type } },
+        { auth: { username: "user", password: "secret\n", type } },
+        { proxy: { url: PROXY_URL, username: "user:name", auth: type } },
+        {
+          proxy: {
+            url: PROXY_URL,
+            username: "user",
+            password: "secret\t",
+            auth: type,
+          },
+        },
+        {
+          proxy: {
+            url: PROXY_URL.replace("://", "://user%3Aname:secret@"),
+            auth: type,
+          },
+        },
+        {
+          proxy: {
+            url: PROXY_URL.replace("://", "://user:secret%0Avalue@"),
+            auth: type,
+          },
+        },
+      ] satisfies Options[]) {
+        expectRejectedBeforeNativeIo(() =>
+          request("GET", authEndpoint, options),
+        );
+      }
+    },
+  );
+
+  test("preserves empty/Unicode usernames and valid password punctuation", () => {
     expect(isSafeAuthUsername("")).toBe(true);
     expect(isSafeAuthUsername("caf\u00e9")).toBe(true);
-    const password = "secret\r\nwith-controls";
+    const password = "secret:with=punc";
     const response = request("GET", `${SERVER_URL}/auth/echo`, {
       auth: { username: "user", password },
     });
@@ -120,9 +151,6 @@ describe("HEAD authentication boundaries", () => {
     (type) => {
       const form = new FormData();
       form.append("field", "value");
-      const call = vi.spyOn(native, "request").mockImplementation(() => {
-        throw new Error("Unexpected native I/O");
-      });
       for (const payload of [
         { body: "abc" },
         { body: "" },
@@ -133,14 +161,12 @@ describe("HEAD authentication boundaries", () => {
           { auth: { ...credentials, type } },
           { proxy: { url: PROXY_URL, username: "user", auth: type } },
         ]) {
-          expect(() =>
-            request("HEAD", authEndpoint, { ...payload, ...auth }),
-          ).toThrow(
+          expectRejectedBeforeNativeIo(
+            () => request("HEAD", authEndpoint, { ...payload, ...auth }),
             "HEAD requests with a payload cannot use negotiated authentication",
           );
         }
       }
-      expect(call).not.toHaveBeenCalled();
     },
   );
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import native from "#/native/index";
-import { FRAMING_SERVER_URL } from "#tests/app/config";
+import { FRAMING_SERVER_URL, PROXY_URL, SERVER_URL } from "#tests/app/config";
 
 const base = {
   method: "GET",
@@ -22,6 +22,12 @@ describe("native credential validation", () => {
     { proxyAuth: "digest" as const, proxyUsername: "user\n" },
     { authPassword: "secret\0suffix" },
     { proxyPassword: "secret\0suffix" },
+    { authType: "basic" as const, authUsername: "user:name" },
+    { authType: "digest" as const, authUsername: "user:name" },
+    { authType: "any" as const, authUsername: "user:name" },
+    { authType: "basic" as const, authPassword: "secret\n" },
+    { proxyAuth: "digest" as const, proxyUsername: "user:name" },
+    { proxyAuth: "any" as const, proxyPassword: "secret\t" },
   ])(
     "rejects credentials even when called without the public schema: %j",
     (options) => {
@@ -105,6 +111,44 @@ describe("native proxy framing and response boundaries", () => {
     );
   });
 
+  test.each(["Authorization: Bearer secret", "Cookie: session=secret"])(
+    "rejects origin-sensitive proxy headers outside public validation: %s",
+    (header) => {
+      expect(() =>
+        native.request({
+          ...base,
+          proxy: PROXY_URL,
+          proxyHeaders: [header],
+        }),
+      ).toThrow("Authorization and Cookie cannot be supplied in proxy.headers");
+    },
+  );
+
+  test("rejects Proxy-Authorization combined with native structured proxy auth", () => {
+    expect(() =>
+      native.request({
+        ...base,
+        proxy: PROXY_URL,
+        proxyUsername: "user",
+        proxyPassword: "secret",
+        proxyHeaders: ["Proxy-Authorization: Basic dXNlcjpwYXNz"],
+      }),
+    ).toThrow(
+      "Proxy-Authorization cannot be combined with structured proxy authentication",
+    );
+  });
+
+  test("allows manual Proxy-Authorization without structured proxy auth", () => {
+    const response = native.request({
+      ...base,
+      url: SERVER_URL,
+      proxy: PROXY_URL,
+      proxyHeaders: ["Proxy-Authorization: Basic dXNlcjpwYXNz"],
+    });
+    expect(response.transportCode).toBe(0);
+    expect(response.statusCode).toBe(200);
+  });
+
   test.each([
     "X-Proxy: safe\r\nContent-Length: 999",
     "X-Proxy: safe\nTransfer-Encoding: chunked",
@@ -117,6 +161,38 @@ describe("native proxy framing and response boundaries", () => {
         proxyHeaders: [header],
       }),
     ).toThrow("Invalid proxy header line");
+  });
+
+  test.each([
+    { name: "unauthenticated", options: {} },
+    {
+      name: "Basic",
+      options: {
+        authType: "basic" as const,
+        authUsername: "user",
+        authPassword: "secret",
+      },
+    },
+    {
+      name: "Bearer",
+      options: { authType: "bearer" as const, authBearer: "token" },
+    },
+    {
+      name: "proxy Basic",
+      options: {
+        proxy: PROXY_URL,
+        proxyUsername: "user",
+        proxyPassword: "secret",
+      },
+    },
+  ])("does not trace ordinary $name requests", ({ options }) => {
+    const response = native.request({
+      ...base,
+      url: `${SERVER_URL}/auth/echo`,
+      ...options,
+    });
+    expect(response.transportCode).toBe(0);
+    expect(response.requestHeaderOffsets).toHaveLength(0);
   });
 
   test.each([0, 1_000])(

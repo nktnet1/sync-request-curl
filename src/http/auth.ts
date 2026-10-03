@@ -1,12 +1,42 @@
-/** Usernames can be interpolated into Digest headers; passwords are not. */
-export const isSafeAuthUsername = (value: string): boolean => {
+const hasAsciiControl = (value: string): boolean => {
   for (const character of value) {
     const code = character.codePointAt(0);
     if (code === undefined || code < 0x20 || code === 0x7f) {
-      return false;
+      return true;
     }
   }
-  return true;
+  return false;
+};
+
+/** Usernames can be interpolated into Digest headers; reject ASCII controls. */
+export const isSafeAuthUsername = (value: string): boolean =>
+  !hasAsciiControl(value);
+
+/** Native string credentials cannot contain NUL even for non-HTTP schemes. */
+export const isSafeAuthPassword = (value: string): boolean =>
+  !value.includes("\0");
+
+const usesHttpCredentialRestrictions = (type: string | undefined): boolean =>
+  type === undefined || type === "basic" || type === "digest" || type === "any";
+
+export const hasSafeOpaqueCredentials = (
+  username: string,
+  password: string | undefined,
+): boolean =>
+  isSafeAuthUsername(username) && isSafeAuthPassword(password ?? "");
+
+export const hasSafeAuthCredentials = (
+  username: string,
+  password: string | undefined,
+  type: string | undefined,
+): boolean => {
+  if (!hasSafeOpaqueCredentials(username, password)) {
+    return false;
+  }
+  if (!usesHttpCredentialRestrictions(type)) {
+    return true;
+  }
+  return !username.includes(":") && !hasAsciiControl(password ?? "");
 };
 
 /** RFC 6750 b64token: one or more token characters, then optional padding. */

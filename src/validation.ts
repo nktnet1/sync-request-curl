@@ -3,7 +3,12 @@ import { URL } from "node:url";
 import * as v from "valibot";
 import type { CurlError, RequestError } from "#/errors";
 import { FormData } from "#/form-data";
-import { isSafeAuthUsername, isSafeBearerToken } from "#/http/auth";
+import {
+  hasSafeAuthCredentials,
+  isSafeAuthPassword,
+  isSafeAuthUsername,
+  isSafeBearerToken,
+} from "#/http/auth";
 import type { Headers } from "#/types/headers";
 
 /** Primitive JSON values accepted in request bodies.
@@ -198,8 +203,9 @@ export const httpAuthTypeSchema = v.picklist([
  * Username/password authentication defaults to Basic when `type` is omitted.
  * Bearer authentication uses libcurl's OAuth2 bearer support. Authentication
  * configured here is never forwarded to a different origin during redirects.
- * Usernames cannot contain ASCII control characters; bearer tokens must use
- * RFC 6750 b64token syntax. Negotiated authentication is not supported with
+ * Usernames cannot contain ASCII control characters. Basic, Digest, and Any
+ * also reject `:` in usernames and ASCII controls in passwords. Bearer tokens
+ * must use RFC 6750 b64token syntax. Negotiated authentication is not supported with
  * HEAD payloads; omit the payload or use preemptive Basic/Bearer authentication.
  *
  * @group Request
@@ -247,9 +253,15 @@ export interface ProxyOptions {
    * `socks4a`, `socks5`, and `socks5h`. May contain URL-encoded credentials.
    */
   url: string;
-  /** Overrides both URL credentials. An omitted password becomes an empty string. */
+  /**
+   * Overrides both URL credentials. An omitted password becomes an empty string.
+   * HTTP Basic, Digest, and Any authentication reject `:` in usernames.
+   */
   username?: string;
-  /** Proxy password. Requires an explicit username. Defaults to an empty string. */
+  /**
+   * Proxy password. Requires an explicit username. Defaults to an empty string.
+   * HTTP Basic, Digest, and Any authentication reject ASCII controls.
+   */
   password?: string;
   /**
    * HTTP(S) proxy authentication method. Defaults to libcurl's Basic mode.
@@ -265,8 +277,9 @@ export interface ProxyOptions {
   /**
    * Headers sent to an HTTP(S) proxy. For HTTPS origins these are used for the
    * CONNECT request and are kept separate from origin request headers.
-   * Content-Length and Transfer-Encoding are rejected, including empty values;
-   * body framing cannot be overridden through a separate proxy header list.
+   * Content-Length, Transfer-Encoding, Authorization, and Cookie are rejected,
+   * including empty values. Proxy-Authorization cannot be combined with URL or
+   * structured proxy authentication credentials.
    */
   headers?: Headers;
 }
@@ -461,10 +474,11 @@ export const authUsernameSchema = v.pipe(
   v.check(isSafeAuthUsername),
 );
 
-// Passwords are encoded/hashed by libcurl, not copied into HTTP headers.
+// This is the generic native-string boundary; method-specific password rules
+// are applied by the credential object/transport validation.
 export const authPasswordSchema = v.pipe(
   v.string(),
-  v.check((value) => !value.includes("\0")),
+  v.check(isSafeAuthPassword),
 );
 
 export const authBearerSchema = v.pipe(v.string(), v.check(isSafeBearerToken));
@@ -474,11 +488,18 @@ const tlsPassphraseSchema = v.pipe(
   v.check((value) => !value.includes("\0")),
 );
 
-const httpCredentialAuthObjectSchema = v.object({
-  username: authUsernameSchema,
-  password: v.optional(authPasswordSchema),
-  type: v.optional(httpAuthTypeSchema),
-});
+const httpCredentialAuthObjectSchema = v.pipe(
+  v.object({
+    username: authUsernameSchema,
+    password: v.optional(authPasswordSchema),
+    type: v.optional(httpAuthTypeSchema),
+  }),
+  v.check(
+    ({ username, password, type }) =>
+      hasSafeAuthCredentials(username, password, type),
+    "Invalid HTTP authentication credentials",
+  ),
+);
 
 const httpBearerAuthObjectSchema = v.object({
   bearer: authBearerSchema,

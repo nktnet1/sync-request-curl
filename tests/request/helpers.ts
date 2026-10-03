@@ -1,4 +1,6 @@
+import { expect, vi } from "vitest";
 import request from "#/index";
+import native from "#/native/index";
 import type { HttpVerb, Options } from "#/types/definition";
 
 export const wrapperRequest = (
@@ -26,4 +28,24 @@ export const wrapperRequest = (
     json,
     code: rawResponse.statusCode,
   };
+};
+
+export const expectRejectedBeforeNativeIo = (
+  action: () => unknown,
+  expectedMessage?: string,
+): void => {
+  const nativeRequest = vi.spyOn(native, "request").mockImplementation(() => {
+    throw new Error("Unexpected native I/O");
+  });
+
+  try {
+    if (expectedMessage === undefined) {
+      expect(action).toThrow();
+    } else {
+      expect(action).toThrow(expectedMessage);
+    }
+    expect(nativeRequest).not.toHaveBeenCalled();
+  } finally {
+    nativeRequest.mockRestore();
+  }
 };

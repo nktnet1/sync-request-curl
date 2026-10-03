@@ -1,19 +1,14 @@
-import { describe, test } from "vitest";
-import {
-  authenticationTypes,
-  expectChallengeDrainDeadline,
-  expectStaleDigestDrainDeadline,
-} from "./helpers";
+import { test } from "vitest";
+import { authenticationAssertions, authenticationTypes } from "./helpers";
 
-describe("origin authentication response bodies", () => {
-  test.each(authenticationTypes)(
-    "cancels while draining a %s challenge, not after the body arrives",
-    (type) => {
-      expectChallengeDrainDeadline("origin", type);
-    },
-  );
+const origin = authenticationAssertions("origin");
 
-  test("cancels while draining a stale Digest nonce challenge", () => {
-    expectStaleDigestDrainDeadline("origin");
-  });
-});
+test.each(authenticationTypes)(
+  "origin authentication response bodies: cancels while draining a %s challenge, not after the body arrives",
+  origin.challengeDrainDeadline,
+);
+
+test(
+  "origin authentication response bodies: cancels while draining a stale Digest nonce challenge",
+  origin.staleDigestDrainDeadline,
+);

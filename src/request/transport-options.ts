@@ -1,6 +1,6 @@
 import { isIP } from "node:net";
-import { isSafeAuthUsername } from "#/http/auth";
-import { serializeProxyHeaders } from "#/http/headers";
+import { hasSafeAuthCredentials, hasSafeOpaqueCredentials } from "#/http/auth";
+import { hasRequestHeader, serializeProxyHeaders } from "#/http/headers";
 import type { Options } from "#/types/definition";
 
 interface PreparedProxyOptions {
@@ -27,8 +27,51 @@ const SOCKS_PROXY_PROTOCOLS = new Set([
   "socks5h:",
 ]);
 
+const assertSafeHttpCredentials = (
+  username: string,
+  password: string | undefined,
+  type: string | undefined,
+): void => {
+  if (!hasSafeAuthCredentials(username, password, type)) {
+    throw new TypeError(
+      `Invalid HTTP credentials for ${type ?? "basic"} authentication`,
+    );
+  }
+};
+
+const assertSafeProxyCredentials = (
+  username: string,
+  password: string | undefined,
+  auth: string | undefined,
+  isHttpProxy: boolean,
+): void => {
+  const valid = isHttpProxy
+    ? hasSafeAuthCredentials(username, password, auth)
+    : hasSafeOpaqueCredentials(username, password);
+  if (!valid) {
+    throw new TypeError("Invalid proxy credentials");
+  }
+};
+
+const validateProxyAuthorizationHeader = (
+  proxyHeaders: string[] | undefined,
+  hasStructuredProxyAuth: boolean,
+): void => {
+  if (
+    hasStructuredProxyAuth &&
+    proxyHeaders !== undefined &&
+    hasRequestHeader(proxyHeaders, "proxy-authorization")
+  ) {
+    throw new TypeError(
+      "Proxy-Authorization cannot be combined with structured proxy authentication",
+    );
+  }
+};
+
 const readProxyUrlCredentials = (
   url: URL,
+  auth: string | undefined,
+  isHttpProxy: boolean,
 ): Pick<PreparedProxyOptions, "proxyUsername" | "proxyPassword"> => {
   // Empty CURLOPT_PROXYUSERNAME/PROXYPASSWORD can enable Basic ':' auth.
   // Leave both unset unless the URL actually supplies credentials.
@@ -38,12 +81,7 @@ const readProxyUrlCredentials = (
 
   const proxyUsername = decodeURIComponent(url.username);
   const proxyPassword = decodeURIComponent(url.password);
-  if (proxyUsername.includes("\0") || proxyPassword.includes("\0")) {
-    throw new TypeError("Proxy credentials cannot contain NUL");
-  }
-  if (!isSafeAuthUsername(proxyUsername)) {
-    throw new TypeError("Proxy usernames cannot contain control characters");
-  }
+  assertSafeProxyCredentials(proxyUsername, proxyPassword, auth, isHttpProxy);
   return { proxyUsername, proxyPassword };
 };
 
@@ -77,7 +115,11 @@ const prepareProxyOptions = (
     throw new TypeError("proxy.headers are only supported for HTTP(S) proxies");
   }
 
-  let { proxyUsername, proxyPassword } = readProxyUrlCredentials(url);
+  let { proxyUsername, proxyPassword } = readProxyUrlCredentials(
+    url,
+    proxy.auth,
+    isHttpProxy,
+  );
 
   if (proxy.password !== undefined && proxy.username === undefined) {
     throw new TypeError("proxy.password requires proxy.username");
@@ -85,7 +127,22 @@ const prepareProxyOptions = (
   if (proxy.username !== undefined) {
     proxyUsername = proxy.username;
     proxyPassword = proxy.password ?? "";
+    assertSafeProxyCredentials(
+      proxyUsername,
+      proxyPassword,
+      proxy.auth,
+      isHttpProxy,
+    );
   }
+
+  const proxyHeaders =
+    proxy.headers === undefined
+      ? undefined
+      : serializeProxyHeaders(proxy.headers);
+  validateProxyAuthorizationHeader(
+    proxyHeaders,
+    proxyUsername !== undefined || proxy.auth !== undefined,
+  );
 
   url.username = "";
   url.password = "";
@@ -95,10 +152,7 @@ const prepareProxyOptions = (
     proxyPassword,
     proxyAuth: proxy.auth,
     proxyNoProxy: proxy.noProxy?.join(",") ?? "",
-    proxyHeaders:
-      proxy.headers === undefined
-        ? undefined
-        : serializeProxyHeaders(proxy.headers),
+    proxyHeaders,
   };
 };
 
@@ -111,6 +165,7 @@ const prepareHttpAuthOptions = (
   if ("bearer" in auth) {
     return { authType: "bearer", authBearer: auth.bearer };
   }
+  assertSafeHttpCredentials(auth.username, auth.password, auth.type);
   return {
     authType: auth.type ?? "basic",
     authUsername: auth.username,
