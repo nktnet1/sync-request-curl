@@ -43,13 +43,26 @@ test.for(["file", "memory"] as const)(
       FRAMING_SERVER_URL,
     );
     const encodedUrl = plainUrl.replace("/resource", "/dir/%2e%2e/resource");
-    for (const url of [encodedUrl, plainUrl, encodedUrl, plainUrl]) {
+    // Compare with the active transport: builds can normalize encoded dots
+    // differently, including in the effective URL. Each key must still make
+    // its own initial origin request and then reuse its own cached response.
+    const warmed = [encodedUrl, plainUrl].map((url) => {
+      const uncached = request("GET", url);
+      const { hits, target } = uncached.getJSON<{
+        hits: number;
+        target: string;
+      }>();
       const response = request("GET", url, { cache });
-      expect(response.getJSON()).toStrictEqual({
-        hits: 1,
-        target: url.slice(FRAMING_SERVER_URL.length),
-      });
-      expect(response.url).toBe(url);
+      expect(response.getJSON()).toStrictEqual({ hits: hits + 1, target });
+      expect(response.url).toBe(uncached.url);
+      return { url, response };
+    });
+    for (let pass = 0; pass < 2; pass += 1) {
+      for (const { url, response: original } of warmed) {
+        const cached = request("GET", url, { cache });
+        expect(cached.getJSON()).toStrictEqual(original.getJSON());
+        expect(cached.url).toBe(original.url);
+      }
     }
   },
 );
