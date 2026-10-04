@@ -6,11 +6,13 @@ import {
   parseRequestHeaderLine,
   setRequestHeader,
 } from "#/http/headers";
+import { getCacheBucketKey } from "#/request/cache-key";
 import { fileCacheDirectory, getCachePath } from "#/request/cache-path";
 import type { CachedResponse, Options, Response } from "#/types/definition";
 import { incomingHttpHeadersSchema } from "#/validation";
 
 const cacheEntrySchema = v.object({
+  cacheKey: v.string(),
   decompress: v.boolean(),
   statusCode: v.pipe(v.number(), v.integer()),
   headers: incomingHttpHeadersSchema,
@@ -22,7 +24,7 @@ const cacheEntrySchema = v.object({
 });
 
 const cacheBucketSchema = v.object({
-  version: v.literal(1),
+  version: v.literal(2),
   entries: v.array(cacheEntrySchema),
 });
 
@@ -150,7 +152,7 @@ const parseCacheControl = (value: string | undefined): Map<string, string> => {
       rawValue.startsWith('"') && rawValue.endsWith('"')
         ? rawValue.slice(1, -1)
         : rawValue;
-    directives.set(name, normalizedValue);
+    if (!directives.has(name)) directives.set(name, normalizedValue);
   }
 
   return directives;
@@ -250,6 +252,21 @@ const requestMatchesEntry = (
     requestHeaders,
     entry.requestHeaders,
   );
+};
+
+const matchesCachePolicy = (
+  entry: CacheEntry,
+  requestHeaders: NormalizedRequestHeaders,
+  policy: Pick<Options, "isMatch">,
+): boolean => {
+  const defaultValue = requestMatchesEntry(entry, requestHeaders);
+  return policy.isMatch
+    ? policy.isMatch(
+        copyRequestHeaders(requestHeaders),
+        toCachedResponse(entry),
+        defaultValue,
+      )
+    : defaultValue;
 };
 
 const getResponseDate = (entry: CacheEntry): number => {
@@ -372,7 +389,7 @@ const readFileCacheEntries = (url: string): CacheEntry[] => {
 };
 
 const writeFileCacheEntries = (url: string, entries: CacheEntry[]): void => {
-  const bucket: CacheBucket = { version: 1, entries };
+  const bucket: CacheBucket = { version: 2, entries };
   try {
     // fileCacheDirectory is derived only from the OS temp directory and uid.
     mkdirSync(fileCacheDirectory, { recursive: true, mode: 0o700 });
@@ -390,10 +407,13 @@ const writeFileCacheEntries = (url: string, entries: CacheEntry[]): void => {
 
 const memoryCacheEntries = new Map<string, CacheEntry[]>();
 
-const readCacheEntries = (url: string, cache: CacheMode): CacheEntry[] =>
+const readCacheBucketEntries = (url: string, cache: CacheMode): CacheEntry[] =>
   cache === "memory"
-    ? (memoryCacheEntries.get(url) ?? [])
-    : readFileCacheEntries(url);
+    ? (memoryCacheEntries.get(getCacheBucketKey(url)) ?? [])
+    : readFileCacheEntries(getCacheBucketKey(url));
+
+const readCacheEntries = (url: string, cache: CacheMode): CacheEntry[] =>
+  readCacheBucketEntries(url, cache).filter((entry) => entry.cacheKey === url);
 
 const writeCacheEntries = (
   url: string,
@@ -401,20 +421,20 @@ const writeCacheEntries = (
   cache: CacheMode,
 ): void => {
   if (cache === "memory") {
-    memoryCacheEntries.set(url, entries);
+    memoryCacheEntries.set(getCacheBucketKey(url), entries);
     return;
   }
-  writeFileCacheEntries(url, entries);
+  writeFileCacheEntries(getCacheBucketKey(url), entries);
 };
 
 export const invalidateCache = (url: string, cache: CacheMode): void => {
   if (cache === "memory") {
-    memoryCacheEntries.delete(url);
+    memoryCacheEntries.delete(getCacheBucketKey(url));
     return;
   }
 
   try {
-    rmSync(getCachePath(url), { force: true });
+    rmSync(getCachePath(getCacheBucketKey(url)), { force: true });
   } catch (error) {
     throw new Error(
       `Error invalidating cache: ${error instanceof Error ? error.message : String(error)}`,
@@ -458,14 +478,7 @@ export const prepareCacheLookup = (
         return false;
       }
 
-      const defaultValue = requestMatchesEntry(candidate, requestHeaders);
-      return policy.isMatch
-        ? policy.isMatch(
-            copyRequestHeaders(requestHeaders),
-            toCachedResponse(candidate),
-            defaultValue,
-          )
-        : defaultValue;
+      return matchesCachePolicy(candidate, requestHeaders, policy);
     })
     .sort(
       (left, right) =>
@@ -525,7 +538,9 @@ const responseForbidsStorage = (headers: Response["headers"]): boolean =>
   getHeaderValue(headers, "set-cookie") !== undefined ||
   getVaryNamesFromHeaders(headers).includes("*");
 
-export const canCacheResponse = (response: CacheableResponse): boolean => {
+export const canCacheResponse = (
+  response: Pick<CacheableResponse, "statusCode" | "headers">,
+): boolean => {
   if (responseForbidsStorage(response.headers)) return false;
   const cacheControl = parseCacheControl(
     getHeaderValue(response.headers, "cache-control"),
@@ -538,7 +553,7 @@ export const canCacheResponse = (response: CacheableResponse): boolean => {
   const hasExplicitFreshness =
     parseDeltaSeconds(cacheControl.get("max-age")) !== undefined ||
     getHeaderValue(response.headers, "expires") !== undefined;
-  return response.statusCode !== 206 && hasExplicitFreshness;
+  return ![206, 412].includes(response.statusCode) && hasExplicitFreshness;
 };
 
 interface StoreCacheResponseOptions {
@@ -564,6 +579,7 @@ export const storeCacheResponse = (
   }
 
   const entry: CacheEntry = {
+    cacheKey: url,
     decompress,
     statusCode: response.statusCode,
     headers: copyHeaders(response.headers),
@@ -574,8 +590,9 @@ export const storeCacheResponse = (
     responseTimestamp,
   };
   const varyNames = getVaryNames(entry);
-  const existingEntries = readCacheEntries(url, cache);
+  const existingEntries = readCacheBucketEntries(url, cache);
   const retainedEntries = existingEntries.filter((existing) => {
+    if (existing.cacheKey !== url) return true;
     if (existing.decompress !== decompress) {
       return true;
     }
@@ -637,6 +654,63 @@ const mergeRevalidationHeaders = (
   }
 
   return merged;
+};
+
+/** A HEAD response can refresh GET metadata, but never replace its body. */
+export const updateCacheFromHead = (
+  url: string,
+  lookup: CacheLookup,
+  responseHeaders: Response["headers"],
+  responseTimestamp: number,
+  cache: CacheMode,
+  decompress: boolean,
+  policy: Pick<Options, "isMatch"> = {},
+): void => {
+  const entries = readCacheBucketEntries(url, cache);
+  const updated: CacheEntry[] = [];
+  for (const entry of entries) {
+    // A different spelling might be the same native target. Its metadata is
+    // unsafe to update on builds that preserve encoded dots; discard it.
+    if (entry.cacheKey !== url) continue;
+    if (
+      entry.decompress !== decompress ||
+      !matchesCachePolicy(entry, lookup.requestHeaders, policy)
+    ) {
+      updated.push(entry);
+      continue;
+    }
+    const validatorsMatch = ["etag", "last-modified", "content-length"].every(
+      (name) => {
+        const received = getHeaderValue(responseHeaders, name);
+        return (
+          received === undefined ||
+          received === getHeaderValue(entry.headers, name)
+        );
+      },
+    );
+    if (!lookup.allowStore || entry.statusCode !== 200 || !validatorsMatch)
+      continue;
+    const headers = mergeRevalidationHeaders(entry.headers, responseHeaders);
+    if (
+      !canCacheResponse({
+        statusCode: entry.statusCode,
+        headers,
+      })
+    )
+      continue;
+    updated.push({
+      ...entry,
+      headers,
+      requestHeaders: lookup.requestHeaders,
+      requestTimestamp: lookup.requestTimestamp,
+      responseTimestamp,
+    });
+  }
+  if (updated.length === 0) {
+    if (entries.length > 0) invalidateCache(url, cache);
+  } else {
+    writeCacheEntries(url, updated, cache);
+  }
 };
 
 export const refreshCacheEntry = (

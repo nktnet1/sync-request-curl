@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 const realm = "transport-regression";
 const basic = `Basic ${Buffer.from("user:secret").toString("base64")}`;
 const cacheOriginHits = new Map<string, number>();
+const cacheOriginVersions = new Map<string, number>();
 // Test-only RFC 2617 interoperability: fixed, public dummy credentials, not
 // password storage or a security boundary. Keep MD5 for legacy Digest clients
 // (including Windows SSPI); do not replace it with an incompatible challenge.
@@ -190,12 +191,22 @@ export const handleRegressionRequest = (
     const target = req.url ?? "/";
     const hits = (cacheOriginHits.get(target) ?? 0) + 1;
     cacheOriginHits.set(target, hits);
-    const etag = '"cache-v1"';
+    const mutable = url.pathname === "/regressions/cache/mutable";
+    const version =
+      (cacheOriginVersions.get(target) ?? 0) +
+      (mutable && req.method === "POST" ? 1 : 0);
+    if (mutable) cacheOriginVersions.set(target, version);
+    const etag = mutable ? `"cache-v${version}"` : '"cache-v1"';
     const lastModified = "Wed, 21 Oct 2015 07:28:00 GMT";
     res.setHeader("Content-Type", "application/json");
     res.setHeader("ETag", etag);
     res.setHeader("Last-Modified", lastModified);
-    res.setHeader("Cache-Control", "max-age=3600");
+    res.setHeader(
+      "Cache-Control",
+      url.pathname === "/regressions/cache/duplicate"
+        ? ["max-age=0", "max-age=3600"]
+        : "max-age=3600",
+    );
     const ifMatch = req.headers["if-match"];
     const ifUnmodifiedSince = req.headers["if-unmodified-since"];
     if (
@@ -204,10 +215,15 @@ export const handleRegressionRequest = (
         Date.parse(ifUnmodifiedSince) < Date.parse(lastModified))
     ) {
       res.statusCode = 412;
-      res.removeHeader("Cache-Control");
     }
     req.resume();
-    res.end(JSON.stringify({ hits, target }));
+    const body = JSON.stringify({
+      hits,
+      target,
+      ...(mutable ? { version } : {}),
+    });
+    res.setHeader("Content-Length", Buffer.byteLength(body));
+    res.end(req.method === "HEAD" ? undefined : body);
     return true;
   }
   if (url.pathname === "/regressions/auth") {

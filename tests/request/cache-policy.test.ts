@@ -81,7 +81,10 @@ const writeBucket = (
   mkdirSync(fileCacheDirectory, { recursive: true });
   writeFileSync(
     getCachePath(url),
-    JSON.stringify({ version: 1, entries }),
+    JSON.stringify({
+      version: 2,
+      entries: entries.map((entry) => ({ cacheKey: url, ...entry })),
+    }),
     "utf8",
   );
 };
@@ -313,7 +316,7 @@ describe("file cache policy", () => {
     const lookup = prepareCacheLookup(
       "GET",
       url,
-      ["Cache-Control: max-age=3600, , max-age=0"],
+      ["Cache-Control: max-age=0, , max-age=3600"],
       "file",
       1,
     );

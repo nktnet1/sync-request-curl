@@ -78,6 +78,62 @@ test.for(["file", "memory"] as const)(
   },
 );
 
+test.for([
+  { cache: "file" as const, encodedWrite: false },
+  { cache: "file" as const, encodedWrite: true },
+  { cache: "memory" as const, encodedWrite: false },
+  { cache: "memory" as const, encodedWrite: true },
+])(
+  "$cache cache invalidates all encoded aliases (encoded write: $encodedWrite)",
+  ({ cache, encodedWrite }) => {
+    const plain = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+    const urls = [
+      plain,
+      ...["%2e%2e", "%2E%2E", ".%2e"].map((dots) =>
+        plain.replace("/resource", `/dir/${dots}/resource`),
+      ),
+    ];
+    const warmed = urls.map((url) =>
+      request("GET", url, { cache }).getJSON<{ hits: number }>(),
+    );
+    const unrelated = cacheUrl(
+      "/regressions/cache/resource",
+      FRAMING_SERVER_URL,
+    );
+    const unrelatedBody = request("GET", unrelated, { cache }).getJSON();
+    request("POST", urls[encodedWrite ? 1 : 0], { cache });
+    for (const [index, url] of urls.entries()) {
+      const fresh = request("GET", url, { cache }).getJSON<{ hits: number }>();
+      expect(fresh.hits).toBeGreaterThan(warmed[index].hits);
+      expect(request("GET", url, { cache }).getJSON()).toStrictEqual(fresh);
+    }
+    expect(request("GET", unrelated, { cache }).getJSON()).toStrictEqual(
+      unrelatedBody,
+    );
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache bypasses ambiguous mixed dots and invalidates both possible targets",
+  (cache) => {
+    const plain = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+    const literal = plain.replace("/resource", "/dir/resource");
+    const mixed = plain.replace("/resource", "/dir/%2e/../resource");
+    const before = [plain, literal].map((url) =>
+      request("GET", url, { cache }).getJSON<{ hits: number }>(),
+    );
+    const first = request("GET", mixed, { cache }).getJSON<{ hits: number }>();
+    const second = request("GET", mixed, { cache }).getJSON<{ hits: number }>();
+    expect(second.hits).toBe(first.hits + 1);
+    request("POST", mixed, { cache });
+    for (const [index, url] of [plain, literal].entries()) {
+      expect(
+        request("GET", url, { cache }).getJSON<{ hits: number }>().hits,
+      ).toBeGreaterThan(before[index].hits);
+    }
+  },
+);
+
 test.for(["file", "memory"] as const)(
   "%s cache does not reuse entries written under the previous colliding keys",
   (cache) => {
@@ -114,11 +170,78 @@ test.for(["file", "memory"] as const)(
       expect(request("GET", url, { cache }).statusCode).toBe(200);
       const conditional = request("GET", url, { cache, headers });
       expect(conditional.statusCode).toBe(412);
+      expect(conditional.headers["cache-control"]).toBe("max-age=3600");
       expect(conditional.getJSON()).toMatchObject({ hits: 2 });
       expect(request("GET", url, { cache }).getJSON()).toMatchObject({
         hits: 1,
       });
+      const cold = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+      expect(request("GET", cold, { cache, headers }).statusCode).toBe(412);
+      const ordinary = request("GET", cold, { cache });
+      expect(ordinary.statusCode).toBe(200);
+      expect(ordinary.getJSON()).toMatchObject({ hits: 2 });
+      expect(request("GET", cold, { cache }).getJSON()).toStrictEqual(
+        ordinary.getJSON(),
+      );
     }
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache discards a GET body when HEAD reports a changed validator",
+  (cache) => {
+    const url = cacheUrl("/regressions/cache/mutable", FRAMING_SERVER_URL);
+    const original = request("GET", url, { cache });
+    expect(original.getJSON()).toMatchObject({ version: 0 });
+    request("POST", url);
+    const head = request("HEAD", url, { cache });
+    expect(head.body).toHaveLength(0);
+    expect(head.headers.etag).not.toBe(original.headers.etag);
+    expect(request("GET", url, { cache }).getJSON()).toMatchObject({
+      version: 1,
+      hits: 4,
+    });
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache retains the GET body when HEAD validators and length match",
+  (cache) => {
+    const url = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+    const original = request("GET", url, { cache });
+    const head = request("HEAD", url, { cache });
+    expect(head.body).toHaveLength(0);
+    expect(Number(head.headers["content-length"])).toBeGreaterThan(0);
+    const cached = request("GET", url, { cache });
+    expect(cached.body).toStrictEqual(original.body);
+    expect(cached.getJSON()).toMatchObject({ hits: 1 });
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache invalidates both possible targets after an ambiguous HEAD",
+  (cache) => {
+    const plain = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+    const literal = plain.replace("/resource", "/dir/resource");
+    const mixed = plain.replace("/resource", "/dir/%2e/../resource");
+    const before = [plain, literal].map((url) =>
+      request("GET", url, { cache }).getJSON<{ hits: number }>(),
+    );
+    expect(request("HEAD", mixed, { cache }).statusCode).toBe(200);
+    for (const [index, url] of [plain, literal].entries()) {
+      expect(
+        request("GET", url, { cache }).getJSON<{ hits: number }>().hits,
+      ).toBeGreaterThan(before[index].hits);
+    }
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache honours the first duplicate response max-age",
+  (cache) => {
+    const url = cacheUrl("/regressions/cache/duplicate", FRAMING_SERVER_URL);
+    expect(request("GET", url, { cache }).getJSON()).toMatchObject({ hits: 1 });
+    expect(request("GET", url, { cache }).getJSON()).toMatchObject({ hits: 2 });
   },
 );
 

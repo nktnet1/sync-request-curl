@@ -21,8 +21,13 @@ import {
   prepareCacheLookup,
   refreshCacheEntry,
   storeCacheResponse,
+  updateCacheFromHead,
 } from "#/request/cache";
-import { canUseRequestCache, getRequestCacheKey } from "#/request/cache-key";
+import {
+  canUseRequestCache,
+  getRequestCacheInvalidationKeys,
+  getRequestCacheKey,
+} from "#/request/cache-key";
 import { type PreparedRequest, prepareRequest } from "#/request/prepare";
 import {
   canRetryRequest,
@@ -213,10 +218,13 @@ export const performRequest = (
   remaining();
   prepareTransportOptions(options);
   const prepared = prepareRequest(url, options, method);
-  const cacheKey = getRequestCacheKey(prepared.url, options);
-  const cache = canUseRequestCache(prepared.url, prepared.headers, options)
-    ? options.cache
-    : undefined;
+  const cacheKey = options.cache
+    ? getRequestCacheKey(prepared.url, options)
+    : "";
+  const cache =
+    options.cache && canUseRequestCache(prepared.url, prepared.headers, options)
+      ? options.cache
+      : undefined;
   const requestTimestamp = options.cache ? Date.now() : 0;
   const cacheLookup = prepareCacheLookup(
     method,
@@ -248,6 +256,31 @@ export const performRequest = (
     remaining,
   );
   const responseTimestamp = options.cache ? Date.now() : 0;
+
+  if (
+    options.cache &&
+    method === "HEAD" &&
+    result.response.statusCode === 200
+  ) {
+    if (cache) {
+      updateCacheFromHead(
+        cacheKey,
+        cacheLookup,
+        result.response.headers,
+        responseTimestamp,
+        cache,
+        options.gzip !== false,
+        options,
+      );
+    } else {
+      for (const key of getRequestCacheInvalidationKeys(
+        prepared.url,
+        options,
+      )) {
+        invalidateCache(key, options.cache);
+      }
+    }
+  }
 
   if (cache && method === "GET" && result.response.statusCode === 304) {
     const refreshedResponse = refreshCacheEntry(
@@ -302,7 +335,9 @@ export const performRequest = (
     result.response.statusCode >= 200 &&
     result.response.statusCode < 400
   ) {
-    invalidateCache(cacheKey, options.cache);
+    for (const key of getRequestCacheInvalidationKeys(prepared.url, options)) {
+      invalidateCache(key, options.cache);
+    }
   }
 
   remaining();
