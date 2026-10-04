@@ -30,7 +30,7 @@ export const expectHeaderDeadline = (url: string, options: Options): void => {
   expect(performance.now() - started).toBeLessThan(1_000);
 };
 
-export const negotiatedOptions = (
+const negotiatedOptions = (
   target: AuthenticationTarget,
   type: NegotiatedAuthenticationType,
   password = "secret",
@@ -48,7 +48,7 @@ export const negotiatedOptions = (
   return { auth: { ...credentials, type, password } };
 };
 
-export const expectChallengeDrainDeadline = (
+const expectChallengeDrainDeadline = (
   target: AuthenticationTarget,
   type: NegotiatedAuthenticationType,
 ): void => {
@@ -59,16 +59,14 @@ export const expectChallengeDrainDeadline = (
   );
 };
 
-export const expectStaleDigestDrainDeadline = (
-  target: AuthenticationTarget,
-): void => {
+const expectStaleDigestDrainDeadline = (target: AuthenticationTarget): void => {
   expectHeaderDeadline(
     `${authEndpoint}?target=${target}&scheme=digest&stale=1&initialBodyDelay=0&bodyDelay=1500`,
     negotiatedOptions(target, "digest"),
   );
 };
 
-export const expectTerminalAuthenticationBodies = (
+const expectTerminalAuthenticationBodies = (
   target: AuthenticationTarget,
   type: NegotiatedAuthenticationType,
 ): void => {

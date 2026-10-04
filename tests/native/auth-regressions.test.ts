@@ -219,7 +219,9 @@ describe("native proxy framing and response boundaries", () => {
         });
         expect(response.transportCode).toBe(0);
         expect(response.requestHeaderOffsets).toStrictEqual([0]);
-        if (method === "HEAD") expect(response.body.length).toBe(0);
+        if (method === "HEAD") {
+          expect(response.body).toHaveLength(0);
+        }
       }
     },
   );
