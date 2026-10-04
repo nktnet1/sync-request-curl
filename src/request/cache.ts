@@ -478,6 +478,8 @@ export const prepareCacheLookup = (
 
   if (
     hasRequestHeader(headers, "range") ||
+    hasRequestHeader(headers, "if-match") ||
+    hasRequestHeader(headers, "if-unmodified-since") ||
     hasRequestHeader(headers, "if-none-match") ||
     hasRequestHeader(headers, "if-modified-since") ||
     requestForcesRevalidation(requestHeaders)

@@ -1,11 +1,12 @@
 import { describe, expect, test } from "vitest";
 import request from "#/index";
-import { SERVER_URL } from "#tests/app/config";
+import { storeCacheResponse } from "#/request/cache";
+import { FRAMING_SERVER_URL, SERVER_URL } from "#tests/app/config";
 
 let nextCacheKey = 0;
-const cacheUrl = (path: string): string => {
+const cacheUrl = (path: string, baseUrl = SERVER_URL): string => {
   nextCacheKey += 1;
-  return `${SERVER_URL}${path}?key=${process.pid}-${Date.now()}-${nextCacheKey}`;
+  return `${baseUrl}${path}?key=${process.pid}-${Date.now()}-${nextCacheKey}`;
 };
 
 type CacheMode = "file" | "memory";
@@ -31,6 +32,80 @@ test.for(["file", "memory"] as const)(
 
     expect(first.getJSON()).toStrictEqual({ hits: 1 });
     expect(second.getJSON()).toStrictEqual({ hits: 1 });
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache keeps encoded dot paths separate from ordinary paths",
+  (cache) => {
+    const plainUrl = cacheUrl(
+      "/regressions/cache/resource",
+      FRAMING_SERVER_URL,
+    );
+    const encodedUrl = plainUrl.replace("/resource", "/dir/%2e%2e/resource");
+    for (const url of [encodedUrl, plainUrl, encodedUrl, plainUrl]) {
+      const response = request("GET", url, { cache });
+      expect(response.getJSON()).toStrictEqual({
+        hits: 1,
+        target: url.slice(FRAMING_SERVER_URL.length),
+      });
+      expect(response.url).toBe(url);
+    }
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache invalidates equivalent literal dot paths after an unsafe request",
+  (cache) => {
+    const url = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+    const alias = url.replace("/resource", "/dir/../resource");
+    expect(request("GET", url, { cache }).getJSON()).toMatchObject({ hits: 1 });
+    request("POST", alias, { cache });
+    expect(request("GET", url, { cache }).getJSON()).toMatchObject({ hits: 3 });
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache does not reuse entries written under the previous colliding keys",
+  (cache) => {
+    const url = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+    const cacheNamespace = "legacy-cache-regression";
+    const now = Date.now();
+    storeCacheResponse(
+      JSON.stringify([cacheNamespace, url]),
+      {},
+      now,
+      now,
+      {
+        statusCode: 200,
+        headers: { "cache-control": "max-age=3600" },
+        body: Buffer.from("wrong cached resource"),
+        responseUrl: url.replace("/resource", "/dir/%2e%2e/resource"),
+      },
+      cache,
+    );
+    const response = request("GET", url, { cache, cacheNamespace });
+    expect(response.getJSON()).toMatchObject({ hits: 1 });
+    expect(response.url).toBe(url);
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache preserves origin precondition failures",
+  (cache) => {
+    for (const headers of [
+      { "If-Match": '"different"' },
+      { "If-Unmodified-Since": "Tue, 20 Oct 2015 07:28:00 GMT" },
+    ]) {
+      const url = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+      expect(request("GET", url, { cache }).statusCode).toBe(200);
+      const conditional = request("GET", url, { cache, headers });
+      expect(conditional.statusCode).toBe(412);
+      expect(conditional.getJSON()).toMatchObject({ hits: 2 });
+      expect(request("GET", url, { cache }).getJSON()).toMatchObject({
+        hits: 1,
+      });
+    }
   },
 );
 

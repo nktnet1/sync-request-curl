@@ -12,6 +12,42 @@ test("cache targets ignore fragments, credentials, and default ports", () => {
 });
 
 test.each([
+  ["/dir/%2e%2e/resource", "/resource"],
+  ["/dir/.%2e/resource", "/resource"],
+  ["/dir/%2E/resource", "/dir/resource"],
+  ["/dir/%2e/resource", "/dir/%252e/resource"],
+  ["/a\\b", "/a/b"],
+  ["/resource?", "/resource"],
+  ["/resource?q=%2e", "/resource?q=."],
+])("cache targets keep distinct wire paths and queries: %s, %s", (a, b) => {
+  expect(getRequestCacheKey(`http://example.com${a}`, {})).not.toBe(
+    getRequestCacheKey(`http://example.com${b}`, {}),
+  );
+});
+
+test.each([
+  ["", "/"],
+  ["?q=one", "/?q=one"],
+  ["/dir/../resource", "/resource"],
+  ["/dir/./resource", "/dir/resource"],
+  ["/dir/.", "/dir/"],
+  ["/dir/..", "/"],
+  ["/../../resource", "/resource"],
+  ["/dir//../resource", "/dir/resource"],
+  ["/dir/%2e/../resource?q=%2e#fragment", "/dir/resource?q=%2e"],
+])("cache targets normalize literal dot segments: %s, %s", (a, b) => {
+  expect(getRequestCacheKey(`http://example.com${a}`, {})).toBe(
+    getRequestCacheKey(`http://example.com${b}`, {}),
+  );
+});
+
+test("unconventional URL forms cannot alias conventional cache targets", () => {
+  expect(getRequestCacheKey("http:example.com/path", {})).not.toBe(
+    getRequestCacheKey("http://example.com/path", {}),
+  );
+});
+
+test.each([
   { url: "http://user@example.com", headers: [], options: {} },
   { url: "http://:pass@example.com", headers: [], options: {} },
   ...["Authorization", "Cookie", "Proxy-Authorization", "Host", "hOsT"].map(

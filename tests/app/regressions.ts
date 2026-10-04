@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 const realm = "transport-regression";
 const basic = `Basic ${Buffer.from("user:secret").toString("base64")}`;
+const cacheOriginHits = new Map<string, number>();
 // Test-only RFC 2617 interoperability: fixed, public dummy credentials, not
 // password storage or a security boundary. Keep MD5 for legacy Digest clients
 // (including Windows SSPI); do not replace it with an incompatible challenge.
@@ -183,6 +184,31 @@ export const handleRegressionRequest = (
   const url = new URL(req.url ?? "/", "https://fixture.invalid");
   if (!url.pathname.startsWith("/regressions/")) {
     return false;
+  }
+  if (url.pathname.startsWith("/regressions/cache/")) {
+    // Use the raw request target so encoded dots remain distinct resources.
+    const target = req.url ?? "/";
+    const hits = (cacheOriginHits.get(target) ?? 0) + 1;
+    cacheOriginHits.set(target, hits);
+    const etag = '"cache-v1"';
+    const lastModified = "Wed, 21 Oct 2015 07:28:00 GMT";
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("ETag", etag);
+    res.setHeader("Last-Modified", lastModified);
+    res.setHeader("Cache-Control", "max-age=3600");
+    const ifMatch = req.headers["if-match"];
+    const ifUnmodifiedSince = req.headers["if-unmodified-since"];
+    if (
+      (ifMatch !== undefined && ifMatch !== etag) ||
+      (ifUnmodifiedSince !== undefined &&
+        Date.parse(ifUnmodifiedSince) < Date.parse(lastModified))
+    ) {
+      res.statusCode = 412;
+      res.removeHeader("Cache-Control");
+    }
+    req.resume();
+    res.end(JSON.stringify({ hits, target }));
+    return true;
   }
   if (url.pathname === "/regressions/auth") {
     handleAuthRequest(req, res, url);

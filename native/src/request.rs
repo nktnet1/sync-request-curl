@@ -85,6 +85,11 @@ pub(crate) fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   let request_body = options.body;
   let has_form = options.form.is_some();
   let has_request_payload = request_body.is_some() || has_form;
+  let track_internal_exchanges = has_request_payload
+    || needs_auth_response_tracking(
+      options.auth_type.as_deref(),
+      options.proxy_auth.as_deref(),
+    );
   let form = options.form.unwrap_or_default();
   let request_headers = options.headers.unwrap_or_default();
   let has_content_type = request_headers
@@ -107,6 +112,9 @@ pub(crate) fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   // Callback state must also outlive curl_easy_cleanup(), which can emit
   // debug events. Locals are dropped in reverse declaration order.
   let mut state = Box::new(RequestState::default());
+  // Preserve explicit single-exchange metadata without a debug callback.
+  // HEADER_OUT deduplicates this initial offset when tracing is enabled.
+  state.request_header_offsets.push(0);
   let easy = EasyHandle::new()?;
   let curl = easy.0;
   state.easy_handle = curl;
@@ -229,22 +237,25 @@ pub(crate) fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_HEADERDATA, state_pointer)
   });
-  // Even unauthenticated transfers can retry internally (e.g. a 417 response
-  // to Expect: 100-continue). Only HEADER_OUT events prove a new exchange;
-  // guessing from response text would let trailers forge another response.
-  keep_first_error(&mut code, unsafe {
-    curl_sys::curl_easy_setopt(
-      curl,
-      curl_sys::CURLOPT_DEBUGFUNCTION,
-      request_debug_callback as curl_sys::curl_debug_callback,
-    )
-  });
-  keep_first_error(&mut code, unsafe {
-    curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_DEBUGDATA, state_pointer)
-  });
-  keep_first_error(&mut code, unsafe {
-    curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_VERBOSE, 1 as c_long)
-  });
+  // Negotiated authentication and uploads can retry internally, including
+  // unauthenticated Expect: 100-continue rejection retries. Only HEADER_OUT
+  // proves a new exchange; wire header/trailer text must not forge one.
+  // Ordinary bodyless requests do not need verbose callback traffic.
+  if track_internal_exchanges {
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(
+        curl,
+        curl_sys::CURLOPT_DEBUGFUNCTION,
+        request_debug_callback as curl_sys::curl_debug_callback,
+      )
+    });
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_DEBUGDATA, state_pointer)
+    });
+    keep_first_error(&mut code, unsafe {
+      curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_VERBOSE, 1 as c_long)
+    });
+  }
   if options.socket_timeout.unwrap_or_default() > 0
     && (options.max_download_speed.unwrap_or_default() > 0
       || options.max_upload_speed.unwrap_or_default() > 0)

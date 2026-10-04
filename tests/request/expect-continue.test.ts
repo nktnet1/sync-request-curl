@@ -41,28 +41,39 @@ describe("automatic Expect rejection retries", () => {
     },
   );
 
-  test("reports both native exchanges without authentication or a header timeout", () => {
-    const response = native.request({
-      method: "POST",
-      url,
-      headers: [],
-      body,
-      httpVersion: "1.1",
-      noBody: false,
-      timeout: 0,
-      connectTimeout: 0,
-      socketTimeout: 0,
-      overallTimeout: 5_000,
-      proxy: "",
-      proxyNoProxy: "",
-    });
-    expect(response.transportCode).toBe(0);
-    expect(response.statusCode).toBe(200);
-    expect(response.headers).toContain("HTTP/1.1 417 Expectation Failed");
-    expect(response.requestHeaderOffsets).toHaveLength(2);
-    const offsets = response.requestHeaderOffsets;
-    if (!offsets) throw new Error("Missing native request boundaries");
-    expect(offsets[0]).toBe(0);
-    expect(response.headers[offsets[1]]).toBe("HTTP/1.1 200 OK");
-  });
+  test.each([
+    { name: "body", payload: { body } },
+    {
+      name: "multipart form",
+      payload: {
+        form: [{ key: "file", value: body, fileName: "payload.bin" }],
+      },
+    },
+  ])(
+    "reports both native exchanges for $name without auth or a header timeout",
+    ({ payload }) => {
+      const response = native.request({
+        method: "POST",
+        url,
+        headers: [],
+        ...payload,
+        httpVersion: "1.1",
+        noBody: false,
+        timeout: 0,
+        connectTimeout: 0,
+        socketTimeout: 0,
+        overallTimeout: 5_000,
+        proxy: "",
+        proxyNoProxy: "",
+      });
+      expect(response.transportCode).toBe(0);
+      expect(response.statusCode).toBe(200);
+      expect(response.headers).toContain("HTTP/1.1 417 Expectation Failed");
+      expect(response.requestHeaderOffsets).toHaveLength(2);
+      const offsets = response.requestHeaderOffsets;
+      if (!offsets) throw new Error("Missing native request boundaries");
+      expect(offsets[0]).toBe(0);
+      expect(response.headers[offsets[1]]).toBe("HTTP/1.1 200 OK");
+    },
+  );
 });

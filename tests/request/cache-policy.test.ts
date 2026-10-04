@@ -340,6 +340,38 @@ describe("file cache policy", () => {
     expect(lookup.revalidationHeaders).toStrictEqual(["Pragma: no-cache"]);
   });
 
+  test.each(["file", "memory"] as const)(
+    "%s cache forwards caller preconditions without adding validators",
+    (cache) => {
+      for (const maxAge of [0, 3600]) {
+        const url = cacheUrl();
+        storeCacheResponse(
+          url,
+          {},
+          0,
+          0,
+          response(url, {
+            "cache-control": `max-age=${maxAge}`,
+            etag: '"v1"',
+            "last-modified": "Wed, 21 Oct 2015 07:28:00 GMT",
+          }),
+          cache,
+        );
+        for (const header of [
+          'If-Match: "different"',
+          "iF-uNmOdIfIeD-sInCe: Tue, 20 Oct 2015 07:28:00 GMT",
+        ]) {
+          const headers = [header];
+          const lookup = prepareCacheLookup("GET", url, headers, cache, 1);
+          expect(lookup.entry).toBeDefined();
+          expect(lookup.useCachedResponse).toBe(false);
+          expect(lookup.isRevalidation).toBe(false);
+          expect(lookup.revalidationHeaders).toStrictEqual(headers);
+        }
+      }
+    },
+  );
+
   test("does not reuse a response marked Cache-Control: no-cache", () => {
     const { lookup } = prepareStaleResponse({ "cache-control": "no-cache" });
 

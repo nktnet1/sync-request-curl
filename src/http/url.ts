@@ -42,7 +42,7 @@ interface AbsoluteUrlParts {
   remainder: string;
 }
 
-const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
+export const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
   const schemeEnd = url.indexOf("://");
   if (schemeEnd <= 0 || !isAsciiLetter(url.codePointAt(0))) {
     return undefined;
