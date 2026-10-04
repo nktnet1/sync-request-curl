@@ -34,7 +34,7 @@ const getCacheTarget = (url: string): string => {
   const hasEncodedDots = path
     .split("/")
     .some((segment) => encodedDotSegments.has(segment.toLowerCase()));
-  return `${target.origin}${hasEncodedDots ? remainder || "/" : normalizeCacheTarget(remainder)}`;
+  return `${target.origin}${hasEncodedDots ? remainder : normalizeCacheTarget(remainder)}`;
 };
 
 const createCacheKey = (target: string, options: Options): string => {

@@ -47,9 +47,13 @@ test.each([
 });
 
 test("unconventional URL forms cannot alias conventional cache targets", () => {
-  expect(getRequestCacheKey("http:example.com/path", {})).not.toBe(
-    getRequestCacheKey("http://example.com/path", {}),
-  );
+  const key = getRequestCacheKey("http:example.com/path", {});
+  const conventional = getRequestCacheKey("http://example.com/path", {});
+  expect(key).not.toBe(conventional);
+  expect(getCacheBucketKey(key)).not.toBe(getCacheBucketKey(conventional));
+  expect(
+    getRequestCacheInvalidationKeys("http:example.com/path#fragment", {}),
+  ).toEqual([key]);
 });
 
 test.each(["%2e%2e", "%2E%2E", ".%2e", "%2e."])(

@@ -294,6 +294,24 @@ describe.each(["file", "memory"] as const)("%s cache regressions", (cache) => {
     ).toBe("cached");
   });
 
+  test("HEAD on an empty cache never creates a bodyless GET entry", () => {
+    const key = keyFor(target());
+    updateCacheFromHead(
+      key,
+      prepareCacheLookup("HEAD", key, [], cache, 1),
+      {
+        "cache-control": "max-age=60",
+        etag: '"original"',
+        "content-length": "6",
+      },
+      2,
+      cache,
+      true,
+    );
+    expect(prepareCacheLookup("GET", key, [], cache, 3).entry).toBeUndefined();
+    expect(existsSync(getCachePath(getCacheBucketKey(key)))).toBe(false);
+  });
+
   test("HEAD request no-store invalidates without refreshing stored metadata", () => {
     const key = keyFor(target());
     storeCacheResponse(key, {}, 0, 0, response("cached"), cache);
