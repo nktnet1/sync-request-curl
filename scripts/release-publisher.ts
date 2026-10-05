@@ -74,6 +74,34 @@ const readTarEntry = (header: Buffer) => {
   return { entry: path, size, isDirectory };
 };
 
+const validateTarFooter = (
+  archive: Buffer,
+  offset: number,
+  file: string,
+): void => {
+  if (
+    archive.length - offset < 2 * TAR_BLOCK_BYTES ||
+    archive.length % TAR_BLOCK_BYTES !== 0 ||
+    !archive.subarray(offset).every((byte) => byte === 0)
+  ) {
+    throw new Error(`Invalid tar archive footer: ${file}`);
+  }
+};
+
+const parsePackageManifest = (
+  data: Buffer,
+  file: string,
+): Record<string, unknown> => {
+  if (data.length > MAX_PACKAGE_MANIFEST_BYTES) {
+    throw new Error(`Package manifest is too large: ${file}`);
+  }
+  const parsed: unknown = JSON.parse(data.toString("utf8"));
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`Invalid package manifest: ${file}`);
+  }
+  return parsed as Record<string, unknown>;
+};
+
 const readPackageManifest = (file: string): Record<string, unknown> => {
   const archive = gunzipSync(readFileSync(file), {
     maxOutputLength: MAX_PACKAGE_ARCHIVE_BYTES,
@@ -85,13 +113,7 @@ const readPackageManifest = (file: string): Record<string, unknown> => {
   for (let offset = 0; offset + TAR_BLOCK_BYTES <= archive.length; ) {
     const header = archive.subarray(offset, offset + TAR_BLOCK_BYTES);
     if (header.every((byte) => byte === 0)) {
-      if (
-        archive.length - offset < 2 * TAR_BLOCK_BYTES ||
-        archive.length % TAR_BLOCK_BYTES !== 0 ||
-        !archive.subarray(offset).every((byte) => byte === 0)
-      ) {
-        throw new Error(`Invalid tar archive footer: ${file}`);
-      }
+      validateTarFooter(archive, offset, file);
       hasFooter = true;
       break;
     }
@@ -107,16 +129,10 @@ const readPackageManifest = (file: string): Record<string, unknown> => {
       throw new Error(`Truncated tarball: ${file}`);
 
     if (entry === "package/package.json" && !isDirectory) {
-      if (size > MAX_PACKAGE_MANIFEST_BYTES) {
-        throw new Error(`Package manifest is too large: ${file}`);
-      }
-      const parsed: unknown = JSON.parse(
-        archive.subarray(dataStart, dataEnd).toString("utf8"),
+      manifest = parsePackageManifest(
+        archive.subarray(dataStart, dataEnd),
+        file,
       );
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        throw new Error(`Invalid package manifest: ${file}`);
-      }
-      manifest = parsed as Record<string, unknown>;
     }
 
     offset = nextOffset;

@@ -53,6 +53,7 @@ const writeTarball = (
   );
 };
 
+let rootDirectory: string | undefined;
 const createReleaseFixtures = (version = "5.0.0-beta.2") => {
   rootDirectory = mkdtempSync(join(tmpdir(), "curl-release-test-"));
   const directory = join(rootDirectory, "release-packages");
@@ -76,7 +77,6 @@ const createReleaseFixtures = (version = "5.0.0-beta.2") => {
   return { root: rootDirectory, directory, names, filesByName };
 };
 
-let rootDirectory: string | undefined;
 afterEach(() => {
   process.argv = originalArgv;
   vi.restoreAllMocks();
