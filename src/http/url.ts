@@ -157,8 +157,8 @@ export const assertSupportedHttpUrl = (url: string): void => {
   // C strings can also truncate at NUL. Reject before either normalization
   // or cache lookup can conceal the malformed input.
   for (const character of url) {
-    const code = character.charCodeAt(0);
-    if (code <= 0x20 || code === 0x7f) {
+    const code = character.codePointAt(0);
+    if (code !== undefined && (code <= 0x20 || code === 0x7f)) {
       throw new CurlError(
         3,
         "Request failed: URL contains an unescaped space or control character",

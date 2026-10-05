@@ -27,7 +27,7 @@ const tarEntry = (name: string, payload: Buffer, type = "0"): Buffer => {
     124,
     "ascii",
   );
-  header[156] = type.charCodeAt(0);
+  header[156] = type.codePointAt(0) ?? 0;
   header.write("ustar\0", 257, "ascii");
   header.write("00", 263, "ascii");
   header.fill(32, 148, 156);
@@ -261,7 +261,7 @@ test.each([
     );
   writeTarball(file, manifest, extra);
   let archive = gunzipSync(readFileSync(file));
-  if (mode === "bad-checksum") archive[148] = "7".charCodeAt(0);
+  if (mode === "bad-checksum") archive[148] = "7".codePointAt(0) ?? 0;
   if (mode === "truncated-entry") archive = archive.subarray(0, 520);
   if (mode === "missing-footer")
     archive = archive.subarray(0, archive.length - 1024);
