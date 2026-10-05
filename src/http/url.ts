@@ -43,7 +43,7 @@ interface AbsoluteUrlParts {
 }
 
 export const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
-  const schemeEnd = url.indexOf("://");
+  const schemeEnd = url.indexOf(":");
   if (schemeEnd <= 0 || !isAsciiLetter(url.codePointAt(0))) {
     return undefined;
   }
@@ -54,7 +54,13 @@ export const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
     }
   }
 
-  const authorityStart = schemeEnd + 3;
+  // libcurl accepts one, two, or three scheme slashes. Locate the authority
+  // consistently while leaving path/query spellings and the prefix untouched.
+  let authorityStart = schemeEnd + 1;
+  while (url.charAt(authorityStart) === "/") authorityStart += 1;
+  const slashCount = authorityStart - schemeEnd - 1;
+  if (slashCount < 1 || slashCount > 3) return undefined;
+
   let authorityEnd = url.length;
   for (let i = authorityStart; i < url.length; i += 1) {
     const code = url.codePointAt(i);
@@ -71,7 +77,7 @@ export const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
   };
 };
 
-/** Remove userinfo without normalizing a conventional absolute URL. */
+/** Remove userinfo without normalizing a libcurl-compatible absolute URL. */
 export const stripUrlCredentials = (url: string): string => {
   const parts = splitAbsoluteUrl(url);
   if (!parts) {

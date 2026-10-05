@@ -29,12 +29,30 @@ describe("stripUrlCredentials", () => {
       "https://example.com/path@value?q=@value#@value",
     ],
     ["https:user:secret@example.com/path", "https://example.com/path"],
+    [
+      "https:/user:secret@example.com/a/%2e/../b?q=%2f#fragment",
+      "https:/example.com/a/%2e/../b?q=%2f#fragment",
+    ],
+    [
+      "https:///user:secret@example.com/a/%2e/../b?q=%2f#fragment",
+      "https:///example.com/a/%2e/../b?q=%2f#fragment",
+    ],
   ])("removes only URL userinfo from %s", (url, expected) => {
     expect(stripUrlCredentials(url)).toBe(expected);
   });
 });
 
 describe("normalizeUrlHostname", () => {
+  test.each([1, 3])(
+    "normalizes the hostname with %i scheme slashes without rewriting the target",
+    (slashes) => {
+      const prefix = `https:${"/".repeat(slashes)}`;
+      expect(
+        normalizeUrlHostname(`${prefix}münchen.example/a/%2e/../über?q=%2f`),
+      ).toBe(`${prefix}xn--mnchen-3ya.example/a/%2e/../über?q=%2f`);
+    },
+  );
+
   test("converts an internationalized hostname to ASCII", () => {
     expect(
       normalizeUrlHostname("https://münchen.example:8443/über?q=你好#résumé"),

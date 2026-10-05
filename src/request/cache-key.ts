@@ -6,8 +6,8 @@ import type { Options } from "#/types/definition";
 // libcurl builds differ in how they normalize encoded dots. Keep read targets
 // separate, but invalidate their shared WHATWG-normalized bucket together.
 const encodedDotSegments = new Set(["%2e", "%2e.", ".%2e", "%2e%2e"]);
-// Retire delta bodies and encoded variants that older validation could mislabel.
-const cacheKeyVersion = 6;
+// Retire entries whose URL authority could be confused with a path segment.
+const cacheKeyVersion = 7;
 
 const normalizeCacheTarget = (target: string): string => {
   const queryStart = target.indexOf("?");
@@ -102,6 +102,7 @@ export const canUseRequestCache = (
 ): boolean => {
   const target = new URL(url);
   return (
+    splitAbsoluteUrl(url) !== undefined &&
     !target.username &&
     !target.password &&
     !hasRequestHeader(headers, "host") &&

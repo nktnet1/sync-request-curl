@@ -125,7 +125,7 @@ const rejectModifiedGet = (
 
 afterEach(() => nativeRequest.mockReset());
 
-test.each([4, 5])("legacy file cache version %i is retired", (version) => {
+test.each([4, 5, 6])("legacy file cache version %i is retired", (version) => {
   const url = nextUrl();
   const options = { cacheNamespace: url };
   const legacyKey = JSON.stringify([options.cacheNamespace, version, url, url]);
@@ -168,6 +168,53 @@ test.each([4, 5])("legacy file cache version %i is retired", (version) => {
 describe.each(["file", "memory"] as const)(
   "%s cache response boundaries",
   (cache) => {
+    test.each([1, 3])(
+      "%i-slash GETs reuse the canonical target without origin I/O",
+      (slashes) => {
+        const url = nextUrl();
+        seed(url, cache);
+        respond(url, 200, {}, "unexpected network response");
+        const unconventional = url.replace("://", `:${"/".repeat(slashes)}`);
+        expect(request("GET", unconventional, { cache }).getBody()).toEqual(
+          body,
+        );
+        expect(nativeRequest).not.toHaveBeenCalled();
+      },
+    );
+
+    test.each([1, 3])(
+      "%i-slash writes invalidate the canonical GET target",
+      (slashes) => {
+        const url = nextUrl();
+        seed(url, cache);
+        const unconventional = url.replace("://", `:${"/".repeat(slashes)}`);
+        respond(url, 200);
+        request("POST", unconventional, { cache });
+        respond(url, 200, { "Cache-Control": "max-age=60" }, "updated");
+        expect(request("GET", url, { cache }).getBody("utf8")).toBe("updated");
+        expect(nativeRequest).toHaveBeenCalledTimes(2);
+      },
+    );
+
+    test("a malformed four-slash URL cannot return another target's cached body", () => {
+      const url = nextUrl();
+      const target = new URL(url);
+      seed(`${target.origin}//${target.host}${target.pathname}`, cache);
+      nativeRequest.mockReturnValueOnce({
+        transportCode: 3,
+        transportMessage: "Unsupported number of slashes following scheme",
+        statusCode: 0,
+        effectiveUrl: null,
+        redirectUrl: null,
+        headers: [],
+        body: Buffer.alloc(0),
+      });
+      expect(() =>
+        request("GET", url.replace("://", ":////"), { cache }),
+      ).toThrow("Unsupported number of slashes");
+      expect(nativeRequest).toHaveBeenCalledTimes(1);
+    });
+
     test.each([
       { name: "Cache-Control", value: "no-store" },
       { name: "Vary", value: "*" },
@@ -580,24 +627,33 @@ describe.each(["file", "memory"] as const)(
       },
     );
 
-    test("absolute mixed-dot metadata invalidates both possible targets in the current namespace", () => {
-      const url = nextUrl();
-      const options = { cacheNamespace: "mutation-boundary" };
-      const plain = url;
-      const literal = url.replace("/resource", "/dir/resource");
-      const related = url.replace("/resource", "/dir/%2e/../resource");
-      const keys = [plain, literal].map((target) =>
-        seed(target, cache, {}, options),
-      );
-      const otherNamespace = seed(plain, cache);
-      respond(new URL("write", url).href, 200, { "Content-Location": related });
-      request("POST", new URL("write", url).href, { ...options, cache });
-      for (const key of keys)
-        expect(prepareCacheLookup("GET", key, [], cache).entry).toBeUndefined();
-      expect(
-        prepareCacheLookup("GET", otherNamespace, [], cache).entry,
-      ).toBeDefined();
-    });
+    test.each([1, 2, 3])(
+      "absolute %i-slash mixed-dot metadata invalidates both possible targets in the current namespace",
+      (slashes) => {
+        const url = nextUrl();
+        const options = { cacheNamespace: "mutation-boundary" };
+        const plain = url;
+        const literal = url.replace("/resource", "/dir/resource");
+        const related = url
+          .replace("/resource", "/dir/%2e/../resource")
+          .replace("://", `:${"/".repeat(slashes)}`);
+        const keys = [plain, literal].map((target) =>
+          seed(target, cache, {}, options),
+        );
+        const otherNamespace = seed(plain, cache);
+        respond(new URL("write", url).href, 200, {
+          "Content-Location": related,
+        });
+        request("POST", new URL("write", url).href, { ...options, cache });
+        for (const key of keys)
+          expect(
+            prepareCacheLookup("GET", key, [], cache).entry,
+          ).toBeUndefined();
+        expect(
+          prepareCacheLookup("GET", otherNamespace, [], cache).entry,
+        ).toBeDefined();
+      },
+    );
 
     test.each([
       "https://foreign.test/related",
