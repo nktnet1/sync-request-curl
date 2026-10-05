@@ -3,6 +3,22 @@ import { FormData } from "#/form-data";
 import { prepareRequest } from "#/request/prepare";
 
 describe("origin URL credentials", () => {
+  test.each([1, 2, 3])(
+    "rejects structured auth with empty userinfo and %i slashes",
+    (slashes) => {
+      for (const userinfo of ["", ":"]) {
+        expect(() =>
+          prepareRequest(
+            `http:${"/".repeat(slashes)}${userinfo}@example.com/`,
+            {
+              auth: { username: "explicit", password: "secret" },
+            },
+          ),
+        ).toThrow("auth cannot be combined with URL credentials");
+      }
+    },
+  );
+
   test.each(["user%3Aname", "user%3aname"])(
     "rejects percent-decoded colons in a Basic username: %s",
     (username) => {

@@ -144,6 +144,8 @@ test.each([
 );
 
 test.each([
+  { url: "http://@example.com", headers: [], options: {} },
+  { url: "http://:@example.com", headers: [], options: {} },
   { url: "http://user@example.com", headers: [], options: {} },
   { url: "http://:pass@example.com", headers: [], options: {} },
   ...["Authorization", "Cookie", "Proxy-Authorization", "Host", "hOsT"].map(

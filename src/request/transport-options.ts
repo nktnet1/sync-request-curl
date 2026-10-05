@@ -85,14 +85,10 @@ const readProxyUrlCredentials = (
   return { proxyUsername, proxyPassword };
 };
 
-const prepareProxyOptions = (
-  proxy?: Options["proxy"],
-): PreparedProxyOptions => {
-  if (proxy === undefined) {
-    return { proxy: "", proxyNoProxy: "" };
-  }
-
-  const url = new URL(proxy.url);
+const parseProxyUrl = (
+  proxyUrl: string,
+): { url: URL; isHttpProxy: boolean } => {
+  const url = new URL(proxyUrl);
   const isHttpProxy = HTTP_PROXY_PROTOCOLS.has(url.protocol);
   const isSocksProxy = SOCKS_PROXY_PROTOCOLS.has(url.protocol);
   const hasRootPath = isHttpProxy
@@ -108,6 +104,17 @@ const prepareProxyOptions = (
       "proxy.url must be an HTTP(S) or SOCKS proxy origin URL",
     );
   }
+  return { url, isHttpProxy };
+};
+
+const prepareProxyOptions = (
+  proxy?: Options["proxy"],
+): PreparedProxyOptions => {
+  if (proxy === undefined) {
+    return { proxy: "", proxyNoProxy: "" };
+  }
+
+  const { url, isHttpProxy } = parseProxyUrl(proxy.url);
   if (!isHttpProxy && proxy.auth !== undefined) {
     throw new TypeError("proxy.auth is only supported for HTTP(S) proxies");
   }

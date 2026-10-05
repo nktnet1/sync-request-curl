@@ -9,6 +9,29 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("URL credentials at the transport boundary", () => {
   test.each([
+    "http://exam\nple.com/resource",
+    "http://example.com/res\0ource",
+    "http://example.com/resource#space fragment",
+    "http://example.com/resource?q=raw\tvalue",
+  ])("rejects raw URL controls and spaces before native I/O: %j", (url) => {
+    for (const options of [
+      {},
+      { followRedirects: false },
+      { cache: "file" as const },
+      { cache: "memory" as const },
+      { qs: {} },
+      { qs: {}, followRedirects: false },
+      { auth: { username: "user", password: "secret" } },
+      { headers: { Authorization: "Bearer explicit" } },
+    ]) {
+      expectRejectedBeforeNativeIo(
+        () => request("GET", url, options),
+        "unescaped space or control character",
+      );
+    }
+  });
+
+  test.each([
     "http://trusted.test\\@other.test/resource",
     "http:/trusted.test\\@other.test/resource",
     "http:///trusted.test\\@other.test/resource",

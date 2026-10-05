@@ -125,49 +125,123 @@ const rejectModifiedGet = (
 
 afterEach(() => nativeRequest.mockReset());
 
-test.each([4, 5, 6])("legacy file cache version %i is retired", (version) => {
-  const url = nextUrl();
-  const options = { cacheNamespace: url };
-  const legacyKey = JSON.stringify([options.cacheNamespace, version, url, url]);
-  const legacyPath = getCachePath(
-    JSON.stringify([options.cacheNamespace, version, url]),
-  );
-  const now = Date.now();
-  mkdirSync(fileCacheDirectory, { recursive: true });
-  writeFileSync(
-    legacyPath,
-    JSON.stringify({
-      version: 2,
-      entries: [
-        {
-          cacheKey: legacyKey,
-          decompress: true,
-          statusCode: 200,
-          headers: { "cache-control": "max-age=3600" },
-          body: body.toString("base64"),
-          responseUrl: url,
-          requestHeaders: {},
-          requestTimestamp: now,
-          responseTimestamp: now,
-        },
-      ],
-    }),
-  );
-  trackCache(getRequestCacheKey(url, options), "file");
-  try {
-    respond(url, 200, { "Cache-Control": "max-age=60" }, "new");
-    expect(
-      request("GET", url, { cache: "file", ...options }).getBody("utf8"),
-    ).toBe("new");
-    expect(nativeRequest).toHaveBeenCalledTimes(1);
-  } finally {
-    rmSync(legacyPath, { force: true });
-  }
-});
+test.each([4, 5, 6, 7])(
+  "legacy file cache version %i is retired",
+  (version) => {
+    const url = nextUrl();
+    const options = { cacheNamespace: url };
+    const legacyKey = JSON.stringify([
+      options.cacheNamespace,
+      version,
+      url,
+      url,
+    ]);
+    const legacyPath = getCachePath(
+      JSON.stringify([options.cacheNamespace, version, url]),
+    );
+    const now = Date.now();
+    mkdirSync(fileCacheDirectory, { recursive: true });
+    writeFileSync(
+      legacyPath,
+      JSON.stringify({
+        version: 2,
+        entries: [
+          {
+            cacheKey: legacyKey,
+            decompress: true,
+            statusCode: 200,
+            headers: { "cache-control": "max-age=3600" },
+            body: body.toString("base64"),
+            responseUrl: url,
+            requestHeaders: {},
+            requestTimestamp: now,
+            responseTimestamp: now,
+          },
+        ],
+      }),
+    );
+    trackCache(getRequestCacheKey(url, options), "file");
+    try {
+      respond(url, 200, { "Cache-Control": "max-age=60" }, "new");
+      expect(
+        request("GET", url, { cache: "file", ...options }).getBody("utf8"),
+      ).toBe("new");
+      expect(nativeRequest).toHaveBeenCalledTimes(1);
+    } finally {
+      rmSync(legacyPath, { force: true });
+    }
+  },
+);
 
 describe.each(["file", "memory"] as const)(
   "%s cache response boundaries",
   (cache) => {
+    test.each(["\t", "\n", "\r", "\0", " "])(
+      "malformed URL character %j cannot be hidden by a cache hit",
+      (character) => {
+        const url = nextUrl();
+        seed(url, cache);
+        const malformed = [
+          url.replace("cache-boundary", `cache${character}-boundary`),
+          `${url}#${character}`,
+        ];
+        for (const target of malformed) {
+          expect(() => request("GET", target, { cache })).toThrow(
+            "Request failed: URL",
+          );
+        }
+        expect(nativeRequest).not.toHaveBeenCalled();
+      },
+    );
+
+    test.each([1, 2, 3])(
+      "empty URL userinfo with %i slashes bypasses anonymous cache reads and writes",
+      (slashes) => {
+        for (const userinfo of ["", ":"]) {
+          const url = nextUrl();
+          seed(url, cache);
+          const authenticated = url.replace(
+            "://",
+            `:${"/".repeat(slashes)}${userinfo}@`,
+          );
+          respond(
+            authenticated,
+            200,
+            { "Cache-Control": "max-age=3600" },
+            "authenticated",
+          );
+          expect(request("GET", authenticated, { cache }).getBody("utf8")).toBe(
+            "authenticated",
+          );
+          expect(request("GET", url, { cache }).getBody()).toEqual(body);
+
+          const unseeded = nextUrl();
+          trackCache(getRequestCacheKey(unseeded, {}), cache);
+          const authUnseeded = unseeded.replace(
+            "://",
+            `:${"/".repeat(slashes)}${userinfo}@`,
+          );
+          respond(
+            authUnseeded,
+            200,
+            { "Cache-Control": "max-age=3600" },
+            "authenticated",
+          );
+          request("GET", authUnseeded, { cache });
+          respond(
+            unseeded,
+            200,
+            { "Cache-Control": "max-age=3600" },
+            "anonymous",
+          );
+          expect(request("GET", unseeded, { cache }).getBody("utf8")).toBe(
+            "anonymous",
+          );
+        }
+        expect(nativeRequest).toHaveBeenCalledTimes(6);
+      },
+    );
+
     test.each([1, 3])(
       "%i-slash GETs reuse the canonical target without origin I/O",
       (slashes) => {

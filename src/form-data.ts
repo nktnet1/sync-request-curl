@@ -173,6 +173,17 @@ const getBlobFileName = (blob: Blob): string => {
 const normalizeFileName = (fileName: string | undefined): string | undefined =>
   fileName === undefined ? undefined : basename(fileName.replaceAll("\\", "/"));
 
+const getBufferedContentType = (
+  value: string | Buffer,
+  fileName: string | undefined,
+  contentType: string | undefined,
+): string | undefined => {
+  if (contentType !== undefined) return contentType;
+  if (fileName !== undefined)
+    return lookupMimeType(fileName) ?? "application/octet-stream";
+  return Buffer.isBuffer(value) ? "application/octet-stream" : undefined;
+};
+
 const prepareFormDataEntry = (entry: FormDataEntry): PreparedFormDataEntry => {
   const rawValue = entry.value;
   const value =
@@ -189,24 +200,19 @@ const prepareFormDataEntry = (entry: FormDataEntry): PreparedFormDataEntry => {
   }
 
   if (!(value instanceof Blob)) {
-    const prepared: PreparedFormDataEntry = {
+    const bufferedContentType = getBufferedContentType(
+      value,
+      fileName,
+      contentType,
+    );
+    return {
       key: entry.key,
       value,
       ...(fileName === undefined ? {} : { fileName }),
+      ...(bufferedContentType === undefined
+        ? {}
+        : { contentType: bufferedContentType }),
     };
-    if (contentType !== undefined) {
-      return { ...prepared, contentType };
-    }
-    if (fileName !== undefined) {
-      return {
-        ...prepared,
-        contentType: lookupMimeType(fileName) ?? "application/octet-stream",
-      };
-    }
-    if (Buffer.isBuffer(value)) {
-      return { ...prepared, contentType: "application/octet-stream" };
-    }
-    return prepared;
   }
 
   return {
