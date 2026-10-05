@@ -210,17 +210,18 @@ fn process_header_chunk(state: &mut RequestState, chunk: &[u8], bytes: usize) ->
     state.current_status_code = Some(status_code);
     state.current_response_has_location = false;
     state.response_body_ignored = false;
-  } else if !line.is_empty() {
-    state.current_response_header_bytes = state
-      .current_response_header_bytes
-      .saturating_add(line.len());
-    if state.current_response_header_bytes > state.max_response_header_bytes {
-      state.response_header_overflow = true;
-      return 0;
-    }
-    if is_location_header(line) {
-      state.current_response_has_location = true;
-    }
+  } else if is_location_header(line) {
+    state.current_response_has_location = true;
+  }
+
+  // Status lines (including reason phrases), fields, and trailers share the
+  // response budget. Check before copying any line into the retained headers.
+  state.current_response_header_bytes = state
+    .current_response_header_bytes
+    .saturating_add(line.len());
+  if state.current_response_header_bytes > state.max_response_header_bytes {
+    state.response_header_overflow = true;
+    return 0;
   }
 
   // Check inside the callback too: an entire late response can arrive in one
@@ -345,6 +346,100 @@ pub(crate) extern "C" fn transfer_progress_callback(
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn oversized_status_lines_are_rejected_before_retention() {
+    let mut state = RequestState::default();
+    let line = format!(
+      "HTTP/1.1 200 {}\r\n",
+      "x".repeat(DEFAULT_MAX_RESPONSE_HEADER_SIZE),
+    );
+    assert_eq!(
+      process_header_chunk(&mut state, line.as_bytes(), line.len()),
+      0,
+    );
+    assert!(state.response_header_overflow);
+    assert!(state.headers.is_empty());
+  }
+
+  #[test]
+  fn status_lines_obey_the_exact_header_size_boundary() {
+    let line = b"HTTP/1.1 200 OK\r\n";
+    let line_bytes = strip_header_line_ending(line).len();
+    for limit in [line_bytes - 1, line_bytes] {
+      let mut state = RequestState::default();
+      state.max_response_header_bytes = limit;
+      let result = process_header_chunk(&mut state, line, line.len());
+      assert_eq!(state.response_header_overflow, limit < line_bytes);
+      assert_eq!(result, if limit < line_bytes { 0 } else { line.len() });
+      assert_eq!(state.current_response_header_bytes, line_bytes);
+    }
+  }
+
+  #[test]
+  fn fields_and_trailers_share_the_status_line_budget() {
+    let status = b"HTTP/1.1 200 OK\r\n";
+    let field = b"X-Test: value\r\n";
+    let combined_bytes = strip_header_line_ending(status).len()
+      + strip_header_line_ending(field).len();
+    for trailer in [false, true] {
+      for limit in [combined_bytes - 1, combined_bytes] {
+        let mut state = RequestState::default();
+        state.max_response_header_bytes = limit;
+        assert_eq!(
+          process_header_chunk(&mut state, status, status.len()),
+          status.len(),
+        );
+        if trailer {
+          assert_eq!(process_header_chunk(&mut state, b"\r\n", 2), 2);
+        }
+        assert_eq!(
+          process_header_chunk(&mut state, field, field.len()),
+          if limit < combined_bytes { 0 } else { field.len() },
+        );
+        assert_eq!(state.response_header_overflow, limit < combined_bytes);
+        assert_eq!(state.current_response_header_bytes, combined_bytes);
+      }
+    }
+  }
+
+  #[test]
+  fn informational_and_retry_responses_have_separate_header_budgets() {
+    for status in [
+      "100 Continue",
+      "103 Early Hints",
+      "401 Unauthorized",
+      "407 Proxy Authentication Required",
+      "417 Expectation Failed",
+    ] {
+      let mut state = RequestState::default();
+      let line = format!("HTTP/1.1 {status}\r\n");
+      let padding_bytes = 64 - strip_header_line_ending(line.as_bytes()).len()
+        - b"X-Fill: ".len();
+      let field = format!("X-Fill: {}\r\n", "x".repeat(padding_bytes));
+      state.max_response_header_bytes = 64;
+      for line in [line.as_bytes(), field.as_bytes(), b"\r\n"] {
+        assert_eq!(
+          process_header_chunk(&mut state, line, line.len()),
+          line.len(),
+        );
+      }
+      assert_eq!(state.current_response_header_bytes, 64);
+      if !status.starts_with('1') {
+        process_debug_event(&mut state, curl_sys::CURLINFO_HEADER_OUT, &[]);
+      }
+      let final_status = b"HTTP/1.1 200 OK\r\n";
+      assert_eq!(
+        process_header_chunk(&mut state, final_status, final_status.len()),
+        final_status.len(),
+      );
+      assert_eq!(
+        state.current_response_header_bytes,
+        strip_header_line_ending(final_status).len(),
+      );
+      assert!(!state.response_header_overflow);
+    }
+  }
 
   #[test]
   fn final_upload_progress_retains_bounded_allowance_without_renewal() {

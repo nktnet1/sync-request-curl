@@ -115,6 +115,16 @@ const framingServer = createServer((request, response) => {
         `HTTP/1.1 200 OK\r\nX-Large: ${"x".repeat(maxHeaderSize)}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`,
       );
       return;
+    case "/headers/oversized-status":
+      request.socket.end(
+        `HTTP/1.1 200 ${"x".repeat(maxHeaderSize)}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`,
+      );
+      return;
+    case "/headers/oversized-combined":
+      request.socket.end(
+        `HTTP/1.1 200 ${"x".repeat(maxHeaderSize / 2)}\r\nX-Large: ${"x".repeat(maxHeaderSize / 2)}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`,
+      );
+      return;
     default:
       response.statusCode = 404;
       response.end("Not found");

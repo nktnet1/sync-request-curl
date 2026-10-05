@@ -109,9 +109,11 @@ pub(crate) fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   )?;
   let http_auth = parse_auth(options.auth_type.as_deref(), AuthTarget::Http)?;
   let proxy_auth = parse_auth(options.proxy_auth.as_deref(), AuthTarget::Proxy)?;
-  // Callback state must also outlive curl_easy_cleanup(), which can emit
-  // debug events. Locals are dropped in reverse declaration order.
+  // Callback state and CURLOPT_ERRORBUFFER storage must outlive
+  // curl_easy_cleanup(), including on early returns. Locals are dropped
+  // in reverse declaration order, so both are declared before the handle.
   let mut state = Box::new(RequestState::default());
+  let mut error_buffer = vec![0 as c_char; curl_sys::CURL_ERROR_SIZE as usize];
   // Preserve explicit single-exchange metadata without a debug callback.
   // HEADER_OUT deduplicates this initial offset when tracing is enabled.
   state.request_header_offsets.push(0);
@@ -139,7 +141,6 @@ pub(crate) fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     .filter(|value| *value > 0)
     .unwrap_or(DEFAULT_MAX_RESPONSE_HEADER_SIZE);
   let state_pointer = (&mut *state as *mut RequestState).cast::<c_void>();
-  let mut error_buffer = vec![0 as c_char; curl_sys::CURL_ERROR_SIZE as usize];
   let mut headers = HeaderList::default();
   let mut proxy_headers = HeaderList::default();
   let mut mime: Option<Mime> = None;

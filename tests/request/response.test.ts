@@ -86,11 +86,18 @@ describe("Response framing", () => {
     expect(response.headers["x-test"]).toBe("first second");
   });
 
-  test("rejects response headers larger than Node's configured maximum", () => {
-    expect(() =>
-      request("GET", `${FRAMING_SERVER_URL}/headers/oversized`),
-    ).toThrow("Request failed: Parse Error: Header overflow");
-  });
+  test.each([
+    ["fields", "/headers/oversized"],
+    ["status lines", "/headers/oversized-status"],
+    ["combined status lines and fields", "/headers/oversized-combined"],
+  ])(
+    "rejects response %s larger than Node's configured maximum",
+    (_description, path) => {
+      expect(() => request("GET", `${FRAMING_SERVER_URL}${path}`)).toThrow(
+        "Request failed: Parse Error: Header overflow",
+      );
+    },
+  );
 });
 
 describe("Response buffering", () => {
