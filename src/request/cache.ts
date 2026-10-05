@@ -131,13 +131,33 @@ const normalizeRequestHeaders = (
   return Object.fromEntries(normalized);
 };
 
+const splitCacheControlDirectives = (value: string): string[] => {
+  const directives: string[] = [];
+  let start = 0;
+  let quoted = false;
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value.charAt(index);
+    if (quoted && character === "\\") {
+      index += 1;
+      continue;
+    }
+    if (character === '"') quoted = !quoted;
+    if (character === "," && !quoted) {
+      directives.push(value.slice(start, index));
+      start = index + 1;
+    }
+  }
+  directives.push(value.slice(start));
+  return directives;
+};
+
 const parseCacheControl = (value: string | undefined): Map<string, string> => {
   const directives = new Map<string, string>();
   if (!value) {
     return directives;
   }
 
-  for (const rawDirective of value.split(",")) {
+  for (const rawDirective of splitCacheControlDirectives(value)) {
     const directive = rawDirective.trim();
     if (!directive) {
       continue;
@@ -164,6 +184,15 @@ const parseDeltaSeconds = (value: string | undefined): number | undefined => {
   }
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) ? parsed : undefined;
+};
+
+const parseAgeSeconds = (value: string | undefined): number => {
+  if (value === undefined) return 0;
+  const firstValue = value.split(",", 1)[0].trim();
+  if (!/^\d+$/.test(firstValue)) return 0;
+  // RFC 9111: use the first list member and saturate numeric overflow.
+  // An oversized age must never make an ancient response appear new.
+  return Math.min(Number(firstValue), Number.MAX_SAFE_INTEGER);
 };
 
 const getRequestHeaderValues = (
@@ -308,7 +337,7 @@ const getCurrentAge = (entry: CacheEntry, now: number): number => {
     0,
     entry.responseTimestamp - getResponseDate(entry),
   );
-  const ageHeaderSeconds = parseDeltaSeconds(
+  const ageHeaderSeconds = parseAgeSeconds(
     getHeaderValue(entry.headers, "age"),
   );
   const responseDelay = Math.max(
@@ -317,7 +346,7 @@ const getCurrentAge = (entry: CacheEntry, now: number): number => {
   );
   const correctedInitialAge = Math.max(
     apparentAge,
-    (ageHeaderSeconds ?? 0) * 1_000 + responseDelay,
+    ageHeaderSeconds * 1_000 + responseDelay,
   );
   return correctedInitialAge + Math.max(0, now - entry.responseTimestamp);
 };
@@ -634,6 +663,9 @@ const mergeRevalidationHeaders = (
   revalidated: Response["headers"],
 ): Response["headers"] => {
   const merged = copyHeaders(cached);
+  // Age belongs to this validation response. An absent field starts at zero;
+  // retaining the earlier response's Age can force endless revalidation.
+  delete merged.age;
   const cachedWasDecoded = cached["content-encoding"] === undefined;
 
   for (const [name, value] of Object.entries(revalidated)) {
@@ -713,6 +745,42 @@ export const updateCacheFromHead = (
   }
 };
 
+const revalidationValidatorsMatch = (
+  entry: CacheEntry,
+  responseHeaders: Response["headers"],
+): boolean => {
+  const receivedTag = getHeaderValue(responseHeaders, "etag");
+  const storedTag = getHeaderValue(entry.headers, "etag");
+  if (receivedTag !== undefined) {
+    return receivedTag.startsWith("W/")
+      ? receivedTag.slice(2) === storedTag?.replace(/^W\//, "")
+      : receivedTag === storedTag;
+  }
+  const receivedDate = getHeaderValue(responseHeaders, "last-modified");
+  const storedDate = getHeaderValue(entry.headers, "last-modified");
+  return receivedDate === undefined || receivedDate === storedDate;
+};
+
+const isExplicitCacheRevalidation = (
+  entry: CacheEntry,
+  lookup: CacheLookup,
+  responseHeaders: Response["headers"],
+): boolean => {
+  const hasCondition =
+    getRequestHeaderValue(lookup.requestHeaders, "if-none-match") !==
+      undefined ||
+    getRequestHeaderValue(lookup.requestHeaders, "if-modified-since") !==
+      undefined;
+  const hasResponseValidator =
+    getHeaderValue(responseHeaders, "etag") !== undefined ||
+    getHeaderValue(responseHeaders, "last-modified") !== undefined;
+  return (
+    hasCondition &&
+    hasResponseValidator &&
+    revalidationValidatorsMatch(entry, responseHeaders)
+  );
+};
+
 export const refreshCacheEntry = (
   url: string,
   lookup: CacheLookup,
@@ -722,25 +790,13 @@ export const refreshCacheEntry = (
   canCache?: (response: CacheableResponse, defaultValue: boolean) => boolean,
 ): CacheableResponse | undefined => {
   const entry = lookup.entry;
-  if (!entry || !lookup.isRevalidation) {
-    return undefined;
-  }
-
-  const receivedTag = getHeaderValue(responseHeaders, "etag");
-  const storedTag = getHeaderValue(entry.headers, "etag");
-  const receivedDate = getHeaderValue(responseHeaders, "last-modified");
-  const storedDate = getHeaderValue(entry.headers, "last-modified");
-  const mismatchedTag =
-    receivedTag !== undefined &&
-    (receivedTag.startsWith("W/")
-      ? receivedTag.slice(2) !== storedTag?.replace(/^W\//, "")
-      : receivedTag !== storedTag);
+  if (!entry || !lookup.allowStore) return undefined;
   if (
-    mismatchedTag ||
-    (receivedTag === undefined &&
-      receivedDate !== undefined &&
-      receivedDate !== storedDate)
-  ) {
+    !lookup.isRevalidation &&
+    !isExplicitCacheRevalidation(entry, lookup, responseHeaders)
+  )
+    return undefined;
+  if (!revalidationValidatorsMatch(entry, responseHeaders)) {
     invalidateCache(url, cache);
     throw new RequestError(
       "ERR_REQUEST_FAILED",

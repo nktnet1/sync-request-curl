@@ -25,6 +25,28 @@ const cachedPair = (path: string, cache: CacheMode = "file") => {
   ] as const;
 };
 
+const prepareAmbiguousTargets = (cache: CacheMode) => {
+  const plain = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+  const literal = plain.replace("/resource", "/dir/resource");
+  const mixed = plain.replace("/resource", "/dir/%2e/../resource");
+  const warmed = [plain, literal].map((url) => ({
+    url,
+    hits: request("GET", url, { cache }).getJSON<{ hits: number }>().hits,
+  }));
+  return { mixed, warmed };
+};
+
+const expectTargetsInvalidated = (
+  targets: { url: string; hits: number }[],
+  cache: CacheMode,
+): void => {
+  for (const { url, hits } of targets) {
+    expect(
+      request("GET", url, { cache }).getJSON<{ hits: number }>().hits,
+    ).toBeGreaterThan(hits);
+  }
+};
+
 test.for(["file", "memory"] as const)(
   "%s cache reuses a fresh GET response without contacting the origin",
   (cache) => {
@@ -116,21 +138,12 @@ test.for([
 test.for(["file", "memory"] as const)(
   "%s cache bypasses ambiguous mixed dots and invalidates both possible targets",
   (cache) => {
-    const plain = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
-    const literal = plain.replace("/resource", "/dir/resource");
-    const mixed = plain.replace("/resource", "/dir/%2e/../resource");
-    const before = [plain, literal].map((url) =>
-      request("GET", url, { cache }).getJSON<{ hits: number }>(),
-    );
+    const { mixed, warmed } = prepareAmbiguousTargets(cache);
     const first = request("GET", mixed, { cache }).getJSON<{ hits: number }>();
     const second = request("GET", mixed, { cache }).getJSON<{ hits: number }>();
     expect(second.hits).toBe(first.hits + 1);
     request("POST", mixed, { cache });
-    for (const [index, url] of [plain, literal].entries()) {
-      expect(
-        request("GET", url, { cache }).getJSON<{ hits: number }>().hits,
-      ).toBeGreaterThan(before[index].hits);
-    }
+    expectTargetsInvalidated(warmed, cache);
   },
 );
 
@@ -228,18 +241,9 @@ test.for(["file", "memory"] as const)(
 test.for(["file", "memory"] as const)(
   "%s cache invalidates both possible targets after an ambiguous HEAD",
   (cache) => {
-    const plain = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
-    const literal = plain.replace("/resource", "/dir/resource");
-    const mixed = plain.replace("/resource", "/dir/%2e/../resource");
-    const before = [plain, literal].map((url) =>
-      request("GET", url, { cache }).getJSON<{ hits: number }>(),
-    );
+    const { mixed, warmed } = prepareAmbiguousTargets(cache);
     expect(request("HEAD", mixed, { cache }).statusCode).toBe(200);
-    for (const [index, url] of [plain, literal].entries()) {
-      expect(
-        request("GET", url, { cache }).getJSON<{ hits: number }>().hits,
-      ).toBeGreaterThan(before[index].hits);
-    }
+    expectTargetsInvalidated(warmed, cache);
   },
 );
 

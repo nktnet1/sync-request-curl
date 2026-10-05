@@ -10,6 +10,7 @@ import {
   throwForResponseFramingTransportError,
   throwForResponseHeaderTransportError,
 } from "#/http/headers";
+import { assertSupportedHttpUrl, splitAbsoluteUrl } from "#/http/url";
 import native from "#/native/index";
 import { getAgentPoolId } from "#/request/agent";
 import {
@@ -265,6 +266,40 @@ const invalidateRequestCache = (
   }
 };
 
+const getRelatedInvalidationUrl = (
+  requestUrl: string,
+  response: Response,
+  name: string,
+): string | undefined => {
+  const value = response.headers[name];
+  if (typeof value !== "string") return undefined;
+  try {
+    const resolved = new URL(value, response.url);
+    if (resolved.origin !== new URL(requestUrl).origin) return undefined;
+    // Keep absolute encoded-dot spellings so both native interpretations are
+    // invalidated. Relative references use the same base as redirect handling.
+    const target = splitAbsoluteUrl(value) ? value : resolved.href;
+    assertSupportedHttpUrl(target);
+    return target;
+  } catch {
+    // Invalid metadata must not turn a completed write into a request failure.
+    return undefined;
+  }
+};
+
+const invalidateMutationCache = (
+  url: string,
+  response: Response,
+  options: Options,
+  mode: NonNullable<Options["cache"]>,
+): void => {
+  invalidateRequestCache(url, options, mode);
+  for (const name of ["location", "content-location"]) {
+    const related = getRelatedInvalidationUrl(url, response, name);
+    if (related !== undefined) invalidateRequestCache(related, options, mode);
+  }
+};
+
 const updateHeadCache = (
   prepared: PreparedRequest,
   options: Options,
@@ -315,7 +350,7 @@ const updateGetCache = (
               defaultValue,
             ),
     );
-    return refreshedResponse === undefined
+    return refreshedResponse === undefined || !lookup.isRevalidation
       ? result
       : createRequestResult("GET", url, refreshedResponse);
   }
@@ -372,7 +407,12 @@ const updateRequestCache = (
     result.response.statusCode >= 200 &&
     result.response.statusCode < 400
   ) {
-    invalidateRequestCache(prepared.url, options, options.cache);
+    invalidateMutationCache(
+      prepared.url,
+      result.response,
+      options,
+      options.cache,
+    );
   }
   return result;
 };

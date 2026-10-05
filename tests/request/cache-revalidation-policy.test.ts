@@ -87,6 +87,16 @@ const queueRevalidation = (
   return { url, key };
 };
 
+const expectOriginalStaleMetadata = (
+  key: string,
+  cache: NonNullable<Options["cache"]>,
+): void => {
+  const lookup = prepareCacheLookup("GET", key, [], cache);
+  expect(lookup.useCachedResponse).toBe(false);
+  expect(lookup.entry?.headers["x-updated"]).toBeUndefined();
+  expect(lookup.entry?.headers["cache-control"]).toBe("max-age=0");
+};
+
 describe.each(["file", "memory"] as const)(
   "%s revalidation cache policy",
   (cache) => {
@@ -145,10 +155,7 @@ describe.each(["file", "memory"] as const)(
           },
         }),
       ).toThrow(failure);
-      const lookup = prepareCacheLookup("GET", key, [], cache);
-      expect(lookup.useCachedResponse).toBe(false);
-      expect(lookup.entry?.headers["x-updated"]).toBeUndefined();
-      expect(lookup.entry?.headers["cache-control"]).toBe("max-age=0");
+      expectOriginalStaleMetadata(key, cache);
     });
 
     test("an ambiguous authority cannot reuse a cached response or call cache hooks", () => {
@@ -173,10 +180,7 @@ describe.each(["file", "memory"] as const)(
         headers: { "If-None-Match": '"same"' },
       });
       expect(response.statusCode).toBe(304);
-      const lookup = prepareCacheLookup("GET", key, [], cache);
-      expect(lookup.useCachedResponse).toBe(false);
-      expect(lookup.entry?.headers["x-updated"]).toBeUndefined();
-      expect(lookup.entry?.headers["cache-control"]).toBe("max-age=0");
+      expectOriginalStaleMetadata(key, cache);
     });
 
     test("a failed mutation preserves the stored GET response", () => {
