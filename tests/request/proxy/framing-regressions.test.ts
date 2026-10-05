@@ -56,6 +56,8 @@ describe("proxy credential header isolation", () => {
   test.each([
     { url: PROXY_URL, username: "user" },
     { url: PROXY_URL.replace("://", "://user:secret@") },
+    { url: PROXY_URL.replace("://", "://@") },
+    { url: PROXY_URL.replace("://", "://:@") },
     { url: PROXY_URL, auth: "negotiate" as const },
   ])("rejects Proxy-Authorization with structured proxy auth %j", (proxy) => {
     expectRejectedBeforeNativeIo(

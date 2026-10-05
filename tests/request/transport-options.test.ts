@@ -130,6 +130,48 @@ describe("transport option validation", () => {
     expect(options.proxyPassword).toBe("");
   });
 
+  test.each(["http", "https", "socks4", "socks4a", "socks5", "socks5h"])(
+    "preserves explicitly empty %s proxy URL credentials",
+    (scheme) => {
+      for (const userinfo of ["", ":"]) {
+        expect(
+          prepareTransportOptions({
+            proxy: { url: `${scheme}://${userinfo}@localhost:8080` },
+          }),
+        ).toMatchObject({
+          proxy: new URL(`${scheme}://localhost:8080`).href,
+          proxyUsername: "",
+          proxyPassword: "",
+        });
+      }
+    },
+  );
+
+  test.each([
+    "http:@localhost:8080",
+    "http:/@localhost:8080",
+    "http:///@localhost:8080",
+    "http:////@localhost:8080",
+    String.raw`http:\\@localhost:8080`,
+    "http:\n//@localhost:8080",
+  ])("retains empty credentials when normalizing proxy URL %j", (url) => {
+    expect(prepareTransportOptions({ proxy: { url } })).toMatchObject({
+      proxy: "http://localhost:8080/",
+      proxyUsername: "",
+      proxyPassword: "",
+    });
+  });
+
+  test.each([
+    "http://localhost:8080/@value/..",
+    String.raw`http://localhost:8080\@value\..`,
+  ])("does not treat normalized proxy path data as credentials: %s", (url) => {
+    const options = prepareTransportOptions({ proxy: { url } });
+    expect(options.proxy).toBe("http://localhost:8080/");
+    expect(options.proxyUsername).toBeUndefined();
+    expect(options.proxyPassword).toBeUndefined();
+  });
+
   test.each([
     "old%3Auser:secret",
     "old:secret%0Avalue",
@@ -668,6 +710,21 @@ describe("native transport controls", () => {
     // Neither outcome may retain credentials from the URL.
     expect(["null", "Basic Og=="]).toContain(response.headers["x-proxy-auth"]);
   });
+
+  test.each(["", ":"])(
+    "empty proxy URL userinfo %j behaves like explicit empty credentials",
+    (userinfo) => {
+      const explicit = request("GET", SERVER_URL, {
+        proxy: { url: PROXY_URL, username: "", password: "" },
+      });
+      const fromUrl = request("GET", SERVER_URL, {
+        proxy: { url: PROXY_URL.replace("://", `://${userinfo}@`) },
+      });
+      expect(fromUrl.headers["x-proxy-auth"]).toBe(
+        explicit.headers["x-proxy-auth"],
+      );
+    },
+  );
 
   test("tunnels HTTPS without passing proxy credentials to the origin", () => {
     const response = request("GET", TLS_URL, {

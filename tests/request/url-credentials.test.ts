@@ -1,54 +1,52 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import request from "#/index";
 import native from "#/native/index";
+import type { Options } from "#/types/definition";
 import { expectRejectedBeforeNativeIo } from "./helpers";
 
 vi.mock("#/native/index", () => ({ default: { request: vi.fn() } }));
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("URL credentials at the transport boundary", () => {
-  test.each([
-    "http://exam\nple.com/resource",
-    "http://example.com/res\0ource",
-    "http://example.com/resource#space fragment",
-    "http://example.com/resource?q=raw\tvalue",
-  ])("rejects raw URL controls and spaces before native I/O: %j", (url) => {
-    for (const options of [
-      {},
-      { followRedirects: false },
-      { cache: "file" as const },
-      { cache: "memory" as const },
-      { qs: {} },
-      { qs: {}, followRedirects: false },
-      { auth: { username: "user", password: "secret" } },
-      { headers: { Authorization: "Bearer explicit" } },
-    ]) {
-      expectRejectedBeforeNativeIo(
-        () => request("GET", url, options),
-        "unescaped space or control character",
-      );
-    }
-  });
+const urlValidationOptions: Options[] = [
+  {},
+  { followRedirects: false },
+  { cache: "file" },
+  { cache: "memory" },
+  { qs: {} },
+  { qs: {}, followRedirects: false },
+  { auth: { username: "user", password: "secret" } },
+  { headers: { Authorization: "Bearer explicit" } },
+];
 
-  test.each([
-    "http://trusted.test\\@other.test/resource",
-    "http:/trusted.test\\@other.test/resource",
-    "http:///trusted.test\\@other.test/resource",
-  ])(
-    "rejects ambiguous authority before credentials or native I/O: %s",
-    (url) => {
-      for (const options of [
-        {},
-        { followRedirects: false },
-        { cache: "file" as const },
-        { cache: "memory" as const },
-        { auth: { username: "user", password: "secret" } },
-        { headers: { Authorization: "Bearer explicit" } },
-      ]) {
+const invalidUrlCases = [
+  {
+    message: "unescaped space or control character",
+    urls: [
+      "http://exam\nple.com/resource",
+      "http://example.com/res\0ource",
+      "http://example.com/resource#space fragment",
+      "http://example.com/resource?q=raw\tvalue",
+    ],
+  },
+  {
+    message: "ambiguous authority",
+    urls: [
+      "http://trusted.test\\@other.test/resource",
+      "http:/trusted.test\\@other.test/resource",
+      "http:///trusted.test\\@other.test/resource",
+    ],
+  },
+].flatMap(({ message, urls }) => urls.map((url) => ({ message, url })));
+
+describe("URL credentials at the transport boundary", () => {
+  test.each(invalidUrlCases)(
+    "rejects invalid URL $url before credentials or native I/O",
+    ({ message, url }) => {
+      for (const options of urlValidationOptions) {
         expectRejectedBeforeNativeIo(
           () => request("GET", url, options),
-          "ambiguous authority",
+          message,
         );
       }
     },
