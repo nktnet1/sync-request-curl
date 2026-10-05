@@ -6,8 +6,8 @@ import type { Options } from "#/types/definition";
 // libcurl builds differ in how they normalize encoded dots. Keep read targets
 // separate, but invalidate their shared WHATWG-normalized bucket together.
 const encodedDotSegments = new Set(["%2e", "%2e.", ".%2e", "%2e%2e"]);
-// Retire persisted variants that older validation could leave obsolete.
-const cacheKeyVersion = 5;
+// Retire delta bodies and encoded variants that older validation could mislabel.
+const cacheKeyVersion = 6;
 
 const normalizeCacheTarget = (target: string): string => {
   const queryStart = target.indexOf("?");

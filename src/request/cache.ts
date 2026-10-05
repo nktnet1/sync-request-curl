@@ -584,7 +584,8 @@ export const canCacheResponse = (
   const hasExplicitFreshness =
     parseDeltaSeconds(cacheControl.get("max-age")) !== undefined ||
     getHeaderValue(response.headers, "expires") !== undefined;
-  return ![206, 412].includes(response.statusCode) && hasExplicitFreshness;
+  // Partial and delta bodies cannot be reused as complete representations.
+  return ![206, 226, 412].includes(response.statusCode) && hasExplicitFreshness;
 };
 
 interface StoreCacheResponseOptions {
@@ -712,19 +713,16 @@ const mergeRevalidationHeaders = (
   // Age belongs to this validation response. An absent field starts at zero;
   // retaining the earlier response's Age can force endless revalidation.
   delete merged.age;
-  const cachedWasDecoded = cached["content-encoding"] === undefined;
-
   for (const [name, value] of Object.entries(revalidated)) {
     // RFC 9111 section 3.2 excludes Content-Length from stored-header updates.
     if (name === "content-length") {
       continue;
     }
 
-    // Cached responses are stored after transparent decompression. Reapplying a
-    // 304 Content-Encoding to an already decoded body would make its metadata
-    // describe bytes that are no longer stored. RFC 9111 explicitly permits a
-    // processed cache to omit such updates to preserve representation integrity.
-    if (name === "content-encoding" && cachedWasDecoded) {
+    // Neither 304 nor HEAD supplies replacement bytes. Keep the coding of the
+    // retained body, whether it was decoded, deliberately left encoded, or used
+    // an unsupported coding. RFC 9111 section 3.2 permits this integrity guard.
+    if (name === "content-encoding") {
       continue;
     }
 

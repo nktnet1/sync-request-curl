@@ -125,12 +125,12 @@ const rejectModifiedGet = (
 
 afterEach(() => nativeRequest.mockReset());
 
-test("file caches written before variant replacement was fixed are retired", () => {
+test.each([4, 5])("legacy file cache version %i is retired", (version) => {
   const url = nextUrl();
   const options = { cacheNamespace: url };
-  const legacyKey = JSON.stringify([options.cacheNamespace, 4, url, url]);
+  const legacyKey = JSON.stringify([options.cacheNamespace, version, url, url]);
   const legacyPath = getCachePath(
-    JSON.stringify([options.cacheNamespace, 4, url]),
+    JSON.stringify([options.cacheNamespace, version, url]),
   );
   const now = Date.now();
   mkdirSync(fileCacheDirectory, { recursive: true });

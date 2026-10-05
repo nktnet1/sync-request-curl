@@ -32,44 +32,99 @@ const readTarSize = (block: Buffer): number => {
   return size;
 };
 
+const readTarEntry = (header: Buffer) => {
+  const expectedChecksum = readTarString(header, 148, 8).trim();
+  const checksum = header.reduce(
+    (sum, byte, index) => sum + (index >= 148 && index < 156 ? 32 : byte),
+    0,
+  );
+  if (
+    !/^[0-7]+$/.test(expectedChecksum) ||
+    Number.parseInt(expectedChecksum, 8) !== checksum
+  ) {
+    throw new Error("Invalid tar header checksum");
+  }
+  if (readTarString(header, 257, 6) !== "ustar") {
+    throw new Error("Unsupported tar archive format");
+  }
+  // npm extracts archives before reading their manifest. Do not accept links
+  // or PAX/GNU extensions whose path semantics differ from this bounded reader.
+  const type = header[156];
+  if (![0, 48, 53].includes(type)) {
+    throw new Error("Unsupported tar entry type");
+  }
+  const name = readTarString(header, 0, 100);
+  const prefix = readTarString(header, 345, 155);
+  const entry = prefix ? `${prefix}/${name}` : name;
+  const path = entry.replace(/\/$/, "");
+  const segments = path.split("/");
+  const isDirectory = type === 53;
+  if (
+    segments[0] !== "package" ||
+    segments.some((segment) => ["", ".", ".."].includes(segment)) ||
+    entry.includes("\\") ||
+    (!isDirectory && (segments.length < 2 || entry.endsWith("/"))) ||
+    (path.toLowerCase() === "package/package.json" &&
+      path !== "package/package.json")
+  ) {
+    throw new Error(`Non-canonical tar entry path: ${entry}`);
+  }
+  const size = readTarSize(header);
+  if (isDirectory && size !== 0) throw new Error("Invalid tar directory size");
+  return { entry: path, size, isDirectory };
+};
+
 const readPackageManifest = (file: string): Record<string, unknown> => {
   const archive = gunzipSync(readFileSync(file), {
     maxOutputLength: MAX_PACKAGE_ARCHIVE_BYTES,
   });
 
+  const entries = new Set<string>();
+  let manifest: Record<string, unknown> | undefined;
+  let hasFooter = false;
   for (let offset = 0; offset + TAR_BLOCK_BYTES <= archive.length; ) {
     const header = archive.subarray(offset, offset + TAR_BLOCK_BYTES);
-    if (header.every((byte) => byte === 0)) break;
+    if (header.every((byte) => byte === 0)) {
+      if (
+        archive.length - offset < 2 * TAR_BLOCK_BYTES ||
+        archive.length % TAR_BLOCK_BYTES !== 0 ||
+        !archive.subarray(offset).every((byte) => byte === 0)
+      ) {
+        throw new Error(`Invalid tar archive footer: ${file}`);
+      }
+      hasFooter = true;
+      break;
+    }
 
-    const name = readTarString(header, 0, 100);
-    const prefix = readTarString(header, 345, 155);
-    const entry = prefix ? `${prefix}/${name}` : name;
-    const size = readTarSize(header);
+    const { entry, size, isDirectory } = readTarEntry(header);
+    if (entries.has(entry)) throw new Error(`Duplicate tar entry: ${entry}`);
+    entries.add(entry);
     const dataStart = offset + TAR_BLOCK_BYTES;
     const dataEnd = dataStart + size;
-    if (dataEnd > archive.length) throw new Error(`Truncated tarball: ${file}`);
+    const nextOffset =
+      dataStart + Math.ceil(size / TAR_BLOCK_BYTES) * TAR_BLOCK_BYTES;
+    if (nextOffset > archive.length)
+      throw new Error(`Truncated tarball: ${file}`);
 
-    if (entry === "package/package.json") {
+    if (entry === "package/package.json" && !isDirectory) {
       if (size > MAX_PACKAGE_MANIFEST_BYTES) {
         throw new Error(`Package manifest is too large: ${file}`);
       }
-      const manifest: unknown = JSON.parse(
+      const parsed: unknown = JSON.parse(
         archive.subarray(dataStart, dataEnd).toString("utf8"),
       );
-      if (
-        !manifest ||
-        typeof manifest !== "object" ||
-        Array.isArray(manifest)
-      ) {
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
         throw new Error(`Invalid package manifest: ${file}`);
       }
-      return manifest as Record<string, unknown>;
+      manifest = parsed as Record<string, unknown>;
     }
 
-    offset = dataStart + Math.ceil(size / TAR_BLOCK_BYTES) * TAR_BLOCK_BYTES;
+    offset = nextOffset;
   }
 
-  throw new Error(`Package manifest not found: ${file}`);
+  if (!hasFooter) throw new Error(`Missing tar archive footer: ${file}`);
+  if (!manifest) throw new Error(`Package manifest not found: ${file}`);
+  return manifest;
 };
 
 export interface PublishReleasePackagesOptions {
