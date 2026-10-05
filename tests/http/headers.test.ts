@@ -432,6 +432,25 @@ describe("native response request boundaries", () => {
     expect(headers["x-final"]).toBe("second");
   });
 
+  test("accepts an Expect rejection retry only with a native request boundary", () => {
+    const rejection = [
+      "HTTP/1.1 417 Expectation Failed",
+      "Content-Length: 0",
+      "X-Rejected-Expectation: yes",
+      "",
+    ];
+    const headers = parseResponseHeaders(
+      [...rejection, ...final],
+      [0, rejection.length],
+    );
+    expect(headers["x-final"]).toBe("second");
+    expect(headers["x-rejected-expectation"]).toBeUndefined();
+    expect(headers["content-length"]).toBe("11");
+    expect(() => parseResponseHeaders([...rejection, ...final], [0])).toThrow(
+      RequestError,
+    );
+  });
+
   test.each([{ boundaries: undefined }, { boundaries: [0] }])(
     "rejects an unproven second success with offsets $boundaries",
     ({ boundaries }) => {
@@ -495,6 +514,7 @@ describe("native response request boundaries", () => {
     "401 Unauthorized",
     "407 Proxy Authentication Required",
     "302 Found",
+    "417 Expectation Failed",
   ])(
     "rejects forged later responses after terminal %s when metadata is available",
     (status) => {

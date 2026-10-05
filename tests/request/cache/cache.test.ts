@@ -1,11 +1,12 @@
 import { describe, expect, test } from "vitest";
 import request from "#/index";
-import { SERVER_URL } from "#tests/app/config";
+import { storeCacheResponse } from "#/request/cache";
+import { FRAMING_SERVER_URL, SERVER_URL } from "#tests/app/config";
 
 let nextCacheKey = 0;
-const cacheUrl = (path: string): string => {
+const cacheUrl = (path: string, baseUrl = SERVER_URL): string => {
   nextCacheKey += 1;
-  return `${SERVER_URL}${path}?key=${process.pid}-${Date.now()}-${nextCacheKey}`;
+  return `${baseUrl}${path}?key=${process.pid}-${Date.now()}-${nextCacheKey}`;
 };
 
 type CacheMode = "file" | "memory";
@@ -24,6 +25,28 @@ const cachedPair = (path: string, cache: CacheMode = "file") => {
   ] as const;
 };
 
+const prepareAmbiguousTargets = (cache: CacheMode) => {
+  const plain = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+  const literal = plain.replace("/resource", "/dir/resource");
+  const mixed = plain.replace("/resource", "/dir/%2e/../resource");
+  const warmed = [plain, literal].map((url) => ({
+    url,
+    hits: request("GET", url, { cache }).getJSON<{ hits: number }>().hits,
+  }));
+  return { mixed, warmed };
+};
+
+const expectTargetsInvalidated = (
+  targets: { url: string; hits: number }[],
+  cache: CacheMode,
+): void => {
+  for (const { url, hits } of targets) {
+    expect(
+      request("GET", url, { cache }).getJSON<{ hits: number }>().hits,
+    ).toBeGreaterThan(hits);
+  }
+};
+
 test.for(["file", "memory"] as const)(
   "%s cache reuses a fresh GET response without contacting the origin",
   (cache) => {
@@ -31,6 +54,205 @@ test.for(["file", "memory"] as const)(
 
     expect(first.getJSON()).toStrictEqual({ hits: 1 });
     expect(second.getJSON()).toStrictEqual({ hits: 1 });
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache keeps encoded dot paths separate from ordinary paths",
+  (cache) => {
+    const plainUrl = cacheUrl(
+      "/regressions/cache/resource",
+      FRAMING_SERVER_URL,
+    );
+    const encodedUrl = plainUrl.replace("/resource", "/dir/%2e%2e/resource");
+    // Compare with the active transport: builds can normalize encoded dots
+    // differently, including in the effective URL. Each key must still make
+    // its own initial origin request and then reuse its own cached response.
+    const warmed = [encodedUrl, plainUrl].map((url) => {
+      const uncached = request("GET", url);
+      const { hits, target } = uncached.getJSON<{
+        hits: number;
+        target: string;
+      }>();
+      const response = request("GET", url, { cache });
+      expect(response.getJSON()).toStrictEqual({ hits: hits + 1, target });
+      expect(response.url).toBe(uncached.url);
+      return { url, response };
+    });
+    for (let pass = 0; pass < 2; pass += 1) {
+      for (const { url, response: original } of warmed) {
+        const cached = request("GET", url, { cache });
+        expect(cached.getJSON()).toStrictEqual(original.getJSON());
+        expect(cached.url).toBe(original.url);
+      }
+    }
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache invalidates equivalent literal dot paths after an unsafe request",
+  (cache) => {
+    const url = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+    const alias = url.replace("/resource", "/dir/../resource");
+    expect(request("GET", url, { cache }).getJSON()).toMatchObject({ hits: 1 });
+    request("POST", alias, { cache });
+    expect(request("GET", url, { cache }).getJSON()).toMatchObject({ hits: 3 });
+  },
+);
+
+test.for([
+  { cache: "file" as const, encodedWrite: false },
+  { cache: "file" as const, encodedWrite: true },
+  { cache: "memory" as const, encodedWrite: false },
+  { cache: "memory" as const, encodedWrite: true },
+])(
+  "$cache cache invalidates all encoded aliases (encoded write: $encodedWrite)",
+  ({ cache, encodedWrite }) => {
+    const plain = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+    const urls = [
+      plain,
+      ...["%2e%2e", "%2E%2E", ".%2e"].map((dots) =>
+        plain.replace("/resource", `/dir/${dots}/resource`),
+      ),
+    ];
+    const warmed = urls.map((url) =>
+      request("GET", url, { cache }).getJSON<{ hits: number }>(),
+    );
+    const unrelated = cacheUrl(
+      "/regressions/cache/resource",
+      FRAMING_SERVER_URL,
+    );
+    const unrelatedBody = request("GET", unrelated, { cache }).getJSON();
+    request("POST", urls[encodedWrite ? 1 : 0], { cache });
+    for (const [index, url] of urls.entries()) {
+      const fresh = request("GET", url, { cache }).getJSON<{ hits: number }>();
+      expect(fresh.hits).toBeGreaterThan(warmed[index].hits);
+      expect(request("GET", url, { cache }).getJSON()).toStrictEqual(fresh);
+    }
+    expect(request("GET", unrelated, { cache }).getJSON()).toStrictEqual(
+      unrelatedBody,
+    );
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache bypasses ambiguous mixed dots and invalidates both possible targets",
+  (cache) => {
+    const { mixed, warmed } = prepareAmbiguousTargets(cache);
+    const first = request("GET", mixed, { cache }).getJSON<{ hits: number }>();
+    const second = request("GET", mixed, { cache }).getJSON<{ hits: number }>();
+    expect(second.hits).toBe(first.hits + 1);
+    request("POST", mixed, { cache });
+    expectTargetsInvalidated(warmed, cache);
+  },
+);
+
+test.for([
+  { cache: "file" as const, version: 1 },
+  { cache: "memory" as const, version: 1 },
+  { cache: "file" as const, version: 3 },
+  { cache: "memory" as const, version: 3 },
+])(
+  "$cache cache does not reuse entries written under version $version keys",
+  ({ cache, version }) => {
+    const url = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+    const cacheNamespace = "legacy-cache-regression";
+    const now = Date.now();
+    storeCacheResponse(
+      JSON.stringify(
+        version === 3 ? [cacheNamespace, 3, url, url] : [cacheNamespace, url],
+      ),
+      {},
+      now,
+      now,
+      {
+        statusCode: 200,
+        headers: { "cache-control": "max-age=3600" },
+        body: Buffer.from("wrong cached resource"),
+        responseUrl: url.replace("/resource", "/dir/%2e%2e/resource"),
+      },
+      cache,
+    );
+    const response = request("GET", url, { cache, cacheNamespace });
+    expect(response.getJSON()).toMatchObject({ hits: 1 });
+    expect(response.url).toBe(url);
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache preserves origin precondition failures",
+  (cache) => {
+    for (const headers of [
+      { "If-Match": '"different"' },
+      { "If-Unmodified-Since": "Tue, 20 Oct 2015 07:28:00 GMT" },
+    ]) {
+      const url = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+      expect(request("GET", url, { cache }).statusCode).toBe(200);
+      const conditional = request("GET", url, { cache, headers });
+      expect(conditional.statusCode).toBe(412);
+      expect(conditional.headers["cache-control"]).toBe("max-age=3600");
+      expect(conditional.getJSON()).toMatchObject({ hits: 2 });
+      expect(request("GET", url, { cache }).getJSON()).toMatchObject({
+        hits: 1,
+      });
+      const cold = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+      expect(request("GET", cold, { cache, headers }).statusCode).toBe(412);
+      const ordinary = request("GET", cold, { cache });
+      expect(ordinary.statusCode).toBe(200);
+      expect(ordinary.getJSON()).toMatchObject({ hits: 2 });
+      expect(request("GET", cold, { cache }).getJSON()).toStrictEqual(
+        ordinary.getJSON(),
+      );
+    }
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache discards a GET body when HEAD reports a changed validator",
+  (cache) => {
+    const url = cacheUrl("/regressions/cache/mutable", FRAMING_SERVER_URL);
+    const original = request("GET", url, { cache });
+    expect(original.getJSON()).toMatchObject({ version: 0 });
+    request("POST", url);
+    const head = request("HEAD", url, { cache });
+    expect(head.body).toHaveLength(0);
+    expect(head.headers.etag).not.toBe(original.headers.etag);
+    expect(request("GET", url, { cache }).getJSON()).toMatchObject({
+      version: 1,
+      hits: 4,
+    });
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache retains the GET body when HEAD validators and length match",
+  (cache) => {
+    const url = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
+    const original = request("GET", url, { cache });
+    const head = request("HEAD", url, { cache });
+    expect(head.body).toHaveLength(0);
+    expect(Number(head.headers["content-length"])).toBeGreaterThan(0);
+    const cached = request("GET", url, { cache });
+    expect(cached.body).toStrictEqual(original.body);
+    expect(cached.getJSON()).toMatchObject({ hits: 1 });
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache invalidates both possible targets after an ambiguous HEAD",
+  (cache) => {
+    const { mixed, warmed } = prepareAmbiguousTargets(cache);
+    expect(request("HEAD", mixed, { cache }).statusCode).toBe(200);
+    expectTargetsInvalidated(warmed, cache);
+  },
+);
+
+test.for(["file", "memory"] as const)(
+  "%s cache honours the first duplicate response max-age",
+  (cache) => {
+    const url = cacheUrl("/regressions/cache/duplicate", FRAMING_SERVER_URL);
+    expect(request("GET", url, { cache }).getJSON()).toMatchObject({ hits: 1 });
+    expect(request("GET", url, { cache }).getJSON()).toMatchObject({ hits: 2 });
   },
 );
 

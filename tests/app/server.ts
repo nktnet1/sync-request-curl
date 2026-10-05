@@ -1,6 +1,7 @@
 import { createServer, maxHeaderSize } from "node:http";
 import { serve } from "@hono/node-server";
 import {
+  EXPECT_CONTINUE_PORT,
   FRAMING_PORT,
   FRAMING_SERVER_URL,
   HOST,
@@ -9,6 +10,7 @@ import {
   SERVER_URL,
   TLS_PORT,
 } from "#tests/app/config";
+import { expectContinueServer } from "#tests/app/expect-continue";
 import app from "#tests/app/index";
 import { handleRegressionRequest } from "#tests/app/regressions";
 import { proxyServer, tlsServer } from "#tests/app/transport";
@@ -16,7 +18,7 @@ import { proxyServer, tlsServer } from "#tests/app/transport";
 let listeningServers = 0;
 const markServerReady = (): void => {
   listeningServers += 1;
-  if (listeningServers === 4) {
+  if (listeningServers === 5) {
     process.send?.("sync-request-curl:test-server-ready");
   }
 };
@@ -113,6 +115,16 @@ const framingServer = createServer((request, response) => {
         `HTTP/1.1 200 OK\r\nX-Large: ${"x".repeat(maxHeaderSize)}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`,
       );
       return;
+    case "/headers/oversized-status":
+      request.socket.end(
+        `HTTP/1.1 200 ${"x".repeat(maxHeaderSize)}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`,
+      );
+      return;
+    case "/headers/oversized-combined":
+      request.socket.end(
+        `HTTP/1.1 200 ${"x".repeat(maxHeaderSize / 2)}\r\nX-Large: ${"x".repeat(maxHeaderSize / 2)}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`,
+      );
+      return;
     default:
       response.statusCode = 404;
       response.end("Not found");
@@ -128,11 +140,13 @@ framingServer.listen(FRAMING_PORT, HOST, () => {
 
 tlsServer.listen(TLS_PORT, HOST, markServerReady);
 proxyServer.listen(PROXY_PORT, HOST, markServerReady);
+expectContinueServer.listen(EXPECT_CONTINUE_PORT, HOST, markServerReady);
 
 const shutdown = (): void => {
   tlsServer.close();
   proxyServer.close();
   server.close();
+  expectContinueServer.close();
   framingServer.close(() => {
     console.log("Shutting down test servers gracefully.");
   });

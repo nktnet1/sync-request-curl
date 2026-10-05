@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { serializeProxyHeaders } from "#/http/headers";
 import request from "#/index";
 import { PROXY_URL, SERVER_URL } from "#tests/app/config";
-import { expectRejectedBeforeNativeIo } from "./helpers";
+import { expectRejectedBeforeNativeIo } from "#tests/request/helpers";
 
 const framingHeaders = [
   "Content-Length",

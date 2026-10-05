@@ -81,7 +81,10 @@ const writeBucket = (
   mkdirSync(fileCacheDirectory, { recursive: true });
   writeFileSync(
     getCachePath(url),
-    JSON.stringify({ version: 1, entries }),
+    JSON.stringify({
+      version: 2,
+      entries: entries.map((entry) => ({ cacheKey: url, ...entry })),
+    }),
     "utf8",
   );
 };
@@ -313,7 +316,7 @@ describe("file cache policy", () => {
     const lookup = prepareCacheLookup(
       "GET",
       url,
-      ["Cache-Control: max-age=3600, , max-age=0"],
+      ["Cache-Control: max-age=0, , max-age=3600"],
       "file",
       1,
     );
@@ -339,6 +342,38 @@ describe("file cache policy", () => {
     expect(lookup.useCachedResponse).toBe(false);
     expect(lookup.revalidationHeaders).toStrictEqual(["Pragma: no-cache"]);
   });
+
+  test.each(["file", "memory"] as const)(
+    "%s cache forwards caller preconditions without adding validators",
+    (cache) => {
+      for (const maxAge of [0, 3600]) {
+        const url = cacheUrl();
+        storeCacheResponse(
+          url,
+          {},
+          0,
+          0,
+          response(url, {
+            "cache-control": `max-age=${maxAge}`,
+            etag: '"v1"',
+            "last-modified": "Wed, 21 Oct 2015 07:28:00 GMT",
+          }),
+          cache,
+        );
+        for (const header of [
+          'If-Match: "different"',
+          "iF-uNmOdIfIeD-sInCe: Tue, 20 Oct 2015 07:28:00 GMT",
+        ]) {
+          const headers = [header];
+          const lookup = prepareCacheLookup("GET", url, headers, cache, 1);
+          expect(lookup.entry).toBeDefined();
+          expect(lookup.useCachedResponse).toBe(false);
+          expect(lookup.isRevalidation).toBe(false);
+          expect(lookup.revalidationHeaders).toStrictEqual(headers);
+        }
+      }
+    },
+  );
 
   test("does not reuse a response marked Cache-Control: no-cache", () => {
     const { lookup } = prepareStaleResponse({ "cache-control": "no-cache" });
@@ -532,6 +567,148 @@ describe("file cache policy", () => {
     };
     expect(bucket.entries).toHaveLength(3);
   });
+
+  describe.each(["file", "memory"] as const)(
+    "%s variant selection",
+    (cache) => {
+      const earlier = "Fri, 02 Oct 2026 00:00:01 GMT";
+      const later = "Fri, 02 Oct 2026 00:00:02 GMT";
+      test.each([
+        {
+          name: "older Date received last",
+          firstDate: later,
+          secondDate: earlier,
+          expected: "first",
+        },
+        {
+          name: "newer Date received last",
+          firstDate: earlier,
+          secondDate: later,
+          expected: "second",
+        },
+        {
+          name: "equal Dates",
+          firstDate: earlier,
+          secondDate: earlier,
+          expected: "second",
+        },
+        {
+          name: "missing Dates",
+          firstDate: undefined,
+          secondDate: undefined,
+          expected: "second",
+        },
+        {
+          name: "invalid Dates",
+          firstDate: "invalid",
+          secondDate: "invalid",
+          expected: "second",
+        },
+        {
+          name: "one missing Date",
+          firstDate: later,
+          secondDate: undefined,
+          expected: "second",
+        },
+      ])(
+        "selects the newest matching response: $name",
+        ({ firstDate, secondDate, expected }) => {
+          const url = cacheUrl();
+          const timestamp = Date.parse("Fri, 02 Oct 2026 00:00:00 GMT");
+          const firstHeaders: Record<string, string> = {
+            "cache-control": "max-age=3600",
+            vary: "X-Missing",
+          };
+          const secondHeaders: Record<string, string> = {
+            "cache-control": "max-age=3600",
+          };
+          if (firstDate !== undefined) firstHeaders.date = firstDate;
+          if (secondDate !== undefined) secondHeaders.date = secondDate;
+          storeCacheResponse(
+            url,
+            {},
+            timestamp + 2_000,
+            timestamp + 2_000,
+            {
+              ...response(url, firstHeaders),
+              body: Buffer.from("first"),
+            },
+            cache,
+          );
+          storeCacheResponse(
+            url,
+            {},
+            timestamp + 3_000,
+            timestamp + 3_000,
+            {
+              ...response(url, secondHeaders),
+              body: Buffer.from("second"),
+            },
+            cache,
+          );
+
+          const lookup = prepareCacheLookup(
+            "GET",
+            url,
+            [],
+            cache,
+            timestamp + 4_000,
+          );
+          expect(lookup.useCachedResponse).toBe(true);
+          if (!lookup.entry) throw new Error("Missing cache entry");
+          expect(
+            getCachedResponse(lookup.entry, timestamp + 4_000).body.toString(),
+          ).toBe(expected);
+        },
+      );
+
+      test("filters newer nonmatching variants before comparing Dates", () => {
+        const url = cacheUrl();
+        const timestamp = Date.parse(earlier);
+        storeCacheResponse(
+          url,
+          { "x-a": ["match"] },
+          timestamp,
+          timestamp,
+          {
+            ...response(url, {
+              "cache-control": "max-age=3600",
+              vary: "X-A",
+              date: earlier,
+            }),
+            body: Buffer.from("matching"),
+          },
+          cache,
+        );
+        storeCacheResponse(
+          url,
+          { "x-a": ["other"] },
+          timestamp,
+          timestamp,
+          {
+            ...response(url, {
+              "cache-control": "max-age=3600",
+              vary: "X-A",
+              date: later,
+            }),
+            body: Buffer.from("nonmatching"),
+          },
+          cache,
+        );
+        const lookup = prepareCacheLookup(
+          "GET",
+          url,
+          ["X-A: match"],
+          cache,
+          timestamp + 2_000,
+        );
+        if (!lookup.entry) throw new Error("Missing cache entry");
+        expect(getCachedResponse(lookup.entry).body.toString()).toBe(
+          "matching",
+        );
+      });
+    },
+  );
 });
 
 describe("cache revalidation integrity", () => {

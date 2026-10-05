@@ -42,7 +42,7 @@ interface AbsoluteUrlParts {
   remainder: string;
 }
 
-const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
+export const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
   const schemeEnd = url.indexOf("://");
   if (schemeEnd <= 0 || !isAsciiLetter(url.codePointAt(0))) {
     return undefined;
@@ -69,6 +69,22 @@ const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
     authority: url.slice(authorityStart, authorityEnd),
     remainder: url.slice(authorityEnd),
   };
+};
+
+/** Remove userinfo without normalizing a conventional absolute URL. */
+export const stripUrlCredentials = (url: string): string => {
+  const parts = splitAbsoluteUrl(url);
+  if (!parts) {
+    const parsed = new URL(url);
+    parsed.username = "";
+    parsed.password = "";
+    return parsed.href;
+  }
+
+  const userInfoEnd = parts.authority.lastIndexOf("@");
+  return userInfoEnd < 0
+    ? url
+    : `${parts.prefix}${parts.authority.slice(userInfoEnd + 1)}${parts.remainder}`;
 };
 
 /**
@@ -112,6 +128,16 @@ export const normalizeUrlHostname = (url: string): string => {
   return `${prefix}${userInfo}${asciiHostname}${port}${remainder}`;
 };
 
+const hasAmbiguousHttpAuthority = (url: string): boolean => {
+  // WHATWG treats a backslash as a slash; libcurl can treat it as userinfo.
+  // Include nonstandard slash counts without changing the path or query.
+  const authority = url
+    .slice(url.indexOf(":") + 1)
+    .replace(/^\/+/, "")
+    .split(/[/?#]/, 1)[0];
+  return authority.includes("\\");
+};
+
 export const assertSupportedHttpUrl = (url: string): void => {
   let parsed: URL;
   try {
@@ -124,6 +150,12 @@ export const assertSupportedHttpUrl = (url: string): void => {
   }
 
   if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+    if (hasAmbiguousHttpAuthority(url)) {
+      throw new CurlError(
+        3,
+        "Request failed: URL contains an ambiguous authority",
+      );
+    }
     return;
   }
 

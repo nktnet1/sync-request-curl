@@ -2,6 +2,71 @@ import { describe, expect, test } from "vitest";
 import { FormData } from "#/form-data";
 import { prepareRequest } from "#/request/prepare";
 
+describe("origin URL credentials", () => {
+  test.each(["user%3Aname", "user%3aname"])(
+    "rejects percent-decoded colons in a Basic username: %s",
+    (username) => {
+      expect(() =>
+        prepareRequest(`https://${username}:secret@example.com/`, {}),
+      ).toThrow("Invalid URL credentials for basic authentication");
+    },
+  );
+
+  test.each(
+    Array.from({ length: 33 }, (_, index) => (index === 32 ? 0x7f : index)),
+  )(
+    "rejects percent-decoded ASCII control character %i in either credential",
+    (code) => {
+      const control = encodeURIComponent(String.fromCharCode(code));
+      for (const userinfo of [
+        `user${control}:secret`,
+        `user:secret${control}`,
+      ]) {
+        expect(() =>
+          prepareRequest(`https://${userinfo}@example.com/`, {}),
+        ).toThrow("Invalid URL credentials for basic authentication");
+      }
+    },
+  );
+
+  test.each([
+    "user%:secret",
+    "user:secret%GG",
+    "user%FF:secret",
+    "user:secret%C3",
+  ])("rejects malformed percent encoding before transport: %s", (userinfo) => {
+    expect(() =>
+      prepareRequest(`https://${userinfo}@example.com/`, {}),
+    ).toThrow(URIError);
+  });
+
+  test.each([
+    "user:p%40ss",
+    "user:p%3Aa%3Ass",
+    "user:secret%253A",
+    "caf%C3%A9:p%C3%A4ss",
+    "café:päss",
+    "user",
+    ":secret",
+    "user:",
+  ])("preserves valid URL Basic credentials: %s", (userinfo) => {
+    const url = `https://${userinfo}@example.com/a/../b?q=%2f#fragment`;
+    expect(prepareRequest(url, {}).url).toBe(url);
+  });
+
+  test.each(["user:secret", "user%3Aname:secret%0A", "user%:secret%FF", ""])(
+    "discards dormant credentials when explicit Authorization wins: %s",
+    (userinfo) => {
+      expect(
+        prepareRequest(
+          `https://${userinfo}@example.com/a/../b?q=%2f#fragment`,
+          { headers: { authorization: "Bearer explicit" } },
+        ).url,
+      ).toBe("https://example.com/a/../b?q=%2f#fragment");
+    },
+  );
+});
+
 describe("request preparation", () => {
   test("rejects JSON values that JSON.stringify cannot serialize", () => {
     expect(() =>

@@ -1,16 +1,19 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import * as v from "valibot";
 import { RequestError } from "#/errors";
+import { parseHttpDate } from "#/http/date";
 import {
   hasRequestHeader,
   parseRequestHeaderLine,
   setRequestHeader,
 } from "#/http/headers";
+import { getCacheBucketKey } from "#/request/cache-key";
 import { fileCacheDirectory, getCachePath } from "#/request/cache-path";
 import type { CachedResponse, Options, Response } from "#/types/definition";
 import { incomingHttpHeadersSchema } from "#/validation";
 
 const cacheEntrySchema = v.object({
+  cacheKey: v.string(),
   decompress: v.boolean(),
   statusCode: v.pipe(v.number(), v.integer()),
   headers: incomingHttpHeadersSchema,
@@ -22,7 +25,7 @@ const cacheEntrySchema = v.object({
 });
 
 const cacheBucketSchema = v.object({
-  version: v.literal(1),
+  version: v.literal(2),
   entries: v.array(cacheEntrySchema),
 });
 
@@ -129,13 +132,33 @@ const normalizeRequestHeaders = (
   return Object.fromEntries(normalized);
 };
 
+const splitCacheControlDirectives = (value: string): string[] => {
+  const directives: string[] = [];
+  let start = 0;
+  let quoted = false;
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value.charAt(index);
+    if (quoted && character === "\\") {
+      index += 1;
+      continue;
+    }
+    if (character === '"') quoted = !quoted;
+    if (character === "," && !quoted) {
+      directives.push(value.slice(start, index));
+      start = index + 1;
+    }
+  }
+  directives.push(value.slice(start));
+  return directives;
+};
+
 const parseCacheControl = (value: string | undefined): Map<string, string> => {
   const directives = new Map<string, string>();
   if (!value) {
     return directives;
   }
 
-  for (const rawDirective of value.split(",")) {
+  for (const rawDirective of splitCacheControlDirectives(value)) {
     const directive = rawDirective.trim();
     if (!directive) {
       continue;
@@ -150,7 +173,7 @@ const parseCacheControl = (value: string | undefined): Map<string, string> => {
       rawValue.startsWith('"') && rawValue.endsWith('"')
         ? rawValue.slice(1, -1)
         : rawValue;
-    directives.set(name, normalizedValue);
+    if (!directives.has(name)) directives.set(name, normalizedValue);
   }
 
   return directives;
@@ -162,6 +185,15 @@ const parseDeltaSeconds = (value: string | undefined): number | undefined => {
   }
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) ? parsed : undefined;
+};
+
+const parseAgeSeconds = (value: string | undefined): number => {
+  if (value === undefined) return 0;
+  const firstValue = value.split(",", 1)[0].trim();
+  if (!/^\d+$/.test(firstValue)) return 0;
+  // RFC 9111: use the first list member and saturate numeric overflow.
+  // An oversized age must never make an ancient response appear new.
+  return Math.min(Number(firstValue), Number.MAX_SAFE_INTEGER);
 };
 
 const getRequestHeaderValues = (
@@ -252,13 +284,36 @@ const requestMatchesEntry = (
   );
 };
 
+const matchesCachePolicy = (
+  entry: CacheEntry,
+  requestHeaders: NormalizedRequestHeaders,
+  policy: Pick<Options, "isMatch">,
+): boolean => {
+  const defaultValue = requestMatchesEntry(entry, requestHeaders);
+  return policy.isMatch
+    ? policy.isMatch(
+        copyRequestHeaders(requestHeaders),
+        toCachedResponse(entry),
+        defaultValue,
+      )
+    : defaultValue;
+};
+
+const getResponseDate = (entry: CacheEntry): number => {
+  const dateHeader = getHeaderValue(entry.headers, "date");
+  return (
+    parseHttpDate(dateHeader, entry.responseTimestamp) ??
+    entry.responseTimestamp
+  );
+};
+
 const getFreshnessLifetime = (entry: CacheEntry): number => {
   const cacheControl = parseCacheControl(
     getHeaderValue(entry.headers, "cache-control"),
   );
-  const maxAge = parseDeltaSeconds(cacheControl.get("max-age"));
-  if (maxAge !== undefined) {
-    return maxAge * 1_000;
+  if (cacheControl.has("max-age")) {
+    // Explicit invalid freshness cannot fall back to Expires or heuristics.
+    return (parseDeltaSeconds(cacheControl.get("max-age")) ?? 0) * 1_000;
   }
 
   const expires = getHeaderValue(entry.headers, "expires");
@@ -271,28 +326,20 @@ const getFreshnessLifetime = (entry: CacheEntry): number => {
     }
     return 0;
   }
-  const expiresAt = Date.parse(expires);
-  if (!Number.isFinite(expiresAt)) {
+  const expiresAt = parseHttpDate(expires, entry.responseTimestamp);
+  if (expiresAt === undefined) {
     return 0;
   }
 
-  const dateHeader = getHeaderValue(entry.headers, "date");
-  const responseDate =
-    dateHeader === undefined ? Number.NaN : Date.parse(dateHeader);
-  const freshnessBase = Number.isFinite(responseDate)
-    ? responseDate
-    : entry.responseTimestamp;
-  return Math.max(0, expiresAt - freshnessBase);
+  return Math.max(0, expiresAt - getResponseDate(entry));
 };
 
 const getCurrentAge = (entry: CacheEntry, now: number): number => {
-  const dateHeader = getHeaderValue(entry.headers, "date");
-  const responseDate =
-    dateHeader === undefined ? Number.NaN : Date.parse(dateHeader);
-  const apparentAge = Number.isFinite(responseDate)
-    ? Math.max(0, entry.responseTimestamp - responseDate)
-    : 0;
-  const ageHeaderSeconds = parseDeltaSeconds(
+  const apparentAge = Math.max(
+    0,
+    entry.responseTimestamp - getResponseDate(entry),
+  );
+  const ageHeaderSeconds = parseAgeSeconds(
     getHeaderValue(entry.headers, "age"),
   );
   const responseDelay = Math.max(
@@ -301,7 +348,7 @@ const getCurrentAge = (entry: CacheEntry, now: number): number => {
   );
   const correctedInitialAge = Math.max(
     apparentAge,
-    (ageHeaderSeconds ?? 0) * 1_000 + responseDelay,
+    ageHeaderSeconds * 1_000 + responseDelay,
   );
   return correctedInitialAge + Math.max(0, now - entry.responseTimestamp);
 };
@@ -373,7 +420,7 @@ const readFileCacheEntries = (url: string): CacheEntry[] => {
 };
 
 const writeFileCacheEntries = (url: string, entries: CacheEntry[]): void => {
-  const bucket: CacheBucket = { version: 1, entries };
+  const bucket: CacheBucket = { version: 2, entries };
   try {
     // fileCacheDirectory is derived only from the OS temp directory and uid.
     mkdirSync(fileCacheDirectory, { recursive: true, mode: 0o700 });
@@ -391,10 +438,13 @@ const writeFileCacheEntries = (url: string, entries: CacheEntry[]): void => {
 
 const memoryCacheEntries = new Map<string, CacheEntry[]>();
 
-const readCacheEntries = (url: string, cache: CacheMode): CacheEntry[] =>
+const readCacheBucketEntries = (url: string, cache: CacheMode): CacheEntry[] =>
   cache === "memory"
-    ? (memoryCacheEntries.get(url) ?? [])
-    : readFileCacheEntries(url);
+    ? (memoryCacheEntries.get(getCacheBucketKey(url)) ?? [])
+    : readFileCacheEntries(getCacheBucketKey(url));
+
+const readCacheEntries = (url: string, cache: CacheMode): CacheEntry[] =>
+  readCacheBucketEntries(url, cache).filter((entry) => entry.cacheKey === url);
 
 const writeCacheEntries = (
   url: string,
@@ -402,20 +452,20 @@ const writeCacheEntries = (
   cache: CacheMode,
 ): void => {
   if (cache === "memory") {
-    memoryCacheEntries.set(url, entries);
+    memoryCacheEntries.set(getCacheBucketKey(url), entries);
     return;
   }
-  writeFileCacheEntries(url, entries);
+  writeFileCacheEntries(getCacheBucketKey(url), entries);
 };
 
 export const invalidateCache = (url: string, cache: CacheMode): void => {
   if (cache === "memory") {
-    memoryCacheEntries.delete(url);
+    memoryCacheEntries.delete(getCacheBucketKey(url));
     return;
   }
 
   try {
-    rmSync(getCachePath(url), { force: true });
+    rmSync(getCachePath(getCacheBucketKey(url)), { force: true });
   } catch (error) {
     throw new Error(
       `Error invalidating cache: ${error instanceof Error ? error.message : String(error)}`,
@@ -451,26 +501,29 @@ export const prepareCacheLookup = (
     return base;
   }
 
-  const entry = readCacheEntries(url, cache).find((candidate) => {
-    if (candidate.decompress !== decompress) {
-      return false;
-    }
+  // Different Vary definitions can overlap. RFC 9111 selects the most recent
+  // matching response by Date, which can differ from local arrival order.
+  const entry = readCacheEntries(url, cache)
+    .filter((candidate) => {
+      if (candidate.decompress !== decompress) {
+        return false;
+      }
 
-    const defaultValue = requestMatchesEntry(candidate, requestHeaders);
-    return policy.isMatch
-      ? policy.isMatch(
-          copyRequestHeaders(requestHeaders),
-          toCachedResponse(candidate),
-          defaultValue,
-        )
-      : defaultValue;
-  });
+      return matchesCachePolicy(candidate, requestHeaders, policy);
+    })
+    .sort(
+      (left, right) =>
+        getResponseDate(right) - getResponseDate(left) ||
+        right.responseTimestamp - left.responseTimestamp,
+    )[0];
   if (!entry) {
     return base;
   }
 
   if (
     hasRequestHeader(headers, "range") ||
+    hasRequestHeader(headers, "if-match") ||
+    hasRequestHeader(headers, "if-unmodified-since") ||
     hasRequestHeader(headers, "if-none-match") ||
     hasRequestHeader(headers, "if-modified-since") ||
     requestForcesRevalidation(requestHeaders)
@@ -516,7 +569,9 @@ const responseForbidsStorage = (headers: Response["headers"]): boolean =>
   getHeaderValue(headers, "set-cookie") !== undefined ||
   getVaryNamesFromHeaders(headers).includes("*");
 
-export const canCacheResponse = (response: CacheableResponse): boolean => {
+export const canCacheResponse = (
+  response: Pick<CacheableResponse, "statusCode" | "headers">,
+): boolean => {
   if (responseForbidsStorage(response.headers)) return false;
   const cacheControl = parseCacheControl(
     getHeaderValue(response.headers, "cache-control"),
@@ -529,13 +584,69 @@ export const canCacheResponse = (response: CacheableResponse): boolean => {
   const hasExplicitFreshness =
     parseDeltaSeconds(cacheControl.get("max-age")) !== undefined ||
     getHeaderValue(response.headers, "expires") !== undefined;
-  return response.statusCode !== 206 && hasExplicitFreshness;
+  return ![206, 412].includes(response.statusCode) && hasExplicitFreshness;
 };
 
 interface StoreCacheResponseOptions {
   decompress?: boolean;
   shouldStore?: boolean;
+  replaceEntry?: CacheEntry;
+  revalidationHeaders?: Response["headers"];
 }
+
+const matchesCacheVariant = (left: CacheEntry, right: CacheEntry): boolean => {
+  if (left.cacheKey !== right.cacheKey || left.decompress !== right.decompress)
+    return false;
+  const varyNames = getVaryNames(right);
+  return (
+    stringArraysEqual(getVaryNames(left), varyNames) &&
+    varyRequestHeadersMatch(
+      varyNames,
+      left.requestHeaders,
+      right.requestHeaders,
+    )
+  );
+};
+
+const replacesCacheEntry = (
+  existing: CacheEntry,
+  requestHeaders: NormalizedRequestHeaders,
+  options: StoreCacheResponseOptions,
+): boolean => {
+  const replacement = options.replaceEntry;
+  if (
+    !replacement ||
+    existing.cacheKey !== replacement.cacheKey ||
+    existing.decompress !== replacement.decompress
+  )
+    return false;
+  if (matchesCacheVariant(existing, replacement)) return true;
+  // A strong validator identifies all matching stored copies, even when
+  // their old Vary dimensions differ. Keep unrelated variants untouched.
+  const tag = getHeaderValue(
+    options.revalidationHeaders ?? replacement.headers,
+    "etag",
+  );
+  return (
+    tag !== undefined &&
+    !tag.startsWith("W/") &&
+    tag === getHeaderValue(existing.headers, "etag") &&
+    requestMatchesEntry(existing, requestHeaders)
+  );
+};
+
+const discardReplacedEntries = (
+  url: string,
+  requestHeaders: NormalizedRequestHeaders,
+  cache: CacheMode,
+  options: StoreCacheResponseOptions,
+): void => {
+  const retained = readCacheBucketEntries(url, cache).filter(
+    (entry) => !replacesCacheEntry(entry, requestHeaders, options),
+  );
+  if (retained.length === 0) invalidateCache(url, cache);
+  else writeCacheEntries(url, retained, cache);
+};
 
 export const storeCacheResponse = (
   url: string,
@@ -551,10 +662,13 @@ export const storeCacheResponse = (
 
   if (!shouldStore) {
     if (responseForbidsStorage(response.headers)) invalidateCache(url, cache);
+    else if (options.replaceEntry !== undefined)
+      discardReplacedEntries(url, requestHeaders, cache, options);
     return;
   }
 
   const entry: CacheEntry = {
+    cacheKey: url,
     decompress,
     statusCode: response.statusCode,
     headers: copyHeaders(response.headers),
@@ -564,25 +678,12 @@ export const storeCacheResponse = (
     requestTimestamp,
     responseTimestamp,
   };
-  const varyNames = getVaryNames(entry);
-  const existingEntries = readCacheEntries(url, cache);
-  const retainedEntries = existingEntries.filter((existing) => {
-    if (existing.decompress !== decompress) {
-      return true;
-    }
-    const existingVaryNames = getVaryNames(existing);
-    if (existingVaryNames.length !== varyNames.length) {
-      return true;
-    }
-    if (!stringArraysEqual(existingVaryNames, varyNames)) {
-      return true;
-    }
-    return !varyRequestHeadersMatch(
-      varyNames,
-      requestHeaders,
-      existing.requestHeaders,
-    );
-  });
+  const existingEntries = readCacheBucketEntries(url, cache);
+  const retainedEntries = existingEntries.filter(
+    (existing) =>
+      !replacesCacheEntry(existing, requestHeaders, options) &&
+      !matchesCacheVariant(existing, entry),
+  );
 
   writeCacheEntries(url, [entry, ...retainedEntries], cache);
 };
@@ -608,6 +709,9 @@ const mergeRevalidationHeaders = (
   revalidated: Response["headers"],
 ): Response["headers"] => {
   const merged = copyHeaders(cached);
+  // Age belongs to this validation response. An absent field starts at zero;
+  // retaining the earlier response's Age can force endless revalidation.
+  delete merged.age;
   const cachedWasDecoded = cached["content-encoding"] === undefined;
 
   for (const [name, value] of Object.entries(revalidated)) {
@@ -630,33 +734,115 @@ const mergeRevalidationHeaders = (
   return merged;
 };
 
+/** A HEAD response can refresh GET metadata, but never replace its body. */
+export const updateCacheFromHead = (
+  url: string,
+  lookup: CacheLookup,
+  responseHeaders: Response["headers"],
+  responseTimestamp: number,
+  cache: CacheMode,
+  decompress: boolean,
+  policy: Pick<Options, "isMatch"> = {},
+): void => {
+  const entries = readCacheBucketEntries(url, cache);
+  const updated: CacheEntry[] = [];
+  for (const entry of entries) {
+    // A different spelling might be the same native target. Its metadata is
+    // unsafe to update on builds that preserve encoded dots; discard it.
+    if (entry.cacheKey !== url) continue;
+    if (
+      entry.decompress !== decompress ||
+      !matchesCachePolicy(entry, lookup.requestHeaders, policy)
+    ) {
+      updated.push(entry);
+      continue;
+    }
+    const validatorsMatch = ["etag", "last-modified", "content-length"].every(
+      (name) => {
+        const received = getHeaderValue(responseHeaders, name);
+        return (
+          received === undefined ||
+          received === getHeaderValue(entry.headers, name)
+        );
+      },
+    );
+    if (!lookup.allowStore || entry.statusCode !== 200 || !validatorsMatch)
+      continue;
+    const headers = mergeRevalidationHeaders(entry.headers, responseHeaders);
+    if (
+      !canCacheResponse({
+        statusCode: entry.statusCode,
+        headers,
+      })
+    )
+      continue;
+    updated.push({
+      ...entry,
+      headers,
+      requestHeaders: lookup.requestHeaders,
+      requestTimestamp: lookup.requestTimestamp,
+      responseTimestamp,
+    });
+  }
+  if (updated.length === 0) {
+    if (entries.length > 0) invalidateCache(url, cache);
+  } else {
+    writeCacheEntries(url, updated, cache);
+  }
+};
+
+const revalidationValidatorsMatch = (
+  entry: CacheEntry,
+  responseHeaders: Response["headers"],
+): boolean => {
+  const receivedTag = getHeaderValue(responseHeaders, "etag");
+  const storedTag = getHeaderValue(entry.headers, "etag");
+  if (receivedTag !== undefined) {
+    return receivedTag.startsWith("W/")
+      ? receivedTag.slice(2) === storedTag?.replace(/^W\//, "")
+      : receivedTag === storedTag;
+  }
+  const receivedDate = getHeaderValue(responseHeaders, "last-modified");
+  const storedDate = getHeaderValue(entry.headers, "last-modified");
+  return receivedDate === undefined || receivedDate === storedDate;
+};
+
+const isExplicitCacheRevalidation = (
+  entry: CacheEntry,
+  lookup: CacheLookup,
+  responseHeaders: Response["headers"],
+): boolean => {
+  const hasCondition =
+    getRequestHeaderValue(lookup.requestHeaders, "if-none-match") !==
+      undefined ||
+    getRequestHeaderValue(lookup.requestHeaders, "if-modified-since") !==
+      undefined;
+  const hasResponseValidator =
+    getHeaderValue(responseHeaders, "etag") !== undefined ||
+    getHeaderValue(responseHeaders, "last-modified") !== undefined;
+  return (
+    hasCondition &&
+    hasResponseValidator &&
+    revalidationValidatorsMatch(entry, responseHeaders)
+  );
+};
+
 export const refreshCacheEntry = (
   url: string,
   lookup: CacheLookup,
   responseHeaders: Response["headers"],
   responseTimestamp: number,
   cache: CacheMode,
+  canCache?: (response: CacheableResponse, defaultValue: boolean) => boolean,
 ): CacheableResponse | undefined => {
   const entry = lookup.entry;
-  if (!entry || !lookup.isRevalidation) {
-    return undefined;
-  }
-
-  const receivedTag = getHeaderValue(responseHeaders, "etag");
-  const storedTag = getHeaderValue(entry.headers, "etag");
-  const receivedDate = getHeaderValue(responseHeaders, "last-modified");
-  const storedDate = getHeaderValue(entry.headers, "last-modified");
-  const mismatchedTag =
-    receivedTag !== undefined &&
-    (receivedTag.startsWith("W/")
-      ? receivedTag.slice(2) !== storedTag?.replace(/^W\//, "")
-      : receivedTag !== storedTag);
+  if (!entry || !lookup.allowStore) return undefined;
   if (
-    mismatchedTag ||
-    (receivedTag === undefined &&
-      receivedDate !== undefined &&
-      receivedDate !== storedDate)
-  ) {
+    !lookup.isRevalidation &&
+    !isExplicitCacheRevalidation(entry, lookup, responseHeaders)
+  )
+    return undefined;
+  if (!revalidationValidatorsMatch(entry, responseHeaders)) {
     invalidateCache(url, cache);
     throw new RequestError(
       "ERR_REQUEST_FAILED",
@@ -670,7 +856,11 @@ export const refreshCacheEntry = (
     body: Buffer.from(entry.body, "base64"),
     responseUrl: entry.responseUrl,
   };
-  if (!canCacheResponse(response)) {
+  const defaultValue = canCacheResponse(response);
+  const shouldStore = canCache
+    ? canCache(response, defaultValue)
+    : defaultValue;
+  if (!shouldStore) {
     invalidateCache(url, cache);
     return response;
   }
@@ -681,7 +871,12 @@ export const refreshCacheEntry = (
     responseTimestamp,
     response,
     cache,
-    { decompress: entry.decompress },
+    {
+      decompress: entry.decompress,
+      shouldStore,
+      replaceEntry: entry,
+      revalidationHeaders: responseHeaders,
+    },
   );
   return response;
 };

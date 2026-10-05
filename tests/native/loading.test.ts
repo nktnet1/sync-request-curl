@@ -1,5 +1,5 @@
 import { join, parse, resolve } from "node:path";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   findPackageRoot,
   loadBinding,
@@ -17,6 +17,14 @@ const fakeBinding = (): NativeBinding => ({
 });
 
 describe("native binding loading", () => {
+  beforeEach(() => {
+    // Container CI selects its prebuild through this variable. Loader unit
+    // tests must use their own paths instead of inheriting that selection.
+    vi.stubEnv("SYNC_REQUEST_CURL_NATIVE_PATH", undefined);
+  });
+
+  afterEach(() => vi.unstubAllEnvs());
+
   test("finds the package root from a nested source directory", () => {
     const root = join("", "package");
     const packageJson = join(root, "package.json");
@@ -112,6 +120,7 @@ describe("native binding loading", () => {
   test("honours an explicit native path", () => {
     const binding = fakeBinding();
     const requireNative = vi.fn(() => binding);
+    vi.stubEnv("SYNC_REQUEST_CURL_NATIVE_PATH", "/environment/native.node");
 
     expect(
       loadBinding({
@@ -120,6 +129,28 @@ describe("native binding loading", () => {
       }),
     ).toBe(binding);
     expect(requireNative).toHaveBeenCalledWith("/custom/native.node");
+  });
+
+  test("honours the environment native path before package-local candidates", () => {
+    const binding = fakeBinding();
+    const requireNative = vi.fn(() => binding);
+    const exists = vi.fn(() => true);
+    const resolveNative = vi.fn();
+    vi.stubEnv("SYNC_REQUEST_CURL_NATIVE_PATH", "/environment/native.node");
+
+    expect(
+      loadBinding({
+        packageRoot: join("", "package"),
+        exists,
+        requireNative,
+        resolveNative,
+      }),
+    ).toBe(binding);
+    expect(requireNative).toHaveBeenCalledExactlyOnceWith(
+      "/environment/native.node",
+    );
+    expect(exists).not.toHaveBeenCalled();
+    expect(resolveNative).not.toHaveBeenCalled();
   });
 
   test("prefers the package-local build output over a matching prebuild", () => {

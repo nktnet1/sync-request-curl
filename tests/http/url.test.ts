@@ -4,7 +4,35 @@ import {
   appendQueryString,
   assertSupportedHttpUrl,
   normalizeUrlHostname,
+  stripUrlCredentials,
 } from "#/http/url";
+
+describe("stripUrlCredentials", () => {
+  test.each([
+    ["https://user:p%40ss@example.com", "https://example.com"],
+    ["http://user@example.com/path", "http://example.com/path"],
+    ["http://:secret@example.com/path", "http://example.com/path"],
+    ["http://@example.com/path", "http://example.com/path"],
+    ["http://user:p@ss@example.com/path", "http://example.com/path"],
+    ["https://user:secret@[::1]:8443/path", "https://[::1]:8443/path"],
+    [
+      "HTTP://user:secret@EXAMPLE.com:80/a/../b?q=%2f#user@fragment",
+      "HTTP://EXAMPLE.com:80/a/../b?q=%2f#user@fragment",
+    ],
+    [
+      "https://user:secret@example.com?q=@value",
+      "https://example.com?q=@value",
+    ],
+    ["https://user:secret@example.com#@value", "https://example.com#@value"],
+    [
+      "https://example.com/path@value?q=@value#@value",
+      "https://example.com/path@value?q=@value#@value",
+    ],
+    ["https:user:secret@example.com/path", "https://example.com/path"],
+  ])("removes only URL userinfo from %s", (url, expected) => {
+    expect(stripUrlCredentials(url)).toBe(expected);
+  });
+});
 
 describe("normalizeUrlHostname", () => {
   test("converts an internationalized hostname to ASCII", () => {
@@ -77,6 +105,30 @@ describe("assertSupportedHttpUrl", () => {
       expect(() => assertSupportedHttpUrl(url)).not.toThrow();
     },
   );
+
+  test.each([
+    "http://trusted.test\\@other.test/resource",
+    "http://trusted.test\\other.test/resource",
+    "http:/trusted.test\\@other.test/resource",
+    "http:///trusted.test\\@other.test/resource",
+    "http:\\\\trusted.test\\@other.test/resource",
+  ])("rejects ambiguous authority %s with CurlError code 3", (url) => {
+    expect(() => assertSupportedHttpUrl(url)).toThrow("ambiguous authority");
+    try {
+      assertSupportedHttpUrl(url);
+    } catch (error) {
+      expect(error).toBeInstanceOf(CurlError);
+      expect((error as CurlError).code).toBe(3);
+    }
+  });
+
+  test.each([
+    "http://user:p%5Css@example.com/resource",
+    "http://example.com/a\\b?q=\\value#\\fragment",
+    "http:/example.com/path\\value",
+  ])("preserves backslashes outside the raw authority: %s", (url) => {
+    expect(() => assertSupportedHttpUrl(url)).not.toThrow();
+  });
 
   test.each(["file:///tmp/example", "ftp://example.com/file"])(
     "rejects unsupported protocol %s",

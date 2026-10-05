@@ -8,10 +8,10 @@ use napi::bindgen_prelude::Either;
 use napi::{Error, Result};
 
 use crate::callbacks::{header_callback, request_debug_callback, transfer_progress_callback, write_callback, CurlXferInfoCallback, RequestState, DEFAULT_MAX_RESPONSE_HEADER_SIZE, CURLOPT_XFERINFOFUNCTION};
-use crate::curl_utils::{configure_default_ca, curl_string, ensure_curl_initialized, keep_first_error, set_string_option, transport_error_message, EasyHandle, CURLE_NOT_BUILT_IN};
+use crate::curl_utils::{configure_default_ca, curl_header_string, ensure_curl_initialized, keep_first_error, set_string_option, transport_error_message, EasyHandle, CURLE_NOT_BUILT_IN};
 use crate::mime::{build_mime, Mime};
 use crate::multi::perform_request;
-use crate::options::{header_name_matches, needs_response_tracking, parse_auth, parse_http_version, parse_ip_resolve, parse_tls_cert_type, parse_tls_version_range, uses_negotiated_auth, validate_auth_credentials, validate_proxy_headers, AuthTarget};
+use crate::options::{header_name_matches, needs_auth_response_tracking, parse_auth, parse_http_version, parse_ip_resolve, parse_tls_cert_type, parse_tls_version_range, proxy_url_has_credentials, uses_negotiated_auth, validate_auth_credentials, validate_proxy_headers, AuthTarget};
 use crate::rate_limit::RateLimitAllowance;
 use crate::types::{NativeRequestOptions, NativeResponse};
 
@@ -28,14 +28,14 @@ const TCP_KEEP_COUNT_UNSUPPORTED_ERROR: &str = "TCP keepalive probeCount require
 struct HeaderList(*mut curl_slist);
 
 impl HeaderList {
-  fn append(&mut self, value: &str) -> CURLcode {
-    let value = curl_string(value);
+  fn append(&mut self, value: &str) -> Result<CURLcode> {
+    let value = curl_header_string(value)?;
     let next = unsafe { curl_sys::curl_slist_append(self.0, value.as_ptr()) };
     if next.is_null() {
-      return CURLE_OUT_OF_MEMORY;
+      return Ok(CURLE_OUT_OF_MEMORY);
     }
     self.0 = next;
-    CURLE_OK
+    Ok(CURLE_OK)
   }
 }
 
@@ -63,7 +63,8 @@ pub(crate) fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   validate_auth_credentials(&options)?;
   let has_structured_proxy_auth = options.proxy_username.is_some()
     || options.proxy_password.is_some()
-    || options.proxy_auth.is_some();
+    || options.proxy_auth.is_some()
+    || proxy_url_has_credentials(options.proxy.as_deref());
   validate_proxy_headers(
     options.proxy_headers.as_deref().unwrap_or_default(),
     has_structured_proxy_auth,
@@ -84,6 +85,11 @@ pub(crate) fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   let request_body = options.body;
   let has_form = options.form.is_some();
   let has_request_payload = request_body.is_some() || has_form;
+  let track_internal_exchanges = has_request_payload
+    || needs_auth_response_tracking(
+      options.auth_type.as_deref(),
+      options.proxy_auth.as_deref(),
+    );
   let form = options.form.unwrap_or_default();
   let request_headers = options.headers.unwrap_or_default();
   let has_content_type = request_headers
@@ -103,18 +109,22 @@ pub(crate) fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   )?;
   let http_auth = parse_auth(options.auth_type.as_deref(), AuthTarget::Http)?;
   let proxy_auth = parse_auth(options.proxy_auth.as_deref(), AuthTarget::Proxy)?;
-  // Callback state must also outlive curl_easy_cleanup(), which can emit
-  // debug events. Locals are dropped in reverse declaration order.
+  // Callback state and CURLOPT_ERRORBUFFER storage must outlive
+  // curl_easy_cleanup(), including on early returns. Locals are dropped
+  // in reverse declaration order, so both are declared before the handle.
   let mut state = Box::new(RequestState::default());
+  let mut error_buffer = vec![0 as c_char; curl_sys::CURL_ERROR_SIZE as usize];
+  // Preserve explicit single-exchange metadata without a debug callback.
+  // HEADER_OUT deduplicates this initial offset when tracing is enabled.
+  state.request_header_offsets.push(0);
   let easy = EasyHandle::new()?;
   let curl = easy.0;
   state.easy_handle = curl;
-  let response_tracking_enabled = needs_response_tracking(
-    options.auth_type.as_deref(),
-    options.proxy_auth.as_deref(),
-  );
-  state.requires_debug_text =
-    options.timeout.unwrap_or_default() > 0 && response_tracking_enabled;
+  state.requires_debug_text = options.timeout.unwrap_or_default() > 0
+    && needs_auth_response_tracking(
+      options.auth_type.as_deref(),
+      options.proxy_auth.as_deref(),
+    );
   state.download_allowance = RateLimitAllowance::new(
     options.max_download_speed.unwrap_or_default(),
     Instant::now(),
@@ -131,7 +141,6 @@ pub(crate) fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     .filter(|value| *value > 0)
     .unwrap_or(DEFAULT_MAX_RESPONSE_HEADER_SIZE);
   let state_pointer = (&mut *state as *mut RequestState).cast::<c_void>();
-  let mut error_buffer = vec![0 as c_char; curl_sys::CURL_ERROR_SIZE as usize];
   let mut headers = HeaderList::default();
   let mut proxy_headers = HeaderList::default();
   let mut mime: Option<Mime> = None;
@@ -229,10 +238,11 @@ pub(crate) fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   keep_first_error(&mut code, unsafe {
     curl_sys::curl_easy_setopt(curl, curl_sys::CURLOPT_HEADERDATA, state_pointer)
   });
-  // Negotiated authentication can produce multiple request/response exchanges
-  // inside one easy transfer. Trace only those requests: ordinary transfers do
-  // not need verbose callbacks and avoid their per-chunk overhead.
-  if response_tracking_enabled {
+  // Negotiated authentication and uploads can retry internally, including
+  // unauthenticated Expect: 100-continue rejection retries. Only HEADER_OUT
+  // proves a new exchange; wire header/trailer text must not forge one.
+  // Ordinary bodyless requests do not need verbose callback traffic.
+  if track_internal_exchanges {
     keep_first_error(&mut code, unsafe {
       curl_sys::curl_easy_setopt(
         curl,
@@ -318,7 +328,7 @@ pub(crate) fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
     });
   }
   for header in options.proxy_headers.unwrap_or_default() {
-    let next = proxy_headers.append(&header);
+    let next = proxy_headers.append(&header)?;
     if next != CURLE_OK {
       code = CURLE_OUT_OF_MEMORY;
       break;
@@ -390,7 +400,7 @@ pub(crate) fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   }
 
   for header in request_headers {
-    let next = headers.append(&header);
+    let next = headers.append(&header)?;
     if next != CURLE_OK {
       code = CURLE_OUT_OF_MEMORY;
       break;
@@ -400,14 +410,14 @@ pub(crate) fn request(options: NativeRequestOptions) -> Result<NativeResponse> {
   // HTTP semantics (no declared media-type preference), and Node does not add
   // this header, so suppress the transport default unless the caller supplied it.
   if code == CURLE_OK && !has_accept {
-    code = headers.append("Accept:");
+    code = headers.append("Accept:")?;
   }
 
   // CURLOPT_POSTFIELDS otherwise invents application/x-www-form-urlencoded.
   // A raw body has no implied media type, so suppress libcurl's generated
   // Content-Type unless the caller (or JSON preparation) supplied one.
   if code == CURLE_OK && request_body.is_some() && !has_form && !has_content_type {
-    code = headers.append("Content-Type:");
+    code = headers.append("Content-Type:")?;
   }
   if !headers.0.is_null() {
     keep_first_error(&mut code, unsafe {

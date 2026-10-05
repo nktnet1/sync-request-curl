@@ -3,6 +3,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 const realm = "transport-regression";
 const basic = `Basic ${Buffer.from("user:secret").toString("base64")}`;
+const cacheOriginHits = new Map<string, number>();
+const cacheOriginVersions = new Map<string, number>();
 // Test-only RFC 2617 interoperability: fixed, public dummy credentials, not
 // password storage or a security boundary. Keep MD5 for legacy Digest clients
 // (including Windows SSPI); do not replace it with an incompatible challenge.
@@ -126,6 +128,29 @@ const sendResponseBody = (
   later(res, delay, () => res.end(body));
 };
 
+interface AuthChallenge {
+  statusCode: number;
+  header: string;
+  value: string;
+}
+
+const sendAuthResponse = (
+  req: IncomingMessage,
+  res: ServerResponse,
+  params: URLSearchParams,
+  authorization: string,
+  challenge: AuthChallenge | undefined,
+): void => {
+  res.statusCode = challenge?.statusCode ?? 200;
+  if (challenge) res.setHeader(challenge.header, challenge.value);
+  sendResponseBody(
+    req,
+    res,
+    challenge ? "denied" : "authenticated",
+    responseBodyDelay(params, authorization === ""),
+  );
+};
+
 const handleAuthRequest = (
   req: IncomingMessage,
   res: ServerResponse,
@@ -149,30 +174,142 @@ const handleAuthRequest = (
   const headerDelay = Number(
     params.get(rejected ? "challengeDelay" : "headersDelay") ?? 0,
   );
+  const challenge = rejected
+    ? {
+        statusCode: proxy ? 407 : 401,
+        header: proxy ? "Proxy-Authenticate" : "WWW-Authenticate",
+        value: createAuthChallenge(
+          scheme,
+          stale ? "second-nonce" : "first-nonce",
+          stale,
+        ),
+      }
+    : undefined;
   req.resume();
   req.once("end", () =>
-    later(res, headerDelay, () => {
-      res.statusCode = 200;
-      if (rejected) {
-        res.statusCode = proxy ? 407 : 401;
-        res.setHeader(
-          proxy ? "Proxy-Authenticate" : "WWW-Authenticate",
-          createAuthChallenge(
-            scheme,
-            stale ? "second-nonce" : "first-nonce",
-            stale,
-          ),
-        );
-      }
-      sendResponseBody(
-        req,
-        res,
-        rejected ? "denied" : "authenticated",
-        responseBodyDelay(params, authorization === ""),
-      );
+    later(res, headerDelay, () =>
+      sendAuthResponse(req, res, params, authorization, challenge),
+    ),
+  );
+};
+
+type RegressionHandler = (
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: URL,
+) => void;
+
+const nextCacheVersion = (target: string, increment: boolean): number => {
+  const version = (cacheOriginVersions.get(target) ?? 0) + (increment ? 1 : 0);
+  cacheOriginVersions.set(target, version);
+  return version;
+};
+
+const failsCachePrecondition = (
+  req: IncomingMessage,
+  etag: string,
+  lastModified: string,
+): boolean => {
+  const ifMatch = req.headers["if-match"];
+  const ifUnmodifiedSince = req.headers["if-unmodified-since"];
+  return (
+    (ifMatch !== undefined && ifMatch !== etag) ||
+    (ifUnmodifiedSince !== undefined &&
+      Date.parse(ifUnmodifiedSince) < Date.parse(lastModified))
+  );
+};
+
+const handleCacheRequest: RegressionHandler = (req, res, url) => {
+  // Use the raw request target so encoded dots remain distinct resources.
+  const target = req.url ?? "/";
+  const hits = (cacheOriginHits.get(target) ?? 0) + 1;
+  cacheOriginHits.set(target, hits);
+  const version =
+    url.pathname === "/regressions/cache/mutable"
+      ? nextCacheVersion(target, req.method === "POST")
+      : undefined;
+  const etag = version === undefined ? '"cache-v1"' : `"cache-v${version}"`;
+  const lastModified = "Wed, 21 Oct 2015 07:28:00 GMT";
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("ETag", etag);
+  res.setHeader("Last-Modified", lastModified);
+  res.setHeader(
+    "Cache-Control",
+    url.pathname === "/regressions/cache/duplicate"
+      ? ["max-age=0", "max-age=3600"]
+      : "max-age=3600",
+  );
+  if (failsCachePrecondition(req, etag, lastModified)) res.statusCode = 412;
+  req.resume();
+  const body = JSON.stringify({
+    hits,
+    target,
+    ...(version === undefined ? {} : { version }),
+  });
+  res.setHeader("Content-Length", Buffer.byteLength(body));
+  res.end(req.method === "HEAD" ? undefined : body);
+};
+
+const handleDelayedHeaders: RegressionHandler = (req, res) => {
+  req.resume();
+  later(res, 900, () => res.end("ready"));
+};
+
+const handleUploadRequest: RegressionHandler = (req, res, url) => {
+  let bytes = 0;
+  req.on("data", (chunk: Buffer) => {
+    bytes += chunk.length;
+  });
+  req.once("end", () => {
+    if (url.searchParams.has("stall")) {
+      later(res, 3_000, () => res.destroy());
+      return;
+    }
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("X-Received-Bytes", bytes);
+    sendResponseBody(
+      req,
+      res,
+      JSON.stringify({ bytes }),
+      responseBodyDelay(url.searchParams, bytes === 0),
+    );
+  });
+};
+
+const handleHeaderEcho: RegressionHandler = (req, res) => {
+  req.resume();
+  res.setHeader("Content-Type", "application/json");
+  res.end(
+    JSON.stringify({
+      value: req.headers["x-test"] ?? null,
+      cookie: req.headers.cookie ?? null,
+      validator: req.headers["if-none-match"] ?? null,
+      proxyTrace: req.headers["x-proxy-trace"] ?? null,
     }),
   );
 };
+
+const handleDownloadRequest: RegressionHandler = (_req, res) => {
+  res.end(Buffer.alloc(128 * 1024, "x"));
+};
+
+const handleStalledDownload: RegressionHandler = (_req, res, url) => {
+  res.setHeader("Content-Length", 128 * 1024);
+  res.flushHeaders();
+  if (!url.searchParams.has("headersOnly")) {
+    res.write(Buffer.alloc(32 * 1024, "x"));
+  }
+  later(res, 3_000, () => res.destroy());
+};
+
+const regressionHandlers = new Map<string, RegressionHandler>([
+  ["/regressions/auth", handleAuthRequest],
+  ["/regressions/delayed-headers", handleDelayedHeaders],
+  ["/regressions/rate/upload", handleUploadRequest],
+  ["/regressions/header-echo", handleHeaderEcho],
+  ["/regressions/rate/download", handleDownloadRequest],
+  ["/regressions/rate/stall", handleStalledDownload],
+]);
 
 /** Raw HTTP fixtures: no framework buffering or automatic HEAD conversion. */
 export const handleRegressionRequest = (
@@ -181,53 +318,17 @@ export const handleRegressionRequest = (
 ): boolean => {
   // Only the path and query are used; this base never opens a connection.
   const url = new URL(req.url ?? "/", "https://fixture.invalid");
-  if (!url.pathname.startsWith("/regressions/")) {
-    return false;
-  }
-  if (url.pathname === "/regressions/auth") {
-    handleAuthRequest(req, res, url);
+  if (!url.pathname.startsWith("/regressions/")) return false;
+  if (url.pathname.startsWith("/regressions/cache/")) {
+    handleCacheRequest(req, res, url);
     return true;
   }
-  if (url.pathname === "/regressions/delayed-headers") {
-    req.resume();
-    later(res, 900, () => res.end("ready"));
-    return true;
+  const handler = regressionHandlers.get(url.pathname);
+  if (handler) {
+    handler(req, res, url);
+  } else {
+    res.statusCode = 404;
+    res.end();
   }
-  if (url.pathname === "/regressions/rate/upload") {
-    let bytes = 0;
-    req.on("data", (chunk: Buffer) => {
-      bytes += chunk.length;
-    });
-    req.once("end", () => {
-      if (url.searchParams.has("stall")) {
-        later(res, 3_000, () => res.destroy());
-        return;
-      }
-      res.setHeader("Content-Type", "application/json");
-      res.setHeader("X-Received-Bytes", bytes);
-      sendResponseBody(
-        req,
-        res,
-        JSON.stringify({ bytes }),
-        responseBodyDelay(url.searchParams, bytes === 0),
-      );
-    });
-    return true;
-  }
-  if (url.pathname === "/regressions/rate/download") {
-    res.end(Buffer.alloc(128 * 1024, "x"));
-    return true;
-  }
-  if (url.pathname === "/regressions/rate/stall") {
-    res.setHeader("Content-Length", 128 * 1024);
-    res.flushHeaders();
-    if (!url.searchParams.has("headersOnly")) {
-      res.write(Buffer.alloc(32 * 1024, "x"));
-    }
-    later(res, 3_000, () => res.destroy());
-    return true;
-  }
-  res.statusCode = 404;
-  res.end();
   return true;
 };
