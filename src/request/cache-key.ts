@@ -6,6 +6,8 @@ import type { Options } from "#/types/definition";
 // libcurl builds differ in how they normalize encoded dots. Keep read targets
 // separate, but invalidate their shared WHATWG-normalized bucket together.
 const encodedDotSegments = new Set(["%2e", "%2e.", ".%2e", "%2e%2e"]);
+// Retire persisted variants that older validation could leave obsolete.
+const cacheKeyVersion = 5;
 
 const normalizeCacheTarget = (target: string): string => {
   const queryStart = target.indexOf("?");
@@ -43,10 +45,9 @@ const createCacheKey = (target: string, options: Options): string => {
   const bucketTarget = parts
     ? `${parsed.origin}${parsed.pathname}${parsed.search}`
     : target;
-  // Retire entries written before ambiguous URL authorities were rejected.
   return JSON.stringify([
     options.cacheNamespace ?? process.cwd(),
-    4,
+    cacheKeyVersion,
     bucketTarget,
     target,
   ]);
@@ -62,7 +63,7 @@ export const getCacheBucketKey = (key: string): string => {
     if (
       Array.isArray(identity) &&
       identity.length === 4 &&
-      identity[1] === 4 &&
+      identity[1] === cacheKeyVersion &&
       [identity[0], identity[2], identity[3]].every(
         (value) => typeof value === "string",
       )

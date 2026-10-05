@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import * as v from "valibot";
 import { RequestError } from "#/errors";
+import { parseHttpDate } from "#/http/date";
 import {
   hasRequestHeader,
   parseRequestHeaderLine,
@@ -300,18 +301,19 @@ const matchesCachePolicy = (
 
 const getResponseDate = (entry: CacheEntry): number => {
   const dateHeader = getHeaderValue(entry.headers, "date");
-  const responseDate =
-    dateHeader === undefined ? Number.NaN : Date.parse(dateHeader);
-  return Number.isFinite(responseDate) ? responseDate : entry.responseTimestamp;
+  return (
+    parseHttpDate(dateHeader, entry.responseTimestamp) ??
+    entry.responseTimestamp
+  );
 };
 
 const getFreshnessLifetime = (entry: CacheEntry): number => {
   const cacheControl = parseCacheControl(
     getHeaderValue(entry.headers, "cache-control"),
   );
-  const maxAge = parseDeltaSeconds(cacheControl.get("max-age"));
-  if (maxAge !== undefined) {
-    return maxAge * 1_000;
+  if (cacheControl.has("max-age")) {
+    // Explicit invalid freshness cannot fall back to Expires or heuristics.
+    return (parseDeltaSeconds(cacheControl.get("max-age")) ?? 0) * 1_000;
   }
 
   const expires = getHeaderValue(entry.headers, "expires");
@@ -324,8 +326,8 @@ const getFreshnessLifetime = (entry: CacheEntry): number => {
     }
     return 0;
   }
-  const expiresAt = Date.parse(expires);
-  if (!Number.isFinite(expiresAt)) {
+  const expiresAt = parseHttpDate(expires, entry.responseTimestamp);
+  if (expiresAt === undefined) {
     return 0;
   }
 
@@ -588,7 +590,63 @@ export const canCacheResponse = (
 interface StoreCacheResponseOptions {
   decompress?: boolean;
   shouldStore?: boolean;
+  replaceEntry?: CacheEntry;
+  revalidationHeaders?: Response["headers"];
 }
+
+const matchesCacheVariant = (left: CacheEntry, right: CacheEntry): boolean => {
+  if (left.cacheKey !== right.cacheKey || left.decompress !== right.decompress)
+    return false;
+  const varyNames = getVaryNames(right);
+  return (
+    stringArraysEqual(getVaryNames(left), varyNames) &&
+    varyRequestHeadersMatch(
+      varyNames,
+      left.requestHeaders,
+      right.requestHeaders,
+    )
+  );
+};
+
+const replacesCacheEntry = (
+  existing: CacheEntry,
+  requestHeaders: NormalizedRequestHeaders,
+  options: StoreCacheResponseOptions,
+): boolean => {
+  const replacement = options.replaceEntry;
+  if (
+    !replacement ||
+    existing.cacheKey !== replacement.cacheKey ||
+    existing.decompress !== replacement.decompress
+  )
+    return false;
+  if (matchesCacheVariant(existing, replacement)) return true;
+  // A strong validator identifies all matching stored copies, even when
+  // their old Vary dimensions differ. Keep unrelated variants untouched.
+  const tag = getHeaderValue(
+    options.revalidationHeaders ?? replacement.headers,
+    "etag",
+  );
+  return (
+    tag !== undefined &&
+    !tag.startsWith("W/") &&
+    tag === getHeaderValue(existing.headers, "etag") &&
+    requestMatchesEntry(existing, requestHeaders)
+  );
+};
+
+const discardReplacedEntries = (
+  url: string,
+  requestHeaders: NormalizedRequestHeaders,
+  cache: CacheMode,
+  options: StoreCacheResponseOptions,
+): void => {
+  const retained = readCacheBucketEntries(url, cache).filter(
+    (entry) => !replacesCacheEntry(entry, requestHeaders, options),
+  );
+  if (retained.length === 0) invalidateCache(url, cache);
+  else writeCacheEntries(url, retained, cache);
+};
 
 export const storeCacheResponse = (
   url: string,
@@ -604,6 +662,8 @@ export const storeCacheResponse = (
 
   if (!shouldStore) {
     if (responseForbidsStorage(response.headers)) invalidateCache(url, cache);
+    else if (options.replaceEntry !== undefined)
+      discardReplacedEntries(url, requestHeaders, cache, options);
     return;
   }
 
@@ -618,26 +678,12 @@ export const storeCacheResponse = (
     requestTimestamp,
     responseTimestamp,
   };
-  const varyNames = getVaryNames(entry);
   const existingEntries = readCacheBucketEntries(url, cache);
-  const retainedEntries = existingEntries.filter((existing) => {
-    if (existing.cacheKey !== url) return true;
-    if (existing.decompress !== decompress) {
-      return true;
-    }
-    const existingVaryNames = getVaryNames(existing);
-    if (existingVaryNames.length !== varyNames.length) {
-      return true;
-    }
-    if (!stringArraysEqual(existingVaryNames, varyNames)) {
-      return true;
-    }
-    return !varyRequestHeadersMatch(
-      varyNames,
-      requestHeaders,
-      existing.requestHeaders,
-    );
-  });
+  const retainedEntries = existingEntries.filter(
+    (existing) =>
+      !replacesCacheEntry(existing, requestHeaders, options) &&
+      !matchesCacheVariant(existing, entry),
+  );
 
   writeCacheEntries(url, [entry, ...retainedEntries], cache);
 };
@@ -825,7 +871,12 @@ export const refreshCacheEntry = (
     responseTimestamp,
     response,
     cache,
-    { decompress: entry.decompress, shouldStore },
+    {
+      decompress: entry.decompress,
+      shouldStore,
+      replaceEntry: entry,
+      revalidationHeaders: responseHeaders,
+    },
   );
   return response;
 };

@@ -34,6 +34,14 @@ const seed = (
   return key;
 };
 
+const expectStaleAge = (cache: CacheMode, age: string | string[]) => {
+  const key = seed(cache, { "cache-control": "max-age=60", age });
+  const lookup = prepareCacheLookup("GET", key, [], cache, 0);
+  expect(lookup.useCachedResponse).toBe(false);
+  if (!lookup.entry) throw new Error("Missing stored response");
+  return getCachedResponse(lookup.entry, 0).headers.age;
+};
+
 afterEach(() => {
   for (const [key, cache] of touched) invalidateCache(key, cache);
   touched.clear();
@@ -103,24 +111,14 @@ describe.each(["file", "memory"] as const)(
     test.for(["120, 0", " 120 \t, 0", ["120", "0"]])(
       "the first Age member determines freshness: %j",
       (age) => {
-        const key = seed(cache, { "cache-control": "max-age=60", age });
-        const lookup = prepareCacheLookup("GET", key, [], cache, 0);
-        expect(lookup.useCachedResponse).toBe(false);
-        if (!lookup.entry) throw new Error("Missing stored response");
-        expect(getCachedResponse(lookup.entry, 0).headers.age).toBe("120");
+        expect(expectStaleAge(cache, age)).toBe("120");
       },
     );
 
     test.each(["9007199254740992", "9".repeat(400)])(
       "an overflowing Age cannot become fresh: %s",
       (age) => {
-        const key = seed(cache, { "cache-control": "max-age=60", age });
-        const lookup = prepareCacheLookup("GET", key, [], cache, 0);
-        expect(lookup.useCachedResponse).toBe(false);
-        if (!lookup.entry) throw new Error("Missing stored response");
-        const reportedAge = Number(
-          getCachedResponse(lookup.entry, 0).headers.age,
-        );
+        const reportedAge = Number(expectStaleAge(cache, age));
         expect(Number.isFinite(reportedAge)).toBe(true);
         expect(reportedAge).toBeGreaterThan(2_147_483_648);
       },

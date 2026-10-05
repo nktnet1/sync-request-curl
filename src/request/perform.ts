@@ -373,7 +373,12 @@ const updateGetCache = (
       responseUrl: result.response.url,
     },
     mode,
-    { decompress: options.gzip !== false, shouldStore },
+    {
+      decompress: options.gzip !== false,
+      shouldStore,
+      replaceEntry:
+        result.response.statusCode === 200 ? lookup.entry : undefined,
+    },
   );
   return result;
 };

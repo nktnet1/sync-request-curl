@@ -1,3 +1,4 @@
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 const { nativeRequest } = vi.hoisted(() => ({ nativeRequest: vi.fn() }));
@@ -10,6 +11,7 @@ import {
   storeCacheResponse,
 } from "#/request/cache";
 import { getRequestCacheKey } from "#/request/cache-key";
+import { fileCacheDirectory, getCachePath } from "#/request/cache-path";
 import type {
   CacheCanCacheFunction,
   HttpVerb,
@@ -34,9 +36,16 @@ const seed = (
   const key = getRequestCacheKey(url, options);
   touched.set(key, cache);
   const now = Date.now();
+  const storedHeaders: Record<string, string[]> = {};
+  for (const [name, value] of Object.entries(options.headers ?? {})) {
+    if (value !== undefined)
+      storedHeaders[name.toLowerCase()] = Array.isArray(value)
+        ? value
+        : [value];
+  }
   storeCacheResponse(
     key,
-    {},
+    storedHeaders,
     now,
     now,
     {
@@ -52,9 +61,34 @@ const seed = (
       responseUrl: url,
     },
     cache,
+    { decompress: options.gzip !== false },
   );
   return key;
 };
+
+const seedVariant = (
+  url: string,
+  cache: CacheMode,
+  name: string,
+  value: string,
+  headers: Response["headers"] = {},
+) =>
+  seed(url, cache, { ...headers, vary: name }, { headers: { [name]: value } });
+
+const lookupStored = (
+  url: string,
+  cache: CacheMode,
+  headers: Record<string, string> = {},
+  options: Options = {},
+) =>
+  prepareCacheLookup(
+    "GET",
+    getRequestCacheKey(url, options),
+    Object.entries(headers).map(([name, value]) => `${name}: ${value}`),
+    cache,
+    Date.now(),
+    options.gzip !== false,
+  );
 
 const respond = (
   url: string,
@@ -85,6 +119,46 @@ afterEach(() => {
   nativeRequest.mockReset();
   for (const [key, cache] of touched) invalidateCache(key, cache);
   touched.clear();
+});
+
+test("file caches written before variant replacement was fixed are retired", () => {
+  const url = nextUrl();
+  const options = { cacheNamespace: url };
+  const legacyKey = JSON.stringify([options.cacheNamespace, 4, url, url]);
+  const legacyPath = getCachePath(
+    JSON.stringify([options.cacheNamespace, 4, url]),
+  );
+  const now = Date.now();
+  mkdirSync(fileCacheDirectory, { recursive: true });
+  writeFileSync(
+    legacyPath,
+    JSON.stringify({
+      version: 2,
+      entries: [
+        {
+          cacheKey: legacyKey,
+          decompress: true,
+          statusCode: 200,
+          headers: { "cache-control": "max-age=3600" },
+          body: body.toString("base64"),
+          responseUrl: url,
+          requestHeaders: {},
+          requestTimestamp: now,
+          responseTimestamp: now,
+        },
+      ],
+    }),
+  );
+  touched.set(getRequestCacheKey(url, options), "file");
+  try {
+    respond(url, 200, { "Cache-Control": "max-age=60" }, "new");
+    expect(
+      request("GET", url, { cache: "file", ...options }).getBody("utf8"),
+    ).toBe("new");
+    expect(nativeRequest).toHaveBeenCalledTimes(1);
+  } finally {
+    rmSync(legacyPath, { force: true });
+  }
 });
 
 describe.each(["file", "memory"] as const)(
@@ -252,6 +326,230 @@ describe.each(["file", "memory"] as const)(
       ).toBe("max-age=3600");
     });
 
+    test.each(["caller", "automatic"] as const)(
+      "%s 304 replaces the old Vary definition without retaining a reusable copy",
+      (condition) => {
+        const url = nextUrl();
+        seed(
+          url,
+          cache,
+          {
+            vary: "X-Shape",
+            "cache-control":
+              condition === "automatic" ? "max-age=0" : "max-age=3600",
+          },
+          { headers: { "X-Shape": "round" } },
+        );
+        respond(url, 304, {
+          ETag: '"same"',
+          Vary: "X-Color",
+          "Cache-Control": "max-age=60",
+        });
+        const headers: Record<string, string> = {
+          "X-Shape": "round",
+          "X-Color": "blue",
+        };
+        if (condition === "caller") headers["If-None-Match"] = '"same"';
+        const validated = request("GET", url, { cache, headers });
+        expect(validated.statusCode).toBe(condition === "caller" ? 304 : 200);
+        expect(
+          request("GET", url, {
+            cache,
+            headers: { "X-Shape": "round", "X-Color": "blue" },
+          }).getBody(),
+        ).toEqual(body);
+        respond(
+          url,
+          200,
+          { ETag: '"red"', Vary: "X-Color", "Cache-Control": "max-age=60" },
+          "red",
+        );
+        expect(
+          request("GET", url, {
+            cache,
+            headers: { "X-Shape": "round", "X-Color": "red" },
+          }).getBody("utf8"),
+        ).toBe("red");
+        expect(nativeRequest).toHaveBeenCalledTimes(2);
+      },
+    );
+
+    test.each([
+      {
+        validator: "strong",
+        storedTag: '"same"',
+        received: { ETag: '"same"' },
+        retainOlder: false,
+      },
+      {
+        validator: "weak",
+        storedTag: '"same"',
+        received: { ETag: 'W/"same"' },
+        retainOlder: true,
+      },
+      {
+        validator: "date",
+        storedTag: undefined,
+        received: { "Last-Modified": lastModified },
+        retainOlder: true,
+      },
+    ])(
+      "$validator validation replaces the identified copies and keeps unrelated variants",
+      ({ storedTag, received, retainOlder }) => {
+        const url = nextUrl();
+        seedVariant(url, cache, "X-Shape", "square", { etag: storedTag });
+        seedVariant(url, cache, "X-Other", "different", { etag: '"other"' });
+        seedVariant(url, cache, "X-Shape", "round", { etag: storedTag });
+        seedVariant(url, cache, "X-Size", "large", { etag: storedTag });
+        const validationHeaders: Record<string, string> = {
+          Vary: "X-Color",
+          "Cache-Control": "max-age=60",
+        };
+        for (const [name, value] of Object.entries(received))
+          if (value !== undefined) validationHeaders[name] = value;
+        respond(url, 304, validationHeaders);
+        expect(
+          request("GET", url, {
+            cache,
+            headers: {
+              "X-Shape": "round",
+              "X-Size": "large",
+              "X-Color": "blue",
+              "X-Other": "different",
+              "If-Modified-Since": lastModified,
+            },
+          }).statusCode,
+        ).toBe(304);
+        expect(
+          lookupStored(url, cache, { "X-Size": "large" }).entry,
+        ).toBeUndefined();
+        expect(
+          lookupStored(url, cache, { "X-Shape": "round" }).entry !== undefined,
+        ).toBe(retainOlder);
+        expect(
+          lookupStored(url, cache, { "X-Shape": "square" }).entry,
+        ).toBeDefined();
+        expect(
+          lookupStored(url, cache, { "X-Other": "different" }).entry?.headers
+            .etag,
+        ).toBe('"other"');
+        expect(
+          lookupStored(url, cache, { "X-Color": "blue" }).useCachedResponse,
+        ).toBe(true);
+      },
+    );
+
+    test.each([false, true])(
+      "a modified GET replaces old variants when canCache returns %s",
+      (approved) => {
+        const url = nextUrl();
+        seedVariant(url, cache, "X-Shape", "square");
+        seedVariant(url, cache, "X-Shape", "round");
+        seedVariant(url, cache, "X-Size", "large");
+        respond(
+          url,
+          200,
+          { ETag: '"new"', Vary: "X-Color", "Cache-Control": "max-age=60" },
+          "new",
+        );
+        const canCache = vi.fn<CacheCanCacheFunction>(
+          (response, defaultValue) => {
+            expect(response.getBody("utf8")).toBe("new");
+            expect(defaultValue).toBe(true);
+            return approved;
+          },
+        );
+        const headers = {
+          "X-Shape": "round",
+          "X-Size": "large",
+          "X-Color": "blue",
+        };
+        expect(
+          request("GET", url, {
+            cache,
+            canCache,
+            headers: { ...headers, "If-None-Match": '"same"' },
+          }).getBody("utf8"),
+        ).toBe("new");
+        expect(
+          lookupStored(url, cache, { "X-Shape": "round" }).entry,
+        ).toBeUndefined();
+        expect(
+          lookupStored(url, cache, { "X-Size": "large" }).entry,
+        ).toBeUndefined();
+        expect(
+          lookupStored(url, cache, { "X-Shape": "square" }).entry,
+        ).toBeDefined();
+        if (!approved)
+          respond(
+            url,
+            200,
+            { ETag: '"new"', "Cache-Control": "max-age=60" },
+            "new",
+          );
+        expect(request("GET", url, { cache, headers }).getBody("utf8")).toBe(
+          "new",
+        );
+        expect(canCache).toHaveBeenCalledTimes(1);
+        expect(nativeRequest).toHaveBeenCalledTimes(approved ? 1 : 2);
+      },
+    );
+
+    test("rejecting a modified body preserves other decoding modes and exact URL spellings", () => {
+      const url = nextUrl();
+      const alias = url.replace("/resource", "/dir/%2e%2e/resource");
+      seed(alias, cache);
+      seed(url, cache, {}, { gzip: false });
+      seed(url, cache);
+      respond(
+        url,
+        200,
+        { ETag: '"new"', "Cache-Control": "max-age=60" },
+        "new",
+      );
+      request("GET", url, {
+        cache,
+        headers: { "If-None-Match": '"same"' },
+        canCache: () => false,
+      });
+      expect(lookupStored(url, cache).entry).toBeUndefined();
+      expect(lookupStored(alias, cache).entry).toBeDefined();
+      expect(lookupStored(url, cache, {}, { gzip: false }).entry).toBeDefined();
+    });
+
+    test("a rejected modified GET removes an otherwise empty cache bucket", () => {
+      const url = nextUrl();
+      seed(url, cache);
+      respond(
+        url,
+        200,
+        { ETag: '"new"', "Cache-Control": "max-age=60" },
+        "new",
+      );
+      request("GET", url, {
+        cache,
+        headers: { "Cache-Control": "no-cache" },
+        canCache: () => false,
+      });
+      expect(lookupStored(url, cache).entry).toBeUndefined();
+    });
+
+    test.each([206, 412, 500])(
+      "a rejected %i response preserves the existing representation",
+      (status) => {
+        const url = nextUrl();
+        seed(url, cache);
+        respond(url, status);
+        request("GET", url, {
+          cache,
+          headers: { "If-None-Match": '"same"' },
+          canCache: () => false,
+        });
+        expect(lookupStored(url, cache).entry?.headers.etag).toBe('"same"');
+        expect(nativeRequest).toHaveBeenCalledTimes(1);
+      },
+    );
+
     test("POST followed by 303 fetches the updated target instead of reusing its cached body", () => {
       const url = nextUrl();
       const target = new URL("updated", url).href;
@@ -315,10 +613,12 @@ describe.each(["file", "memory"] as const)(
       "invalid or cross-origin metadata cannot evict other targets: %s",
       (reference) => {
         const url = nextUrl();
-        let protectedUrl = new URL("related", url).href;
+        let protectedUrl: string;
         try {
           protectedUrl = new URL(reference, url).href;
-        } catch {}
+        } catch {
+          protectedUrl = new URL("related", url).href;
+        }
         const protectedKey = seed(protectedUrl, cache);
         respond(url, 201, { Location: reference });
         expect(
