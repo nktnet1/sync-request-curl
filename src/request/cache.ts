@@ -719,6 +719,7 @@ export const refreshCacheEntry = (
   responseHeaders: Response["headers"],
   responseTimestamp: number,
   cache: CacheMode,
+  canCache?: (response: CacheableResponse, defaultValue: boolean) => boolean,
 ): CacheableResponse | undefined => {
   const entry = lookup.entry;
   if (!entry || !lookup.isRevalidation) {
@@ -753,7 +754,11 @@ export const refreshCacheEntry = (
     body: Buffer.from(entry.body, "base64"),
     responseUrl: entry.responseUrl,
   };
-  if (!canCacheResponse(response)) {
+  const defaultValue = canCacheResponse(response);
+  const shouldStore = canCache
+    ? canCache(response, defaultValue)
+    : defaultValue;
+  if (!shouldStore) {
     invalidateCache(url, cache);
     return response;
   }
@@ -764,7 +769,7 @@ export const refreshCacheEntry = (
     responseTimestamp,
     response,
     cache,
-    { decompress: entry.decompress },
+    { decompress: entry.decompress, shouldStore },
   );
   return response;
 };

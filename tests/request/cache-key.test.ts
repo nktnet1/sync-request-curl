@@ -118,6 +118,7 @@ test.each([
   "[]",
   '["namespace",3,"target"]',
   '[0,3,"target","read"]',
+  '["namespace",3,"target","read"]',
 ])("low-level cache key %s is not mistaken for a bucket identity", (key) =>
   expect(getCacheBucketKey(key)).toBe(key),
 );

@@ -128,6 +128,16 @@ export const normalizeUrlHostname = (url: string): string => {
   return `${prefix}${userInfo}${asciiHostname}${port}${remainder}`;
 };
 
+const hasAmbiguousHttpAuthority = (url: string): boolean => {
+  // WHATWG treats a backslash as a slash; libcurl can treat it as userinfo.
+  // Include nonstandard slash counts without changing the path or query.
+  const authority = url
+    .slice(url.indexOf(":") + 1)
+    .replace(/^\/+/, "")
+    .split(/[/?#]/, 1)[0];
+  return authority.includes("\\");
+};
+
 export const assertSupportedHttpUrl = (url: string): void => {
   let parsed: URL;
   try {
@@ -140,6 +150,12 @@ export const assertSupportedHttpUrl = (url: string): void => {
   }
 
   if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+    if (hasAmbiguousHttpAuthority(url)) {
+      throw new CurlError(
+        3,
+        "Request failed: URL contains an ambiguous authority",
+      );
+    }
     return;
   }
 

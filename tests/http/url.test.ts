@@ -106,6 +106,30 @@ describe("assertSupportedHttpUrl", () => {
     },
   );
 
+  test.each([
+    "http://trusted.test\\@other.test/resource",
+    "http://trusted.test\\other.test/resource",
+    "http:/trusted.test\\@other.test/resource",
+    "http:///trusted.test\\@other.test/resource",
+    "http:\\\\trusted.test\\@other.test/resource",
+  ])("rejects ambiguous authority %s with CurlError code 3", (url) => {
+    expect(() => assertSupportedHttpUrl(url)).toThrow("ambiguous authority");
+    try {
+      assertSupportedHttpUrl(url);
+    } catch (error) {
+      expect(error).toBeInstanceOf(CurlError);
+      expect((error as CurlError).code).toBe(3);
+    }
+  });
+
+  test.each([
+    "http://user:p%5Css@example.com/resource",
+    "http://example.com/a\\b?q=\\value#\\fragment",
+    "http:/example.com/path\\value",
+  ])("preserves backslashes outside the raw authority: %s", (url) => {
+    expect(() => assertSupportedHttpUrl(url)).not.toThrow();
+  });
+
   test.each(["file:///tmp/example", "ftp://example.com/file"])(
     "rejects unsupported protocol %s",
     (url) => {

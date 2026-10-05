@@ -134,14 +134,21 @@ test.for(["file", "memory"] as const)(
   },
 );
 
-test.for(["file", "memory"] as const)(
-  "%s cache does not reuse entries written under the previous colliding keys",
-  (cache) => {
+test.for([
+  { cache: "file" as const, version: 1 },
+  { cache: "memory" as const, version: 1 },
+  { cache: "file" as const, version: 3 },
+  { cache: "memory" as const, version: 3 },
+])(
+  "$cache cache does not reuse entries written under version $version keys",
+  ({ cache, version }) => {
     const url = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
     const cacheNamespace = "legacy-cache-regression";
     const now = Date.now();
     storeCacheResponse(
-      JSON.stringify([cacheNamespace, url]),
+      JSON.stringify(
+        version === 3 ? [cacheNamespace, 3, url, url] : [cacheNamespace, url],
+      ),
       {},
       now,
       now,

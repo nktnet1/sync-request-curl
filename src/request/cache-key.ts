@@ -43,10 +43,10 @@ const createCacheKey = (target: string, options: Options): string => {
   const bucketTarget = parts
     ? `${parsed.origin}${parsed.pathname}${parsed.search}`
     : target;
-  // Version 3 also retires old keys that merged mixed literal/encoded dots.
+  // Retire entries written before ambiguous URL authorities were rejected.
   return JSON.stringify([
     options.cacheNamespace ?? process.cwd(),
-    3,
+    4,
     bucketTarget,
     target,
   ]);
@@ -62,7 +62,7 @@ export const getCacheBucketKey = (key: string): string => {
     if (
       Array.isArray(identity) &&
       identity.length === 4 &&
-      identity[1] === 3 &&
+      identity[1] === 4 &&
       [identity[0], identity[2], identity[3]].every(
         (value) => typeof value === "string",
       )
