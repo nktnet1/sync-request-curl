@@ -1,14 +1,11 @@
-import { afterEach, describe, expect, test } from "vitest";
-import {
-  invalidateCache,
-  prepareCacheLookup,
-  storeCacheResponse,
-} from "#/request/cache";
+import { describe, expect, test } from "vitest";
+import { prepareCacheLookup, storeCacheResponse } from "#/request/cache";
+import { createCacheTracker } from "#tests/request/cache-cleanup";
 
 const now = Date.UTC(2026, 9, 5);
 const expires = "Mon, 05 Oct 2026 01:00:00 GMT";
 type CacheMode = "file" | "memory";
-const touched = new Map<string, CacheMode>();
+const trackCache = createCacheTracker();
 let serial = 0;
 
 const isFresh = (
@@ -17,7 +14,7 @@ const isFresh = (
   statusCode = 200,
 ) => {
   const key = `https://cache-freshness.test/${process.pid}-${++serial}`;
-  touched.set(key, cache);
+  trackCache(key, cache);
   storeCacheResponse(
     key,
     {},
@@ -34,11 +31,6 @@ const isFresh = (
   return prepareCacheLookup("GET", key, [], cache, now + 1_000)
     .useCachedResponse;
 };
-
-afterEach(() => {
-  for (const [key, cache] of touched) invalidateCache(key, cache);
-  touched.clear();
-});
 
 describe.each(["file", "memory"] as const)(
   "%s cache invalid freshness",

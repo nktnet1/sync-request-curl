@@ -69,6 +69,8 @@ test.each([
   "Mon, 05 Oct 2026 00:00:00 PST",
   "Xxx, 05 Oct 2026 00:00:00 GMT",
   "Mon, 05 Foo 2026 00:00:00 GMT",
+  "Monday, 05-Foo-26 00:00:00 GMT",
+  "Mon Foo  5 00:00:00 2026",
   "Mon, 05 Oct 2026 00:00:00 GMT trailing",
   "Mon, 05 Oct 2026 00:00:00 GMT, Tue, 06 Oct 2026 00:00:00 GMT",
   "Mon, 00 Oct 2026 00:00:00 GMT",

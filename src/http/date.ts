@@ -14,11 +14,11 @@ const months = [
 ];
 
 const imfDate =
-  /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4}) (\d{2}):(\d{2}):(\d{2}) GMT$/i;
+  /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{2}) ([a-z]{3}) (\d{4}) (\d{2}):(\d{2}):(\d{2}) GMT$/i;
 const rfc850Date =
-  /^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), (\d{2})-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-(\d{2}) (\d{2}):(\d{2}):(\d{2}) GMT$/i;
+  /^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), (\d{2})-([a-z]{3})-(\d{2}) (\d{2}):(\d{2}):(\d{2}) GMT$/i;
 const asctimeDate =
-  /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ([ \d]\d) (\d{2}):(\d{2}):(\d{2}) (\d{4})$/i;
+  /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) ([a-z]{3}) ([ \d]\d) (\d{2}):(\d{2}):(\d{2}) (\d{4})$/i;
 
 const getFullYear = (value: string, referenceTime: number): number => {
   const year = Number(value);
@@ -38,7 +38,7 @@ const toTimestamp = (
   const hour = Number(parts[4]);
   const minute = Number(parts[5]);
   const second = Number(parts[6]);
-  if (hour > 23 || minute > 59 || second > 60) return undefined;
+  if (month < 0 || hour > 23 || minute > 59 || second > 60) return undefined;
   const leapSecond = second === 60 ? 1_000 : 0;
 
   // setUTCFullYear avoids Date.UTC's special interpretation of years 00–99.

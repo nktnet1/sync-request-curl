@@ -1,23 +1,23 @@
-import { afterEach, describe, expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import {
   getCachedResponse,
-  invalidateCache,
   prepareCacheLookup,
   refreshCacheEntry,
   storeCacheResponse,
   updateCacheFromHead,
 } from "#/request/cache";
+import { createCacheTracker } from "#tests/request/cache-cleanup";
 
 type CacheMode = "file" | "memory";
 let serial = 0;
-const touched = new Map<string, CacheMode>();
+const trackCache = createCacheTracker();
 
 const seed = (
   cache: CacheMode,
   headers: Record<string, string | string[] | undefined>,
 ) => {
   const key = `https://cache-directives.test/${process.pid}-${++serial}`;
-  touched.set(key, cache);
+  trackCache(key, cache);
   storeCacheResponse(
     key,
     {},
@@ -41,11 +41,6 @@ const expectStaleAge = (cache: CacheMode, age: string | string[]) => {
   if (!lookup.entry) throw new Error("Missing stored response");
   return getCachedResponse(lookup.entry, 0).headers.age;
 };
-
-afterEach(() => {
-  for (const [key, cache] of touched) invalidateCache(key, cache);
-  touched.clear();
-});
 
 describe.each(["file", "memory"] as const)(
   "%s cache directive parsing",

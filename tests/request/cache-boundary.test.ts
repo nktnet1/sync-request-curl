@@ -1,15 +1,12 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { createCacheTracker } from "#tests/request/cache-cleanup";
 
 const { nativeRequest } = vi.hoisted(() => ({ nativeRequest: vi.fn() }));
 vi.mock("#/native/index", () => ({ default: { request: nativeRequest } }));
 
 import request from "#/index";
-import {
-  invalidateCache,
-  prepareCacheLookup,
-  storeCacheResponse,
-} from "#/request/cache";
+import { prepareCacheLookup, storeCacheResponse } from "#/request/cache";
 import { getRequestCacheKey } from "#/request/cache-key";
 import { fileCacheDirectory, getCachePath } from "#/request/cache-path";
 import type {
@@ -20,7 +17,7 @@ import type {
 } from "#/types/definition";
 
 type CacheMode = NonNullable<Options["cache"]>;
-const touched = new Map<string, CacheMode>();
+const trackCache = createCacheTracker();
 const body = Buffer.from("original");
 const lastModified = "Wed, 21 Oct 2015 07:28:00 GMT";
 let serial = 0;
@@ -34,7 +31,7 @@ const seed = (
   options: Options = {},
 ) => {
   const key = getRequestCacheKey(url, options);
-  touched.set(key, cache);
+  trackCache(key, cache);
   const now = Date.now();
   const storedHeaders: Record<string, string[]> = {};
   for (const [name, value] of Object.entries(options.headers ?? {})) {
@@ -115,11 +112,17 @@ const respond = (
   });
 };
 
-afterEach(() => {
-  nativeRequest.mockReset();
-  for (const [key, cache] of touched) invalidateCache(key, cache);
-  touched.clear();
-});
+const rejectModifiedGet = (
+  url: string,
+  cache: CacheMode,
+  headers: Record<string, string>,
+): void => {
+  seed(url, cache);
+  respond(url, 200, { ETag: '"new"', "Cache-Control": "max-age=60" }, "new");
+  request("GET", url, { cache, headers, canCache: () => false });
+};
+
+afterEach(() => nativeRequest.mockReset());
 
 test("file caches written before variant replacement was fixed are retired", () => {
   const url = nextUrl();
@@ -149,7 +152,7 @@ test("file caches written before variant replacement was fixed are retired", () 
       ],
     }),
   );
-  touched.set(getRequestCacheKey(url, options), "file");
+  trackCache(getRequestCacheKey(url, options), "file");
   try {
     respond(url, 200, { "Cache-Control": "max-age=60" }, "new");
     expect(
@@ -500,18 +503,7 @@ describe.each(["file", "memory"] as const)(
       const alias = url.replace("/resource", "/dir/%2e%2e/resource");
       seed(alias, cache);
       seed(url, cache, {}, { gzip: false });
-      seed(url, cache);
-      respond(
-        url,
-        200,
-        { ETag: '"new"', "Cache-Control": "max-age=60" },
-        "new",
-      );
-      request("GET", url, {
-        cache,
-        headers: { "If-None-Match": '"same"' },
-        canCache: () => false,
-      });
+      rejectModifiedGet(url, cache, { "If-None-Match": '"same"' });
       expect(lookupStored(url, cache).entry).toBeUndefined();
       expect(lookupStored(alias, cache).entry).toBeDefined();
       expect(lookupStored(url, cache, {}, { gzip: false }).entry).toBeDefined();
@@ -519,18 +511,7 @@ describe.each(["file", "memory"] as const)(
 
     test("a rejected modified GET removes an otherwise empty cache bucket", () => {
       const url = nextUrl();
-      seed(url, cache);
-      respond(
-        url,
-        200,
-        { ETag: '"new"', "Cache-Control": "max-age=60" },
-        "new",
-      );
-      request("GET", url, {
-        cache,
-        headers: { "Cache-Control": "no-cache" },
-        canCache: () => false,
-      });
+      rejectModifiedGet(url, cache, { "Cache-Control": "no-cache" });
       expect(lookupStored(url, cache).entry).toBeUndefined();
     });
 
