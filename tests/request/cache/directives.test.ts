@@ -6,7 +6,7 @@ import {
   storeCacheResponse,
   updateCacheFromHead,
 } from "#/request/cache";
-import { createCacheTracker } from "#tests/request/cache-cleanup";
+import { createCacheTracker } from "#tests/request/cache/cleanup";
 
 type CacheMode = "file" | "memory";
 let serial = 0;

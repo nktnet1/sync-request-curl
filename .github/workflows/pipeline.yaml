@@ -163,7 +163,7 @@ jobs:
         if: matrix.os == 'macos-latest' && matrix.node-version == '24.x'
         env:
           RUN_EXTERNAL_TEST: "1"
-        run: pnpm exec vitest run tests/request/redirects.test.ts -t "External URL redirect"
+        run: pnpm exec vitest run tests/request/redirects/redirects.test.ts -t "External URL redirect"
 
       - name: Upload coverage reports to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == '24.x' && github.ref_name == 'main'

@@ -324,6 +324,13 @@ const updateHeadCache = (
   );
 };
 
+// Complete successful responses supersede the matched representation even
+// when storage is rejected or Vary changes. Exclude partial (206) and
+// potentially delta-encoded (226) responses, which need separate handling.
+const completeSuccessfulStatusCodes = new Set([
+  200, 201, 202, 203, 204, 205, 207, 208,
+]);
+
 const updateGetCache = (
   url: string,
   options: Options,
@@ -376,8 +383,11 @@ const updateGetCache = (
     {
       decompress: options.gzip !== false,
       shouldStore,
-      replaceEntry:
-        result.response.statusCode === 200 ? lookup.entry : undefined,
+      replaceEntry: completeSuccessfulStatusCodes.has(
+        result.response.statusCode,
+      )
+        ? lookup.entry
+        : undefined,
     },
   );
   return result;

@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { createCacheTracker } from "#tests/request/cache-cleanup";
+import { createCacheTracker } from "#tests/request/cache/cleanup";
 
 const { nativeRequest } = vi.hoisted(() => ({ nativeRequest: vi.fn() }));
 vi.mock("#/native/index", () => ({ default: { request: nativeRequest } }));
@@ -116,9 +116,10 @@ const rejectModifiedGet = (
   url: string,
   cache: CacheMode,
   headers: Record<string, string>,
+  status = 200,
 ): void => {
   seed(url, cache);
-  respond(url, 200, { ETag: '"new"', "Cache-Control": "max-age=60" }, "new");
+  respond(url, status, { ETag: '"new"', "Cache-Control": "max-age=60" }, "new");
   request("GET", url, { cache, headers, canCache: () => false });
 };
 
@@ -442,22 +443,28 @@ describe.each(["file", "memory"] as const)(
       },
     );
 
-    test.each([false, true])(
-      "a modified GET replaces old variants when canCache returns %s",
-      (approved) => {
+    test.each(
+      [200, 201, 202, 203, 204, 205, 207, 208].flatMap((status) =>
+        [false, true].map((approved) => ({ status, approved })),
+      ),
+    )(
+      "a $status GET replaces old variants when canCache returns $approved",
+      ({ status, approved }) => {
         const url = nextUrl();
+        const payload = status === 204 || status === 205 ? "" : "new";
         seedVariant(url, cache, "X-Shape", "square");
         seedVariant(url, cache, "X-Shape", "round");
         seedVariant(url, cache, "X-Size", "large");
         respond(
           url,
-          200,
+          status,
           { ETag: '"new"', Vary: "X-Color", "Cache-Control": "max-age=60" },
-          "new",
+          payload,
         );
         const canCache = vi.fn<CacheCanCacheFunction>(
           (response, defaultValue) => {
-            expect(response.getBody("utf8")).toBe("new");
+            expect(response.statusCode).toBe(status);
+            expect(response.getBody("utf8")).toBe(payload);
             expect(defaultValue).toBe(true);
             return approved;
           },
@@ -473,7 +480,7 @@ describe.each(["file", "memory"] as const)(
             canCache,
             headers: { ...headers, "If-None-Match": '"same"' },
           }).getBody("utf8"),
-        ).toBe("new");
+        ).toBe(payload);
         expect(
           lookupStored(url, cache, { "X-Shape": "round" }).entry,
         ).toBeUndefined();
@@ -486,36 +493,44 @@ describe.each(["file", "memory"] as const)(
         if (!approved)
           respond(
             url,
-            200,
+            status,
             { ETag: '"new"', "Cache-Control": "max-age=60" },
-            "new",
+            payload,
           );
         expect(request("GET", url, { cache, headers }).getBody("utf8")).toBe(
-          "new",
+          payload,
         );
         expect(canCache).toHaveBeenCalledTimes(1);
         expect(nativeRequest).toHaveBeenCalledTimes(approved ? 1 : 2);
       },
     );
 
-    test("rejecting a modified body preserves other decoding modes and exact URL spellings", () => {
-      const url = nextUrl();
-      const alias = url.replace("/resource", "/dir/%2e%2e/resource");
-      seed(alias, cache);
-      seed(url, cache, {}, { gzip: false });
-      rejectModifiedGet(url, cache, { "If-None-Match": '"same"' });
-      expect(lookupStored(url, cache).entry).toBeUndefined();
-      expect(lookupStored(alias, cache).entry).toBeDefined();
-      expect(lookupStored(url, cache, {}, { gzip: false }).entry).toBeDefined();
-    });
+    test.each([200, 203])(
+      "rejecting a modified %i body preserves other decoding modes and exact URL spellings",
+      (status) => {
+        const url = nextUrl();
+        const alias = url.replace("/resource", "/dir/%2e%2e/resource");
+        seed(alias, cache);
+        seed(url, cache, {}, { gzip: false });
+        rejectModifiedGet(url, cache, { "If-None-Match": '"same"' }, status);
+        expect(lookupStored(url, cache).entry).toBeUndefined();
+        expect(lookupStored(alias, cache).entry).toBeDefined();
+        expect(
+          lookupStored(url, cache, {}, { gzip: false }).entry,
+        ).toBeDefined();
+      },
+    );
 
-    test("a rejected modified GET removes an otherwise empty cache bucket", () => {
-      const url = nextUrl();
-      rejectModifiedGet(url, cache, { "Cache-Control": "no-cache" });
-      expect(lookupStored(url, cache).entry).toBeUndefined();
-    });
+    test.each([200, 203])(
+      "a rejected modified %i GET removes an otherwise empty cache bucket",
+      (status) => {
+        const url = nextUrl();
+        rejectModifiedGet(url, cache, { "Cache-Control": "no-cache" }, status);
+        expect(lookupStored(url, cache).entry).toBeUndefined();
+      },
+    );
 
-    test.each([206, 412, 500])(
+    test.each([206, 226, 412, 500])(
       "a rejected %i response preserves the existing representation",
       (status) => {
         const url = nextUrl();

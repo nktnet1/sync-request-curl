@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { prepareCacheLookup, storeCacheResponse } from "#/request/cache";
-import { createCacheTracker } from "#tests/request/cache-cleanup";
+import { createCacheTracker } from "#tests/request/cache/cleanup";
 
 const now = Date.UTC(2026, 9, 5);
 const expires = "Mon, 05 Oct 2026 01:00:00 GMT";
