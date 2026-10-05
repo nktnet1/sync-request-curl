@@ -515,6 +515,55 @@ describe("request retries", () => {
     expect(nativeRequest).toHaveBeenCalledOnce();
   });
 
+  test("propagates CurlError thrown by retry policy without retrying", () => {
+    nativeRequest
+      .mockReturnValueOnce(nativeResponse({ statusCode: 503 }))
+      .mockReturnValueOnce(nativeResponse());
+    const retryError = new CurlError(7, "retry policy failed");
+    const retry = vi.fn(
+      (
+        error: CurlError | RequestError | null,
+        response: RetryResponse | undefined,
+      ) => {
+        if (error instanceof CurlError) {
+          return true;
+        }
+        if (response?.statusCode === 503) {
+          throw retryError;
+        }
+        return false;
+      },
+    );
+
+    expect(() =>
+      request("GET", "https://example.com/retry", {
+        retry,
+        retryDelay: 0,
+        maxRetries: 1,
+      }),
+    ).toThrow(retryError);
+    expect(retry).toHaveBeenCalledOnce();
+    expect(nativeRequest).toHaveBeenCalledOnce();
+  });
+
+  test("propagates non-retryable request exceptions without invoking retry policy", () => {
+    const requestError = new Error("native request failed");
+    nativeRequest.mockImplementationOnce(() => {
+      throw requestError;
+    });
+    const retry = vi.fn(() => true);
+
+    expect(() =>
+      request("GET", "https://example.com/retry", {
+        retry,
+        retryDelay: 0,
+        maxRetries: 1,
+      }),
+    ).toThrow(requestError);
+    expect(retry).not.toHaveBeenCalled();
+    expect(nativeRequest).toHaveBeenCalledOnce();
+  });
+
   test("passes transport errors to a function-valued retry policy", () => {
     nativeRequest
       .mockReturnValueOnce(transportErrorResponse())

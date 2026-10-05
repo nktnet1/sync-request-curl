@@ -178,44 +178,48 @@ const performRequestWithRetry = (
 
   for (let retries = 0; ; retries += 1) {
     const attemptNumber = retries + 1;
-    let retryError: CurlError | RequestError | null = null;
-    let retryResponse: Response | undefined;
+    let attempt:
+      | { error: CurlError | RequestError }
+      | { error: null; result: RequestResult };
 
     try {
-      const result = performTransportRequest(
-        method,
-        url,
-        options,
-        prepared,
-        remaining,
-      );
-      if (
-        !shouldRetryAttempt(
-          retry,
-          null,
-          result.response,
-          attemptNumber,
-          maxRetries,
-        )
-      ) {
-        return result;
-      }
-      retryResponse = result.response;
+      attempt = {
+        error: null,
+        result: performTransportRequest(
+          method,
+          url,
+          options,
+          prepared,
+          remaining,
+        ),
+      };
     } catch (error) {
       if (!isRetryableRequestError(error)) {
         throw error;
       }
-      if (
-        !shouldRetryAttempt(retry, error, undefined, attemptNumber, maxRetries)
-      ) {
-        throw error;
+      attempt = { error };
+    }
+
+    const retryResponse =
+      attempt.error === null ? attempt.result.response : undefined;
+    if (
+      !shouldRetryAttempt(
+        retry,
+        attempt.error,
+        retryResponse,
+        attemptNumber,
+        maxRetries,
+      )
+    ) {
+      if (attempt.error !== null) {
+        throw attempt.error;
       }
-      retryError = error;
+      return attempt.result;
     }
 
     const delay = getRetryDelay(
       options.retryDelay,
-      retryError,
+      attempt.error,
       retryResponse,
       attemptNumber,
     );
