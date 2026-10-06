@@ -191,6 +191,8 @@ test("built declarations expose the public root API without leaking Node header 
        type HttpAuthOptions,
        type HttpAuthType,
        type HttpVerb,
+       type HttpVersion,
+       type IpFamily,
        type JsonLike,
        type JsonPrimitive,
        type NestedJsonLike,
@@ -208,6 +210,8 @@ test("built declarations expose the public root API without leaking Node header 
      } from "sync-request-curl";
 
      const method: HttpVerb = "GET";
+     let httpVersion: HttpVersion | undefined;
+     let ipFamily: IpFamily | undefined;
      const headers: Headers = { "x-test": "value" };
      const options: Options = {};
      const response: Response = request(method, "http://localhost", options);
@@ -232,6 +236,10 @@ test("built declarations expose the public root API without leaking Node header 
      const curlError = new CurlError(7, "failed");
      const requestError = new RequestError("ERR_REQUEST_FAILED", "failed");
      const responseError = new ResponseError(500, {}, Buffer.alloc(0));
+     const typedForm: FormData = form;
+     const typedCurlError: CurlError = curlError;
+     const typedRequestError: RequestError = requestError;
+     const typedResponseError: ResponseError = responseError;
      const encoding: BufferEncoding = "utf8";
      const primitive: JsonPrimitive = null;
      const json: JsonLike = primitive;
@@ -279,6 +287,8 @@ test("built declarations expose the public root API without leaking Node header 
      let retryResponse: RetryResponse | undefined;
      void [
        response,
+       httpVersion,
+       ipFamily,
        headers,
        form,
        formHeaders,
@@ -292,6 +302,10 @@ test("built declarations expose the public root API without leaking Node header 
        curlError,
        requestError,
        responseError,
+       typedForm,
+       typedCurlError,
+       typedRequestError,
+       typedResponseError,
        encoding,
        nested,
        httpAuthType,
@@ -314,18 +328,21 @@ test("built declarations expose the public root API without leaking Node header 
        retryResponse,
      ];`;
   for (const fixture of fixtures) {
-    writeFileSync(
-      fixture,
-      fixture.endsWith(".mts")
-        ? `${consumer}
-           const typedForm: FormData = form;
-           const typedCurlError: CurlError = curlError;
-           const typedRequestError: RequestError = requestError;
-           const typedResponseError: ResponseError = responseError;
-           void [typedForm, typedCurlError, typedRequestError, typedResponseError];`
-        : consumer,
-    );
+    writeFileSync(fixture, consumer);
   }
+  writeFileSync(
+    join(directory, "consumer-require.cts"),
+    `import request = require("sync-request-curl");
+      const options: request.Options = {};
+      const response: request.Response = request("GET", "http://localhost", options);
+      const form: request.FormData = new request.FormData();
+      const curlError: request.CurlError = new request.CurlError(7, "failed");
+      const requestError: request.RequestError = new request.RequestError("ERR_REQUEST_FAILED", "failed");
+      const responseError: request.ResponseError = new request.ResponseError(500, {}, Buffer.alloc(0));
+      const defaultRequest: typeof request = request.default;
+      options.form = form;
+      void [response, curlError, requestError, responseError, defaultRequest];`,
+  );
   writeFileSync(
     tsconfig,
     JSON.stringify({
@@ -337,7 +354,7 @@ test("built declarations expose the public root API without leaking Node header 
         strict: true,
         noEmit: true,
       },
-      files: ["./consumer.cts", "./consumer.mts"],
+      files: ["./consumer.cts", "./consumer.mts", "./consumer-require.cts"],
     }),
   );
 
