@@ -2,6 +2,7 @@ import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    isolate: true,
     fsModuleCache: true,
     exclude: [...configDefaults.exclude, "tests/typedoc/**"],
     globalSetup: ["./tests/globalSetup.ts"],
@@ -14,9 +15,7 @@ export default defineConfig({
       },
       include: ["src/**/*.ts"],
       exclude: [
-        "src/index.ts",
-        "src/index-cjs.ts",
-        "src/index-esm.ts",
+        "src/index*.ts",
         "src/types/*.ts",
         "src/internal/blob-reader-worker.ts",
       ],
