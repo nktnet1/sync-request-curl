@@ -5,5 +5,5 @@
 
 export { CurlError, RequestError, ResponseError } from "#/errors";
 export { FormData } from "#/form-data";
-export type * from "#/index-esm";
 export { default as request } from "#/request/index";
+export type * from "#/types/public";
