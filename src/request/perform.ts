@@ -162,6 +162,12 @@ const shouldRetryAttempt = (
   shouldRetryRequest(retry, error, response, attemptNumber) &&
   attemptNumber - 1 < maxRetries;
 
+const waitBeforeRetry = (delay: number, remaining: () => number): void => {
+  const budget = remaining();
+  waitForRetry(budget === 0 ? delay : Math.min(delay, budget));
+  remaining();
+};
+
 const performRequestWithRetry = (
   method: UppercaseHttpVerb,
   url: string,
@@ -223,9 +229,7 @@ const performRequestWithRetry = (
       retryResponse,
       attemptNumber,
     );
-    const budget = remaining();
-    waitForRetry(budget === 0 ? delay : Math.min(delay, budget));
-    remaining();
+    waitBeforeRetry(delay, remaining);
   }
 };
 

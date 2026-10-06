@@ -1,13 +1,13 @@
 import { hasRequestHeader } from "#/http/headers";
-import { splitAbsoluteUrl } from "#/http/url";
+import { hasUrlCredentials, splitAbsoluteUrl } from "#/http/url";
 import { usesCustomTransport } from "#/request/transport-options";
 import type { Options } from "#/types/definition";
 
 // libcurl builds differ in how they normalize encoded dots. Keep read targets
 // separate, but invalidate their shared WHATWG-normalized bucket together.
 const encodedDotSegments = new Set(["%2e", "%2e.", ".%2e", "%2e%2e"]);
-// Retire persisted variants that older validation could leave obsolete.
-const cacheKeyVersion = 5;
+// Retire entries that may mix URL-authenticated and anonymous responses.
+const cacheKeyVersion = 8;
 
 const normalizeCacheTarget = (target: string): string => {
   const queryStart = target.indexOf("?");
@@ -100,10 +100,9 @@ export const canUseRequestCache = (
   headers: string[],
   options: Options,
 ): boolean => {
-  const target = new URL(url);
   return (
-    !target.username &&
-    !target.password &&
+    splitAbsoluteUrl(url) !== undefined &&
+    !hasUrlCredentials(url) &&
     !hasRequestHeader(headers, "host") &&
     !hasRequestHeader(headers, "authorization") &&
     !hasRequestHeader(headers, "cookie") &&

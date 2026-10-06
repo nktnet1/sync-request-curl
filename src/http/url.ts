@@ -43,7 +43,7 @@ interface AbsoluteUrlParts {
 }
 
 export const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
-  const schemeEnd = url.indexOf("://");
+  const schemeEnd = url.indexOf(":");
   if (schemeEnd <= 0 || !isAsciiLetter(url.codePointAt(0))) {
     return undefined;
   }
@@ -54,7 +54,13 @@ export const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
     }
   }
 
-  const authorityStart = schemeEnd + 3;
+  // libcurl accepts one, two, or three scheme slashes. Locate the authority
+  // consistently while leaving path/query spellings and the prefix untouched.
+  let authorityStart = schemeEnd + 1;
+  while (url.charAt(authorityStart) === "/") authorityStart += 1;
+  const slashCount = authorityStart - schemeEnd - 1;
+  if (slashCount < 1 || slashCount > 3) return undefined;
+
   let authorityEnd = url.length;
   for (let i = authorityStart; i < url.length; i += 1) {
     const code = url.codePointAt(i);
@@ -71,7 +77,15 @@ export const splitAbsoluteUrl = (url: string): AbsoluteUrlParts | undefined => {
   };
 };
 
-/** Remove userinfo without normalizing a conventional absolute URL. */
+/** Userinfo can enable Basic authentication even when both fields are empty. */
+export const hasUrlCredentials = (url: string): boolean => {
+  const parts = splitAbsoluteUrl(url);
+  if (parts) return parts.authority.includes("@");
+  const parsed = new URL(url);
+  return parsed.username !== "" || parsed.password !== "";
+};
+
+/** Remove userinfo without normalizing a libcurl-compatible absolute URL. */
 export const stripUrlCredentials = (url: string): string => {
   const parts = splitAbsoluteUrl(url);
   if (!parts) {
@@ -139,6 +153,19 @@ const hasAmbiguousHttpAuthority = (url: string): boolean => {
 };
 
 export const assertSupportedHttpUrl = (url: string): void => {
+  // WHATWG removes some controls and trims surrounding whitespace; native
+  // C strings can also truncate at NUL. Reject before either normalization
+  // or cache lookup can conceal the malformed input.
+  for (const character of url) {
+    const code = character.codePointAt(0);
+    if (code !== undefined && (code <= 0x20 || code === 0x7f)) {
+      throw new CurlError(
+        3,
+        "Request failed: URL contains an unescaped space or control character",
+      );
+    }
+  }
+
   let parsed: URL;
   try {
     parsed = new URL(url);

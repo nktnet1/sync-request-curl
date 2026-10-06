@@ -13,6 +13,7 @@ import {
 import {
   appendQueryString,
   assertSupportedHttpUrl,
+  hasUrlCredentials,
   normalizeUrlHostname,
   stripUrlCredentials,
 } from "#/http/url";
@@ -115,8 +116,8 @@ const preparePayload = (
 };
 
 const prepareUrl = (url: string, options: Options): string => {
+  assertSupportedHttpUrl(url);
   const withQuery = options.qs ? appendQueryString(url, options.qs) : url;
-  assertSupportedHttpUrl(withQuery);
   return normalizeUrlHostname(withQuery);
 };
 
@@ -161,8 +162,8 @@ export const prepareRequest = (
 
   let preparedUrl = prepareUrl(url, options);
   const target = new URL(preparedUrl);
-  const hasUrlCredentials = target.username !== "" || target.password !== "";
-  if (options.auth !== undefined && hasUrlCredentials) {
+  const hasCredentials = hasUrlCredentials(preparedUrl);
+  if (options.auth !== undefined && hasCredentials) {
     invalidRequestSemantics("auth cannot be combined with URL credentials");
   }
   if (hasRequestHeader(headers, "authorization")) {
@@ -170,7 +171,7 @@ export const prepareRequest = (
     // libcurl can retain them in the effective URL used for relative redirects.
     preparedUrl = stripUrlCredentials(preparedUrl);
   } else if (
-    hasUrlCredentials &&
+    hasCredentials &&
     !hasSafeAuthCredentials(
       decodeURIComponent(target.username),
       decodeURIComponent(target.password),

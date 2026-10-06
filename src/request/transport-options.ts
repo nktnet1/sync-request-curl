@@ -73,26 +73,30 @@ const readProxyUrlCredentials = (
   auth: string | undefined,
   isHttpProxy: boolean,
 ): Pick<PreparedProxyOptions, "proxyUsername" | "proxyPassword"> => {
-  // Empty CURLOPT_PROXYUSERNAME/PROXYPASSWORD can enable Basic ':' auth.
-  // Leave both unset unless the URL actually supplies credentials.
-  if (!url.username && !url.password) {
-    return {};
-  }
-
   const proxyUsername = decodeURIComponent(url.username);
   const proxyPassword = decodeURIComponent(url.password);
   assertSafeProxyCredentials(proxyUsername, proxyPassword, auth, isHttpProxy);
   return { proxyUsername, proxyPassword };
 };
 
-const prepareProxyOptions = (
-  proxy?: Options["proxy"],
-): PreparedProxyOptions => {
-  if (proxy === undefined) {
-    return { proxy: "", proxyNoProxy: "" };
-  }
+const hasProxyUrlCredentials = (
+  proxyUrl: string,
+  isHttpProxy: boolean,
+): boolean => {
+  // WHATWG drops empty userinfo. Preserve its marker using the same ignored
+  // whitespace and authority delimiters as the parser, including HTTP's '\\'.
+  const normalized = proxyUrl.replace(/[\t\r\n]/g, "");
+  const authority = normalized
+    .slice(normalized.indexOf(":") + 1)
+    .replace(isHttpProxy ? /^[\\/]+/ : /^\/+/, "")
+    .split(isHttpProxy ? /[\\/?#]/ : /[/?#]/, 1)[0];
+  return authority.includes("@");
+};
 
-  const url = new URL(proxy.url);
+const parseProxyUrl = (
+  proxyUrl: string,
+): { url: URL; isHttpProxy: boolean; hasCredentials: boolean } => {
+  const url = new URL(proxyUrl);
   const isHttpProxy = HTTP_PROXY_PROTOCOLS.has(url.protocol);
   const isSocksProxy = SOCKS_PROXY_PROTOCOLS.has(url.protocol);
   const hasRootPath = isHttpProxy
@@ -108,6 +112,21 @@ const prepareProxyOptions = (
       "proxy.url must be an HTTP(S) or SOCKS proxy origin URL",
     );
   }
+  return {
+    url,
+    isHttpProxy,
+    hasCredentials: hasProxyUrlCredentials(proxyUrl, isHttpProxy),
+  };
+};
+
+const prepareProxyOptions = (
+  proxy?: Options["proxy"],
+): PreparedProxyOptions => {
+  if (proxy === undefined) {
+    return { proxy: "", proxyNoProxy: "" };
+  }
+
+  const { url, isHttpProxy, hasCredentials } = parseProxyUrl(proxy.url);
   if (!isHttpProxy && proxy.auth !== undefined) {
     throw new TypeError("proxy.auth is only supported for HTTP(S) proxies");
   }
@@ -129,7 +148,7 @@ const prepareProxyOptions = (
       proxy.auth,
       isHttpProxy,
     );
-  } else {
+  } else if (hasCredentials) {
     // Explicit credentials replace both URL fields. Discarded userinfo must
     // not be decoded or validated before that replacement takes effect.
     ({ proxyUsername, proxyPassword } = readProxyUrlCredentials(

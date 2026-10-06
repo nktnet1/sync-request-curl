@@ -3,6 +3,7 @@ import { CurlError } from "#/errors";
 import {
   appendQueryString,
   assertSupportedHttpUrl,
+  hasUrlCredentials,
   normalizeUrlHostname,
   stripUrlCredentials,
 } from "#/http/url";
@@ -29,12 +30,30 @@ describe("stripUrlCredentials", () => {
       "https://example.com/path@value?q=@value#@value",
     ],
     ["https:user:secret@example.com/path", "https://example.com/path"],
+    [
+      "https:/user:secret@example.com/a/%2e/../b?q=%2f#fragment",
+      "https:/example.com/a/%2e/../b?q=%2f#fragment",
+    ],
+    [
+      "https:///user:secret@example.com/a/%2e/../b?q=%2f#fragment",
+      "https:///example.com/a/%2e/../b?q=%2f#fragment",
+    ],
   ])("removes only URL userinfo from %s", (url, expected) => {
     expect(stripUrlCredentials(url)).toBe(expected);
   });
 });
 
 describe("normalizeUrlHostname", () => {
+  test.each([1, 3])(
+    "normalizes the hostname with %i scheme slashes without rewriting the target",
+    (slashes) => {
+      const prefix = `https:${"/".repeat(slashes)}`;
+      expect(
+        normalizeUrlHostname(`${prefix}münchen.example/a/%2e/../über?q=%2f`),
+      ).toBe(`${prefix}xn--mnchen-3ya.example/a/%2e/../über?q=%2f`);
+    },
+  );
+
   test("converts an internationalized hostname to ASCII", () => {
     expect(
       normalizeUrlHostname("https://münchen.example:8443/über?q=你好#résumé"),
@@ -99,6 +118,28 @@ describe("normalizeUrlHostname", () => {
 });
 
 describe("assertSupportedHttpUrl", () => {
+  test.each([...Array.from({ length: 33 }, (_, code) => code), 0x7f])(
+    "rejects raw URL character %i before WHATWG normalization",
+    (code) => {
+      const character = String.fromCharCode(code);
+      for (const url of [
+        `${character}http://example.com/resource`,
+        `http://exam${character}ple.com/resource`,
+        `http://example.com/res${character}ource`,
+        `http://example.com/resource?q=${character}`,
+        `http://example.com/resource#${character}`,
+      ]) {
+        expect(() => assertSupportedHttpUrl(url)).toThrow(CurlError);
+      }
+    },
+  );
+
+  test("accepts percent-encoded spaces and controls outside credentials", () => {
+    expect(() =>
+      assertSupportedHttpUrl("http://example.com/a%20b?q=%00%09%0A%0D%7F"),
+    ).not.toThrow();
+  });
+
   test.each(["http://example.com", "https://example.com"])(
     "accepts %s",
     (url) => {
@@ -150,6 +191,32 @@ describe("assertSupportedHttpUrl", () => {
       }
     },
   );
+});
+
+describe("hasUrlCredentials", () => {
+  test.each([1, 2, 3])(
+    "detects even empty userinfo with %i slashes",
+    (slashes) => {
+      const prefix = `http:${"/".repeat(slashes)}`;
+      for (const userinfo of ["", ":", "user", ":secret", "user:secret"]) {
+        expect(hasUrlCredentials(`${prefix}${userinfo}@example.com/path`)).toBe(
+          true,
+        );
+      }
+      expect(
+        hasUrlCredentials(`${prefix}example.com/path@value?q=@value#@value`),
+      ).toBe(false);
+      expect(hasUrlCredentials(`${prefix}example.com?q=@value`)).toBe(false);
+    },
+  );
+
+  test.each([
+    ["http:user:secret@example.com/path", true],
+    ["http::secret@example.com/path", true],
+    ["http:example.com/path", false],
+  ])("handles a URL without scheme slashes: %s", (url, expected) => {
+    expect(hasUrlCredentials(url)).toBe(expected);
+  });
 });
 
 describe("appendQueryString", () => {

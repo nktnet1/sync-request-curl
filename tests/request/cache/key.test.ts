@@ -46,15 +46,35 @@ test.each([
   );
 });
 
-test("unconventional URL forms cannot alias conventional cache targets", () => {
-  const key = getRequestCacheKey("http:example.com/path", {});
-  const conventional = getRequestCacheKey("http://example.com/path", {});
-  expect(key).not.toBe(conventional);
-  expect(getCacheBucketKey(key)).not.toBe(getCacheBucketKey(conventional));
-  expect(
-    getRequestCacheInvalidationKeys("http:example.com/path#fragment", {}),
-  ).toEqual([key]);
-});
+test.each([0, 4, 5])(
+  "unsupported %i-slash URLs cannot alias conventional cache targets",
+  (slashes) => {
+    const url = `http:${"/".repeat(slashes)}example.com/path`;
+    const key = getRequestCacheKey(url, {});
+    const conventional = getRequestCacheKey("http://example.com/path", {});
+    expect(key).not.toBe(conventional);
+    expect(getCacheBucketKey(key)).not.toBe(getCacheBucketKey(conventional));
+    expect(getRequestCacheInvalidationKeys(`${url}#fragment`, {})).toEqual([
+      key,
+    ]);
+    expect(canUseRequestCache(url, [], {})).toBe(false);
+  },
+);
+
+test.each([1, 3])(
+  "%i scheme slashes share the actual transport target's cache identity",
+  (slashes) => {
+    const path = "/dir/%2e/../resource?q=%2f";
+    const unconventional = `http:${"/".repeat(slashes)}example.com${path}`;
+    const conventional = `http://example.com${path}`;
+    expect(getRequestCacheKey(unconventional, {})).toBe(
+      getRequestCacheKey(conventional, {}),
+    );
+    expect(getRequestCacheInvalidationKeys(unconventional, {})).toEqual(
+      getRequestCacheInvalidationKeys(conventional, {}),
+    );
+  },
+);
 
 test.each(["%2e%2e", "%2E%2E", ".%2e", "%2e."])(
   "encoded parent %s shares invalidation with the plain path, while reads stay separate",
@@ -124,6 +144,8 @@ test.each([
 );
 
 test.each([
+  { url: "http://@example.com", headers: [], options: {} },
+  { url: "http://:@example.com", headers: [], options: {} },
   { url: "http://user@example.com", headers: [], options: {} },
   { url: "http://:pass@example.com", headers: [], options: {} },
   ...["Authorization", "Cookie", "Proxy-Authorization", "Host", "hOsT"].map(
