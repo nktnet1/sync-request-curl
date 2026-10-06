@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { parseArgs } from "node:util";
+import { parseArgs, styleText } from "node:util";
 import {
   getNativePackageName,
   getNativeTarget,
@@ -99,6 +99,12 @@ const verifyNativeSelection = (
   }
 };
 
+const logLoadedPackage = (format: "CommonJS" | "ESM"): void => {
+  console.log(
+    `${styleText("green", "Loaded")} ${styleText("cyan", format)} package and native binding successfully`,
+  );
+};
+
 try {
   if (values.matrix) {
     for (const platform of supportedPlatformKeys) {
@@ -106,7 +112,9 @@ try {
       mkdirSync(directory, { recursive: true });
       installPackage(directory, getNativeTarget(platform));
       verifyNativeSelection(directory, platform);
-      console.log(`Verified optional dependency selection for ${platform}`);
+      console.log(
+        `${styleText("green", "Verified")} optional dependency selection for ${styleText("cyan", platform)}`,
+      );
     }
   }
 
@@ -119,21 +127,21 @@ try {
   const commonJsSmokeScript = [
     'const request = require("sync-request-curl");',
     'if (typeof request !== "function") throw new TypeError("Expected CommonJS default export to be a function");',
-    'console.log("Loaded CommonJS package and native binding successfully");',
   ].join("\n");
   run("node", ["-e", commonJsSmokeScript], { cwd: currentDirectory });
+  logLoadedPackage("CommonJS");
 
   const esmSmokeScript = [
     'import request from "sync-request-curl";',
     'if (typeof request !== "function") throw new TypeError("Expected ESM default export to be a function");',
-    'console.log("Loaded ESM package and native binding successfully");',
   ].join("\n");
   run("node", ["--input-type=module", "-e", esmSmokeScript], {
     cwd: currentDirectory,
   });
+  logLoadedPackage("ESM");
 
   console.log(
-    `Verified sync-request-curl@${version} from ${registry} with ${getNativePackageName(currentPlatform)}`,
+    `${styleText("green", "Verified")} sync-request-curl@${styleText("cyan", version)} from ${registry} with ${styleText("cyan", getNativePackageName(currentPlatform))}`,
   );
 } finally {
   rmSync(temporaryRoot, { recursive: true, force: true });

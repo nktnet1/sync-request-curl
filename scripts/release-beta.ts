@@ -116,7 +116,7 @@ Run --publish from a clean checkout, not after an uncommitted preparation run.`)
     throw new Error("Package version changed during validation");
   }
   git(["add", "--", "package.json"]);
-  git(["commit", "-m", tag]);
+  git(["commit", "-m", version]);
   git(["tag", "-a", tag, "-m", tag]);
   run(
     "git",
