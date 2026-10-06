@@ -16,6 +16,23 @@ on:
       - '**/README.md'
 
 jobs:
+  native-unit-tests:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Rust
+        run: rustup toolchain install 1.88.0 --profile minimal --no-self-update
+
+      - name: Run Rust unit tests
+        env:
+          LIBZ_SYS_STATIC: "1"
+          OPENSSL_STATIC: "1"
+          PKG_CONFIG_ALL_STATIC: "1"
+        run: cargo test --locked --manifest-path native/Cargo.toml --lib --features test-noop
+
   native:
     strategy:
       matrix:
