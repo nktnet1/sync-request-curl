@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,30 +9,61 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 
+type ModuleFormat = "module" | "commonjs";
+
 // Exercise the published export map in fresh Node processes. Source imports
-// cannot detect constructors duplicated by separate bundler invocations.
-for (const format of ["module", "commonjs"]) {
-  test(`built ${format} entrypoints share constructors`, () => {
-    const directory = mkdtempSync(join(tmpdir(), "curl-entrypoints-"));
-    const binding = join(directory, "binding.cjs");
-    writeFileSync(
-      binding,
-      `module.exports = {
+// cannot detect constructors or state duplicated by separate bundler invocations.
+const runEntrypointCheck = (format: ModuleFormat, script: string): void => {
+  const directory = mkdtempSync(join(tmpdir(), "curl-entrypoints-"));
+  const binding = join(directory, "binding.cjs");
+  writeFileSync(
+    binding,
+    `let version = 1;
+      module.exports = {
+        calls: [],
         request(options) {
+          this.calls.push(options.method);
+          if (options.method === 'PUT') version += 1;
+          const statusCode = options.url.endsWith('/http-error') ? 404 : options.method === 'PUT' ? 204 : 200;
           return {
             transportCode: options.url.endsWith('/transport-error') ? 7 : 0,
             transportMessage: 'Could not connect to server',
-            statusCode: options.url.endsWith('/http-error') ? 404 : 200,
+            statusCode,
             effectiveUrl: options.url,
             redirectUrl: options.url.endsWith('/redirect') ? options.url : null,
-            headers: [],
-            body: Buffer.from('{}'),
+            headers: [
+              'HTTP/1.1 ' + statusCode,
+              'Cache-Control: max-age=3600',
+              'Date: ' + new Date().toUTCString(),
+              'Content-Type: application/json',
+              '',
+            ],
+            body: statusCode === 204 ? Buffer.alloc(0) : Buffer.from(JSON.stringify({ version })),
           };
         },
         createConnectionPool() { return 1; },
         releaseConnectionPool() {},
       };`,
+  );
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [`--input-type=${format}`, "-e", script],
+      {
+        cwd: root,
+        env: { ...process.env, SYNC_REQUEST_CURL_NATIVE_PATH: binding },
+        encoding: "utf8",
+      },
     );
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+};
+
+for (const format of ["module", "commonjs"] as const) {
+  test(`built ${format} entrypoint exposes its constructors`, () => {
     const imports =
       format === "module"
         ? `import request, { CurlError, FormData, RequestError, ResponseError } from 'sync-request-curl';
@@ -40,13 +71,9 @@ for (const format of ["module", "commonjs"]) {
         : `const request = require('sync-request-curl');
            const { CurlError, FormData, RequestError, ResponseError } = request;
            const assert = require('node:assert/strict');`;
-    try {
-      const result = spawnSync(
-        process.execPath,
-        [
-          `--input-type=${format}`,
-          "-e",
-          `${imports}
+    runEntrypointCheck(
+      format,
+      `${imports}
            assert.equal(typeof request, 'function');
            assert.equal(request.FormData, FormData);
            assert.equal(request.CurlError, CurlError);
@@ -67,23 +94,77 @@ for (const format of ["module", "commonjs"]) {
            assert.equal(form.hasKnownLength(), true);
            assert.equal(form.toString(), '[object FormData]');
            assert.equal(request('POST', 'http://localhost/ok', { form }).statusCode, 200);`,
-        ],
-        {
-          cwd: root,
-          env: { ...process.env, SYNC_REQUEST_CURL_NATIVE_PATH: binding },
-          encoding: "utf8",
-        },
-      );
-      assert.ifError(result.error);
-      assert.equal(result.status, 0, result.stderr || result.stdout);
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
-    }
+    );
+  });
+
+  const mixedImports = `
+    import assert from 'node:assert/strict';
+    import { createRequire } from 'node:module';
+    const require = createRequire(import.meta.url);
+    const loadCommonJS = () => require('sync-request-curl');
+    const loadESM = async () => (await import('sync-request-curl')).default;
+    const first = await ${format === "module" ? "loadESM()" : "loadCommonJS()"};
+    const second = await ${format === "module" ? "loadCommonJS()" : "loadESM()"};
+  `;
+
+  test(`mixed entrypoints share constructors and accept forms when ${format} loads first`, () => {
+    runEntrypointCheck(
+      "module",
+      `${mixedImports}
+      assert.equal(first, second);
+      assert.equal(first.default, first);
+      for (const name of ['FormData', 'CurlError', 'RequestError', 'ResponseError']) {
+        assert.equal(first[name], second[name]);
+      }
+      for (const [client, other] of [[first, second], [second, first]]) {
+        const form = new other.FormData();
+        form.append('message', 'hello');
+        assert.equal(client('POST', 'http://localhost/ok', { form }).statusCode, 200);
+        assert.throws(() => client('GET', 'http://localhost/transport-error'), other.CurlError);
+        assert.throws(() => client('GET', 'http://localhost/redirect', { maxRedirects: 0 }), other.RequestError);
+        assert.throws(() => client('GET', 'http://localhost/http-error').getBody(), other.ResponseError);
+      }
+    `,
+    );
+  });
+
+  test(`mixed entrypoints invalidate shared memory cache when ${format} loads first`, () => {
+    runEntrypointCheck(
+      "module",
+      `${mixedImports}
+      const options = { cache: 'memory', cacheNamespace: process.env.SYNC_REQUEST_CURL_NATIVE_PATH };
+      const url = 'http://localhost/resource';
+      let version = 1;
+      for (const [reader, writer] of [[first, second], [second, first]]) {
+        assert.deepEqual(reader('GET', url, options).getJSON(), { version });
+        assert.equal(writer('PUT', url, options).statusCode, 204);
+        version += 1;
+        assert.deepEqual(reader('GET', url, options).getJSON(), { version });
+        assert.deepEqual(reader('GET', url, options).getJSON(), { version });
+      }
+      assert.deepEqual(require(process.env.SYNC_REQUEST_CURL_NATIVE_PATH).calls, ['GET', 'PUT', 'GET', 'PUT', 'GET']);
+    `,
+    );
   });
 }
 
 test("built declarations expose the public root API without leaking Node header types", () => {
   const directory = mkdtempSync(join(root, ".entrypoints-types-"));
+  // Compile an installed copy without source files or the repository's imports.
+  const installedPackage = join(directory, "node_modules", "sync-request-curl");
+  mkdirSync(installedPackage, { recursive: true });
+  cpSync(join(root, "package.json"), join(installedPackage, "package.json"));
+  cpSync(join(root, "dist"), join(installedPackage, "dist"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(directory, "package.json"),
+    JSON.stringify({
+      name: "entrypoint-consumer",
+      private: true,
+      type: "module",
+    }),
+  );
   const fixtures = [
     join(directory, "consumer.cts"),
     join(directory, "consumer.mts"),
@@ -146,6 +227,8 @@ test("built declarations expose the public root API without leaking Node header 
      const formKnownLength: boolean = form.hasKnownLength();
      const formString: string = form.toString();
      const attachedForm = new request.FormData();
+     const attachedFormData: typeof FormData = request.FormData;
+     options.form = form;
      const curlError = new CurlError(7, "failed");
      const requestError = new RequestError("ERR_REQUEST_FAILED", "failed");
      const responseError = new ResponseError(500, {}, Buffer.alloc(0));
@@ -205,6 +288,7 @@ test("built declarations expose the public root API without leaking Node header 
        formKnownLength,
        formString,
        attachedForm,
+       attachedFormData,
        curlError,
        requestError,
        responseError,
@@ -230,7 +314,17 @@ test("built declarations expose the public root API without leaking Node header 
        retryResponse,
      ];`;
   for (const fixture of fixtures) {
-    writeFileSync(fixture, consumer);
+    writeFileSync(
+      fixture,
+      fixture.endsWith(".mts")
+        ? `${consumer}
+           const typedForm: FormData = form;
+           const typedCurlError: CurlError = curlError;
+           const typedRequestError: RequestError = requestError;
+           const typedResponseError: ResponseError = responseError;
+           void [typedForm, typedCurlError, typedRequestError, typedResponseError];`
+        : consumer,
+    );
   }
   writeFileSync(
     tsconfig,
@@ -241,7 +335,6 @@ test("built declarations expose the public root API without leaking Node header 
         target: "ES2022",
         types: ["node"],
         strict: true,
-        skipLibCheck: true,
         noEmit: true,
       },
       files: ["./consumer.cts", "./consumer.mts"],
