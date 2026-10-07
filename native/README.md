@@ -11,8 +11,8 @@ part of the language migration.
 
 ## Building locally
 
-Local native builds require Rust 1.96 or newer, Node.js, CMake, and the platform C/C++
-toolchain used by the bundled libcurl/AWS-LC build (Xcode Command Line Tools,
+Local native builds require the Rust toolchain pinned by `../rust-toolchain.toml`,
+Node.js, CMake 3.20+, and the platform C/C++ toolchain used by the bundled libcurl/AWS-LC build (Xcode Command Line Tools,
 MSVC Build Tools, or a Linux build-essential equivalent). Linux builds also need
 libclang for bindgen, and Windows x86/x64 builds need NASM:
 
@@ -31,8 +31,10 @@ The build uses Cargo and produces:
 native/build/sync_request_curl_native.node
 ```
 
-`curl-sys` builds bundled libcurl with HTTP/2 and HTTP/3 enabled on all supported
-platforms. HTTP/3 uses ngtcp2 and nghttp3 with AWS-LC as libcurl's TLS backend.
+`curl-sys` builds bundled libcurl with HTTP/2 on all supported platforms. HTTP/3
+is enabled on supported bundled targets using ngtcp2 and nghttp3 with AWS-LC as
+libcurl's TLS backend. The Windows x86 (`i686-pc-windows-msvc`) build remains
+HTTP/2-only because the fork does not currently exercise its AWS-LC HTTP/3 path.
 macOS additionally enables Apple SecTrust for native certificate verification, and
 Windows uses the native CA store. System/custom libcurl builds can use
 `httpVersion: "3"` or `"3-only"` only when that linked libcurl reports HTTP/3

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Application } from "typedoc";
+import { getRustVersionLabel } from "#scripts/rust-toolchain";
 import config from "#typedoc/typedoc.config";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
@@ -47,7 +48,9 @@ const OPTIONS_PARAMETER_ROW_PREFIX = "| `options` |";
 const OPTIONS_REFERENCE = "[`Options`](#options)";
 
 const readAsset = (name: string): string =>
-  readFileSync(resolve(assetsDirectory, name), "utf8").trim();
+  readFileSync(resolve(assetsDirectory, name), "utf8")
+    .trim()
+    .replaceAll("{{RUST_VERSION}}", getRustVersionLabel());
 
 const getFenceMarker = (line: string): FenceMarker | undefined => {
   let offset = 0;

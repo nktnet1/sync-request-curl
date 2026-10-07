@@ -2,7 +2,6 @@
 name = "sync-request-curl-native"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.96.0"
 publish = false
 
 [lib]
@@ -10,8 +9,9 @@ name = "sync_request_curl_native"
 crate-type = ["cdylib"]
 
 [features]
-default = ["bundled-curl"]
-bundled-curl = ["curl-sys/http2", "curl-sys/http3", "curl-sys/ssl", "curl-sys/static-curl", "curl-sys/static-ssl", "curl-sys/apple-sectrust"]
+default = ["bundled-curl-http3"]
+bundled-curl = ["curl-sys/http2", "curl-sys/ssl", "curl-sys/static-curl", "curl-sys/static-ssl", "curl-sys/apple-sectrust"]
+bundled-curl-http3 = ["bundled-curl", "curl-sys/http3"]
 system-curl = ["curl-sys/force-system-lib-on-osx"]
 # Cargo unit tests run without a Node host; never enable this for addon builds.
 test-noop = ["napi/noop", "napi-derive/noop"]

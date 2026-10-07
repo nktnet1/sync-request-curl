@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Rust
-        run: rustup toolchain install 1.96.0 --profile minimal --no-self-update
+        run: rustup toolchain install "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)" --profile minimal --no-self-update
 
       - name: Install HTTP/3 native build dependencies
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake libclang-dev
@@ -34,7 +34,7 @@ jobs:
           LIBZ_SYS_STATIC: "1"
           OPENSSL_STATIC: "1"
           PKG_CONFIG_ALL_STATIC: "1"
-        run: cargo test --locked --manifest-path native/Cargo.toml --lib --no-default-features --features bundled-curl,test-noop
+        run: cargo test --locked --manifest-path native/Cargo.toml --lib --no-default-features --features bundled-curl-http3,test-noop
 
   native:
     strategy:
@@ -91,7 +91,7 @@ jobs:
 
       - name: Set up Rust
         if: matrix.kind == 'desktop' && steps.native-desktop-cache.outputs.cache-hit != 'true'
-        run: rustup toolchain install 1.96.0 --profile minimal --no-self-update
+        run: rustup toolchain install "$(node scripts/rust-toolchain.ts)" --profile minimal --no-self-update
 
       - name: Build native addon
         if: matrix.kind == 'desktop' && steps.native-desktop-cache.outputs.cache-hit != 'true'

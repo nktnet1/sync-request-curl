@@ -47,6 +47,7 @@ for (const mode of [
   "cargo-failure",
   "load-failure",
   "musl",
+  "windows-x86",
   "symlink",
 ] as const) {
   test(`source builder: ${mode}`, async () => {
@@ -71,6 +72,8 @@ for (const mode of [
       target = "x86_64-unknown-linux-musl";
     } else if (mode === "macos-default") {
       target = "x86_64-apple-darwin";
+    } else if (mode === "windows-x86") {
+      target = "i686-pc-windows-msvc";
     }
     const originalSpawn = childProcess.spawnSync;
     const originalTarget = process.env.CARGO_BUILD_TARGET;
@@ -98,7 +101,11 @@ for (const mode of [
         const features = args.at(args.indexOf("--features") + 1);
         assert.equal(
           features,
-          mode === "system" ? "system-curl" : "bundled-curl",
+          mode === "system"
+            ? "system-curl"
+            : mode === "windows-x86"
+              ? "bundled-curl"
+              : "bundled-curl-http3",
         );
         assert.equal(args.at(-1), target);
         assert.equal(options?.env?.CARGO_TARGET_DIR, join(native, "target"));

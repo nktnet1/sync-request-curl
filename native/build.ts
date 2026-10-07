@@ -19,7 +19,7 @@ type CliOptions = {
 const usage = `Usage: sync-request-curl-build [--libcurl=system|bundled]
 
 Build the installed sync-request-curl addon from its bundled Rust sources.
-Requires Rust 1.96+ and platform native build tools.
+Requires the Rust toolchain pinned by rust-toolchain.toml and platform native build tools.
 Run using the same Node.js architecture as your application.
 Set CARGO_BUILD_TARGET to override the Rust target.
 
@@ -27,7 +27,7 @@ Options:
   --libcurl=system    Link against a system-provided libcurl and fail if unavailable.
   --libcurl=bundled   Build the libcurl bundled by curl-sys.
 
-Default: bundled libcurl on all targets. Use --libcurl=system to opt into a system-provided libcurl.`;
+Default: bundled libcurl on all targets. HTTP/3 is enabled where the bundled AWS-LC backend is supported; Windows x86 uses the HTTP/2 bundled build. Use --libcurl=system to opt into a system-provided libcurl.`;
 
 const parseCliOptions = (args: readonly string[]): CliOptions => {
   if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) {
@@ -77,7 +77,7 @@ const run = (
   if (result.error || result.status !== 0) {
     throw new Error(
       `${command} failed: ${result.error?.message || result.stderr || result.signal || result.status}. ` +
-        "Source builds require Rust 1.96+, a platform C/C++ toolchain, CMake, make, Perl, and pkg-config on Unix. " +
+        "Source builds require the Rust toolchain pinned by rust-toolchain.toml, a platform C/C++ toolchain, CMake 3.20+, make, Perl, and pkg-config on Unix. " +
         "Install the Rust target and native toolchain matching your Node.js architecture.",
     );
   }
@@ -120,6 +120,12 @@ const buildNative = (requestedCurlSource?: CurlSource): void => {
         `${env.RUSTFLAGS || ""} -C target-feature=-crt-static`.trim();
     }
   }
+  const bundledFeature = [
+    "i686-pc-windows-msvc",
+    "x86_64-pc-windows-gnu",
+  ].includes(target)
+    ? "bundled-curl"
+    : "bundled-curl-http3";
   run(
     "cargo",
     [
@@ -130,7 +136,7 @@ const buildNative = (requestedCurlSource?: CurlSource): void => {
       "--release",
       "--no-default-features",
       "--features",
-      curlSource === "system" ? "system-curl" : "bundled-curl",
+      curlSource === "system" ? "system-curl" : bundledFeature,
       "--target",
       target,
     ],

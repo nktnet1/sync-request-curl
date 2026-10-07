@@ -24,7 +24,7 @@ loaded and tested in Alpine containers.
 
 Desktop builds run Cargo on GitHub runners. Windows x86 builds target
 `i686-pc-windows-msvc` and are load-checked with 32-bit Node.js 22. Linux build
-containers install the pinned Rust 1.96 toolchain before compiling. The Cargo
+containers install the toolchain pinned by `rust-toolchain.toml` before compiling. The Cargo
 build bundles libcurl and its build-time native dependencies into the addon, after which CI
 stages the dynamic library as:
 

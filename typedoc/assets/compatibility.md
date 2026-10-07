@@ -71,11 +71,11 @@ The flag selects the libcurl implementation. Both modes continue to use
 
 Source builds require:
 
-- Rust 1.96 or newer and Cargo
-- Linux and other Unix systems: a C/C++ compiler, CMake, make, Perl, pkg-config,
+- Rust {{RUST_VERSION}} or newer and Cargo
+- Linux and other Unix systems: a C/C++ compiler, CMake 3.20+, make, Perl, pkg-config,
   libclang, and CA certificates
-- macOS: Xcode Command Line Tools and CMake
-- Windows: Visual Studio C++ Build Tools, CMake, and the Windows SDK for the target
+- macOS: Xcode Command Line Tools and CMake 3.20+
+- Windows: Visual Studio C++ Build Tools, CMake 3.20+, and the Windows SDK for the target
   CPU; x86 and x64 builds also require NASM
 - Access to the locked Cargo dependencies, or an already populated Cargo cache
 

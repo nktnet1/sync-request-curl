@@ -160,7 +160,7 @@ pub(crate) fn configure_default_ca(
 mod tests {
   use super::*;
 
-  #[cfg(feature = "bundled-curl")]
+  #[cfg(feature = "bundled-curl-http3")]
   #[test]
   fn bundled_libcurl_reports_http3_support() {
     ensure_curl_initialized().unwrap();
