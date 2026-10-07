@@ -24,26 +24,16 @@ const section = (name: string): string => {
 };
 
 describe("native libcurl build contract", () => {
-  test("bundled libcurl separates the HTTP/3 extension from the portable baseline", () => {
+  test("bundled HTTP/3 retains the complete bundled TLS feature set", () => {
     const features = section("features");
 
     expect(features).toContain('default = ["bundled-curl-http3"]');
     expect(features).toContain(
-      'bundled-curl-base = ["curl-sys/http2", "curl-sys/static-curl", "curl-sys/apple-sectrust"]',
+      'bundled-curl = ["curl-sys/http2", "curl-sys/ssl", "curl-sys/static-curl", "curl-sys/static-ssl", "curl-sys/apple-sectrust"]',
     );
     expect(features).toContain(
-      'bundled-curl = ["bundled-curl-base", "curl-sys/ssl", "curl-sys/static-ssl"]',
+      'bundled-curl-http3 = ["bundled-curl", "curl-sys/http3"]',
     );
-    expect(features).toContain(
-      'bundled-curl-http3 = ["bundled-curl-base", "curl-sys/http3"]',
-    );
-
-    const http3Feature = features
-      .split("\n")
-      .find((line) => line.startsWith("bundled-curl-http3 ="));
-    expect(http3Feature).not.toContain('"bundled-curl"');
-    expect(http3Feature).not.toContain('"curl-sys/ssl"');
-    expect(http3Feature).not.toContain('"curl-sys/static-ssl"');
   });
 
   test("system libcurl keeps macOS force-system support without enabling bundled HTTP features", () => {
@@ -65,7 +55,11 @@ describe("native libcurl build contract", () => {
     );
   });
 
-  test("system mode rejects curl-sys bundled fallback", () => {
+  test("build script recognises both bundled entry features and rejects system fallback", () => {
+    expect(buildRs).toContain('env::var_os("CARGO_FEATURE_BUNDLED_CURL")');
+    expect(buildRs).toContain(
+      'env::var_os("CARGO_FEATURE_BUNDLED_CURL_HTTP3")',
+    );
     expect(buildRs).toContain('env::var_os("DEP_CURL_STATIC")');
     expect(buildRs).toContain("system-curl was requested");
   });
