@@ -84,6 +84,30 @@ const run = (
   return result.stdout?.trim() || "";
 };
 
+const configureMuslBuildEnvironment = (
+  env: NodeJS.ProcessEnv,
+  target: string,
+): void => {
+  if (!target.includes("musl")) {
+    return;
+  }
+  if (env.CARGO_ENCODED_RUSTFLAGS !== undefined) {
+    env.CARGO_ENCODED_RUSTFLAGS += `${env.CARGO_ENCODED_RUSTFLAGS ? "\x1f" : ""}-C\x1ftarget-feature=-crt-static`;
+    return;
+  }
+  env.RUSTFLAGS = `${env.RUSTFLAGS || ""} -C target-feature=-crt-static`.trim();
+};
+
+const nativeLibraryName = (): string => {
+  if (process.platform === "win32") {
+    return "sync_request_curl_native.dll";
+  }
+  if (process.platform === "darwin") {
+    return "libsync_request_curl_native.dylib";
+  }
+  return "libsync_request_curl_native.so";
+};
+
 const buildNative = (requestedCurlSource?: CurlSource): void => {
   const host = run("rustc", ["-vV"], process.env, true)
     .split("\n")
@@ -118,14 +142,7 @@ const buildNative = (requestedCurlSource?: CurlSource): void => {
     delete env.CARGO_BUILD_TARGET;
   }
   // Rust's musl defaults otherwise prevent producing a loadable shared library.
-  if (target.includes("musl")) {
-    if (env.CARGO_ENCODED_RUSTFLAGS !== undefined) {
-      env.CARGO_ENCODED_RUSTFLAGS += `${env.CARGO_ENCODED_RUSTFLAGS ? "\x1f" : ""}-C\x1ftarget-feature=-crt-static`;
-    } else {
-      env.RUSTFLAGS =
-        `${env.RUSTFLAGS || ""} -C target-feature=-crt-static`.trim();
-    }
-  }
+  configureMuslBuildEnvironment(env, target);
   const bundledFeature = [
     "i686-pc-windows-msvc",
     "x86_64-pc-windows-gnu",
@@ -146,12 +163,7 @@ const buildNative = (requestedCurlSource?: CurlSource): void => {
     cargoArgs.push("--target", target);
   }
   run("cargo", cargoArgs, env);
-  let library = "libsync_request_curl_native.so";
-  if (process.platform === "win32") {
-    library = "sync_request_curl_native.dll";
-  } else if (process.platform === "darwin") {
-    library = "libsync_request_curl_native.dylib";
-  }
+  const library = nativeLibraryName();
   mkdirSync(buildDir, { recursive: true });
   const temporary = join(
     buildDir,
