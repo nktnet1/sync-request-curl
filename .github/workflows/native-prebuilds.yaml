@@ -136,7 +136,7 @@ jobs:
       - name: Set up Rust and x86 target
         if: steps.native-cache.outputs.cache-hit != 'true'
         run: |
-          $toolchain = (Select-String -Path rust-toolchain.toml -Pattern '^channel = "([^"]+)"$').Matches[0].Groups[1].Value
+          $toolchain = node scripts/rust-toolchain.ts
           rustup toolchain install $toolchain --profile minimal --no-self-update
           rustup target add i686-pc-windows-msvc --toolchain $toolchain
       - name: Set up NASM for Windows x86

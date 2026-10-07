@@ -40,7 +40,7 @@ const mutableChildProcess = childProcess as {
   spawnSync: typeof childProcess.spawnSync;
 };
 
-for (const mode of [
+const modes = [
   "success",
   "system",
   "macos-default",
@@ -49,7 +49,113 @@ for (const mode of [
   "musl",
   "windows-x86",
   "symlink",
-] as const) {
+] as const;
+
+type Mode = (typeof modes)[number];
+
+const targetForMode = (mode: Mode): string => {
+  switch (mode) {
+    case "musl":
+      return "x86_64-unknown-linux-musl";
+    case "macos-default":
+      return "x86_64-apple-darwin";
+    case "windows-x86":
+      return "i686-pc-windows-msvc";
+    default:
+      return "x86_64-unknown-linux-gnu";
+  }
+};
+
+const expectedFeatureForMode = (mode: Mode): string => {
+  if (mode === "system") {
+    return "system-curl";
+  }
+  if (mode === "windows-x86") {
+    return "bundled-curl";
+  }
+  return "bundled-curl-http3";
+};
+
+const nativeLibraryName = (): string => {
+  if (process.platform === "win32") {
+    return "sync_request_curl_native.dll";
+  }
+  if (process.platform === "darwin") {
+    return "libsync_request_curl_native.dylib";
+  }
+  return "libsync_request_curl_native.so";
+};
+
+const restoreEnvironmentVariable = (
+  name: string,
+  value: string | undefined,
+): void => {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
+};
+
+const createMockSpawn = (
+  mode: Mode,
+  target: string,
+  native: string,
+  output: string,
+  commands: string[],
+): typeof childProcess.spawnSync =>
+  ((
+    command: string,
+    args: readonly string[] = [],
+    options?: SpawnSyncOptionsWithStringEncoding,
+  ): SpawnSyncReturns<string> => {
+    commands.push(command);
+    if (command === "rustc") {
+      return spawnResult(0, `host: ${target}`);
+    }
+    if (command === "cargo") {
+      assert.ok(args.includes("--locked"));
+      assert.ok(args.includes("--no-default-features"));
+      assert.equal(
+        args.at(args.indexOf("--features") + 1),
+        expectedFeatureForMode(mode),
+      );
+      assert.equal(options?.env?.CARGO_TARGET_DIR, join(native, "target"));
+
+      const targetIndex = args.indexOf("--target");
+      if (mode === "musl") {
+        assert.equal(targetIndex, -1);
+        assert.equal(options?.env?.CARGO_BUILD_TARGET, undefined);
+        assert.equal(
+          options?.env?.CARGO_ENCODED_RUSTFLAGS,
+          "--cfg\x1ftest_build\x1f-C\x1ftarget-feature=-crt-static",
+        );
+      } else {
+        assert.equal(args.at(targetIndex + 1), target);
+      }
+
+      if (mode === "cargo-failure") {
+        return spawnResult(1);
+      }
+      const releaseDirectory =
+        mode === "musl"
+          ? join(native, "target", "release")
+          : join(native, "target", target, "release");
+      const artifact = join(releaseDirectory, nativeLibraryName());
+      mkdirSync(dirname(artifact), { recursive: true });
+      writeFileSync(artifact, "new addon");
+      return spawnResult(0);
+    }
+
+    assert.equal(command, process.execPath);
+    assert.equal(readFileSync(output, "utf8"), "previous addon");
+    const candidate = args.at(-1);
+    assert.ok(candidate);
+    assert.equal(readFileSync(candidate, "utf8"), "new addon");
+    return mode === "load-failure" ? spawnResult(1) : spawnResult(0);
+  }) as typeof childProcess.spawnSync;
+
+for (const mode of modes) {
   test(`source builder: ${mode}`, async () => {
     // ESM resolves symlinks, including macOS /var -> /private/var.
     const root = realpathSync(mkdtempSync(join(tmpdir(), "curl-source-test-")));
@@ -67,14 +173,7 @@ for (const mode of [
         process.platform === "win32" ? "junction" : "dir",
       );
     }
-    let target = "x86_64-unknown-linux-gnu";
-    if (mode === "musl") {
-      target = "x86_64-unknown-linux-musl";
-    } else if (mode === "macos-default") {
-      target = "x86_64-apple-darwin";
-    } else if (mode === "windows-x86") {
-      target = "i686-pc-windows-msvc";
-    }
+    const target = targetForMode(mode);
     const originalSpawn = childProcess.spawnSync;
     const originalTarget = process.env.CARGO_BUILD_TARGET;
     const originalFlags = process.env.CARGO_ENCODED_RUSTFLAGS;
@@ -86,60 +185,8 @@ for (const mode of [
         ? [process.execPath, source, "--libcurl=system"]
         : [process.execPath, source];
     const commands: string[] = [];
-    const mockSpawn = (
-      command: string,
-      args: readonly string[] = [],
-      options?: SpawnSyncOptionsWithStringEncoding,
-    ): SpawnSyncReturns<string> => {
-      commands.push(command);
-      if (command === "rustc") {
-        return spawnResult(0, `host: ${target}`);
-      }
-      if (command === "cargo") {
-        assert.ok(args.includes("--locked"));
-        assert.ok(args.includes("--no-default-features"));
-        const features = args.at(args.indexOf("--features") + 1);
-        assert.equal(
-          features,
-          mode === "system"
-            ? "system-curl"
-            : mode === "windows-x86"
-              ? "bundled-curl"
-              : "bundled-curl-http3",
-        );
-        assert.equal(args.at(-1), target);
-        assert.equal(options?.env?.CARGO_TARGET_DIR, join(native, "target"));
-        if (mode === "musl") {
-          assert.equal(
-            options?.env?.CARGO_ENCODED_RUSTFLAGS,
-            "--cfg\x1ftest_build\x1f-C\x1ftarget-feature=-crt-static",
-          );
-        }
-        if (mode === "cargo-failure") {
-          return spawnResult(1);
-        }
-        let name = "libsync_request_curl_native.so";
-        if (process.platform === "win32") {
-          name = "sync_request_curl_native.dll";
-        } else if (process.platform === "darwin") {
-          name = "libsync_request_curl_native.dylib";
-        }
-        const artifact = join(native, "target", target, "release", name);
-        mkdirSync(dirname(artifact), { recursive: true });
-        writeFileSync(artifact, "new addon");
-      } else {
-        assert.equal(command, process.execPath);
-        assert.equal(readFileSync(output, "utf8"), "previous addon");
-        const candidate = args.at(-1);
-        assert.ok(candidate);
-        assert.equal(readFileSync(candidate, "utf8"), "new addon");
-        if (mode === "load-failure") {
-          return spawnResult(1);
-        }
-      }
-      return spawnResult(0);
-    };
-    mutableChildProcess.spawnSync = mockSpawn as typeof childProcess.spawnSync;
+    const mockSpawn = createMockSpawn(mode, target, native, output, commands);
+    mutableChildProcess.spawnSync = mockSpawn;
     syncBuiltinESMExports();
     try {
       const build = import(
@@ -157,16 +204,8 @@ for (const mode of [
       mutableChildProcess.spawnSync = originalSpawn;
       syncBuiltinESMExports();
       process.argv = originalArgv;
-      if (originalTarget === undefined) {
-        delete process.env.CARGO_BUILD_TARGET;
-      } else {
-        process.env.CARGO_BUILD_TARGET = originalTarget;
-      }
-      if (originalFlags === undefined) {
-        delete process.env.CARGO_ENCODED_RUSTFLAGS;
-      } else {
-        process.env.CARGO_ENCODED_RUSTFLAGS = originalFlags;
-      }
+      restoreEnvironmentVariable("CARGO_BUILD_TARGET", originalTarget);
+      restoreEnvironmentVariable("CARGO_ENCODED_RUSTFLAGS", originalFlags);
       rmSync(root, { recursive: true, force: true });
     }
   });

@@ -104,6 +104,9 @@ const buildNative = (requestedCurlSource?: CurlSource): void => {
     );
   }
   const curlSource = requestedCurlSource ?? "bundled";
+  // Cargo's explicit --target mode does not pass rustflags to host build scripts.
+  // On a native musl host, bindgen also needs dynamic musl linkage to load libclang.
+  const nativeMuslHostBuild = target === host && target.includes("musl");
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     CARGO_TARGET_DIR: targetDir,
@@ -111,6 +114,9 @@ const buildNative = (requestedCurlSource?: CurlSource): void => {
     OPENSSL_STATIC: "1",
     PKG_CONFIG_ALL_STATIC: "1",
   };
+  if (nativeMuslHostBuild) {
+    delete env.CARGO_BUILD_TARGET;
+  }
   // Rust's musl defaults otherwise prevent producing a loadable shared library.
   if (target.includes("musl")) {
     if (env.CARGO_ENCODED_RUSTFLAGS !== undefined) {
@@ -126,22 +132,20 @@ const buildNative = (requestedCurlSource?: CurlSource): void => {
   ].includes(target)
     ? "bundled-curl"
     : "bundled-curl-http3";
-  run(
-    "cargo",
-    [
-      "build",
-      "--locked",
-      "--manifest-path",
-      join(nativeDir, "Cargo.toml"),
-      "--release",
-      "--no-default-features",
-      "--features",
-      curlSource === "system" ? "system-curl" : bundledFeature,
-      "--target",
-      target,
-    ],
-    env,
-  );
+  const cargoArgs = [
+    "build",
+    "--locked",
+    "--manifest-path",
+    join(nativeDir, "Cargo.toml"),
+    "--release",
+    "--no-default-features",
+    "--features",
+    curlSource === "system" ? "system-curl" : bundledFeature,
+  ];
+  if (!nativeMuslHostBuild) {
+    cargoArgs.push("--target", target);
+  }
+  run("cargo", cargoArgs, env);
   let library = "libsync_request_curl_native.so";
   if (process.platform === "win32") {
     library = "sync_request_curl_native.dll";
@@ -154,7 +158,10 @@ const buildNative = (requestedCurlSource?: CurlSource): void => {
     `sync_request_curl_native.${process.pid}.node`,
   );
   try {
-    copyFileSync(join(targetDir, target, "release", library), temporary);
+    const releaseDirectory = nativeMuslHostBuild
+      ? join(targetDir, "release")
+      : join(targetDir, target, "release");
+    copyFileSync(join(releaseDirectory, library), temporary);
     // Validate in a child process before replacing a working addon. This also catches
     // wrong-architecture targets and missing shared dependencies without loading it here.
     run(process.execPath, [
