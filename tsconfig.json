@@ -1,7 +1,7 @@
 {
   "include": [
     "src/**/*.ts",
-    "native/**/*.ts",
+    "native/*.ts",
     "tests/**/*.ts",
     "scripts/**/*.ts",
     "typedoc/**/*.ts"

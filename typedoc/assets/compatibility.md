@@ -15,14 +15,16 @@ the peer certificate cannot be verified. `rejectUnauthorized: false` disables
 origin certificate and hostname verification and should only be used when that
 trade-off is intentional.
 
-The bundled Windows libcurl uses Schannel. For file-based mutual TLS, use a
-PKCS#12 client identity (`tls.certType: "p12"`); Schannel expects the private
-key to be part of that identity and ignores a separate `tls.keyFile`.
+The bundled Windows libcurl builds use AWS-LC, support HTTP/3, and use the
+Windows native CA store on x64, arm64, and x86. File-based mutual TLS supports
+PEM certificate/key pairs and PKCS#12 identities through the high-level `tls`
+option.
 
 ### macOS
 
-Prebuilt binaries are available for Apple Silicon (`arm64`) and Intel (`x64`) macOS.
-The default bundled libcurl uses OpenSSL, with Apple SecTrust for native
+Prebuilt binaries are available for Apple Silicon (`arm64`, macOS 11+) and Intel
+(`x64`, macOS 10.13+) macOS.
+The default bundled libcurl uses AWS-LC, with Apple SecTrust for native
 certificate verification. File-based mutual TLS supports PEM certificate/key
 pairs and PKCS#12 identities through the high-level `tls` option.
 
@@ -33,7 +35,7 @@ and TLS-version capabilities of the selected system libcurl and TLS backend.
 
 Prebuilt binaries are available for x64 and arm64 Linux on both glibc and musl.
 GNU/Linux release binaries require GLIBC 2.31 or newer. The bundled Linux
-libcurl uses OpenSSL and supports PEM certificate/key pairs and PKCS#12 client
+libcurl uses AWS-LC and supports PEM certificate/key pairs and PKCS#12 client
 identities through the high-level `tls` option.
 
 ### Building from source
@@ -52,8 +54,9 @@ Run the build with the same Node.js architecture that will use the library. Run
 `sync-request-curl-build --help` for the current prerequisites.
 
 Source builds use the libcurl bundled by `curl-sys` by default on all supported
-platforms. On macOS, the bundled OpenSSL backend uses Apple SecTrust for native
-certificate verification. Override the libcurl source explicitly when needed:
+platforms. The bundled build includes HTTP/2 and HTTP/3 using AWS-LC on all
+supported prebuilt targets. On macOS, Apple SecTrust provides native certificate
+verification. Override the libcurl source explicitly when needed:
 
 ```sh
 npm exec --no -- sync-request-curl-build --libcurl=system
@@ -71,11 +74,13 @@ The flag selects the libcurl implementation. Both modes continue to use
 
 Source builds require:
 
-- Rust 1.88 or newer and Cargo
-- Linux and other Unix systems: a C/C++ compiler, make, Perl, pkg-config, and
-  CA certificates
-- macOS: Xcode Command Line Tools
-- Windows: Visual Studio C++ Build Tools and the Windows SDK for the target CPU
+- Rust {{RUST_VERSION}} or newer and Cargo
+- Linux and other Unix systems: a C/C++ compiler, CMake 3.20+, make, Perl, pkg-config,
+  libclang, and CA certificates
+- macOS: Xcode Command Line Tools and CMake 3.20+; bundled builds default to a
+  macOS 10.13 deployment target on x64 and 11.0 on arm64
+- Windows: Visual Studio C++ Build Tools, CMake 3.20+, and the Windows SDK for the target
+  CPU; x86 and x64 builds also require NASM
 - Access to the locked Cargo dependencies, or an already populated Cargo cache
 
 Other architectures and Unix platforms may work when Node.js, Rust, and the

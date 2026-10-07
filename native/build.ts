@@ -19,7 +19,7 @@ type CliOptions = {
 const usage = `Usage: sync-request-curl-build [--libcurl=system|bundled]
 
 Build the installed sync-request-curl addon from its bundled Rust sources.
-Requires Rust 1.88+ and platform native build tools.
+Requires the Rust toolchain pinned by rust-toolchain.toml and platform native build tools.
 Run using the same Node.js architecture as your application.
 Set CARGO_BUILD_TARGET to override the Rust target.
 
@@ -27,7 +27,7 @@ Options:
   --libcurl=system    Link against a system-provided libcurl and fail if unavailable.
   --libcurl=bundled   Build the libcurl bundled by curl-sys.
 
-Default: bundled libcurl on all targets. Use --libcurl=system to opt into a system-provided libcurl.`;
+Default: bundled libcurl with HTTP/3 on all release targets. Use --libcurl=system to opt into a system-provided libcurl.`;
 
 const parseCliOptions = (args: readonly string[]): CliOptions => {
   if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) {
@@ -77,11 +77,50 @@ const run = (
   if (result.error || result.status !== 0) {
     throw new Error(
       `${command} failed: ${result.error?.message || result.stderr || result.signal || result.status}. ` +
-        "Source builds require Rust 1.88+, a platform C/C++ toolchain, make, Perl, and pkg-config on Unix. " +
+        "Source builds require the Rust toolchain pinned by rust-toolchain.toml, a platform C/C++ toolchain, CMake 3.20+, make, Perl, and pkg-config on Unix. " +
         "Install the Rust target and native toolchain matching your Node.js architecture.",
     );
   }
   return result.stdout?.trim() || "";
+};
+
+const defaultMacosDeploymentTarget = (target: string): string =>
+  target === "x86_64-apple-darwin" ? "10.13" : "11.0";
+
+const configureMacosBuildEnvironment = (
+  env: NodeJS.ProcessEnv,
+  target: string,
+): void => {
+  if (
+    target.endsWith("-apple-darwin") &&
+    env.MACOSX_DEPLOYMENT_TARGET === undefined
+  ) {
+    env.MACOSX_DEPLOYMENT_TARGET = defaultMacosDeploymentTarget(target);
+  }
+};
+
+const configureMuslBuildEnvironment = (
+  env: NodeJS.ProcessEnv,
+  target: string,
+): void => {
+  if (!target.includes("musl")) {
+    return;
+  }
+  if (env.CARGO_ENCODED_RUSTFLAGS !== undefined) {
+    env.CARGO_ENCODED_RUSTFLAGS += `${env.CARGO_ENCODED_RUSTFLAGS ? "\x1f" : ""}-C\x1ftarget-feature=-crt-static`;
+    return;
+  }
+  env.RUSTFLAGS = `${env.RUSTFLAGS || ""} -C target-feature=-crt-static`.trim();
+};
+
+const nativeLibraryName = (): string => {
+  if (process.platform === "win32") {
+    return "sync_request_curl_native.dll";
+  }
+  if (process.platform === "darwin") {
+    return "libsync_request_curl_native.dylib";
+  }
+  return "libsync_request_curl_native.so";
 };
 
 const buildNative = (requestedCurlSource?: CurlSource): void => {
@@ -104,6 +143,9 @@ const buildNative = (requestedCurlSource?: CurlSource): void => {
     );
   }
   const curlSource = requestedCurlSource ?? "bundled";
+  // Cargo's explicit --target mode does not pass rustflags to host build scripts.
+  // On a native musl host, bindgen also needs dynamic musl linkage to load libclang.
+  const nativeMuslHostBuild = target === host && target.includes("musl");
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     CARGO_TARGET_DIR: targetDir,
@@ -111,44 +153,39 @@ const buildNative = (requestedCurlSource?: CurlSource): void => {
     OPENSSL_STATIC: "1",
     PKG_CONFIG_ALL_STATIC: "1",
   };
+  if (nativeMuslHostBuild) {
+    delete env.CARGO_BUILD_TARGET;
+  }
+  configureMacosBuildEnvironment(env, target);
   // Rust's musl defaults otherwise prevent producing a loadable shared library.
-  if (target.includes("musl")) {
-    if (env.CARGO_ENCODED_RUSTFLAGS !== undefined) {
-      env.CARGO_ENCODED_RUSTFLAGS += `${env.CARGO_ENCODED_RUSTFLAGS ? "\x1f" : ""}-C\x1ftarget-feature=-crt-static`;
-    } else {
-      env.RUSTFLAGS =
-        `${env.RUSTFLAGS || ""} -C target-feature=-crt-static`.trim();
-    }
+  configureMuslBuildEnvironment(env, target);
+  const bundledFeature =
+    target === "x86_64-pc-windows-gnu" ? "bundled-curl" : "bundled-curl-http3";
+  const cargoArgs = [
+    "build",
+    "--locked",
+    "--manifest-path",
+    join(nativeDir, "Cargo.toml"),
+    "--release",
+    "--no-default-features",
+    "--features",
+    curlSource === "system" ? "system-curl" : bundledFeature,
+  ];
+  if (!nativeMuslHostBuild) {
+    cargoArgs.push("--target", target);
   }
-  run(
-    "cargo",
-    [
-      "build",
-      "--locked",
-      "--manifest-path",
-      join(nativeDir, "Cargo.toml"),
-      "--release",
-      "--no-default-features",
-      "--features",
-      curlSource === "system" ? "system-curl" : "bundled-curl",
-      "--target",
-      target,
-    ],
-    env,
-  );
-  let library = "libsync_request_curl_native.so";
-  if (process.platform === "win32") {
-    library = "sync_request_curl_native.dll";
-  } else if (process.platform === "darwin") {
-    library = "libsync_request_curl_native.dylib";
-  }
+  run("cargo", cargoArgs, env);
+  const library = nativeLibraryName();
   mkdirSync(buildDir, { recursive: true });
   const temporary = join(
     buildDir,
     `sync_request_curl_native.${process.pid}.node`,
   );
   try {
-    copyFileSync(join(targetDir, target, "release", library), temporary);
+    const releaseDirectory = nativeMuslHostBuild
+      ? join(targetDir, "release")
+      : join(targetDir, target, "release");
+    copyFileSync(join(releaseDirectory, library), temporary);
     // Validate in a child process before replacing a working addon. This also catches
     // wrong-architecture targets and missing shared dependencies without loading it here.
     run(process.execPath, [

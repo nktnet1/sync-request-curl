@@ -1,7 +1,8 @@
 use std::env;
 
 fn main() {
-  let bundled = env::var_os("CARGO_FEATURE_BUNDLED_CURL").is_some();
+  let bundled = env::var_os("CARGO_FEATURE_BUNDLED_CURL").is_some()
+    || env::var_os("CARGO_FEATURE_BUNDLED_CURL_HTTP3").is_some();
   let system = env::var_os("CARGO_FEATURE_SYSTEM_CURL").is_some();
 
   match (bundled, system) {
@@ -14,10 +15,12 @@ fn main() {
       }
     }
     (false, false) => {
-      panic!("select exactly one libcurl source feature: bundled-curl or system-curl");
+      panic!(
+        "select exactly one libcurl source feature: bundled-curl, bundled-curl-http3, or system-curl"
+      );
     }
     (true, true) => {
-      panic!("bundled-curl and system-curl are mutually exclusive");
+      panic!("bundled libcurl features and system-curl are mutually exclusive");
     }
   }
 

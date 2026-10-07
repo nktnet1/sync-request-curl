@@ -285,6 +285,15 @@ mod tests {
   use super::*;
 
   #[test]
+  fn http3_preferences_map_to_libcurl_values() {
+    assert_eq!(
+      parse_http_version(Some("3")).unwrap(),
+      curl_sys::CURL_HTTP_VERSION_3 as c_long,
+    );
+    assert_eq!(parse_http_version(Some("3-only")).unwrap(), CURL_HTTP_VERSION_3ONLY);
+  }
+
+  #[test]
   fn proxy_url_credentials_conflict_with_manual_proxy_authorization() {
     let headers = ["Proxy-Authorization: Basic dXNlcjpwYXNz".to_owned()];
     for proxy in [

@@ -11,9 +11,10 @@ part of the language migration.
 
 ## Building locally
 
-Local native builds require Rust 1.88 or newer, Node.js, and the platform C
-toolchain used by the vendored libcurl/OpenSSL build (Xcode Command Line Tools,
-MSVC Build Tools, or a Linux build-essential equivalent):
+Local native builds require the Rust toolchain pinned by `../rust-toolchain.toml`,
+Node.js, CMake 3.20+, and the platform C/C++ toolchain used by the bundled libcurl/AWS-LC build (Xcode Command Line Tools,
+MSVC Build Tools, or a Linux build-essential equivalent). Linux builds also need
+libclang for bindgen, and Windows x86/x64 builds need NASM:
 
 ```sh
 pnpm build:native
@@ -30,13 +31,13 @@ The build uses Cargo and produces:
 native/build/sync_request_curl_native.node
 ```
 
-`curl-sys` builds bundled libcurl with HTTP/2 enabled on all supported platforms.
-Linux and macOS use vendored OpenSSL; macOS additionally enables Apple SecTrust so
-certificate verification uses Apple's native trust configuration. Windows uses
-Schannel. The bundled build does not currently include an HTTP/3/QUIC backend,
-even though its libcurl version understands the HTTP/3 option values. System/custom
-libcurl builds can use `httpVersion: "3"` or `"3-only"` when that linked libcurl
-reports HTTP/3 support. zlib is forced static in the prebuild path. The Linux GCC
+`curl-sys` builds bundled libcurl with HTTP/2 and HTTP/3 on all prebuilt release
+targets. HTTP/3 uses ngtcp2 and nghttp3 with AWS-LC as libcurl's TLS backend.
+macOS additionally enables Apple SecTrust for native certificate verification; x64
+builds default to a macOS 10.13 deployment target and arm64 builds to 11.0. Windows
+uses the native CA store. System/custom libcurl builds can use
+`httpVersion: "3"` or `"3-only"` only when that linked libcurl reports HTTP/3
+support. zlib is forced static in the prebuild path. The Linux GCC
 unwinding runtime (`libgcc_s`) may
 remain dynamically linked; the dependency verifier permits this platform runtime
 while rejecting dynamically linked copies of the bundled native dependencies.

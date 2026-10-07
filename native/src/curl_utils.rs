@@ -160,6 +160,16 @@ pub(crate) fn configure_default_ca(
 mod tests {
   use super::*;
 
+  #[cfg(feature = "bundled-curl-http3")]
+  #[test]
+  fn bundled_libcurl_reports_http3_support() {
+    ensure_curl_initialized().unwrap();
+    let info = unsafe { curl_sys::curl_version_info(curl_sys::CURLVERSION_NOW) };
+    assert!(!info.is_null());
+    let features = unsafe { (*info).features };
+    assert_ne!(features & curl_sys::CURL_VERSION_HTTP3, 0);
+  }
+
   #[test]
   fn headers_preserve_latin1_bytes_without_changing_other_curl_strings() {
     let header = "X-Test: caf\u{e9}\u{80}\u{ff}";

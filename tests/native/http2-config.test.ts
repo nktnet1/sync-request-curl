@@ -24,15 +24,19 @@ const section = (name: string): string => {
 };
 
 describe("native libcurl build contract", () => {
-  test("bundled libcurl enables HTTP/2, static TLS, and Apple SecTrust", () => {
+  test("bundled HTTP/3 retains the complete bundled TLS feature set", () => {
     const features = section("features");
 
+    expect(features).toContain('default = ["bundled-curl-http3"]');
     expect(features).toContain(
       'bundled-curl = ["curl-sys/http2", "curl-sys/ssl", "curl-sys/static-curl", "curl-sys/static-ssl", "curl-sys/apple-sectrust"]',
     );
+    expect(features).toContain(
+      'bundled-curl-http3 = ["bundled-curl", "curl-sys/http3"]',
+    );
   });
 
-  test("system libcurl keeps macOS force-system support without enabling HTTP/2 features", () => {
+  test("system libcurl keeps macOS force-system support without enabling bundled HTTP features", () => {
     const features = section("features");
     const systemFeature = features
       .split("\n")
@@ -40,9 +44,22 @@ describe("native libcurl build contract", () => {
 
     expect(systemFeature).toContain('"curl-sys/force-system-lib-on-osx"');
     expect(systemFeature).not.toContain('"curl-sys/http2"');
+    expect(systemFeature).not.toContain('"curl-sys/http3"');
   });
 
-  test("system mode rejects curl-sys bundled fallback", () => {
+  test("pins the curl-sys release that provides the HTTP/3 feature", () => {
+    const dependencies = section("dependencies");
+
+    expect(dependencies).toContain(
+      'curl-sys = { package = "nktnet-curl-sys", version = "=0.4.91-nktnet.2", default-features = false }',
+    );
+  });
+
+  test("build script recognises both bundled entry features and rejects system fallback", () => {
+    expect(buildRs).toContain('env::var_os("CARGO_FEATURE_BUNDLED_CURL")');
+    expect(buildRs).toContain(
+      'env::var_os("CARGO_FEATURE_BUNDLED_CURL_HTTP3")',
+    );
     expect(buildRs).toContain('env::var_os("DEP_CURL_STATIC")');
     expect(buildRs).toContain("system-curl was requested");
   });

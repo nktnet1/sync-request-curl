@@ -1,13 +1,23 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import type { LinuxLibc, NativePlatformKey } from "#scripts/native-platform";
 import { getLinuxLibc, getPrebuildFilename } from "#scripts/native-platform";
 import { run } from "#scripts/process";
+import { getRustToolchain } from "#scripts/rust-toolchain";
 
 const root = resolve(import.meta.dirname, "..");
-const rustToolchain = "1.88.0";
+const rustToolchain = getRustToolchain();
+const cmakeVersion = "3.31.12";
+const cmakeRelease = cmakeVersion.split(".").slice(0, 2).join(".");
 // Bullseye LTS ended on 2026-08-31. Pin the last complete archive so
 // security mirror cleanup cannot make an otherwise reproducible build fail.
 const bullseyeSnapshot = "20260901T000000Z";
@@ -67,6 +77,20 @@ const getArchitecture = (): Architecture => {
 const getPlatform = (targetLibc: LinuxLibc): NativePlatformKey =>
   `linux-${getArchitecture()}-${targetLibc}`;
 
+const bullseyeCmake = {
+  x64: {
+    archiveArchitecture: "x86_64",
+    sha256: "0dc2e9a6860f06bf10bd8fadc03e35d9eeb4df46e33763a7e480e987758f385c",
+  },
+  arm64: {
+    archiveArchitecture: "aarch64",
+    sha256: "83f8fd91d2038a56556e1400390fcfe42f79602940c494f6c6f1cdae7f9e7f40",
+  },
+} as const satisfies Record<
+  Architecture,
+  { archiveArchitecture: string; sha256: string }
+>;
+
 const imageFor = (targetLibc: LinuxLibc, nodeVersion: string): string =>
   `node:${nodeVersion}-${targetLibc === "musl" ? "alpine" : "bullseye"}`;
 
@@ -125,6 +149,8 @@ const installBuildDependencies = (targetLibc: LinuxLibc): void => {
       "binutils",
       "build-base",
       "ca-certificates",
+      "clang-dev",
+      "cmake",
       "curl",
       "linux-headers",
       "perl",
@@ -144,9 +170,47 @@ const installBuildDependencies = (targetLibc: LinuxLibc): void => {
     "build-essential",
     "ca-certificates",
     "curl",
+    "libclang-dev",
     "perl",
     "pkg-config",
   ]);
+};
+
+const installBullseyeCmake = (): string => {
+  const { archiveArchitecture, sha256 } = bullseyeCmake[getArchitecture()];
+  const archiveName = `cmake-${cmakeVersion}-linux-${archiveArchitecture}.tar.gz`;
+  const archivePath = join(tmpdir(), archiveName);
+  const installDirectory = mkdtempSync(
+    join(tmpdir(), "sync-request-curl-cmake-"),
+  );
+
+  run("curl", [
+    "--fail",
+    "--location",
+    "--silent",
+    "--show-error",
+    `https://cmake.org/files/v${cmakeRelease}/${archiveName}`,
+    "--output",
+    archivePath,
+  ]);
+
+  const actualSha256 = createHash("sha256")
+    .update(readFileSync(archivePath))
+    .digest("hex");
+  if (actualSha256 !== sha256) {
+    throw new Error(
+      `CMake archive checksum mismatch: expected ${sha256}, got ${actualSha256}`,
+    );
+  }
+
+  run("tar", [
+    "-xzf",
+    archivePath,
+    "--strip-components=1",
+    "-C",
+    installDirectory,
+  ]);
+  return join(installDirectory, "bin");
 };
 
 const installVerifyDependencies = (targetLibc: LinuxLibc): void => {
@@ -220,6 +284,11 @@ const buildInsideContainer = (targetLibc: LinuxLibc): void => {
 
   installBuildDependencies(targetLibc);
   const buildEnv = installRust();
+  if (targetLibc === "gnu") {
+    const cmakeBin = installBullseyeCmake();
+    buildEnv.CMAKE = join(cmakeBin, "cmake");
+    buildEnv.PATH = `${cmakeBin}:${buildEnv.PATH ?? ""}`;
+  }
   run(process.execPath, ["scripts/build-native.ts"], {
     cwd: root,
     env: buildEnv,
