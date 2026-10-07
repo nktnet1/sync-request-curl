@@ -2,7 +2,7 @@
 name = "sync-request-curl-native"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.88.0"
+rust-version = "1.96.0"
 publish = false
 
 [lib]
@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 
 [features]
 default = ["bundled-curl"]
-bundled-curl = ["curl-sys/http2", "curl-sys/ssl", "curl-sys/static-curl", "curl-sys/static-ssl", "curl-sys/apple-sectrust"]
+bundled-curl = ["curl-sys/http2", "curl-sys/http3", "curl-sys/ssl", "curl-sys/static-curl", "curl-sys/static-ssl", "curl-sys/apple-sectrust"]
 system-curl = ["curl-sys/force-system-lib-on-osx"]
 # Cargo unit tests run without a Node host; never enable this for addon builds.
 test-noop = ["napi/noop", "napi-derive/noop"]
@@ -22,7 +22,7 @@ napi-derive = "=3.6.3"
 # Keep the macro crate on the backend release it was published against.
 # napi-derive-backend 6.1.4 moved to convert_case 0.12 while napi-derive 3.6.3 still uses 0.11.
 napi-derive-backend = "=6.1.2"
-curl-sys = { package = "nktnet-curl-sys", version = "=0.4.91-nktnet.1", default-features = false }
+curl-sys = { package = "nktnet-curl-sys", version = "=0.4.91-nktnet.2", default-features = false }
 
 [target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
 openssl-probe = "=0.2.1"

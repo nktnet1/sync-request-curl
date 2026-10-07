@@ -203,9 +203,8 @@ For a PKCS#12 identity, set `certType: 'p12'` and provide the `.p12` file as
 `certFile`; `passphrase` unlocks either a PKCS#12 identity or an encrypted
 private key. A separate `keyFile` is intentionally not accepted with `p12`.
 The active libcurl TLS backend determines which client-certificate formats are
-supported. The bundled Windows build uses Schannel, where PKCS#12 is the
-portable file-based client-certificate form and a separate `keyFile` is not
-used. `minVersion` and `maxVersion` currently accept `TLSv1.2` and `TLSv1.3`.
+supported. The bundled build uses AWS-LC and supports PEM certificate/key pairs as well as
+PKCS#12 identities. `minVersion` and `maxVersion` currently accept `TLSv1.2` and `TLSv1.3`.
 
 </details>
 
@@ -348,7 +347,7 @@ supplied.
 | ------ | ------ | ------ |
 | <a id="property-auth"></a> `auth?` | [`HttpAuthOptions`](#httpauthoptions) | HTTP origin authentication. Username/password authentication defaults to Basic; Bearer tokens use libcurl's OAuth2 bearer support. Cannot be combined with an explicit `Authorization` header. |
 | <a id="property-proxy"></a> `proxy?` | [`ProxyOptions`](#proxyoptions) | Explicit HTTP(S) or SOCKS proxy configuration. Ambient proxy variables are ignored. Defaults to no proxy. |
-| <a id="property-httpversion"></a> `httpVersion?` | \| `"auto"` \| `"2"` \| `"3"` \| `"1.0"` \| `"1.1"` \| `"2-tls"` \| `"2-prior-knowledge"` \| `"3-only"` | HTTP protocol preference. Defaults to `"auto"`. HTTP/3 values require an HTTP/3-capable linked libcurl build. |
+| <a id="property-httpversion"></a> `httpVersion?` | \| `"auto"` \| `"2"` \| `"3"` \| `"1.0"` \| `"1.1"` \| `"2-tls"` \| `"2-prior-knowledge"` \| `"3-only"` | HTTP protocol preference. Defaults to `"auto"`. The bundled build supports HTTP/3; system libcurl builds must provide HTTP/3 themselves. |
 | <a id="property-rejectunauthorized"></a> `rejectUnauthorized?` | `boolean` | Verify the origin certificate chain and hostname. Defaults to `true`. |
 | <a id="property-cafile"></a> `caFile?` | `string` | PEM CA bundle path for origin TLS verification. |
 | <a id="property-tls"></a> `tls?` | [`TlsOptions`](#tlsoptions) | Client certificate and TLS protocol-version controls for the origin. |
@@ -462,7 +461,8 @@ type HttpVersion =
 
 HTTP protocol preference passed to libcurl.
 
-HTTP/3 values require the linked libcurl build to include HTTP/3 support.
+The bundled libcurl build includes HTTP/3 support. System libcurl builds must
+provide HTTP/3 themselves.
 
 ***
 
@@ -534,8 +534,8 @@ High-level origin TLS controls.
 
 Existing top-level `caFile` and `rejectUnauthorized` options remain separate
 for backwards compatibility. Client certificate format support depends on
-the active libcurl TLS backend; PKCS#12 is supported by the package's bundled
-OpenSSL and Schannel builds.
+the active libcurl TLS backend; the package's bundled AWS-LC build supports
+PEM certificate/key pairs and PKCS#12 identities.
 
 ##### Type Declaration
 
@@ -1420,8 +1420,8 @@ Error.constructor
   support. Unsupported linked libcurl/platform combinations return a transport
   error rather than silently ignoring the setting.
 - `httpVersion` can request HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/2 over TLS,
-  HTTP/2 prior knowledge, HTTP/3, or HTTP/3-only behaviour. HTTP/3 requires
-  the linked libcurl build to include HTTP/3 support.
+  HTTP/2 prior knowledge, HTTP/3, or HTTP/3-only behaviour. The bundled build
+  includes HTTP/3; system libcurl builds must provide HTTP/3 themselves.
 - `family` can leave address-family selection automatic or restrict hostname
   resolution to IPv4 or IPv6.
 - Explicit proxy configuration supports HTTP(S), SOCKS4/SOCKS4a, and
@@ -1501,15 +1501,15 @@ the peer certificate cannot be verified. `rejectUnauthorized: false` disables
 origin certificate and hostname verification and should only be used when that
 trade-off is intentional.
 
-The bundled Windows libcurl uses Schannel. For file-based mutual TLS, use a
-PKCS#12 client identity (`tls.certType: "p12"`); Schannel expects the private
-key to be part of that identity and ignores a separate `tls.keyFile`.
+The bundled Windows libcurl uses AWS-LC and the Windows native CA store.
+File-based mutual TLS supports PEM certificate/key pairs and PKCS#12 identities
+through the high-level `tls` option.
 
 <a id="compatibility-macos"></a>
 ### 6.2. macOS
 
 Prebuilt binaries are available for Apple Silicon (`arm64`) and Intel (`x64`) macOS.
-The default bundled libcurl uses OpenSSL, with Apple SecTrust for native
+The default bundled libcurl uses AWS-LC, with Apple SecTrust for native
 certificate verification. File-based mutual TLS supports PEM certificate/key
 pairs and PKCS#12 identities through the high-level `tls` option.
 
@@ -1521,7 +1521,7 @@ and TLS-version capabilities of the selected system libcurl and TLS backend.
 
 Prebuilt binaries are available for x64 and arm64 Linux on both glibc and musl.
 GNU/Linux release binaries require GLIBC 2.31 or newer. The bundled Linux
-libcurl uses OpenSSL and supports PEM certificate/key pairs and PKCS#12 client
+libcurl uses AWS-LC and supports PEM certificate/key pairs and PKCS#12 client
 identities through the high-level `tls` option.
 
 <a id="compatibility-building-from-source"></a>
@@ -1541,8 +1541,8 @@ Run the build with the same Node.js architecture that will use the library. Run
 `sync-request-curl-build --help` for the current prerequisites.
 
 Source builds use the libcurl bundled by `curl-sys` by default on all supported
-platforms. On macOS, the bundled OpenSSL backend uses Apple SecTrust for native
-certificate verification. Override the libcurl source explicitly when needed:
+platforms. The bundled build includes HTTP/2 and HTTP/3 using AWS-LC; on macOS,
+Apple SecTrust provides native certificate verification. Override the libcurl source explicitly when needed:
 
 ```sh
 npm exec --no -- sync-request-curl-build --libcurl=system
@@ -1560,11 +1560,12 @@ The flag selects the libcurl implementation. Both modes continue to use
 
 Source builds require:
 
-- Rust 1.88 or newer and Cargo
-- Linux and other Unix systems: a C/C++ compiler, make, Perl, pkg-config, and
-  CA certificates
-- macOS: Xcode Command Line Tools
-- Windows: Visual Studio C++ Build Tools and the Windows SDK for the target CPU
+- Rust 1.96 or newer and Cargo
+- Linux and other Unix systems: a C/C++ compiler, CMake, make, Perl, pkg-config,
+  libclang, and CA certificates
+- macOS: Xcode Command Line Tools and CMake
+- Windows: Visual Studio C++ Build Tools, CMake, and the Windows SDK for the target
+  CPU; x86 and x64 builds also require NASM
 - Access to the locked Cargo dependencies, or an already populated Cargo cache
 
 Other architectures and Unix platforms may work when Node.js, Rust, and the

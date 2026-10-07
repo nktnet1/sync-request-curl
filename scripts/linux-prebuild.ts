@@ -7,7 +7,7 @@ import { getLinuxLibc, getPrebuildFilename } from "#scripts/native-platform";
 import { run } from "#scripts/process";
 
 const root = resolve(import.meta.dirname, "..");
-const rustToolchain = "1.88.0";
+const rustToolchain = "1.96.0";
 // Bullseye LTS ended on 2026-08-31. Pin the last complete archive so
 // security mirror cleanup cannot make an otherwise reproducible build fail.
 const bullseyeSnapshot = "20260901T000000Z";
@@ -125,6 +125,8 @@ const installBuildDependencies = (targetLibc: LinuxLibc): void => {
       "binutils",
       "build-base",
       "ca-certificates",
+      "clang-dev",
+      "cmake",
       "curl",
       "linux-headers",
       "perl",
@@ -143,7 +145,9 @@ const installBuildDependencies = (targetLibc: LinuxLibc): void => {
     "binutils",
     "build-essential",
     "ca-certificates",
+    "cmake",
     "curl",
+    "libclang-dev",
     "perl",
     "pkg-config",
   ]);

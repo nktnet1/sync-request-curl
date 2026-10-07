@@ -31,8 +31,8 @@
   support. Unsupported linked libcurl/platform combinations return a transport
   error rather than silently ignoring the setting.
 - `httpVersion` can request HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/2 over TLS,
-  HTTP/2 prior knowledge, HTTP/3, or HTTP/3-only behaviour. HTTP/3 requires
-  the linked libcurl build to include HTTP/3 support.
+  HTTP/2 prior knowledge, HTTP/3, or HTTP/3-only behaviour. The bundled build
+  includes HTTP/3; system libcurl builds must provide HTTP/3 themselves.
 - `family` can leave address-family selection automatic or restrict hostname
   resolution to IPv4 or IPv6.
 - Explicit proxy configuration supports HTTP(S), SOCKS4/SOCKS4a, and

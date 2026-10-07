@@ -19,7 +19,7 @@ type CliOptions = {
 const usage = `Usage: sync-request-curl-build [--libcurl=system|bundled]
 
 Build the installed sync-request-curl addon from its bundled Rust sources.
-Requires Rust 1.88+ and platform native build tools.
+Requires Rust 1.96+ and platform native build tools.
 Run using the same Node.js architecture as your application.
 Set CARGO_BUILD_TARGET to override the Rust target.
 
@@ -77,7 +77,7 @@ const run = (
   if (result.error || result.status !== 0) {
     throw new Error(
       `${command} failed: ${result.error?.message || result.stderr || result.signal || result.status}. ` +
-        "Source builds require Rust 1.88+, a platform C/C++ toolchain, make, Perl, and pkg-config on Unix. " +
+        "Source builds require Rust 1.96+, a platform C/C++ toolchain, CMake, make, Perl, and pkg-config on Unix. " +
         "Install the Rust target and native toolchain matching your Node.js architecture.",
     );
   }

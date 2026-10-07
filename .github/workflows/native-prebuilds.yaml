@@ -94,7 +94,11 @@ jobs:
 
       - name: Set up Rust
         if: steps.native-cache.outputs.cache-hit != 'true'
-        run: rustup toolchain install 1.88.0 --profile minimal --no-self-update
+        run: rustup toolchain install 1.96.0 --profile minimal --no-self-update
+
+      - name: Set up NASM for Windows x64
+        if: steps.native-cache.outputs.cache-hit != 'true' && matrix.platform == 'win32-x64-msvc'
+        uses: ilammy/setup-nasm@72793074d3c8cdda771dba85f6deafe00623038b # v1.5.2
 
       - name: Build native addon
         if: steps.native-cache.outputs.cache-hit != 'true'
@@ -132,8 +136,11 @@ jobs:
       - name: Set up Rust and x86 target
         if: steps.native-cache.outputs.cache-hit != 'true'
         run: |
-          rustup toolchain install 1.88.0 --profile minimal --no-self-update
-          rustup target add i686-pc-windows-msvc --toolchain 1.88.0
+          rustup toolchain install 1.96.0 --profile minimal --no-self-update
+          rustup target add i686-pc-windows-msvc --toolchain 1.96.0
+      - name: Set up NASM for Windows x86
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: ilammy/setup-nasm@72793074d3c8cdda771dba85f6deafe00623038b # v1.5.2
       - name: Build and verify with 32-bit Node.js
         if: steps.native-cache.outputs.cache-hit != 'true'
         run: node native/build.ts

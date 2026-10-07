@@ -75,7 +75,8 @@ export const incomingHttpHeadersSchema = v.custom<Headers>(
 
 /** HTTP protocol preference passed to libcurl.
  *
- * HTTP/3 values require the linked libcurl build to include HTTP/3 support.
+ * The bundled libcurl build includes HTTP/3 support. System libcurl builds must
+ * provide HTTP/3 themselves.
  *
  * @group Request
  */
@@ -143,8 +144,8 @@ export const tlsCertificateTypeSchema = v.picklist([
  *
  * Existing top-level `caFile` and `rejectUnauthorized` options remain separate
  * for backwards compatibility. Client certificate format support depends on
- * the active libcurl TLS backend; PKCS#12 is supported by the package's bundled
- * OpenSSL and Schannel builds.
+ * the active libcurl TLS backend; the package's bundled AWS-LC build supports
+ * PEM certificate/key pairs and PKCS#12 identities.
  *
  * @group Request
  */
@@ -590,8 +591,8 @@ const optionsObjectSchema = v.object({
    */
   proxy: v.optional(proxySchema),
   /**
-   * HTTP protocol preference. Defaults to `"auto"`. HTTP/3 values require an
-   * HTTP/3-capable linked libcurl build.
+   * HTTP protocol preference. Defaults to `"auto"`. The bundled build supports
+   * HTTP/3; system libcurl builds must provide HTTP/3 themselves.
    */
   httpVersion: v.optional(httpVersionSchema),
   /** Verify the origin certificate chain and hostname. Defaults to `true`. */
