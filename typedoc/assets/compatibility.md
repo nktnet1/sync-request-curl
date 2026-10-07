@@ -15,10 +15,10 @@ the peer certificate cannot be verified. `rejectUnauthorized: false` disables
 origin certificate and hostname verification and should only be used when that
 trade-off is intentional.
 
-The bundled Windows x64 and arm64 libcurl builds use AWS-LC and the Windows
-native CA store. The Windows x86 build uses the HTTP/2-only bundled
-configuration. File-based mutual TLS supports PEM certificate/key pairs and
-PKCS#12 identities through the high-level `tls` option.
+The bundled Windows libcurl builds use AWS-LC, support HTTP/3, and use the
+Windows native CA store on x64, arm64, and x86. File-based mutual TLS supports
+PEM certificate/key pairs and PKCS#12 identities through the high-level `tls`
+option.
 
 ### macOS
 
@@ -53,9 +53,8 @@ Run the build with the same Node.js architecture that will use the library. Run
 `sync-request-curl-build --help` for the current prerequisites.
 
 Source builds use the libcurl bundled by `curl-sys` by default on all supported
-platforms. The bundled build includes HTTP/2 everywhere and HTTP/3 using AWS-LC
-on all supported targets except Windows x86, which uses the HTTP/2-only bundled
-configuration. On macOS, Apple SecTrust provides native certificate
+platforms. The bundled build includes HTTP/2 and HTTP/3 using AWS-LC on all
+supported prebuilt targets. On macOS, Apple SecTrust provides native certificate
 verification. Override the libcurl source explicitly when needed:
 
 ```sh

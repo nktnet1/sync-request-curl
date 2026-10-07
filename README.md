@@ -348,7 +348,7 @@ supplied.
 | ------ | ------ | ------ |
 | <a id="property-auth"></a> `auth?` | [`HttpAuthOptions`](#httpauthoptions) | HTTP origin authentication. Username/password authentication defaults to Basic; Bearer tokens use libcurl's OAuth2 bearer support. Cannot be combined with an explicit `Authorization` header. |
 | <a id="property-proxy"></a> `proxy?` | [`ProxyOptions`](#proxyoptions) | Explicit HTTP(S) or SOCKS proxy configuration. Ambient proxy variables are ignored. Defaults to no proxy. |
-| <a id="property-httpversion"></a> `httpVersion?` | \| `"auto"` \| `"2"` \| `"3"` \| `"1.0"` \| `"1.1"` \| `"2-tls"` \| `"2-prior-knowledge"` \| `"3-only"` | HTTP protocol preference. Defaults to `"auto"`. The bundled build supports HTTP/3 on all prebuilt targets except Windows x86, which is HTTP/2-only. System libcurl builds must provide HTTP/3 themselves. |
+| <a id="property-httpversion"></a> `httpVersion?` | \| `"auto"` \| `"2"` \| `"3"` \| `"1.0"` \| `"1.1"` \| `"2-tls"` \| `"2-prior-knowledge"` \| `"3-only"` | HTTP protocol preference. Defaults to `"auto"`. The bundled build supports HTTP/3 on all prebuilt targets. System libcurl builds must provide HTTP/3 themselves. |
 | <a id="property-rejectunauthorized"></a> `rejectUnauthorized?` | `boolean` | Verify the origin certificate chain and hostname. Defaults to `true`. |
 | <a id="property-cafile"></a> `caFile?` | `string` | PEM CA bundle path for origin TLS verification. |
 | <a id="property-tls"></a> `tls?` | [`TlsOptions`](#tlsoptions) | Client certificate and TLS protocol-version controls for the origin. |
@@ -462,9 +462,8 @@ type HttpVersion =
 
 HTTP protocol preference passed to libcurl.
 
-The bundled libcurl build supports HTTP/3 on all prebuilt targets except
-Windows x86, which is HTTP/2-only. System libcurl builds must provide HTTP/3
-themselves.
+The bundled libcurl build supports HTTP/3 on all prebuilt targets. System
+libcurl builds must provide HTTP/3 themselves.
 
 ***
 
@@ -1423,8 +1422,8 @@ Error.constructor
   error rather than silently ignoring the setting.
 - `httpVersion` can request HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/2 over TLS,
   HTTP/2 prior knowledge, HTTP/3, or HTTP/3-only behaviour. The bundled build
-  includes HTTP/3 on all prebuilt targets except Windows x86, which is
-  HTTP/2-only; system libcurl builds must provide HTTP/3 themselves.
+  includes HTTP/3 on all prebuilt targets; system libcurl builds must provide
+  HTTP/3 themselves.
 - `family` can leave address-family selection automatic or restrict hostname
   resolution to IPv4 or IPv6.
 - Explicit proxy configuration supports HTTP(S), SOCKS4/SOCKS4a, and
@@ -1504,10 +1503,10 @@ the peer certificate cannot be verified. `rejectUnauthorized: false` disables
 origin certificate and hostname verification and should only be used when that
 trade-off is intentional.
 
-The bundled Windows x64 and arm64 libcurl builds use AWS-LC and the Windows
-native CA store. The Windows x86 build uses the HTTP/2-only bundled
-configuration. File-based mutual TLS supports PEM certificate/key pairs and
-PKCS#12 identities through the high-level `tls` option.
+The bundled Windows libcurl builds use AWS-LC, support HTTP/3, and use the
+Windows native CA store on x64, arm64, and x86. File-based mutual TLS supports
+PEM certificate/key pairs and PKCS#12 identities through the high-level `tls`
+option.
 
 <a id="compatibility-macos"></a>
 ### 6.2. macOS
@@ -1545,9 +1544,8 @@ Run the build with the same Node.js architecture that will use the library. Run
 `sync-request-curl-build --help` for the current prerequisites.
 
 Source builds use the libcurl bundled by `curl-sys` by default on all supported
-platforms. The bundled build includes HTTP/2 everywhere and HTTP/3 using AWS-LC
-on all supported targets except Windows x86, which uses the HTTP/2-only bundled
-configuration. On macOS, Apple SecTrust provides native certificate
+platforms. The bundled build includes HTTP/2 and HTTP/3 using AWS-LC on all
+supported prebuilt targets. On macOS, Apple SecTrust provides native certificate
 verification. Override the libcurl source explicitly when needed:
 
 ```sh

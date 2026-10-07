@@ -23,7 +23,8 @@ use the archived Debian Bullseye package snapshot and are checked for a GLIBC
 loaded and tested in Alpine containers.
 
 Desktop builds run Cargo on GitHub runners. Windows x86 builds target
-`i686-pc-windows-msvc` and are load-checked with 32-bit Node.js 22. Linux build
+`i686-pc-windows-msvc`, verify bundled HTTP/3 support, and are load-checked with
+32-bit Node.js 22. Linux build
 containers install the toolchain pinned by `rust-toolchain.toml` before compiling. The Cargo
 build bundles libcurl and its build-time native dependencies into the addon, after which CI
 stages the dynamic library as:
