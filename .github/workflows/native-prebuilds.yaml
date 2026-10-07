@@ -142,6 +142,16 @@ jobs:
       - name: Set up NASM for Windows x86
         if: steps.native-cache.outputs.cache-hit != 'true'
         uses: ilammy/setup-nasm@72793074d3c8cdda771dba85f6deafe00623038b # v1.5.2
+      - name: Verify bundled HTTP/3 capability on Windows x86
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        env:
+          LIBZ_SYS_STATIC: "1"
+          OPENSSL_STATIC: "1"
+          PKG_CONFIG_ALL_STATIC: "1"
+        run: >-
+          cargo test --locked --manifest-path native/Cargo.toml --release
+          --target i686-pc-windows-msvc --lib --no-default-features
+          --features bundled-curl-http3,test-noop
       - name: Build and verify with 32-bit Node.js
         if: steps.native-cache.outputs.cache-hit != 'true'
         run: node native/build.ts

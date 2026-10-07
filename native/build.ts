@@ -27,7 +27,7 @@ Options:
   --libcurl=system    Link against a system-provided libcurl and fail if unavailable.
   --libcurl=bundled   Build the libcurl bundled by curl-sys.
 
-Default: bundled libcurl on all targets. HTTP/3 is enabled where the bundled AWS-LC backend is supported; Windows x86 uses the HTTP/2 bundled build. Use --libcurl=system to opt into a system-provided libcurl.`;
+Default: bundled libcurl with HTTP/3 on all release targets. Use --libcurl=system to opt into a system-provided libcurl.`;
 
 const parseCliOptions = (args: readonly string[]): CliOptions => {
   if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) {
@@ -158,12 +158,8 @@ const buildNative = (requestedCurlSource?: CurlSource): void => {
   configureMacosBuildEnvironment(env, target);
   // Rust's musl defaults otherwise prevent producing a loadable shared library.
   configureMuslBuildEnvironment(env, target);
-  const bundledFeature = [
-    "i686-pc-windows-msvc",
-    "x86_64-pc-windows-gnu",
-  ].includes(target)
-    ? "bundled-curl"
-    : "bundled-curl-http3";
+  const bundledFeature =
+    target === "x86_64-pc-windows-gnu" ? "bundled-curl" : "bundled-curl-http3";
   const cargoArgs = [
     "build",
     "--locked",

@@ -70,9 +70,6 @@ const expectedFeatureForMode = (mode: Mode): string => {
   if (mode === "system") {
     return "system-curl";
   }
-  if (mode === "windows-x86") {
-    return "bundled-curl";
-  }
   return "bundled-curl-http3";
 };
 
@@ -229,7 +226,10 @@ test("source builder CLI displays help without a compiler", () => {
   assert.match(result.stdout, /Usage: sync-request-curl-build/);
   assert.match(result.stdout, /--libcurl=system/);
   assert.match(result.stdout, /--libcurl=bundled/);
-  assert.match(result.stdout, /bundled libcurl on all targets/);
+  assert.match(
+    result.stdout,
+    /bundled libcurl with HTTP\/3 on all release targets/,
+  );
 });
 
 test("source builder CLI rejects unknown arguments before compiling", () => {

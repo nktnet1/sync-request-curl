@@ -41,6 +41,44 @@ jobs:
           PKG_CONFIG_ALL_STATIC: "1"
         run: cargo test --locked --manifest-path native/Cargo.toml --lib --no-default-features --features bundled-curl-http3,test-noop
 
+  windows-x86-http3:
+    runs-on: windows-2025
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up 32-bit Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          architecture: x86
+
+      - name: Set up Rust and x86 target
+        run: |
+          $toolchain = node scripts/rust-toolchain.ts
+          rustup toolchain install $toolchain --profile minimal --no-self-update
+          rustup target add i686-pc-windows-msvc --toolchain $toolchain
+
+      - name: Set up NASM
+        uses: ilammy/setup-nasm@72793074d3c8cdda771dba85f6deafe00623038b # v1.5.2
+
+      - name: Verify bundled HTTP/3 capability on Windows x86
+        env:
+          LIBZ_SYS_STATIC: "1"
+          OPENSSL_STATIC: "1"
+          PKG_CONFIG_ALL_STATIC: "1"
+        run: >-
+          cargo test --locked --manifest-path native/Cargo.toml --release
+          --target i686-pc-windows-msvc --lib --no-default-features
+          --features bundled-curl-http3,test-noop
+
+      - name: Build and load-check the Windows x86 addon
+        run: node native/build.ts
+
+      - name: Verify addon with 32-bit Node.js
+        run: node scripts/verify-native-load.ts --file=native/build/sync_request_curl_native.node
+
   native:
     strategy:
       matrix:
