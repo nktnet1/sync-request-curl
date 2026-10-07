@@ -1511,7 +1511,8 @@ option.
 <a id="compatibility-macos"></a>
 ### 6.2. macOS
 
-Prebuilt binaries are available for Apple Silicon (`arm64`) and Intel (`x64`) macOS.
+Prebuilt binaries are available for Apple Silicon (`arm64`, macOS 11+) and Intel
+(`x64`, macOS 10.13+) macOS.
 The default bundled libcurl uses AWS-LC, with Apple SecTrust for native
 certificate verification. File-based mutual TLS supports PEM certificate/key
 pairs and PKCS#12 identities through the high-level `tls` option.
@@ -1567,7 +1568,8 @@ Source builds require:
 - Rust 1.96 or newer and Cargo
 - Linux and other Unix systems: a C/C++ compiler, CMake 3.20+, make, Perl, pkg-config,
   libclang, and CA certificates
-- macOS: Xcode Command Line Tools and CMake 3.20+
+- macOS: Xcode Command Line Tools and CMake 3.20+; bundled builds default to a
+  macOS 10.13 deployment target on x64 and 11.0 on arm64
 - Windows: Visual Studio C++ Build Tools, CMake 3.20+, and the Windows SDK for the target
   CPU; x86 and x64 builds also require NASM
 - Access to the locked Cargo dependencies, or an already populated Cargo cache

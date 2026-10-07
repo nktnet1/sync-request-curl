@@ -33,8 +33,9 @@ native/build/sync_request_curl_native.node
 
 `curl-sys` builds bundled libcurl with HTTP/2 and HTTP/3 on all prebuilt release
 targets. HTTP/3 uses ngtcp2 and nghttp3 with AWS-LC as libcurl's TLS backend.
-macOS additionally enables Apple SecTrust for native certificate verification, and
-Windows uses the native CA store. System/custom libcurl builds can use
+macOS additionally enables Apple SecTrust for native certificate verification; x64
+builds default to a macOS 10.13 deployment target and arm64 builds to 11.0. Windows
+uses the native CA store. System/custom libcurl builds can use
 `httpVersion: "3"` or `"3-only"` only when that linked libcurl reports HTTP/3
 support. zlib is forced static in the prebuild path. The Linux GCC
 unwinding runtime (`libgcc_s`) may

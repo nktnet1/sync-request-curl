@@ -84,7 +84,8 @@ const run = (
   return result.stdout?.trim() || "";
 };
 
-const defaultMacosDeploymentTarget = "11.0";
+const defaultMacosDeploymentTarget = (target: string): string =>
+  target === "x86_64-apple-darwin" ? "10.13" : "11.0";
 
 const configureMacosBuildEnvironment = (
   env: NodeJS.ProcessEnv,
@@ -94,7 +95,7 @@ const configureMacosBuildEnvironment = (
     target.endsWith("-apple-darwin") &&
     env.MACOSX_DEPLOYMENT_TARGET === undefined
   ) {
-    env.MACOSX_DEPLOYMENT_TARGET = defaultMacosDeploymentTarget;
+    env.MACOSX_DEPLOYMENT_TARGET = defaultMacosDeploymentTarget(target);
   }
 };
 

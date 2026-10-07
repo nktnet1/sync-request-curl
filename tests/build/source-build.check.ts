@@ -43,7 +43,8 @@ const mutableChildProcess = childProcess as {
 const modes = [
   "success",
   "system",
-  "macos-default",
+  "macos-x64",
+  "macos-arm64",
   "cargo-failure",
   "load-failure",
   "musl",
@@ -57,8 +58,10 @@ const targetForMode = (mode: Mode): string => {
   switch (mode) {
     case "musl":
       return "x86_64-unknown-linux-musl";
-    case "macos-default":
+    case "macos-x64":
       return "x86_64-apple-darwin";
+    case "macos-arm64":
+      return "aarch64-apple-darwin";
     case "windows-x86":
       return "i686-pc-windows-msvc";
     default:
@@ -118,7 +121,10 @@ const createMockSpawn = (
         expectedFeatureForMode(mode),
       );
       assert.equal(options?.env?.CARGO_TARGET_DIR, join(native, "target"));
-      if (mode === "macos-default") {
+      if (mode === "macos-x64") {
+        assert.equal(options?.env?.MACOSX_DEPLOYMENT_TARGET, "10.13");
+      }
+      if (mode === "macos-arm64") {
         assert.equal(options?.env?.MACOSX_DEPLOYMENT_TARGET, "11.0");
       }
 
