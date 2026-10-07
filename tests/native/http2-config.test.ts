@@ -29,11 +29,21 @@ describe("native libcurl build contract", () => {
 
     expect(features).toContain('default = ["bundled-curl-http3"]');
     expect(features).toContain(
-      'bundled-curl = ["curl-sys/http2", "curl-sys/ssl", "curl-sys/static-curl", "curl-sys/static-ssl", "curl-sys/apple-sectrust"]',
+      'bundled-curl-base = ["curl-sys/http2", "curl-sys/static-curl", "curl-sys/apple-sectrust"]',
     );
     expect(features).toContain(
-      'bundled-curl-http3 = ["bundled-curl", "curl-sys/http3"]',
+      'bundled-curl = ["bundled-curl-base", "curl-sys/ssl", "curl-sys/static-ssl"]',
     );
+    expect(features).toContain(
+      'bundled-curl-http3 = ["bundled-curl-base", "curl-sys/http3"]',
+    );
+
+    const http3Feature = features
+      .split("\n")
+      .find((line) => line.startsWith("bundled-curl-http3 ="));
+    expect(http3Feature).not.toContain('"bundled-curl"');
+    expect(http3Feature).not.toContain('"curl-sys/ssl"');
+    expect(http3Feature).not.toContain('"curl-sys/static-ssl"');
   });
 
   test("system libcurl keeps macOS force-system support without enabling bundled HTTP features", () => {

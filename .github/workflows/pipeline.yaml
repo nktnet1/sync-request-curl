@@ -23,8 +23,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+
       - name: Set up Rust
-        run: rustup toolchain install "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)" --profile minimal --no-self-update
+        run: rustup toolchain install "$(node scripts/rust-toolchain.ts)" --profile minimal --no-self-update
 
       - name: Install HTTP/3 native build dependencies
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake libclang-dev

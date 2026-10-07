@@ -10,8 +10,9 @@ crate-type = ["cdylib"]
 
 [features]
 default = ["bundled-curl-http3"]
-bundled-curl = ["curl-sys/http2", "curl-sys/ssl", "curl-sys/static-curl", "curl-sys/static-ssl", "curl-sys/apple-sectrust"]
-bundled-curl-http3 = ["bundled-curl", "curl-sys/http3"]
+bundled-curl-base = ["curl-sys/http2", "curl-sys/static-curl", "curl-sys/apple-sectrust"]
+bundled-curl = ["bundled-curl-base", "curl-sys/ssl", "curl-sys/static-ssl"]
+bundled-curl-http3 = ["bundled-curl-base", "curl-sys/http3"]
 system-curl = ["curl-sys/force-system-lib-on-osx"]
 # Cargo unit tests run without a Node host; never enable this for addon builds.
 test-noop = ["napi/noop", "napi-derive/noop"]

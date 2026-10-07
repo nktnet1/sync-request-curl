@@ -136,8 +136,9 @@ For a PKCS#12 identity, set `certType: 'p12'` and provide the `.p12` file as
 `certFile`; `passphrase` unlocks either a PKCS#12 identity or an encrypted
 private key. A separate `keyFile` is intentionally not accepted with `p12`.
 The active libcurl TLS backend determines which client-certificate formats are
-supported. The bundled build uses AWS-LC and supports PEM certificate/key pairs as well as
-PKCS#12 identities. `minVersion` and `maxVersion` currently accept `TLSv1.2` and `TLSv1.3`.
+supported. Bundled builds support PEM certificate/key pairs and PKCS#12
+identities; HTTP/3-enabled bundled targets use AWS-LC. `minVersion` and
+`maxVersion` currently accept `TLSv1.2` and `TLSv1.3`.
 
 </details>
 

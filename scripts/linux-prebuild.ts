@@ -17,6 +17,7 @@ import { getRustToolchain } from "#scripts/rust-toolchain";
 const root = resolve(import.meta.dirname, "..");
 const rustToolchain = getRustToolchain();
 const cmakeVersion = "3.31.12";
+const cmakeRelease = cmakeVersion.split(".").slice(0, 2).join(".");
 // Bullseye LTS ended on 2026-08-31. Pin the last complete archive so
 // security mirror cleanup cannot make an otherwise reproducible build fail.
 const bullseyeSnapshot = "20260901T000000Z";
@@ -188,7 +189,7 @@ const installBullseyeCmake = (): string => {
     "--location",
     "--silent",
     "--show-error",
-    `https://cmake.org/files/v3.31/${archiveName}`,
+    `https://cmake.org/files/v${cmakeRelease}/${archiveName}`,
     "--output",
     archivePath,
   ]);

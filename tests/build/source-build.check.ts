@@ -121,6 +121,9 @@ const createMockSpawn = (
         expectedFeatureForMode(mode),
       );
       assert.equal(options?.env?.CARGO_TARGET_DIR, join(native, "target"));
+      if (mode === "macos-default") {
+        assert.equal(options?.env?.MACOSX_DEPLOYMENT_TARGET, "11.0");
+      }
 
       const targetIndex = args.indexOf("--target");
       if (mode === "musl") {
@@ -177,8 +180,10 @@ for (const mode of modes) {
     const originalSpawn = childProcess.spawnSync;
     const originalTarget = process.env.CARGO_BUILD_TARGET;
     const originalFlags = process.env.CARGO_ENCODED_RUSTFLAGS;
+    const originalMacosDeploymentTarget = process.env.MACOSX_DEPLOYMENT_TARGET;
     const originalArgv = process.argv;
     process.env.CARGO_BUILD_TARGET = target;
+    delete process.env.MACOSX_DEPLOYMENT_TARGET;
     process.env.CARGO_ENCODED_RUSTFLAGS = "--cfg\x1ftest_build";
     process.argv =
       mode === "system"
@@ -206,6 +211,10 @@ for (const mode of modes) {
       process.argv = originalArgv;
       restoreEnvironmentVariable("CARGO_BUILD_TARGET", originalTarget);
       restoreEnvironmentVariable("CARGO_ENCODED_RUSTFLAGS", originalFlags);
+      restoreEnvironmentVariable(
+        "MACOSX_DEPLOYMENT_TARGET",
+        originalMacosDeploymentTarget,
+      );
       rmSync(root, { recursive: true, force: true });
     }
   });

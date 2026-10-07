@@ -32,7 +32,8 @@
   error rather than silently ignoring the setting.
 - `httpVersion` can request HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/2 over TLS,
   HTTP/2 prior knowledge, HTTP/3, or HTTP/3-only behaviour. The bundled build
-  includes HTTP/3; system libcurl builds must provide HTTP/3 themselves.
+  includes HTTP/3 on all prebuilt targets except Windows x86, which is
+  HTTP/2-only; system libcurl builds must provide HTTP/3 themselves.
 - `family` can leave address-family selection automatic or restrict hostname
   resolution to IPv4 or IPv6.
 - Explicit proxy configuration supports HTTP(S), SOCKS4/SOCKS4a, and

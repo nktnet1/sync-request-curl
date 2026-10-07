@@ -84,6 +84,20 @@ const run = (
   return result.stdout?.trim() || "";
 };
 
+const defaultMacosDeploymentTarget = "11.0";
+
+const configureMacosBuildEnvironment = (
+  env: NodeJS.ProcessEnv,
+  target: string,
+): void => {
+  if (
+    target.endsWith("-apple-darwin") &&
+    env.MACOSX_DEPLOYMENT_TARGET === undefined
+  ) {
+    env.MACOSX_DEPLOYMENT_TARGET = defaultMacosDeploymentTarget;
+  }
+};
+
 const configureMuslBuildEnvironment = (
   env: NodeJS.ProcessEnv,
   target: string,
@@ -141,6 +155,7 @@ const buildNative = (requestedCurlSource?: CurlSource): void => {
   if (nativeMuslHostBuild) {
     delete env.CARGO_BUILD_TARGET;
   }
+  configureMacosBuildEnvironment(env, target);
   // Rust's musl defaults otherwise prevent producing a loadable shared library.
   configureMuslBuildEnvironment(env, target);
   const bundledFeature = [

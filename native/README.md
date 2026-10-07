@@ -34,7 +34,7 @@ native/build/sync_request_curl_native.node
 `curl-sys` builds bundled libcurl with HTTP/2 on all supported platforms. HTTP/3
 is enabled on supported bundled targets using ngtcp2 and nghttp3 with AWS-LC as
 libcurl's TLS backend. The Windows x86 (`i686-pc-windows-msvc`) build remains
-HTTP/2-only because the fork does not currently exercise its AWS-LC HTTP/3 path.
+HTTP/2-only because HTTP/3 is not enabled for that release target.
 macOS additionally enables Apple SecTrust for native certificate verification, and
 Windows uses the native CA store. System/custom libcurl builds can use
 `httpVersion: "3"` or `"3-only"` only when that linked libcurl reports HTTP/3

@@ -75,8 +75,9 @@ export const incomingHttpHeadersSchema = v.custom<Headers>(
 
 /** HTTP protocol preference passed to libcurl.
  *
- * The bundled libcurl build includes HTTP/3 support. System libcurl builds must
- * provide HTTP/3 themselves.
+ * The bundled libcurl build supports HTTP/3 on all prebuilt targets except
+ * Windows x86, which is HTTP/2-only. System libcurl builds must provide HTTP/3
+ * themselves.
  *
  * @group Request
  */
@@ -592,7 +593,8 @@ const optionsObjectSchema = v.object({
   proxy: v.optional(proxySchema),
   /**
    * HTTP protocol preference. Defaults to `"auto"`. The bundled build supports
-   * HTTP/3; system libcurl builds must provide HTTP/3 themselves.
+   * HTTP/3 on all prebuilt targets except Windows x86, which is HTTP/2-only.
+   * System libcurl builds must provide HTTP/3 themselves.
    */
   httpVersion: v.optional(httpVersionSchema),
   /** Verify the origin certificate chain and hostname. Defaults to `true`. */
