@@ -44,7 +44,7 @@ type RenderedSection = {
 
 const DUPLICATE_COMMENT_WARNING =
   "has multiple declarations with a comment. An arbitrary comment will be used";
-const OPTIONS_PARAMETER_ROW_PREFIX = "| `options` |";
+const OPTIONS_PARAMETER_ROW_PATTERN = /^\| `options\??` \|/;
 const OPTIONS_REFERENCE = "[`Options`](#options)";
 
 const readAsset = (name: string): string =>
@@ -361,7 +361,7 @@ const buildReadme = (api: string): string => {
 const assertOptionsParameterReference = (api: string): void => {
   const optionsRow = api
     .split("\n")
-    .find((line) => line.startsWith(OPTIONS_PARAMETER_ROW_PREFIX));
+    .find((line) => OPTIONS_PARAMETER_ROW_PATTERN.test(line));
 
   if (!optionsRow?.includes(OPTIONS_REFERENCE)) {
     throw new Error(

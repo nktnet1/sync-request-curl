@@ -235,7 +235,7 @@ response.
 | ------ | ------ | ------ |
 | `method` | [`HttpVerb`](#httpverb) | Recognised HTTP method. Matching is case-insensitive; `CONNECT` is rejected. |
 | `url` | `string` \| [`URL`](https://nodejs.org/api/url.html#class-url) | Absolute `http:` or `https:` URL, provided as a string or [`URL`](https://nodejs.org/api/url.html#class-url). |
-| `options` | [`Options`](#options) | Request, transport, redirect, retry, and cache options. |
+| `options?` | [`Options`](#options) | Request, transport, redirect, retry, and cache options. |
 
 ##### Returns
 
@@ -761,7 +761,7 @@ Parse the buffered response body as JSON.
 
 | Type Parameter | Default type |
 | ------ | ------ |
-| `T` | `any` |
+| <a id="type-parameter-t"></a> `T` | `any` |
 
 ###### Parameters
 
@@ -949,7 +949,7 @@ a string. A response with `statusCode >= 300` throws `ResponseError`.
 
 | Type Parameter |
 | ------ |
-| `Encoding` *extends* [`BufferEncoding`](#bufferencoding) |
+| <a id="type-parameter-__typeencoding"></a> `Encoding` *extends* [`BufferEncoding`](#bufferencoding) |
 
 ###### Parameters
 
@@ -990,7 +990,7 @@ describe the expected result; this does not perform runtime validation.
 
 | Type Parameter | Default type |
 | ------ | ------ |
-| `T` | `any` |
+| <a id="type-parameter-__typet"></a> `T` | `any` |
 
 ##### Parameters
 
@@ -1122,7 +1122,7 @@ path components are stripped from generated filenames before sending.
 
 ```ts
 getHeaders(): IncomingHttpHeaders & {
-  content-type: string;
+  "content-type": string;
 };
 ```
 
@@ -1131,7 +1131,7 @@ Return multipart request headers, merged with optional caller headers.
 ###### Returns
 
 [`IncomingHttpHeaders`](https://nodejs.org/api/http.html#messageheaders) & \{
-  `content-type`: `string`;
+  `"content-type"`: `string`;
 \}
 
 ###### Call Signature
@@ -1274,9 +1274,7 @@ new CurlError(code, message): CurlError;
 
 ###### Overrides
 
-```ts
-Error.constructor
-```
+`Error.constructor`
 
 ##### Properties
 
@@ -1320,9 +1318,7 @@ new RequestError(
 
 ###### Overrides
 
-```ts
-Error.constructor
-```
+`Error.constructor`
 
 ##### Properties
 
@@ -1373,9 +1369,7 @@ new ResponseError(
 
 ###### Overrides
 
-```ts
-Error.constructor
-```
+`Error.constructor`
 
 ##### Properties
 

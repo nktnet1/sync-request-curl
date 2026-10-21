@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +17,30 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 
 type ModuleFormat = "module" | "commonjs";
+
+test("CommonJS release bundle exposes literal native package resolutions to file tracers", () => {
+  const bundle = readFileSync(join(root, "dist", "index.cjs"), "utf8");
+  const platforms = [
+    "darwin-arm64",
+    "darwin-x64",
+    "linux-arm64-gnu",
+    "linux-arm64-musl",
+    "linux-x64-gnu",
+    "linux-x64-musl",
+    "win32-arm64-msvc",
+    "win32-ia32-msvc",
+    "win32-x64-msvc",
+  ];
+
+  for (const platform of platforms) {
+    const packageName = `@nktnet/sync-request-curl-${platform}`;
+    assert.match(
+      bundle,
+      new RegExp(String.raw`\brequire\.resolve\(["']${packageName}["']\)`),
+      `${packageName} must be a literal require.resolve target in the published bundle`,
+    );
+  }
+});
 
 // Exercise the published export map in fresh Node processes. Source imports
 // cannot detect constructors or state duplicated by separate bundler invocations.
