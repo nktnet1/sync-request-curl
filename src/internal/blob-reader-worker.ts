@@ -22,4 +22,9 @@ const main = async (): Promise<void> => {
   }
 };
 
-void main();
+// The worker normally handles failures in main; guard against an unexpected
+// rejection while signalling completion so the waiting thread is unblocked.
+main().catch(() => {
+  Atomics.store(state, 0, -1);
+  Atomics.notify(state, 0);
+});
