@@ -94,7 +94,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Build and test ${{ matrix.platform }} prebuild
+      # Keep a verified FreeBSD addon between runs. The VM prepared-image cache
+      # only caches build tools, not the Rust/AWS-LC compilation in `run`.
+      - name: Restore cached FreeBSD addon
+        id: native-cache
+        uses: actions/cache@v4
+        with:
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          key: freebsd-prebuild-v1-14.4-${{ matrix.platform }}-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml', 'native/build.rs', 'native/build.ts', 'native/src/**', 'rust-toolchain.toml', 'scripts/freebsd-ci.sh', 'scripts/build-native.ts', 'scripts/stage-native.ts') }}
+
+      - name: Build or verify ${{ matrix.platform }} prebuild
         uses: vmactions/freebsd-vm@a2f9a41fa97f6848b8c3b791087dfcdaa5b473ff # v1.5.8
         with:
           release: "14.4"
@@ -107,7 +116,11 @@ jobs:
           prepare: |
             # ${{ hashFiles('scripts/freebsd-ci.sh', 'rust-toolchain.toml') }}
             sh scripts/freebsd-ci.sh prepare
-          run: sh scripts/freebsd-ci.sh build ${{ matrix.platform }}
+          # Cache hits still run the native load/HTTP smoke checks in FreeBSD.
+          run: sh scripts/freebsd-ci.sh ${{ steps.native-cache.outputs.cache-hit == 'true' && 'verify' || 'build' }} ${{ matrix.platform }}
+
+      - name: Confirm native addon was copied back
+        run: test -s prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
 
   native:
     strategy:

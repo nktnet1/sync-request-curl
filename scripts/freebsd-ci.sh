@@ -125,17 +125,28 @@ build() {
   test "$(node -p 'process.platform + "-" + process.arch')" = "$platform"
   node scripts/build-native.ts
   node scripts/stage-native.ts "--platform=$platform"
-  node scripts/verify-native-load.ts "--file=prebuilds/sync_request_curl_native.$platform.node"
-  node scripts/verify-native-http.ts "--file=prebuilds/sync_request_curl_native.$platform.node"
-  if ldd "prebuilds/sync_request_curl_native.$platform.node" | grep -q '/usr/local/'; then
-    echo "FreeBSD addon has unexpected runtime dependencies under /usr/local" >&2
-    exit 1
-  fi
+  verify "$platform"
   rm -rf native/target native/build
+}
+
+verify() {
+  platform="${1:?Expected native platform key}"
+  set -x
+  # Preserve the caller's PATH precedence (including test command shims).
+  export PATH="$PATH:/usr/local/bin"
+  test "$(node -p 'process.platform + "-" + process.arch')" = "$platform"
+  addon="prebuilds/sync_request_curl_native.$platform.node"
+  node scripts/verify-native-load.ts "--file=$addon"
+  node scripts/verify-native-http.ts "--file=$addon"
+  if ldd "$addon" | grep -q '/usr/local/'; then
+    echo "FreeBSD addon has unexpected runtime dependencies under /usr/local" >&2
+    return 1
+  fi
 }
 
 case "${1:-}" in
   prepare) prepare ;;
   build) build "${2:-}" ;;
-  *) echo "Usage: sh scripts/freebsd-ci.sh prepare|build [freebsd-x64|freebsd-arm64]" >&2; exit 2 ;;
+  verify) verify "${2:-}" ;;
+  *) echo "Usage: sh scripts/freebsd-ci.sh prepare|build|verify [freebsd-x64|freebsd-arm64]" >&2; exit 2 ;;
 esac

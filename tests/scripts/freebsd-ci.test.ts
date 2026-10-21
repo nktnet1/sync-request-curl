@@ -15,7 +15,7 @@ const directories: string[] = [];
 
 const runFreebsdScript = (
   arch: "amd64" | "arm64" | "other",
-  command: "prepare" | "build",
+  command: "prepare" | "build" | "verify",
   options: {
     rustVersion?: string;
     failRustPackage?: boolean;
@@ -23,6 +23,7 @@ const runFreebsdScript = (
     missingToolchain?: boolean;
     failPkg?: boolean;
     failRustup?: boolean;
+    failVerify?: boolean;
     pinnedToolchain?: string;
   } = {},
 ) => {
@@ -58,13 +59,14 @@ const runFreebsdScript = (
   mock(
     "node",
     [
-      'case "$PATH" in "$HOME/.cargo/bin:$MOCK_BIN:"*) ;; *) echo "Mock directory lost PATH precedence" >&2; exit 66 ;; esac',
+      'case "$PATH" in "$HOME/.cargo/bin:$MOCK_BIN:"* | "$MOCK_BIN:"*) ;; *) echo "Mock directory lost PATH precedence" >&2; exit 66 ;; esac',
       'if [ "$1" = "-p" ]; then',
       '  printf "freebsd-%s\\n" "$FAKE_NODE_ARCH"',
       "else",
       "  toolchain=system",
       '  if [ -n "$RUSTUP_TOOLCHAIN" ]; then toolchain="$RUSTUP_TOOLCHAIN"; fi',
       '  printf "node %s toolchain=%s\\n" "$*" "$toolchain" >> "$LOG_FILE"',
+      '  if [ "$FAIL_VERIFY" = "yes" ] && [ "$1" = "scripts/verify-native-http.ts" ]; then exit 1; fi',
       "fi",
     ].join("\n"),
   );
@@ -93,6 +95,7 @@ const runFreebsdScript = (
         FAIL_RUST_PACKAGE: options.failRustPackage ? "yes" : "no",
         FAIL_PKG: options.failPkg ? "yes" : "no",
         FAIL_RUSTUP: options.failRustup ? "yes" : "no",
+        FAIL_VERIFY: options.failVerify ? "yes" : "no",
       },
       encoding: "utf8",
     },
@@ -236,5 +239,31 @@ test("FreeBSD arm64 refuses to build with an outdated Rust package", () => {
   });
   expect(result.status).toBe(1);
   expect(result.stderr).toContain("requires Rust 1.96.0 or newer");
+  expect(result.log).not.toContain("node scripts/build-native.ts");
+});
+
+test.each([
+  ["amd64", "x64"],
+  ["arm64", "arm64"],
+] as const)(
+  "FreeBSD %s verifies cached addons without rebuilding",
+  (arch, key) => {
+    const result = runFreebsdScript(arch, "verify");
+    expect(result.status, result.stderr + result.log).toBe(0);
+    expect(result.log).toContain(
+      `node scripts/verify-native-load.ts --file=prebuilds/sync_request_curl_native.freebsd-${key}.node`,
+    );
+    expect(result.log).toContain(
+      `node scripts/verify-native-http.ts --file=prebuilds/sync_request_curl_native.freebsd-${key}.node`,
+    );
+    expect(result.log).not.toContain("node scripts/build-native.ts");
+    expect(result.log).not.toContain("node scripts/stage-native.ts");
+  },
+);
+
+test("FreeBSD cached addon verification fails on an HTTP smoke-test error", () => {
+  const result = runFreebsdScript("arm64", "verify", { failVerify: true });
+  expect(result.status).not.toBe(0);
+  expect(result.log).toContain("node scripts/verify-native-http.ts");
   expect(result.log).not.toContain("node scripts/build-native.ts");
 });
