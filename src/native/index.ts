@@ -178,6 +178,7 @@ const traceableNativeResolvers = {
   "darwin-arm64": () =>
     require.resolve("@nktnet/sync-request-curl-darwin-arm64"),
   "darwin-x64": () => require.resolve("@nktnet/sync-request-curl-darwin-x64"),
+  "freebsd-x64": () => require.resolve("@nktnet/sync-request-curl-freebsd-x64"),
   "linux-arm64-gnu": () =>
     require.resolve("@nktnet/sync-request-curl-linux-arm64-gnu"),
   "linux-arm64-musl": () =>

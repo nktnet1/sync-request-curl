@@ -167,8 +167,58 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  build-freebsd:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Build and test FreeBSD x64 prebuild
+        uses: vmactions/freebsd-vm@a2f9a41fa97f6848b8c3b791087dfcdaa5b473ff # v1.5.8
+        with:
+          release: "14.4"
+          mem: 8192
+          usesh: true
+          cache-after-prepare: true
+          prepare: |
+            set -eu
+            pkg install -y node24 rustup-init cmake gmake pkgconf perl5 llvm
+            rustup-init -y --no-modify-path --default-toolchain none --profile minimal
+            export PATH="$HOME/.cargo/bin:/usr/local/bin:$PATH"
+            rustup toolchain install 1.96.0 --profile minimal --no-self-update
+          run: |
+            set -eu
+            export PATH="$HOME/.cargo/bin:/usr/local/bin:$PATH"
+            for directory in /usr/local/llvm*/lib; do
+              if [ -f "$directory/libclang.so" ]; then
+                export LIBCLANG_PATH="$directory"
+                break
+              fi
+            done
+            test "$(node -p 'process.platform + "-" + process.arch')" = freebsd-x64
+            test "$(rustc --version | awk '{print $2}')" = "$(node scripts/rust-toolchain.ts)"
+            node scripts/build-native.ts
+            node scripts/stage-native.ts --platform=freebsd-x64
+            node scripts/verify-native-load.ts --file=prebuilds/sync_request_curl_native.freebsd-x64.node
+            node scripts/verify-native-http.ts --file=prebuilds/sync_request_curl_native.freebsd-x64.node
+            if ldd prebuilds/sync_request_curl_native.freebsd-x64.node | grep -q '/usr/local/'; then
+              echo "FreeBSD addon has unexpected runtime dependencies under /usr/local" >&2
+              exit 1
+            fi
+            rm -rf native/target native/build
+
+      - name: Upload native addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-freebsd-x64
+          path: prebuilds/sync_request_curl_native.freebsd-x64.node
+          if-no-files-found: error
+          retention-days: 1
+
   collect:
     needs:
+      - build-freebsd
       - build-linux
       - build-desktop
       - build-windows-x86
@@ -258,7 +308,7 @@ jobs:
             npm pack "$package_dir" --pack-destination release-tarballs --ignore-scripts
           done
           npm pack .release/main --pack-destination release-tarballs --ignore-scripts
-          test "$(find release-tarballs -maxdepth 1 -name '*.tgz' -type f | wc -l)" -eq 10
+          test "$(find release-tarballs -maxdepth 1 -name '*.tgz' -type f | wc -l)" -eq 11
 
       - name: Upload release packages
         uses: actions/upload-artifact@v4
