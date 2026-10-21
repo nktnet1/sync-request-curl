@@ -1,14 +1,49 @@
 # Releases
 
-Use Node.js 24.14+ or 26+. Commit these release-tooling changes to the default
-branch before creating a release tag. Configure npm trusted publishing for
+Use Node.js 24.14+ or 26+. Commit release tooling to the default branch
+before creating a release tag. npm Trusted Publishing must authorise
 `publish.yaml` on the main package and all native companion packages.
-For missing companion package names, use the existing `pnpm bootstrap:native`
-flow first; its placeholder version and `bootstrap` tag are separate from releases.
-Before tagging a release, bootstrap the new
-`@nktnet/sync-request-curl-freebsd-arm64` package if it is not yet on npm.
-Ensure it and `@nktnet/sync-request-curl-freebsd-x64` have npm Trusted
-Publishing permissions configured.
+
+## Bootstrap FreeBSD packages and OIDC
+
+The existing bootstrap command can create the missing FreeBSD package names and
+configure their trusted publishers in one pass. It publishes a README-only
+`0.0.0-bootstrap.0` placeholder under the non-default `bootstrap` dist-tag,
+not under `latest` or `beta`. No FreeBSD build is needed for this initial step.
+
+Use Node.js with npm 11.15.0 or newer. Sign in interactively with `npm login`,
+using an npm account with 2FA enabled and write access to `@nktnet`. An npm
+bypass-2FA automation token cannot create trusted publisher configurations.
+
+```sh
+npm login --registry=https://registry.npmjs.org/
+pnpm bootstrap:native --freebsd-only --configure-oidc
+pnpm bootstrap:native --freebsd-only --configure-oidc --publish
+```
+
+The second command previews package creation and OIDC settings. The third
+publishes any missing packages, then uses `npm trust github` to configure both
+`@nktnet/sync-request-curl-freebsd-arm64` and
+`@nktnet/sync-request-curl-freebsd-x64` with repository
+`nktnet1/sync-request-curl`, workflow `publish.yaml`, environment `Production`,
+and `--allow-publish`. It also works when both packages already exist.
+The first trust operation can require an interactive browser 2FA challenge; npm
+offers a five-minute 2FA skip option for completing the batch. The command is
+safe to repeat: existing names and matching trusted publishers are skipped,
+while conflicting trusted publisher settings cause an error instead of being
+revoked automatically.
+
+To bootstrap or configure OIDC for *all* native companion packages, omit
+`--freebsd-only`. The main `sync-request-curl` package's trusted publisher must
+also be configured separately if it does not already exist. GitHub Actions
+already supplies `id-token: write` and uses the `Production` environment in
+`publish.yaml`, so normal releases need no npm publishing token.
+
+**Important:** npm requires a successful OIDC publish within two days of
+creating a new trusted publisher, or the unvalidated configuration expires.
+Create the release tag within that window and check the Publish workflow.
+If a configuration expires, revoke it in npm settings and re-run the bootstrap
+command to register a new one.
 
 ## Prepare a beta
 
