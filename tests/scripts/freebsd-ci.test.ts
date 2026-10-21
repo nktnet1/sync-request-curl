@@ -62,7 +62,7 @@ const runFreebsdScript = (
       'if [ "$1" = "-p" ]; then',
       '  printf "freebsd-%s\\n" "$FAKE_NODE_ARCH"',
       "else",
-      `  printf "node %s toolchain=%s\\n" "$*" "\${RUSTUP_TOOLCHAIN:-system}" >> "$LOG_FILE"`,
+      '  printf "node %s toolchain=%s\\n" "$*" "\x24{RUSTUP_TOOLCHAIN:-system}" >> "$LOG_FILE"',
       "fi",
     ].join("\n"),
   );

@@ -16,7 +16,10 @@ rust_toolchain() {
 }
 
 rust_version_at_least() {
-  awk -v found="$1" -v required="$2" 'BEGIN {
+  local found required
+  found="$1"
+  required="$2"
+  awk -v found="$found" -v required="$required" 'BEGIN {
     if (found !~ /^[0-9]+\.[0-9]+\.[0-9]+$/ || required !~ /^[0-9]+\.[0-9]+\.[0-9]+$/) exit 1
     split(found, actual, ".")
     split(required, minimum, ".")
