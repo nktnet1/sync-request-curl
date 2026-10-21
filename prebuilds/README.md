@@ -10,7 +10,7 @@ verification.
 The release matrix contains:
 
 - macOS x64 and arm64
-- FreeBSD x64
+- FreeBSD x64 and arm64
 - Windows x64, arm64, and x86 (ia32)
 - Linux x64 and arm64 with glibc
 - Linux x64 and arm64 with musl
@@ -23,7 +23,8 @@ use the archived Debian Bullseye package snapshot and are checked for a GLIBC
 2.31-or-older requirement. musl builds are produced in Alpine and are also
 loaded and tested in Alpine containers.
 
-FreeBSD x64 builds run on a FreeBSD VM using its native toolchain and are load-checked before publication.
+FreeBSD x64 and arm64 builds run in architecture-matched FreeBSD VMs using
+native toolchains. CI load-checks the addons and makes an HTTP request before publication.
 
 Desktop builds run Cargo on GitHub runners. Windows x86 builds target
 `i686-pc-windows-msvc`, verify bundled HTTP/3 support, and are load-checked with
@@ -36,9 +37,9 @@ stages the dynamic library as:
 prebuilds/sync_request_curl_native.<platform>.node
 ```
 
-`pnpm verify:prebuilds` checks that the complete ten-binary release matrix is
+`pnpm verify:prebuilds` checks that the complete eleven-binary release matrix is
 present before packaging. `pnpm prepare:release-packages` then creates the main
-package plus ten `@nktnet/sync-request-curl-<platform>` packages under
+package plus eleven `@nktnet/sync-request-curl-<platform>` packages under
 `.release/`. The main package declares those packages as exact-version optional
 dependencies; npm-compatible package managers use each companion package's `os`,
 `cpu`, and (on Linux) `libc` metadata to install only the matching binary.

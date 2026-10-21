@@ -168,16 +168,25 @@ jobs:
           retention-days: 1
 
   build-freebsd:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: freebsd-x64
+            arch: x86_64
+          - platform: freebsd-arm64
+            arch: aarch64
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Build and test FreeBSD x64 prebuild
+      - name: Build and test ${{ matrix.platform }} prebuild
         uses: vmactions/freebsd-vm@a2f9a41fa97f6848b8c3b791087dfcdaa5b473ff # v1.5.8
         with:
           release: "14.4"
+          arch: ${{ matrix.arch }}
           mem: 8192
           usesh: true
           cache-after-prepare: true
@@ -196,13 +205,13 @@ jobs:
                 break
               fi
             done
-            test "$(node -p 'process.platform + "-" + process.arch')" = freebsd-x64
+            test "$(node -p 'process.platform + "-" + process.arch')" = ${{ matrix.platform }}
             test "$(rustc --version | awk '{print $2}')" = "$(node scripts/rust-toolchain.ts)"
             node scripts/build-native.ts
-            node scripts/stage-native.ts --platform=freebsd-x64
-            node scripts/verify-native-load.ts --file=prebuilds/sync_request_curl_native.freebsd-x64.node
-            node scripts/verify-native-http.ts --file=prebuilds/sync_request_curl_native.freebsd-x64.node
-            if ldd prebuilds/sync_request_curl_native.freebsd-x64.node | grep -q '/usr/local/'; then
+            node scripts/stage-native.ts --platform=${{ matrix.platform }}
+            node scripts/verify-native-load.ts --file=prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+            node scripts/verify-native-http.ts --file=prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+            if ldd prebuilds/sync_request_curl_native.${{ matrix.platform }}.node | grep -q '/usr/local/'; then
               echo "FreeBSD addon has unexpected runtime dependencies under /usr/local" >&2
               exit 1
             fi
@@ -211,8 +220,8 @@ jobs:
       - name: Upload native addon
         uses: actions/upload-artifact@v4
         with:
-          name: prebuild-freebsd-x64
-          path: prebuilds/sync_request_curl_native.freebsd-x64.node
+          name: prebuild-${{ matrix.platform }}
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
           if-no-files-found: error
           retention-days: 1
 
@@ -308,7 +317,7 @@ jobs:
             npm pack "$package_dir" --pack-destination release-tarballs --ignore-scripts
           done
           npm pack .release/main --pack-destination release-tarballs --ignore-scripts
-          test "$(find release-tarballs -maxdepth 1 -name '*.tgz' -type f | wc -l)" -eq 11
+          test "$(find release-tarballs -maxdepth 1 -name '*.tgz' -type f | wc -l)" -eq 12
 
       - name: Upload release packages
         uses: actions/upload-artifact@v4

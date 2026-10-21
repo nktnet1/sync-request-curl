@@ -19,6 +19,8 @@ describe("native platform detection", () => {
   test.each([
     ["darwin", "x64", "gnu", "darwin-x64"],
     ["darwin", "arm64", "gnu", "darwin-arm64"],
+    ["freebsd", "arm64", "gnu", "freebsd-arm64"],
+    ["freebsd", "arm64", "musl", "freebsd-arm64"],
     ["freebsd", "x64", "gnu", "freebsd-x64"],
     ["freebsd", "x64", "musl", "freebsd-x64"],
     ["linux", "x64", "gnu", "linux-x64-gnu"],
@@ -34,9 +36,9 @@ describe("native platform detection", () => {
   );
 
   test("rejects unsupported platforms and architectures", () => {
-    expect(() => getPlatformKey("freebsd", "arm64", "gnu")).toThrow(
+    expect(() => getPlatformKey("freebsd", "arm", "gnu")).toThrow(
       [
-        "sync-request-curl does not provide a native binary for freebsd-arm64.",
+        "sync-request-curl does not provide a native binary for freebsd-arm.",
         "",
         "Build from source using your package manager:",
         "  npm exec --no -- sync-request-curl-build",
@@ -65,11 +67,15 @@ describe("native platform detection", () => {
 
   test("validates native platform keys", () => {
     expect(isNativePlatformKey("linux-x64-gnu")).toBe(true);
+    expect(isNativePlatformKey("freebsd-arm64")).toBe(true);
     expect(isNativePlatformKey("freebsd-x64")).toBe(true);
     expect(isNativePlatformKey("linux-x64-unknown")).toBe(false);
   });
 
   test("maps platform keys to optional native package names", () => {
+    expect(getNativePackageName("freebsd-arm64")).toBe(
+      "@nktnet/sync-request-curl-freebsd-arm64",
+    );
     expect(getNativePackageName("freebsd-x64")).toBe(
       "@nktnet/sync-request-curl-freebsd-x64",
     );
@@ -79,6 +85,10 @@ describe("native platform detection", () => {
   });
 
   test("maps platform keys to native package targets", () => {
+    expect(getNativeTarget("freebsd-arm64")).toEqual({
+      os: "freebsd",
+      cpu: "arm64",
+    });
     expect(getNativeTarget("freebsd-x64")).toEqual({
       os: "freebsd",
       cpu: "x64",

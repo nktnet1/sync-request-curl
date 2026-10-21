@@ -1,6 +1,7 @@
 export const supportedPlatformKeys = [
   "darwin-arm64",
   "darwin-x64",
+  "freebsd-arm64",
   "freebsd-x64",
   "linux-arm64-gnu",
   "linux-arm64-musl",
@@ -25,6 +26,7 @@ export interface NativeTarget {
 const nativeTargets: Record<NativePlatformKey, NativeTarget> = {
   "darwin-arm64": { os: "darwin", cpu: "arm64" },
   "darwin-x64": { os: "darwin", cpu: "x64" },
+  "freebsd-arm64": { os: "freebsd", cpu: "arm64" },
   "freebsd-x64": { os: "freebsd", cpu: "x64" },
   "linux-arm64-gnu": { os: "linux", cpu: "arm64", libc: "glibc" },
   "linux-arm64-musl": { os: "linux", cpu: "arm64", libc: "musl" },
@@ -81,7 +83,7 @@ export function resolveNativePlatformKey(
     case "darwin":
       return `darwin-${arch}`;
     case "freebsd":
-      return arch === "x64" ? "freebsd-x64" : undefined;
+      return `freebsd-${arch}`;
     case "linux":
       return `linux-${arch}-${linuxLibc}`;
     case "win32":

@@ -5,8 +5,10 @@ branch before creating a release tag. Configure npm trusted publishing for
 `publish.yaml` on the main package and all native companion packages.
 For missing companion package names, use the existing `pnpm bootstrap:native`
 flow first; its placeholder version and `bootstrap` tag are separate from releases.
-For FreeBSD x64, bootstrap `@nktnet/sync-request-curl-freebsd-x64` and
-configure its npm Trusted Publishing permission before tagging a release.
+Before tagging a release, bootstrap the new
+`@nktnet/sync-request-curl-freebsd-arm64` package if it is not yet on npm.
+Ensure it and `@nktnet/sync-request-curl-freebsd-x64` have npm Trusted
+Publishing permissions configured.
 
 ## Prepare a beta
 

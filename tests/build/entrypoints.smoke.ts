@@ -23,6 +23,7 @@ test("CommonJS release bundle exposes literal native package resolutions to file
   const platforms = [
     "darwin-arm64",
     "darwin-x64",
+    "freebsd-arm64",
     "freebsd-x64",
     "linux-arm64-gnu",
     "linux-arm64-musl",
