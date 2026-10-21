@@ -169,6 +169,31 @@ const nativeRequire: NativeRequire = (path) =>
 const nativeResolve = moduleRequire.resolve.bind(moduleRequire);
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
 
+// Deployment file tracers (including Vercel's Node File Trace) recognise
+// literal require.resolve() calls, but not a computed name or a custom
+// require alias. Only call the matching resolver in the published CJS bundle.
+// In ESM source-mode tests, fall back to createRequire(import.meta.url).
+// Other platform packages remain optional install-time dependencies.
+const traceableNativeResolvers = {
+  "darwin-arm64": () =>
+    require.resolve("@nktnet/sync-request-curl-darwin-arm64"),
+  "darwin-x64": () => require.resolve("@nktnet/sync-request-curl-darwin-x64"),
+  "linux-arm64-gnu": () =>
+    require.resolve("@nktnet/sync-request-curl-linux-arm64-gnu"),
+  "linux-arm64-musl": () =>
+    require.resolve("@nktnet/sync-request-curl-linux-arm64-musl"),
+  "linux-x64-gnu": () =>
+    require.resolve("@nktnet/sync-request-curl-linux-x64-gnu"),
+  "linux-x64-musl": () =>
+    require.resolve("@nktnet/sync-request-curl-linux-x64-musl"),
+  "win32-arm64-msvc": () =>
+    require.resolve("@nktnet/sync-request-curl-win32-arm64-msvc"),
+  "win32-ia32-msvc": () =>
+    require.resolve("@nktnet/sync-request-curl-win32-ia32-msvc"),
+  "win32-x64-msvc": () =>
+    require.resolve("@nktnet/sync-request-curl-win32-x64-msvc"),
+} satisfies Record<NativePlatformKey, () => string>;
+
 export const findPackageRoot = (
   startDirectory: string,
   exists: FileExists = existsSync,
@@ -295,7 +320,10 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
   const nativePackageName = getNativePackageName(platformKey);
   const nativePackagePath = resolveOptionalNativePackage(
     nativePackageName,
-    options.resolveNative,
+    options.resolveNative ??
+      (typeof require === "function"
+        ? traceableNativeResolvers[platformKey]
+        : nativeResolve),
   );
   if (nativePackagePath) {
     return requireNative(nativePackagePath);
