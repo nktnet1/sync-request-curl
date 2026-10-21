@@ -21,6 +21,7 @@ import { parseArgs, styleText } from "node:util";
 import { getNativePackageName } from "#/native/platform-key-core";
 import { reserveLoopbackPort } from "#scripts/loopback-port";
 import { getCurrentPlatformKey } from "#scripts/native-platform";
+import { pollUntilReady } from "#scripts/poll-until-ready";
 import { canRun, run } from "#scripts/process";
 import {
   createMainPackageManifest,
@@ -201,27 +202,30 @@ const startVerdaccio = (registry: string): void => {
 };
 
 const waitForVerdaccio = async (registry: string): Promise<void> => {
-  const deadline = Date.now() + STARTUP_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    if (verdaccioProcess && verdaccioProcess.exitCode !== null) {
-      const log = existsSync(verdaccioLog)
-        ? readFileSync(verdaccioLog, "utf8").trim()
-        : "";
-      const logSuffix = log ? `:\n${log}` : "";
-      throw new Error(`Verdaccio exited before becoming ready${logSuffix}`);
-    }
-
-    try {
-      const response = await fetch(`${registry}/-/ping`);
-      if (response.ok) {
-        return;
+  const ready = await pollUntilReady(
+    async () => {
+      if (verdaccioProcess && verdaccioProcess.exitCode !== null) {
+        const log = existsSync(verdaccioLog)
+          ? readFileSync(verdaccioLog, "utf8").trim()
+          : "";
+        const logSuffix = log ? `:\n${log}` : "";
+        throw new Error(`Verdaccio exited before becoming ready${logSuffix}`);
       }
-    } catch {
-      // Verdaccio is still starting.
-    }
-    await delay(250);
+
+      try {
+        const response = await fetch(`${registry}/-/ping`);
+        return response.ok;
+      } catch {
+        // Verdaccio is still starting.
+        return false;
+      }
+    },
+    250,
+    Date.now() + STARTUP_TIMEOUT_MS,
+  );
+  if (!ready) {
+    throw new Error(`Timed out waiting for Verdaccio at ${registry}`);
   }
-  throw new Error(`Timed out waiting for Verdaccio at ${registry}`);
 };
 
 const startSmokeServer = async (): Promise<string> => {
@@ -264,37 +268,44 @@ const startSmokeServer = async (): Promise<string> => {
   );
 
   smokeServerOutput = "";
-  smokeServerProcess = spawn(process.execPath, [serverPath, String(port)], {
+  const serverProcess = spawn(process.execPath, [serverPath, String(port)], {
     cwd: temporaryRoot,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  smokeServerProcess.stdout?.on("data", (chunk: Buffer) => {
+  smokeServerProcess = serverProcess;
+  serverProcess.stdout?.on("data", (chunk: Buffer) => {
     smokeServerOutput += chunk.toString();
   });
-  smokeServerProcess.stderr?.on("data", (chunk: Buffer) => {
+  serverProcess.stderr?.on("data", (chunk: Buffer) => {
     smokeServerOutput += chunk.toString();
   });
 
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline) {
-    if (smokeServerProcess.exitCode !== null) {
-      throw new Error(
-        `Request smoke server exited before becoming ready${
-          smokeServerOutput.trim() ? `:\n${smokeServerOutput.trim()}` : ""
-        }`,
-      );
-    }
-    try {
-      const response = await fetch(`${serverUrl}/health`);
-      if (response.status === 204) {
-        return serverUrl;
+  const ready = await pollUntilReady(
+    async () => {
+      if (serverProcess.exitCode !== null) {
+        throw new Error(
+          `Request smoke server exited before becoming ready${
+            smokeServerOutput.trim() ? `:\n${smokeServerOutput.trim()}` : ""
+          }`,
+        );
       }
-    } catch {
-      // The request smoke server is still starting.
-    }
-    await delay(50);
+      try {
+        const response = await fetch(`${serverUrl}/health`);
+        return response.status === 204;
+      } catch {
+        // The request smoke server is still starting.
+        return false;
+      }
+    },
+    50,
+    Date.now() + 10_000,
+  );
+  if (!ready) {
+    throw new Error(
+      `Timed out waiting for request smoke server at ${serverUrl}`,
+    );
   }
-  throw new Error(`Timed out waiting for request smoke server at ${serverUrl}`);
+  return serverUrl;
 };
 
 const createVerdaccioUser = async (registry: string): Promise<string> => {
