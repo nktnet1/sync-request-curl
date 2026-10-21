@@ -46,6 +46,9 @@ describe("native platform detection", () => {
         "See the Compatibility section for prerequisites.",
       ].join("\n"),
     );
+    expect(() => getPlatformKey("sunos", "x64", "gnu")).toThrow(
+      "sync-request-curl does not provide a native binary for sunos-x64.",
+    );
     expect(() => getPlatformKey("linux", "ia32", "gnu")).toThrow(
       [
         "sync-request-curl does not provide a native binary for linux-ia32.",
