@@ -267,3 +267,93 @@ test("FreeBSD cached addon verification fails on an HTTP smoke-test error", () =
   expect(result.log).toContain("node scripts/verify-native-http.ts");
   expect(result.log).not.toContain("node scripts/build-native.ts");
 });
+
+const freebsdWorkflowJob = (
+  file: "native-prebuilds.yaml" | "pipeline.yaml",
+  job: "build-freebsd" | "freebsd-native",
+  nextJob: "collect" | "native",
+): string => {
+  const workflow = readFileSync(
+    resolve(import.meta.dirname, "../../.github/workflows", file),
+    "utf8",
+  );
+  const start = workflow.indexOf(`\n  ${job}:\n`);
+  const end = workflow.indexOf(`\n  ${nextJob}:\n`, start);
+  if (start === -1 || end === -1) {
+    throw new Error(`Unable to find ${job} in ${file}`);
+  }
+  return workflow.slice(start, end);
+};
+
+test("FreeBSD release and pipeline jobs share the exact cache key", () => {
+  const release = freebsdWorkflowJob(
+    "native-prebuilds.yaml",
+    "build-freebsd",
+    "collect",
+  );
+  const pipeline = freebsdWorkflowJob(
+    "pipeline.yaml",
+    "freebsd-native",
+    "native",
+  );
+  const key = /\bkey: (freebsd-prebuild-[^\n]+)/;
+  const releaseKey = release.match(key)?.[1];
+  const pipelineKey = pipeline.match(key)?.[1];
+  expect(releaseKey).toBeDefined();
+  expect(releaseKey).toBe(pipelineKey);
+  expect(releaseKey).toContain("'native/build.ts'");
+  expect(releaseKey).toContain("'scripts/freebsd-ci.sh'");
+});
+
+test("main pipeline smoke-tests FreeBSD artifacts before caching them", () => {
+  const pipeline = freebsdWorkflowJob(
+    "pipeline.yaml",
+    "freebsd-native",
+    "native",
+  );
+  expect(pipeline).toContain("uses: actions/cache@v4");
+  expect(pipeline).toContain("uses: vmactions/freebsd-vm@");
+  expect(pipeline).toContain("run: sh scripts/freebsd-ci.sh");
+  expect(pipeline).toContain("&& 'verify' || 'build'");
+  expect(pipeline).toContain("run: test -s prebuilds/");
+});
+
+test("release skips the FreeBSD VM only for an exact cache hit", () => {
+  const release = freebsdWorkflowJob(
+    "native-prebuilds.yaml",
+    "build-freebsd",
+    "collect",
+  );
+  expect(release).toMatch(
+    /if: steps\.native-cache\.outputs\.cache-hit == 'true'\n\s+run: echo /,
+  );
+  expect(release).toMatch(
+    /if: steps\.native-cache\.outputs\.cache-hit != 'true'\n\s+uses: vmactions\/freebsd-vm@/,
+  );
+  expect(release).toContain("run: sh scripts/freebsd-ci.sh build");
+  expect(release).toContain("run: test -s prebuilds/");
+  expect(release).toContain("if-no-files-found: error");
+});
+
+test("the FreeBSD cache is warmed on main without triggering npm publication", () => {
+  const pipeline = readFileSync(
+    resolve(import.meta.dirname, "../../.github/workflows/pipeline.yaml"),
+    "utf8",
+  );
+  const release = readFileSync(
+    resolve(
+      import.meta.dirname,
+      "../../.github/workflows/native-prebuilds.yaml",
+    ),
+    "utf8",
+  );
+  const publish = readFileSync(
+    resolve(import.meta.dirname, "../../.github/workflows/publish.yaml"),
+    "utf8",
+  );
+  expect(pipeline).toMatch(/on:\n {2}push:\n {4}branches:\n {6}- main\n/);
+  expect(release).toMatch(
+    /on:\n {2}workflow_dispatch:\n {2}push:\n {4}tags:\n {6}- 'v\*'/,
+  );
+  expect(publish).toContain("github.event.workflow_run.event == 'push'");
+});

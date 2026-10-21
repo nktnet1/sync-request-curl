@@ -191,7 +191,15 @@ jobs:
           path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
           key: freebsd-prebuild-v1-14.4-${{ matrix.platform }}-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml', 'native/build.rs', 'native/build.ts', 'native/src/**', 'rust-toolchain.toml', 'scripts/freebsd-ci.sh', 'scripts/build-native.ts', 'scripts/stage-native.ts') }}
 
-      - name: Build or verify ${{ matrix.platform }} prebuild
+      # Pipeline runs on main already compile and smoke-test this exact addon
+      # before writing its cache. On an exact hit, avoid starting a FreeBSD VM
+      # again just to release the already verified binary.
+      - name: Reuse verified ${{ matrix.platform }} prebuild
+        if: steps.native-cache.outputs.cache-hit == 'true'
+        run: echo "Reusing a previously verified ${{ matrix.platform }} prebuild; skipping FreeBSD VM"
+
+      - name: Build and verify ${{ matrix.platform }} on cache miss
+        if: steps.native-cache.outputs.cache-hit != 'true'
         uses: vmactions/freebsd-vm@a2f9a41fa97f6848b8c3b791087dfcdaa5b473ff # v1.5.8
         with:
           release: "14.4"
@@ -204,8 +212,8 @@ jobs:
           prepare: |
             # ${{ hashFiles('scripts/freebsd-ci.sh', 'rust-toolchain.toml') }}
             sh scripts/freebsd-ci.sh prepare
-          # Cache hits still run the native load/HTTP smoke checks in FreeBSD.
-          run: sh scripts/freebsd-ci.sh ${{ steps.native-cache.outputs.cache-hit == 'true' && 'verify' || 'build' }} ${{ matrix.platform }}
+          # Cache misses still compile and run all FreeBSD smoke checks.
+          run: sh scripts/freebsd-ci.sh build ${{ matrix.platform }}
 
       - name: Confirm native addon was copied back
         run: test -s prebuilds/sync_request_curl_native.${{ matrix.platform }}.node

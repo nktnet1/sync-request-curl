@@ -76,6 +76,22 @@ version edit available for inspection.
 
 ## Build and publish
 
+### FreeBSD release cache
+
+`Pipeline` builds or smoke-tests both FreeBSD architectures on every relevant
+push to `main`. Once a successful run has populated the default-branch native
+addon cache, tagged releases restore the **exact** source-keyed binary and skip
+the FreeBSD VM entirely. The prebuilt binary was already loaded and HTTP-tested
+on FreeBSD before that cache entry was saved. Normal branch pushes cannot
+trigger the npm Publish job; publication still requires a release tag.
+
+**Wait for `Pipeline` on `main` to succeed before pushing a release tag**, in
+particular after changing native code or build scripts. The FreeBSD cache key
+includes the native build entrypoint (`native/build.ts`), the Rust sources and
+lockfile, and the FreeBSD CI tooling. A cache miss, expiration, or first build
+after a cache-key change falls back to the full FreeBSD build and smoke tests;
+the release still waits for that job rather than publishing a missing binary.
+
 The tag triggers Native prebuilds, which builds the native matrix and packages
 the release. Publish then invokes `scripts/publish-release-packages.ts` using
 release metadata and the upstream run's expected SHA. CI does not increment the
