@@ -17,7 +17,8 @@ const runFreebsdScript = (
   arch: "amd64" | "arm64" | "other",
   command: "prepare" | "build",
   options: {
-    badDigest?: boolean;
+    rustVersion?: string;
+    failRustPackage?: boolean;
     invalidToolchain?: boolean;
     missingToolchain?: boolean;
     failPkg?: boolean;
@@ -49,7 +50,10 @@ const runFreebsdScript = (
   mock("uname", 'printf "%s\\n" "$FAKE_ARCH"');
   mock(
     "pkg",
-    'printf "pkg %s\\n" "$*" >> "$LOG_FILE"; if [ "$FAIL_PKG" = "yes" ]; then exit 1; fi',
+    [
+      'printf "pkg %s\\n" "$*" >> "$LOG_FILE"',
+      'if [ "$FAIL_PKG" = "yes" ] || { [ "$FAIL_RUST_PACKAGE" = "yes" ] && [ "$*" = "install -y rust" ]; }; then exit 1; fi',
+    ].join("\n"),
   );
   mock(
     "node",
@@ -58,7 +62,7 @@ const runFreebsdScript = (
       'if [ "$1" = "-p" ]; then',
       '  printf "freebsd-%s\\n" "$FAKE_NODE_ARCH"',
       "else",
-      '  printf "node %s toolchain=%s\\n" "$*" "$RUSTUP_TOOLCHAIN" >> "$LOG_FILE"',
+      `  printf "node %s toolchain=%s\\n" "$*" "\${RUSTUP_TOOLCHAIN:-system}" >> "$LOG_FILE"`,
       "fi",
     ].join("\n"),
   );
@@ -66,20 +70,6 @@ const runFreebsdScript = (
   mock(
     "rustup",
     'printf "rustup %s\\n" "$*" >> "$LOG_FILE"; if [ "$FAIL_RUSTUP" = "yes" ]; then exit 1; fi',
-  );
-  mock(
-    "fetch",
-    [
-      'file="$2"',
-      'case "$file" in',
-      '  *.sha256) printf "fixture-digest  rustup-init\\n" > "$file" ;;',
-      '  *) printf \'#!/bin/sh\\nprintf "downloaded-rustup %%s\\\\n" "$*" >> "$LOG_FILE"\\n\' > "$file" ;;',
-      "esac",
-    ].join("\n"),
-  );
-  mock(
-    "sha256",
-    'if [ "$BAD_DIGEST" = "yes" ]; then echo incorrect; else echo fixture-digest; fi',
   );
   mock("rustc", 'printf "rustc %s (mock)\\n" "$FAKE_RUST_VERSION"');
   mock("ldd", 'printf "libc.so.7 => /lib/libc.so.7\\n"');
@@ -96,8 +86,9 @@ const runFreebsdScript = (
         MOCK_BIN: bin,
         FAKE_ARCH: arch,
         FAKE_NODE_ARCH: arch === "amd64" ? "x64" : "arm64",
-        FAKE_RUST_VERSION: arch === "arm64" ? "1.98.1" : "1.96.0",
-        BAD_DIGEST: options.badDigest ? "yes" : "no",
+        FAKE_RUST_VERSION:
+          options.rustVersion ?? (arch === "arm64" ? "1.97.1" : "1.96.0"),
+        FAIL_RUST_PACKAGE: options.failRustPackage ? "yes" : "no",
         FAIL_PKG: options.failPkg ? "yes" : "no",
         FAIL_RUSTUP: options.failRustup ? "yes" : "no",
       },
@@ -132,14 +123,14 @@ test("FreeBSD x64 reads changes to the pinned Rust version", () => {
   expect(result.log).toContain("rustup toolchain install 1.97.7");
 });
 
-test("FreeBSD arm64 uses the verified official installer and newer toolchain", () => {
+test("FreeBSD arm64 installs Rust from the native FreeBSD package", () => {
   const result = runFreebsdScript("arm64", "prepare");
   expect(result.status, result.stderr + result.log).toBe(0);
   expect(result.log).toContain("pkg bootstrap -f");
   expect(result.log).toContain("pkg update -f");
-  expect(result.log).not.toContain("pkg install -y rustup-init");
-  expect(result.log).toContain("downloaded-rustup -y --no-modify-path");
-  expect(result.log).toContain("rustup toolchain install 1.98.1");
+  expect(result.log).toContain("pkg install -y rust");
+  expect(result.log).not.toContain("rustup");
+  expect(result.stderr).toContain("Rust 1.97.1 meets minimum 1.96.0");
 });
 
 test("FreeBSD arm64 reports pkg bootstrap failures with their phase", () => {
@@ -150,15 +141,41 @@ test("FreeBSD arm64 reports pkg bootstrap failures with their phase", () => {
   expect(result.log).not.toContain("pkg install -y node24");
 });
 
-test("FreeBSD arm64 refuses an installer with a bad checksum", () => {
-  const result = runFreebsdScript("arm64", "prepare", { badDigest: true });
+test("FreeBSD arm64 identifies Rust package installation failures", () => {
+  const result = runFreebsdScript("arm64", "prepare", {
+    failRustPackage: true,
+  });
   expect(result.status).toBe(1);
-  expect(result.stderr).toContain("SHA-256 verification failed");
   expect(result.stderr).toContain(
-    "preparation failed during rustup checksum verification",
+    "Failed to install FreeBSD arm64 Rust package",
   );
-  expect(result.log).not.toContain("downloaded-rustup");
+  expect(result.stderr).toContain(
+    "preparation failed during FreeBSD Rust package installation",
+  );
 });
+
+test.each(["1.95.9", "not-a-version"])(
+  "FreeBSD arm64 rejects unsupported Rust version %s",
+  (rustVersion) => {
+    const result = runFreebsdScript("arm64", "prepare", { rustVersion });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      `FreeBSD arm64 requires Rust 1.96.0 or newer; found ${rustVersion}`,
+    );
+    expect(result.stderr).toContain(
+      "preparation failed during Rust version verification",
+    );
+  },
+);
+
+test.each(["1.96.0", "1.97.1", "1.100.0"])(
+  "FreeBSD arm64 accepts supported Rust version %s",
+  (rustVersion) => {
+    const result = runFreebsdScript("arm64", "prepare", { rustVersion });
+    expect(result.status, result.stderr + result.log).toBe(0);
+    expect(result.stderr).toContain(`Rust ${rustVersion} meets minimum 1.96.0`);
+  },
+);
 
 test.each(["invalidToolchain", "missingToolchain"] as const)(
   "FreeBSD x64 rejects an %s configuration",
@@ -183,11 +200,11 @@ test("FreeBSD package failures are identified before Rust installation", () => {
   expect(result.log).not.toContain("rustup toolchain install");
 });
 
-test("FreeBSD Rust installation failures identify the toolchain and architecture", () => {
-  const result = runFreebsdScript("arm64", "prepare", { failRustup: true });
+test("FreeBSD x64 Rust installation failures identify the toolchain and architecture", () => {
+  const result = runFreebsdScript("amd64", "prepare", { failRustup: true });
   expect(result.status).toBe(1);
   expect(result.stderr).toContain(
-    "Failed to install Rust toolchain 1.98.1 on FreeBSD arm64",
+    "Failed to install Rust toolchain 1.96.0 on FreeBSD amd64",
   );
 });
 
@@ -199,8 +216,8 @@ test("FreeBSD CI rejects unsupported host architectures", () => {
 
 test.each([
   ["amd64", "1.96.0"],
-  ["arm64", "1.98.1"],
-] as const)("FreeBSD %s builds use Rust %s", (arch, version) => {
+  ["arm64", "system"],
+] as const)("FreeBSD %s builds use Rust toolchain %s", (arch, version) => {
   const result = runFreebsdScript(arch, "build");
   expect(result.status, result.stderr + result.log).toBe(0);
   expect(result.log).toContain(
@@ -209,4 +226,13 @@ test.each([
   expect(result.log).toContain(
     `node scripts/verify-native-http.ts --file=prebuilds/sync_request_curl_native.freebsd-${arch === "amd64" ? "x64" : "arm64"}.node toolchain=${version}`,
   );
+});
+
+test("FreeBSD arm64 refuses to build with an outdated Rust package", () => {
+  const result = runFreebsdScript("arm64", "build", {
+    rustVersion: "1.95.9",
+  });
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain("requires Rust 1.96.0 or newer");
+  expect(result.log).not.toContain("node scripts/build-native.ts");
 });
