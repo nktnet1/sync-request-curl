@@ -1,24 +1,11 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
-import { resolve } from "node:path";
-import { parseArgs, styleText } from "node:util";
+import { styleText } from "node:util";
 import { Worker } from "node:worker_threads";
 
-const { values } = parseArgs({
-  options: {
-    file: { type: "string" },
-  },
-});
+import { resolveNativeAddonFile } from "#scripts/native-addon-file";
 
-if (!values.file) {
-  throw new Error("--file must point to a native addon");
-}
-
-const file = resolve(values.file);
-if (!existsSync(file)) {
-  throw new Error(`Native addon does not exist: ${file}`);
-}
+const file = resolveNativeAddonFile();
 
 interface NativeHttpResponse {
   transportCode: number;
