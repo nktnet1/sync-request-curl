@@ -54,6 +54,7 @@ const runFreebsdScript = (
   mock(
     "node",
     [
+      'case "$PATH" in "$HOME/.cargo/bin:$MOCK_BIN:"*) ;; *) echo "Mock directory lost PATH precedence" >&2; exit 66 ;; esac',
       'if [ "$1" = "-p" ]; then',
       '  printf "freebsd-%s\\n" "$FAKE_NODE_ARCH"',
       "else",
@@ -89,10 +90,10 @@ const runFreebsdScript = (
     {
       cwd: root,
       env: {
-        ...process.env,
         PATH: `${bin}:${process.env.PATH}`,
         HOME: root,
         LOG_FILE: log,
+        MOCK_BIN: bin,
         FAKE_ARCH: arch,
         FAKE_NODE_ARCH: arch === "amd64" ? "x64" : "arm64",
         FAKE_RUST_VERSION: arch === "arm64" ? "1.98.1" : "1.96.0",
@@ -115,7 +116,7 @@ afterEach(() => {
 
 test("FreeBSD x64 uses the packaged installer and pinned toolchain", () => {
   const result = runFreebsdScript("amd64", "prepare");
-  expect(result.status).toBe(0);
+  expect(result.status, result.stderr + result.log).toBe(0);
   expect(result.log).toContain("pkg install -y rustup-init");
   expect(result.log).toContain("rustup-init -y --no-modify-path");
   expect(result.log).toContain("rustup toolchain install 1.96.0");
@@ -127,22 +128,35 @@ test("FreeBSD x64 reads changes to the pinned Rust version", () => {
   const result = runFreebsdScript("amd64", "prepare", {
     pinnedToolchain: "1.97.7",
   });
-  expect(result.status).toBe(0);
+  expect(result.status, result.stderr + result.log).toBe(0);
   expect(result.log).toContain("rustup toolchain install 1.97.7");
 });
 
 test("FreeBSD arm64 uses the verified official installer and newer toolchain", () => {
   const result = runFreebsdScript("arm64", "prepare");
-  expect(result.status).toBe(0);
+  expect(result.status, result.stderr + result.log).toBe(0);
+  expect(result.log).toContain("pkg bootstrap -f");
+  expect(result.log).toContain("pkg update -f");
   expect(result.log).not.toContain("pkg install -y rustup-init");
   expect(result.log).toContain("downloaded-rustup -y --no-modify-path");
   expect(result.log).toContain("rustup toolchain install 1.98.1");
+});
+
+test("FreeBSD arm64 reports pkg bootstrap failures with their phase", () => {
+  const result = runFreebsdScript("arm64", "prepare", { failPkg: true });
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain("preparation failed during pkg bootstrap");
+  expect(result.log).toContain("pkg bootstrap -f");
+  expect(result.log).not.toContain("pkg install -y node24");
 });
 
 test("FreeBSD arm64 refuses an installer with a bad checksum", () => {
   const result = runFreebsdScript("arm64", "prepare", { badDigest: true });
   expect(result.status).toBe(1);
   expect(result.stderr).toContain("SHA-256 verification failed");
+  expect(result.stderr).toContain(
+    "preparation failed during rustup checksum verification",
+  );
   expect(result.log).not.toContain("downloaded-rustup");
 });
 
@@ -188,7 +202,7 @@ test.each([
   ["arm64", "1.98.1"],
 ] as const)("FreeBSD %s builds use Rust %s", (arch, version) => {
   const result = runFreebsdScript(arch, "build");
-  expect(result.status).toBe(0);
+  expect(result.status, result.stderr + result.log).toBe(0);
   expect(result.log).toContain(
     `node scripts/build-native.ts toolchain=${version}`,
   );
