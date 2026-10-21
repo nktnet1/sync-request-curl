@@ -2,6 +2,7 @@ import { join, parse, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   findPackageRoot,
+  getDefaultNativeResolver,
   loadBinding,
   loadFirstExisting,
   type NativeBinding,
@@ -301,6 +302,12 @@ describe("native binding loading", () => {
         expect(requireNative).not.toHaveBeenCalled();
       }
     }
+  });
+
+  test("uses createRequire to resolve packages when CommonJS require is unavailable", () => {
+    const resolveNative = getDefaultNativeResolver("linux-x64-gnu", false);
+
+    expect(resolveNative("node:fs")).toBe("node:fs");
   });
 
   test("throws a useful error when no matching binary exists", () => {

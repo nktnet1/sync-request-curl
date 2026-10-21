@@ -194,6 +194,12 @@ const traceableNativeResolvers = {
     require.resolve("@nktnet/sync-request-curl-win32-x64-msvc"),
 } satisfies Record<NativePlatformKey, () => string>;
 
+export const getDefaultNativeResolver = (
+  platformKey: NativePlatformKey,
+  hasCommonJsRequire: boolean = typeof require === "function",
+): NativeResolve =>
+  hasCommonJsRequire ? traceableNativeResolvers[platformKey] : nativeResolve;
+
 export const findPackageRoot = (
   startDirectory: string,
   exists: FileExists = existsSync,
@@ -320,10 +326,7 @@ export const loadBinding = (options: NativeLoadOptions = {}): NativeBinding => {
   const nativePackageName = getNativePackageName(platformKey);
   const nativePackagePath = resolveOptionalNativePackage(
     nativePackageName,
-    options.resolveNative ??
-      (typeof require === "function"
-        ? traceableNativeResolvers[platformKey]
-        : nativeResolve),
+    options.resolveNative ?? getDefaultNativeResolver(platformKey),
   );
   if (nativePackagePath) {
     return requireNative(nativePackagePath);
