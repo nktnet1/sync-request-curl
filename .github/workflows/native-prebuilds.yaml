@@ -190,32 +190,8 @@ jobs:
           mem: 8192
           usesh: true
           cache-after-prepare: true
-          prepare: |
-            set -eu
-            pkg install -y node24 rustup-init cmake gmake pkgconf perl5 llvm
-            rustup-init -y --no-modify-path --default-toolchain none --profile minimal
-            export PATH="$HOME/.cargo/bin:/usr/local/bin:$PATH"
-            rustup toolchain install 1.96.0 --profile minimal --no-self-update
-          run: |
-            set -eu
-            export PATH="$HOME/.cargo/bin:/usr/local/bin:$PATH"
-            for directory in /usr/local/llvm*/lib; do
-              if [ -f "$directory/libclang.so" ]; then
-                export LIBCLANG_PATH="$directory"
-                break
-              fi
-            done
-            test "$(node -p 'process.platform + "-" + process.arch')" = ${{ matrix.platform }}
-            test "$(rustc --version | awk '{print $2}')" = "$(node scripts/rust-toolchain.ts)"
-            node scripts/build-native.ts
-            node scripts/stage-native.ts --platform=${{ matrix.platform }}
-            node scripts/verify-native-load.ts --file=prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
-            node scripts/verify-native-http.ts --file=prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
-            if ldd prebuilds/sync_request_curl_native.${{ matrix.platform }}.node | grep -q '/usr/local/'; then
-              echo "FreeBSD addon has unexpected runtime dependencies under /usr/local" >&2
-              exit 1
-            fi
-            rm -rf native/target native/build
+          prepare: sh scripts/freebsd-ci.sh prepare
+          run: sh scripts/freebsd-ci.sh build ${{ matrix.platform }}
 
       - name: Upload native addon
         uses: actions/upload-artifact@v4
