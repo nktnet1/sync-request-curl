@@ -7,6 +7,8 @@ import {
   type NativeBinding,
   resolveOptionalNativePackage,
 } from "#/native/index";
+import { getNativePackageName } from "#/native/platform-key";
+import { supportedPlatformKeys } from "#/native/platform-key-core";
 
 const fakeBinding = (): NativeBinding => ({
   request: vi.fn(() => {
@@ -272,6 +274,33 @@ describe("native binding loading", () => {
       "@nktnet/sync-request-curl-linux-x64-gnu",
     );
     expect(requireNative).toHaveBeenCalledWith(resolved);
+  });
+
+  test("attempts each statically traceable native package resolver", () => {
+    for (const platformKey of supportedPlatformKeys) {
+      const binding = fakeBinding();
+      const requireNative = vi.fn(() => binding);
+
+      try {
+        expect(
+          loadBinding({
+            platformKey,
+            packageRoot: join("", "package"),
+            exists: () => false,
+            requireNative,
+          }),
+        ).toBe(binding);
+        expect(requireNative).toHaveBeenCalledOnce();
+      } catch (error) {
+        // All platforms are exercised, even when only the host's optional
+        // package was installed. A missing package is the expected fallback.
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toContain(
+          `The optional package ${getNativePackageName(platformKey)} is missing.`,
+        );
+        expect(requireNative).not.toHaveBeenCalled();
+      }
+    }
   });
 
   test("throws a useful error when no matching binary exists", () => {

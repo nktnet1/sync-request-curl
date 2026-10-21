@@ -18,6 +18,12 @@ test("renders JSON serializers as callable properties in the API documentation",
     await app.generateOutputs(project);
     const markdown = readFileSync(join(output, "README.md"), "utf8");
 
+    // typedoc-plugin-markdown 4.14+ marks the optional request options parameter with `?`.
+    // Both forms must link to the standalone Options documentation.
+    expect(markdown).toMatch(
+      /^\| `options\??` \| \[`Options`\]\(#options\) \|/m,
+    );
+
     for (const type of ["JsonLike", "NestedJsonLike"]) {
       expect(markdown).toContain(`toJSON: () => ${type};`);
       expect(markdown).not.toContain(`toJSON: ${type};`);
