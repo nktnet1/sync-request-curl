@@ -190,7 +190,11 @@ jobs:
           mem: 8192
           usesh: true
           cache-after-prepare: true
-          prepare: sh scripts/freebsd-ci.sh prepare
+          # Include the script and pin in the input, since this action version
+          # hashes only the literal prepare command for its prepared VM cache.
+          prepare: |
+            # ${{ hashFiles('scripts/freebsd-ci.sh', 'rust-toolchain.toml') }}
+            sh scripts/freebsd-ci.sh prepare
           run: sh scripts/freebsd-ci.sh build ${{ matrix.platform }}
 
       - name: Upload native addon

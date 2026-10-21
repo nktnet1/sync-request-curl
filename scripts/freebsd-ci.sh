@@ -3,15 +3,31 @@ set -eu
 
 rust_toolchain() {
   case "$(uname -m)" in
-    amd64) node scripts/rust-toolchain.ts ;;
+    amd64)
+      # Read the pin without running Node (which may not be installed yet).
+      if [ ! -f rust-toolchain.toml ]; then
+        echo "Missing rust-toolchain.toml" >&2
+        return 1
+      fi
+      version="$(awk -F '"' '/^[[:space:]]*channel[[:space:]]*=/ { print $2; exit }' rust-toolchain.toml)"
+      if [ -z "$version" ]; then
+        echo "Missing Rust channel in rust-toolchain.toml" >&2
+        return 1
+      fi
+      printf '%s\n' "$version"
+      ;;
     arm64) printf '1.98.1\n' ;;
-    *) echo "Unsupported FreeBSD architecture: $(uname -m)" >&2; exit 1 ;;
+    *) echo "Unsupported FreeBSD architecture: $(uname -m)" >&2; return 1 ;;
   esac
 }
 
 prepare() {
   set -x
-  pkg install -y node24 cmake gmake pkgconf perl5 llvm
+  printf 'Preparing FreeBSD %s native build environment\n' "$(uname -m)" >&2
+  if ! pkg install -y node24 cmake gmake pkgconf perl5 llvm ca_root_nss; then
+    echo "FreeBSD dependency installation failed (pkg)" >&2
+    return 1
+  fi
 
   case "$(uname -m)" in
     amd64)
@@ -38,14 +54,20 @@ prepare() {
   esac
 
   export PATH="$HOME/.cargo/bin:/usr/local/bin:$PATH"
-  rustup toolchain install "$(rust_toolchain)" --profile minimal --no-self-update
+  toolchain="$(rust_toolchain)" || return 1
+  printf 'Installing Rust toolchain %s\n' "$toolchain" >&2
+  if ! rustup toolchain install "$toolchain" --profile minimal --no-self-update; then
+    echo "Failed to install Rust toolchain $toolchain on FreeBSD $(uname -m)" >&2
+    return 1
+  fi
 }
 
 build() {
   platform="${1:?Expected native platform key}"
   set -x
   export PATH="$HOME/.cargo/bin:/usr/local/bin:$PATH"
-  export RUSTUP_TOOLCHAIN="$(rust_toolchain)"
+  RUSTUP_TOOLCHAIN="$(rust_toolchain)" || return 1
+  export RUSTUP_TOOLCHAIN
   for directory in /usr/local/llvm*/lib; do
     if [ -f "$directory/libclang.so" ]; then
       export LIBCLANG_PATH="$directory"
