@@ -137,7 +137,8 @@ Default: check the registry and dry-run missing bootstrap packages.
 --registry <url>: registry to inspect and publish to (default: npmjs.org).
 
 OIDC setup requires npm >= 11.15, npm login with 2FA enabled, and write access
-for the package names. The first trust operation may prompt for browser 2FA.
+for the package names. If a captured trust lookup requires 2FA, the interactive
+npm trust github command handles the browser challenge instead.
 Publish a release via the trusted GitHub Actions workflow within 2 days of
 creating a new trust relationship so npm can validate it.`);
 };
@@ -311,37 +312,36 @@ export const parseTrustedPublishers = (
 const readTrustedPublishers = (
   packageName: string,
   registry: string,
-): TrustConfiguration[] => {
-  const args = ["trust", "list", packageName, `--registry=${registry}`];
-  const capture = (): string =>
-    run("npm", [...args, "--json"], { cwd: root, capture: true });
+): TrustConfiguration[] | undefined => {
   try {
-    let output: string;
-    try {
-      output = capture();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (
-        !/\bEOTP\b|one-time pass|two-factor|\b2FA\b|npm-otp/i.test(message) ||
-        !process.stdin.isTTY ||
-        !process.stdout.isTTY
-      ) {
-        throw error;
-      }
-      // Capturing stdout removes npm's TTY, preventing browser 2FA. Let npm
-      // complete the challenge interactively, then retry the JSON lookup.
-      console.log(
-        `${status("yellow", "2FA")} Verify ${packageName} in npm. ` +
-          "Select the 5-minute 2FA skip option in the browser to continue the batch.",
-      );
-      run("npm", args, { cwd: root });
-      output = capture();
-    }
+    const output = run(
+      "npm",
+      ["trust", "list", packageName, "--json", `--registry=${registry}`],
+      { cwd: root, capture: true },
+    );
     return parseTrustedPublishers(output);
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/\bEOTP\b|one-time pass|two-factor|\b2FA\b|npm-otp/i.test(message)) {
+      if (!process.stdin.isTTY || !process.stdout.isTTY) {
+        throw new Error(
+          `An interactive terminal is required to configure npm trusted publishers for ${packageName}. ` +
+            "Run the bootstrap command from a terminal to complete browser 2FA.",
+          { cause: error },
+        );
+      }
+      // npm cannot complete browser 2FA when its output is captured. Do not
+      // repeat the captured lookup: creation below uses inherited stdio and
+      // lets `npm trust github` complete the authentication challenge.
+      console.log(
+        `${status("yellow", "2FA")} Unable to inspect trust for ${packageName}; ` +
+          "npm trust github will authenticate interactively. " +
+          "Select the 5-minute 2FA skip option when offered.",
+      );
+      return undefined;
+    }
     throw new Error(
-      `Unable to check npm trusted publishers for ${packageName}. ` +
-        "Complete npm's browser 2FA challenge with the 5-minute skip option, then retry.",
+      `Unable to check npm trusted publishers for ${packageName}.`,
       { cause: error },
     );
   }
@@ -367,7 +367,7 @@ const configureTrustedPublishers = async (
   for (const packageName of names) {
     const configurations = readTrustedPublishers(packageName, registry);
     if (
-      configurations.some((config) => isExpectedPublisher(config, repository))
+      configurations?.some((config) => isExpectedPublisher(config, repository))
     ) {
       skipped++;
       console.log(
@@ -375,7 +375,7 @@ const configureTrustedPublishers = async (
       );
       continue;
     }
-    if (configurations.length > 0) {
+    if (configurations && configurations.length > 0) {
       throw new Error(
         `${packageName} already has a different trusted publisher. ` +
           `Review npm trust list ${packageName} and resolve it manually; existing trust is never revoked automatically.`,

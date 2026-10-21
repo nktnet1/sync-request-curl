@@ -28,10 +28,13 @@ publishes any missing packages, then uses `npm trust github` to configure both
 `nktnet1/sync-request-curl`, workflow `publish.yaml`, environment `Production`,
 and `--allow-publish`. It also works when both packages already exist.
 The first trust operation can require an interactive browser 2FA challenge; npm
-offers a five-minute 2FA skip option for completing the batch. The command is
-safe to repeat: existing names and matching trusted publishers are skipped,
-while conflicting trusted publisher settings cause an error instead of being
-revoked automatically.
+offers a five-minute 2FA skip option for completing the batch. The script
+inspects existing trusted publishers first: when npm allows the lookup, matching
+configurations are skipped, and conflicting ones stop the command. If npm
+requires 2FA for a captured `npm trust list --json`, the script proceeds to the
+interactive `npm trust github` command rather than retrying the captured lookup.
+In this case npm may reject an already-existing relationship rather than skip
+it, but no existing trusted publisher is revoked or overwritten.
 
 To bootstrap or configure OIDC for *all* native companion packages, omit
 `--freebsd-only`. The main `sync-request-curl` package's trusted publisher must

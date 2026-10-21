@@ -200,7 +200,7 @@ test("fails closed on trust-list errors", async () => {
   expect(commands.some(({ args }) => args[1] === "github")).toBe(false);
 });
 
-test("retries npm trust inspection interactively when browser 2FA is needed", async () => {
+test("delegates browser 2FA to npm trust github without retrying the captured lookup", async () => {
   const originalInput = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
   const originalOutput = Object.getOwnPropertyDescriptor(
     process.stdout,
@@ -214,20 +214,19 @@ test("retries npm trust inspection interactively when browser 2FA is needed", as
     value: true,
     configurable: true,
   });
-  const commands: string[][] = [];
-  let challenged = false;
+  const { commands } = createCommandMock();
   mocks.run.mockImplementation((command: string, args: string[]) => {
-    commands.push([command, ...args]);
+    commands.push({ command, args });
     if (command === "npm" && args[0] === "--version") return "11.19.0";
     if (args[0] === "whoami") return "package-owner";
     if (args[0] === "view") return "[]";
     if (command === "npm" && args[1] === "list") {
-      if (args.includes("--json") && !challenged) {
-        challenged = true;
+      if (args[2] === arm64) {
         throw new Error("EOTP two-factor authentication required");
       }
-      return args.includes("--json") ? JSON.stringify(expectedTrust) : "";
+      return JSON.stringify(expectedTrust);
     }
+    if (command === "npm" && args[1] === "github") return "";
     throw new Error(`Unexpected command: ${command} ${args.join(" ")}`);
   });
   try {
@@ -237,15 +236,59 @@ test("retries npm trust inspection interactively when browser 2FA is needed", as
       configureOidc: true,
     });
     expect(
-      commands.filter(
-        ([, first, second]) => first === "trust" && second === "list",
-      ),
-    ).toHaveLength(4);
+      commands
+        .filter(({ args }) => args[0] === "trust")
+        .map(({ args }) => args[1]),
+    ).toEqual(["list", "github", "list"]);
     expect(
-      commands.some(
-        ([, first, second]) => first === "trust" && second === "github",
-      ),
-    ).toBe(false);
+      commands
+        .filter(({ args }) => args[1] === "github")
+        .map(({ args }) => args[2]),
+    ).toEqual([arm64]);
+  } finally {
+    if (originalInput)
+      Object.defineProperty(process.stdin, "isTTY", originalInput);
+    else Reflect.deleteProperty(process.stdin, "isTTY");
+    if (originalOutput)
+      Object.defineProperty(process.stdout, "isTTY", originalOutput);
+    else Reflect.deleteProperty(process.stdout, "isTTY");
+  }
+});
+
+test("requires an interactive terminal when npm trust inspection needs 2FA", async () => {
+  const originalInput = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
+  const originalOutput = Object.getOwnPropertyDescriptor(
+    process.stdout,
+    "isTTY",
+  );
+  Object.defineProperty(process.stdin, "isTTY", {
+    value: false,
+    configurable: true,
+  });
+  Object.defineProperty(process.stdout, "isTTY", {
+    value: false,
+    configurable: true,
+  });
+  const { commands } = createCommandMock();
+  mocks.run.mockImplementation((command: string, args: string[]) => {
+    commands.push({ command, args });
+    if (command === "npm" && args[0] === "--version") return "11.19.0";
+    if (args[0] === "whoami") return "package-owner";
+    if (args[0] === "view") return "[]";
+    if (command === "npm" && args[1] === "list") {
+      throw new Error("npm error code EOTP");
+    }
+    throw new Error(`Unexpected command: ${command} ${args.join(" ")}`);
+  });
+  try {
+    await expect(
+      bootstrapNativePackages({
+        freebsdOnly: true,
+        publish: true,
+        configureOidc: true,
+      }),
+    ).rejects.toThrow(/interactive terminal/);
+    expect(commands.some(({ args }) => args[1] === "github")).toBe(false);
   } finally {
     if (originalInput)
       Object.defineProperty(process.stdin, "isTTY", originalInput);
