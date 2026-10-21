@@ -36,7 +36,7 @@ test("CommonJS release bundle exposes literal native package resolutions to file
     const packageName = `@nktnet/sync-request-curl-${platform}`;
     assert.match(
       bundle,
-      new RegExp(`\\brequire\\.resolve\\(["']${packageName}["']\\)`),
+      new RegExp(String.raw`\brequire\.resolve\(["']${packageName}["']\)`),
       `${packageName} must be a literal require.resolve target in the published bundle`,
     );
   }
