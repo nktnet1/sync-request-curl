@@ -187,11 +187,11 @@ const ensurePublisherAuthentication = (
     });
     console.log(`${status("cyan", "USER")} publishing as ${username}`);
   } catch {
+    const hint = configureOidc
+      ? " npm Trusted Publishing setup requires account 2FA."
+      : "";
     throw new Error(
-      `Authenticate with ${cli} login --registry=${registry} before retrying. ` +
-        (configureOidc
-          ? "npm Trusted Publishing setup requires account 2FA."
-          : ""),
+      `Authenticate with ${cli} login --registry=${registry} before retrying.${hint}`,
     );
   }
 };
@@ -203,7 +203,7 @@ const getGitHubRepository = (): string => {
       ? repository.url
       : repository;
   if (typeof value !== "string") {
-    throw new Error("package.json must specify its GitHub repository URL");
+    throw new TypeError("package.json must specify its GitHub repository URL");
   }
   const match =
     /^(?:git\+)?https:\/\/github\.com\/([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/.exec(
@@ -244,7 +244,65 @@ const ensureOidcPrerequisites = (registry: string): string => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** npm 11 emits a separate JSON object for each trusted publisher, not an array. */
+interface JsonObjectScanState {
+  depth: number;
+  inString: boolean;
+  escaped: boolean;
+}
+
+const advanceJsonObjectScan = (
+  state: JsonObjectScanState,
+  character: string,
+): void => {
+  if (state.inString) {
+    if (state.escaped) state.escaped = false;
+    else if (character === "\\") state.escaped = true;
+    else if (character === '"') state.inString = false;
+    return;
+  }
+
+  if (character === '"') state.inString = true;
+  else if (character === "{") state.depth += 1;
+  else if (character === "}") state.depth -= 1;
+};
+
+/** npm 11 can print adjacent JSON objects rather than a single JSON array. */
+const parseAdjacentJsonObjects = (input: string): unknown[] => {
+  const values: unknown[] = [];
+  const state: JsonObjectScanState = {
+    depth: 0,
+    inString: false,
+    escaped: false,
+  };
+  let start = -1;
+
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index];
+    if (start === -1) {
+      if (/\s/.test(character)) continue;
+      if (character !== "{")
+        throw new SyntaxError("Invalid npm trust list JSON");
+      start = index;
+    }
+
+    advanceJsonObjectScan(state, character);
+    if (state.depth === 0) {
+      values.push(JSON.parse(input.slice(start, index + 1)));
+      start = -1;
+    }
+  }
+
+  if (start !== -1) throw new SyntaxError("Incomplete npm trust list JSON");
+  return values;
+};
+
+const isTrustConfiguration = (value: unknown): value is TrustConfiguration =>
+  isRecord(value) &&
+  typeof value.type === "string" &&
+  (value.permissions === undefined ||
+    (Array.isArray(value.permissions) &&
+      value.permissions.every((permission) => typeof permission === "string")));
+
 export const parseTrustedPublishers = (
   output: string,
 ): TrustConfiguration[] => {
@@ -255,58 +313,14 @@ export const parseTrustedPublishers = (
   try {
     parsed = JSON.parse(input);
   } catch {
-    // Support multiple pretty-printed JSON objects, with no delimiters.
-    const values: unknown[] = [];
-    let depth = 0;
-    let start = -1;
-    let inString = false;
-    let escaped = false;
-    for (let i = 0; i < input.length; i++) {
-      const char = input[i];
-      if (start === -1) {
-        if (/\s/.test(char)) continue;
-        if (char !== "{") throw new Error("Invalid npm trust list JSON");
-        start = i;
-      }
-      if (inString) {
-        if (escaped) escaped = false;
-        else if (char === "\\") escaped = true;
-        else if (char === '"') inString = false;
-      } else if (char === '"') {
-        inString = true;
-      } else if (char === "{") {
-        depth++;
-      } else if (char === "}") {
-        depth--;
-        if (depth === 0) {
-          values.push(JSON.parse(input.slice(start, i + 1)));
-          start = -1;
-        }
-      }
-      if (depth < 0) throw new Error("Invalid npm trust list JSON");
-    }
-    if (start !== -1 || depth !== 0) {
-      throw new Error("Incomplete npm trust list JSON");
-    }
-    parsed = values;
+    parsed = parseAdjacentJsonObjects(input);
   }
 
-  const configs: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
-  if (
-    !configs.every(
-      (config) =>
-        isRecord(config) &&
-        typeof config.type === "string" &&
-        (config.permissions === undefined ||
-          (Array.isArray(config.permissions) &&
-            config.permissions.every(
-              (permission) => typeof permission === "string",
-            ))),
-    )
-  ) {
-    throw new Error("Unexpected npm trust list configuration format");
+  const configurations: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
+  if (!configurations.every(isTrustConfiguration)) {
+    throw new TypeError("Unexpected npm trust list configuration format");
   }
-  return configs as TrustConfiguration[];
+  return configurations;
 };
 
 const readTrustedPublishers = (
@@ -357,52 +371,70 @@ const isExpectedPublisher = (
   configuration.environment === OIDC_ENVIRONMENT &&
   configuration.permissions?.includes("createPackage") === true;
 
+interface TrustSetupTotals {
+  created: number;
+  skipped: number;
+}
+
+const configureTrustedPublisher = async (
+  packageName: string,
+  registry: string,
+  repository: string,
+  totals: TrustSetupTotals,
+): Promise<void> => {
+  const configurations = readTrustedPublishers(packageName, registry);
+  if (
+    configurations?.some((config) => isExpectedPublisher(config, repository))
+  ) {
+    totals.skipped += 1;
+    console.log(
+      `${status("green", "SKIP")} ${packageName} OIDC already configured`,
+    );
+    return;
+  }
+  if (configurations && configurations.length > 0) {
+    throw new Error(
+      `${packageName} already has a different trusted publisher. ` +
+        `Review npm trust list ${packageName} and resolve it manually; existing trust is never revoked automatically.`,
+    );
+  }
+
+  if (totals.created > 0) await setTimeout(2_000);
+  run(
+    "npm",
+    [
+      "trust",
+      "github",
+      packageName,
+      `--repo=${repository}`,
+      `--file=${OIDC_WORKFLOW}`,
+      `--env=${OIDC_ENVIRONMENT}`,
+      "--allow-publish",
+      "--yes",
+      `--registry=${registry}`,
+    ],
+    { cwd: root },
+  );
+  totals.created += 1;
+  console.log(`${status("green", "TRUSTED")} ${packageName}`);
+};
+
 const configureTrustedPublishers = async (
   names: string[],
   registry: string,
   repository: string,
 ): Promise<void> => {
-  let created = 0;
-  let skipped = 0;
-  for (const packageName of names) {
-    const configurations = readTrustedPublishers(packageName, registry);
-    if (
-      configurations?.some((config) => isExpectedPublisher(config, repository))
-    ) {
-      skipped++;
-      console.log(
-        `${status("green", "SKIP")} ${packageName} OIDC already configured`,
-      );
-      continue;
-    }
-    if (configurations && configurations.length > 0) {
-      throw new Error(
-        `${packageName} already has a different trusted publisher. ` +
-          `Review npm trust list ${packageName} and resolve it manually; existing trust is never revoked automatically.`,
-      );
-    }
-
-    if (created > 0) await setTimeout(2000);
-    run(
-      "npm",
-      [
-        "trust",
-        "github",
-        packageName,
-        `--repo=${repository}`,
-        `--file=${OIDC_WORKFLOW}`,
-        `--env=${OIDC_ENVIRONMENT}`,
-        "--allow-publish",
-        "--yes",
-        `--registry=${registry}`,
-      ],
-      { cwd: root },
-    );
-    created++;
-    console.log(`${status("green", "TRUSTED")} ${packageName}`);
-  }
+  const totals: TrustSetupTotals = { created: 0, skipped: 0 };
+  // Browser 2FA prompts and npm governance changes must run sequentially.
+  await names.reduce<Promise<void>>(
+    (previous, packageName) =>
+      previous.then(() =>
+        configureTrustedPublisher(packageName, registry, repository, totals),
+      ),
+    Promise.resolve(),
+  );
   console.log(
-    `${status("green", "OIDC")} ${created} configured, ${skipped} already configured`,
+    `${status("green", "OIDC")} ${totals.created} configured, ${totals.skipped} already configured`,
   );
 };
 

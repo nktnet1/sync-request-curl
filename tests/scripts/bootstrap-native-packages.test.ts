@@ -355,3 +355,81 @@ test("parses npm trust list JSON including separate pretty-printed objects", () 
     /Incomplete npm trust list JSON/,
   );
 });
+
+test("parses adjacent npm trust JSON with nested objects and escaped braces", () => {
+  const first = {
+    ...expectedTrust,
+    metadata: { note: 'a quoted "brace } {" and a backslash \\' },
+  };
+  const second = { ...expectedTrust, id: "second" };
+  expect(
+    parseTrustedPublishers(
+      `\n${JSON.stringify(first, null, 2)}\n${JSON.stringify(second, null, 2)}\n`,
+    ),
+  ).toEqual([first, second]);
+});
+
+test("rejects malformed and incorrectly typed npm trust results", () => {
+  for (const output of [
+    "null",
+    '"unexpected string"',
+    '{"type":123}',
+    '{"type":"github","permissions":[123]}',
+    '[{"type":"github"},null]',
+  ]) {
+    expect(() => parseTrustedPublishers(output)).toThrow(TypeError);
+  }
+  expect(() => parseTrustedPublishers('{"type":"github"} garbage')).toThrow(
+    SyntaxError,
+  );
+});
+
+test("serializes OIDC registration in platform order", async () => {
+  const { commands } = createCommandMock();
+  await bootstrapNativePackages({
+    freebsdOnly: true,
+    configureOidc: true,
+    publish: true,
+  });
+
+  expect(
+    commands
+      .filter(({ command, args }) => command === "npm" && args[1] === "github")
+      .map(({ args }) => args[2]),
+  ).toEqual([arm64, x64]);
+  expect(
+    commands
+      .filter(({ command, args }) => command === "npm" && args[0] === "trust")
+      .map(({ args }) => `${args[1]}:${args[2]}`),
+  ).toEqual([
+    `list:${arm64}`,
+    `github:${arm64}`,
+    `list:${x64}`,
+    `github:${x64}`,
+  ]);
+});
+
+test("stops OIDC registration when the first create fails", async () => {
+  const { commands } = createCommandMock();
+  const originalRun = mocks.run.getMockImplementation();
+  mocks.run.mockImplementation(
+    (command: string, args: string[], options?: { cwd?: string }) => {
+      if (command === "npm" && args[1] === "github") {
+        throw new Error("npm rejected trusted publisher setup");
+      }
+      return originalRun?.(command, args, options);
+    },
+  );
+  await expect(
+    bootstrapNativePackages({
+      freebsdOnly: true,
+      configureOidc: true,
+      publish: true,
+    }),
+  ).rejects.toThrow(/npm rejected trusted publisher setup/);
+  expect(
+    commands
+      .filter(({ command, args }) => command === "npm" && args[0] === "trust")
+      .map(({ args }) => args[2]),
+  ).toEqual([arm64]);
+});
