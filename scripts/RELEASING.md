@@ -119,12 +119,23 @@ package names, versions, and exact optional native dependency pins are validated
 before publication. Native packages publish before the main package. For a
 manually prepared stable release, use an annotated version tag such as `v5.0.0`.
 
-Registry preflight aborts on authentication/network errors. Existing versions
-are skipped only when their SHA-512 integrity matches the local tarball. Keep the
-original artifacts for retries; rebuilt tarballs may differ. Retrying does not
-move dist-tags for existing versions. Publication is not transactional: if npm
-fails partway through, rerun with the same artifacts. Do not overwrite an
-existing version or bypass a tarball mismatch.
+Registry preflight retries transient lookup failures and aborts on persistent
+errors. Existing versions are skipped only when their SHA-512 integrity matches
+the local tarball. Publishing is not transactional: npm can return a 503 **after**
+the registry accepted a package. The publisher now rechecks the exact tarball
+integrity after any failed publish and polls briefly for registry propagation.
+If the version is still absent, only transient registry/network errors are
+retried (up to three publish attempts). It never retries blindly if npm's
+registry cannot be queried, or if the published integrity differs. The
+`--fetch-retries=0` setting prevents npm's internal HTTP retry policy from
+interfering with the publisher's bounded retries and integrity checks.
+
+Keep the original `release-packages` artifact for all retries: rebuilt tarballs
+may differ. Rerun the failed **Publish** job if a transient outage lasts longer
+than the automatic retry window; you do not need to rebuild the native binaries
+or create a new release tag. The SHA-512 preflight will skip successfully
+published packages, and reruns do not move dist-tags for existing versions.
+Do not overwrite an existing version or bypass a tarball mismatch.
 
 After GitHub Actions completes:
 

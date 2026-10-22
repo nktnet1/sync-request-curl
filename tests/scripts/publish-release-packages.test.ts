@@ -16,8 +16,12 @@ import {
 } from "#/native/platform-key-core";
 import { publishReleasePackages } from "#scripts/release-publisher";
 
-const mocks = vi.hoisted(() => ({ spawn: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  spawn: vi.fn(),
+  wait: vi.fn((_milliseconds: number) => Promise.resolve()),
+}));
 vi.mock("node:child_process", () => ({ spawnSync: mocks.spawn }));
+vi.mock("node:timers/promises", () => ({ setTimeout: mocks.wait }));
 const originalArgv = process.argv;
 const tarEntry = (name: string, payload: Buffer, type = "0"): Buffer => {
   const header = Buffer.alloc(512);
@@ -80,6 +84,7 @@ const createReleaseFixtures = (version = "5.0.0-beta.2") => {
 afterEach(() => {
   process.argv = originalArgv;
   vi.restoreAllMocks();
+  mocks.wait.mockClear();
   vi.resetModules();
   if (rootDirectory) rmSync(rootDirectory, { recursive: true, force: true });
   rootDirectory = undefined;
@@ -95,7 +100,7 @@ test.each([
   "network",
   "bad-manifest",
   "bad-sha",
-])("publisher orchestration: %s", (mode) => {
+])("publisher orchestration: %s", async (mode) => {
   const version = mode === "stable" ? "5.0.0" : "5.0.0-beta.2";
   const { root, directory, names, filesByName } =
     createReleaseFixtures(version);
@@ -156,9 +161,9 @@ test.each([
   vi.spyOn(console, "log").mockImplementation(() => undefined);
   const execute = () => publishReleasePackages(options);
   if (["different", "network", "bad-manifest", "bad-sha"].includes(mode)) {
-    expect(execute).toThrow();
+    await expect(execute()).rejects.toThrow();
   } else {
-    execute();
+    await execute();
   }
   const publishes = calls.filter(
     ([command, action]) => command === "npm" && action === "publish",
@@ -169,9 +174,10 @@ test.each([
       join(directory, `${names.length - 1}.tgz`),
     );
     for (const command of publishes) {
-      expect(command.slice(-2)).toEqual([
+      expect(command.slice(-3)).toEqual([
         "--tag",
         mode === "stable" ? "latest" : "beta",
+        "--fetch-retries=0",
       ]);
       expect(command).toContain("--ignore-scripts");
     }
@@ -216,70 +222,295 @@ test.each([
   "truncated-entry",
   "missing-footer",
   "after-footer",
-])("rejects ambiguous release archives before registry access: %s", (mode) => {
-  const { root, directory, names } = createReleaseFixtures();
-  const file = join(directory, "0.tgz");
-  const manifest = { name: names[0], version: "5.0.0-beta.2" };
-  const shadow = Buffer.from(
-    JSON.stringify({ name: "unexpected-package", version: "99.0.0" }),
-  );
-  const aliases: Record<string, string> = {
-    "duplicate-manifest": "package/package.json",
-    "dot-alias": "package/./package.json",
-    "slash-alias": "package//package.json",
-    "different-root": "shadow/package.json",
-    "absolute-path": "/package/package.json",
-    "backslash-path": "package\\package.json",
-    "case-alias": "package/PACKAGE.JSON",
-  };
-  const extra: Buffer[] = [];
-  const alias = aliases[mode];
-  if (alias !== undefined) extra.push(tarEntry(alias, shadow));
-  if (mode === "pax-path" || mode === "global-pax") {
-    extra.push(
-      tarEntry(
-        "package/PaxHeader",
-        Buffer.from("29 path=package/package.json\n"),
-        mode === "pax-path" ? "x" : "g",
-      ),
-      tarEntry("package/shadow", shadow),
+])(
+  "rejects ambiguous release archives before registry access: %s",
+  async (mode) => {
+    const { root, directory, names } = createReleaseFixtures();
+    const file = join(directory, "0.tgz");
+    const manifest = { name: names[0], version: "5.0.0-beta.2" };
+    const shadow = Buffer.from(
+      JSON.stringify({ name: "unexpected-package", version: "99.0.0" }),
     );
-  }
-  if (mode === "gnu-long-name") {
-    extra.push(
-      tarEntry("././@LongLink", Buffer.from("package/package.json\0"), "L"),
-      tarEntry("package/shadow", shadow),
-    );
-  }
-  if (mode === "symlink" || mode === "hard-link")
-    extra.push(
-      tarEntry(
-        "package/shadow",
-        Buffer.alloc(0),
-        mode === "symlink" ? "2" : "1",
-      ),
-    );
-  writeTarball(file, manifest, extra);
-  let archive = gunzipSync(readFileSync(file));
-  if (mode === "bad-checksum") archive[148] = "7".codePointAt(0) ?? 0;
-  if (mode === "truncated-entry") archive = archive.subarray(0, 520);
-  if (mode === "missing-footer")
-    archive = archive.subarray(0, archive.length - 1024);
-  if (mode === "after-footer")
-    archive = Buffer.concat([
-      archive,
-      tarEntry("package/package.json", shadow),
-      Buffer.alloc(1024),
-    ]);
-  writeFileSync(file, gzipSync(archive));
-  mocks.spawn.mockReset();
+    const aliases: Record<string, string> = {
+      "duplicate-manifest": "package/package.json",
+      "dot-alias": "package/./package.json",
+      "slash-alias": "package//package.json",
+      "different-root": "shadow/package.json",
+      "absolute-path": "/package/package.json",
+      "backslash-path": "package\\package.json",
+      "case-alias": "package/PACKAGE.JSON",
+    };
+    const extra: Buffer[] = [];
+    const alias = aliases[mode];
+    if (alias !== undefined) extra.push(tarEntry(alias, shadow));
+    if (mode === "pax-path" || mode === "global-pax") {
+      extra.push(
+        tarEntry(
+          "package/PaxHeader",
+          Buffer.from("29 path=package/package.json\n"),
+          mode === "pax-path" ? "x" : "g",
+        ),
+        tarEntry("package/shadow", shadow),
+      );
+    }
+    if (mode === "gnu-long-name") {
+      extra.push(
+        tarEntry("././@LongLink", Buffer.from("package/package.json\0"), "L"),
+        tarEntry("package/shadow", shadow),
+      );
+    }
+    if (mode === "symlink" || mode === "hard-link")
+      extra.push(
+        tarEntry(
+          "package/shadow",
+          Buffer.alloc(0),
+          mode === "symlink" ? "2" : "1",
+        ),
+      );
+    writeTarball(file, manifest, extra);
+    let archive = gunzipSync(readFileSync(file));
+    if (mode === "bad-checksum") archive[148] = "7".codePointAt(0) ?? 0;
+    if (mode === "truncated-entry") archive = archive.subarray(0, 520);
+    if (mode === "missing-footer")
+      archive = archive.subarray(0, archive.length - 1024);
+    if (mode === "after-footer")
+      archive = Buffer.concat([
+        archive,
+        tarEntry("package/package.json", shadow),
+        Buffer.alloc(1024),
+      ]);
+    writeFileSync(file, gzipSync(archive));
+    mocks.spawn.mockReset();
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    await expect(
+      publishReleasePackages({
+        root,
+        registry: "https://registry.npmjs.org",
+        tag: "v5.0.0-beta.2",
+      }),
+    ).rejects.toThrow();
+    expect(mocks.spawn).not.toHaveBeenCalled();
+  },
+);
+
+const absent = { status: 1, stdout: '{"error":{"code":"E404"}}' };
+const unavailable = { status: 1, stdout: '{"error":{"code":"E503"}}' };
+const failedPublish = (code: string) => ({
+  status: 1,
+  stderr: `npm error code ${code}\nnpm error ${code} Service Unavailable`,
+});
+const artifactIntegrity = (file: string): string =>
+  `sha512-${createHash("sha512").update(readFileSync(file)).digest("base64")}`;
+
+type NpmResult = { status: number; stdout?: string; stderr?: string };
+
+// Route npm invocations to the scenario's registry and publishing responses.
+const mockNpm = ({
+  view = (_specifier: string) => absent,
+  publish = (_tarball: string) => ({ status: 0 }),
+}: {
+  view?: (specifier: string) => NpmResult;
+  publish?: (tarball: string) => NpmResult;
+} = {}): void => {
+  mocks.spawn.mockImplementation((_command: string, args: string[]) => {
+    if (args[1] === "view") return view(args[2]);
+    if (args[1] === "publish") return publish(args[2]);
+    throw new Error(`Unexpected npm command: ${args[1]}`);
+  });
+};
+
+const lookupFirstPackage =
+  (name: string, view: () => NpmResult): ((specifier: string) => NpmResult) =>
+  (specifier) =>
+    specifier === `${name}@5.0.0-beta.2` ? view() : absent;
+
+const publishOptions = (root: string) => ({
+  root,
+  registry: "https://registry.npmjs.org",
+  tag: "v5.0.0-beta.2",
+});
+
+const runPublisher = (root: string) =>
+  publishReleasePackages(publishOptions(root));
+
+const firstArtifactFixture = () => {
+  const { root, names, filesByName } = createReleaseFixtures();
+  const firstName = names[0];
+  const firstFile = filesByName.get(firstName);
+  if (!firstFile) throw new Error("Missing first release artifact");
+  return { root, names, firstName, firstFile };
+};
+
+const publishedTarballs = (): string[] =>
+  mocks.spawn.mock.calls
+    .filter(([, args]) => args[1] === "publish")
+    .map(([, args]) => args[2] as string);
+
+const expectFirstArtifactPublishedOnce = (
+  names: string[],
+  firstFile: string,
+): void => {
+  const tarballs = publishedTarballs();
+  expect(tarballs).toHaveLength(names.length);
+  expect(tarballs.filter((file) => file === firstFile)).toHaveLength(1);
+};
+
+const existingIntegrity = (file: string): NpmResult => ({
+  status: 0,
+  stdout: JSON.stringify(artifactIntegrity(file)),
+});
+
+const mockFailedFirstPublish = (name: string, view: () => NpmResult) => {
+  const publish = vi.fn((_tarball: string) => failedPublish("E503"));
+  mockNpm({ view: lookupFirstPackage(name, view), publish });
+  return publish;
+};
+
+const silencePublisherOutput = (): void => {
   vi.spyOn(console, "log").mockImplementation(() => undefined);
-  expect(() =>
-    publishReleasePackages({
-      root,
-      registry: "https://registry.npmjs.org",
-      tag: "v5.0.0-beta.2",
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+};
+
+test.each([
+  {
+    name: "reconciles an ambiguous E503 when the registry eventually shows the exact tarball",
+    code: "E503",
+    visibleAfter: 3,
+    waitCount: 1,
+  },
+  {
+    name: "handles an npm E403 after the version was actually published",
+    code: "E403",
+    visibleAfter: 2,
+    waitCount: 0,
+  },
+])("$name", async ({ code, visibleAfter, waitCount }) => {
+  const { root, names, firstName, firstFile } = firstArtifactFixture();
+  let firstLookups = 0;
+  mockNpm({
+    view: lookupFirstPackage(firstName, () => {
+      firstLookups += 1;
+      return firstLookups >= visibleAfter
+        ? existingIntegrity(firstFile)
+        : absent;
     }),
-  ).toThrow();
-  expect(mocks.spawn).not.toHaveBeenCalled();
+    publish: (file) =>
+      file === firstFile ? failedPublish(code) : { status: 0 },
+  });
+  silencePublisherOutput();
+
+  await runPublisher(root);
+
+  expectFirstArtifactPublishedOnce(names, firstFile);
+  expect(firstLookups).toBe(visibleAfter);
+  expect(mocks.wait).toHaveBeenCalledTimes(waitCount);
+});
+
+test("retries a transient publish only after repeated registry checks confirm absence", async () => {
+  const { root, names, firstFile } = firstArtifactFixture();
+  let firstAttempts = 0;
+  mockNpm({
+    publish: (file) =>
+      file === firstFile && firstAttempts++ === 0
+        ? failedPublish("E503")
+        : { status: 0 },
+  });
+  silencePublisherOutput();
+
+  await runPublisher(root);
+
+  const tarballs = publishedTarballs();
+  expect(tarballs).toHaveLength(names.length + 1);
+  expect(tarballs.slice(0, 2)).toEqual([firstFile, firstFile]);
+  expect(mocks.wait.mock.calls.map(([delay]) => delay)).toEqual([
+    2_000, 4_000, 2_000,
+  ]);
+  expect(
+    mocks.spawn.mock.calls.find(([, args]) => args[1] === "publish")?.[1],
+  ).toContain("--fetch-retries=0");
+});
+
+test("retries transient npm view failures before publishing anything", async () => {
+  const { root, names } = createReleaseFixtures();
+  const publish = vi.fn(() => ({ status: 0 }));
+  mockNpm({
+    view: vi.fn(() => absent).mockReturnValueOnce(unavailable),
+    publish,
+  });
+  silencePublisherOutput();
+
+  await runPublisher(root);
+
+  expect(publish).toHaveBeenCalledTimes(names.length);
+  expect(mocks.wait).toHaveBeenCalledWith(2_000);
+  expect(
+    mocks.spawn.mock.calls.find(([, args]) => args[1] === "view")?.[1],
+  ).toContain("--fetch-retries=0");
+});
+
+test.each([
+  {
+    name: "does not retry a publish when registry state cannot be verified",
+    registryResult: unavailable,
+    message: /registry state could not be verified/,
+    delays: [2_000, 4_000],
+  },
+  {
+    name: "fails closed on published tarball mismatch after E503",
+    registryResult: { status: 0, stdout: '"sha512-not-the-artifact"' },
+    message: /Published tarball differs from local artifact/,
+    delays: [],
+  },
+])("$name", async ({ registryResult, message, delays }) => {
+  const { root, firstName } = firstArtifactFixture();
+  const lookup = vi
+    .fn((): NpmResult => registryResult)
+    .mockReturnValueOnce(absent);
+  const publish = mockFailedFirstPublish(firstName, lookup);
+  silencePublisherOutput();
+
+  await expect(runPublisher(root)).rejects.toThrow(message);
+  expect(publish).toHaveBeenCalledTimes(1);
+  expect(mocks.wait.mock.calls.map(([delay]) => delay)).toEqual(delays);
+});
+
+test.each([
+  {
+    name: "does not retry npm authentication failures when the version is absent",
+    code: "EOTP",
+    attempts: 1,
+    waitCount: undefined,
+  },
+  {
+    name: "stops after three transient publish failures when the registry confirms absence",
+    code: "E503",
+    attempts: 3,
+    waitCount: 8,
+  },
+])("$name", async ({ code, attempts, waitCount }) => {
+  const { root } = createReleaseFixtures();
+  const publish = vi.fn(() => failedPublish(code));
+  mockNpm({ publish });
+  silencePublisherOutput();
+
+  await expect(runPublisher(root)).rejects.toThrow(new RegExp(code));
+  expect(publish).toHaveBeenCalledTimes(attempts);
+  if (waitCount !== undefined) {
+    expect(mocks.wait).toHaveBeenCalledTimes(waitCount);
+  }
+});
+
+test("resumes a partial release without republishing identical packages", async () => {
+  const { root, names, firstName, firstFile } = firstArtifactFixture();
+  mockNpm({
+    view: lookupFirstPackage(firstName, () => existingIntegrity(firstFile)),
+  });
+  silencePublisherOutput();
+
+  await runPublisher(root);
+
+  const tarballs = publishedTarballs();
+  expect(tarballs).toHaveLength(names.length - 1);
+  expect(tarballs).not.toContain(firstFile);
 });
