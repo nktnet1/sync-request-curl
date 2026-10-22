@@ -18,7 +18,7 @@ import { publishReleasePackages } from "#scripts/release-publisher";
 
 const mocks = vi.hoisted(() => ({
   spawn: vi.fn(),
-  wait: vi.fn(async (_milliseconds: number) => undefined),
+  wait: vi.fn((_milliseconds: number) => Promise.resolve()),
 }));
 vi.mock("node:child_process", () => ({ spawnSync: mocks.spawn }));
 vi.mock("node:timers/promises", () => ({ setTimeout: mocks.wait }));

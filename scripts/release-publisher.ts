@@ -243,9 +243,8 @@ const isAlreadyPublished = (
       // An unstructured failure is not proof that the version is absent.
     }
     if (code === "E404") return false;
-    throw new Error(
-      `Registry lookup failed for ${name}@${version}: ${result.stderr || result.stdout || `exit ${result.status}`}`,
-    );
+    const detail = result.stderr || result.stdout || `exit ${result.status}`;
+    throw new Error(`Registry lookup failed for ${name}@${version}: ${detail}`);
   }
 
   const integrity: unknown = JSON.parse(result.stdout);
@@ -336,11 +335,12 @@ const attemptPublish = (
   if (result.status === 0) return { success: true };
 
   const detail = [result.stderr, result.stdout].filter(Boolean).join("\n");
+  const detailSuffix = detail ? `: ${detail.trim()}` : "";
   return {
     success: false,
     transient: retryableNpmError.test(detail),
     error: new Error(
-      `npm publish ${manifest.name} failed (exit ${result.status ?? "signal"})${detail ? `: ${detail.trim()}` : ""}`,
+      `npm publish ${manifest.name} failed (exit ${result.status ?? "signal"})${detailSuffix}`,
     ),
   };
 };
@@ -384,7 +384,7 @@ const publishWithRecovery = async (
     `${styleText("yellow", "RETRY")} npm publish ${label} (${attempt}/${MAX_PUBLISH_ATTEMPTS}); confirmed not yet published`,
   );
   await setTimeout(retryDelay(attempt));
-  return publishWithRecovery(context, artifact, distTag, attempt + 1);
+  await publishWithRecovery(context, artifact, distTag, attempt + 1);
 };
 
 const preflightRelease = async (
