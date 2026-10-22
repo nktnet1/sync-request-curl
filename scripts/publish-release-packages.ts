@@ -15,7 +15,7 @@ const { values } = parseArgs({
 const registry = values.registry;
 if (!registry) throw new Error("--registry is required");
 
-publishReleasePackages({
+await publishReleasePackages({
   root: realpathSync(resolve(import.meta.dirname, "..")),
   registry,
   tag: values.tag,
