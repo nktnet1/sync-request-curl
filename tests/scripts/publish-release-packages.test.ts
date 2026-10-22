@@ -302,6 +302,29 @@ const failedPublish = (code: string) => ({
 const artifactIntegrity = (file: string): string =>
   `sha512-${createHash("sha512").update(readFileSync(file)).digest("base64")}`;
 
+type NpmResult = { status: number; stdout?: string; stderr?: string };
+
+// Keep the command routing shared while allowing each test to supply its own
+// responses for registry lookups and publication attempts.
+const mockNpm = ({
+  view = () => absent,
+  publish = () => ({ status: 0 }),
+}: {
+  view?: (specifier: string) => NpmResult;
+  publish?: (tarball: string) => NpmResult;
+} = {}): void => {
+  mocks.spawn.mockImplementation((_command: string, args: string[]) => {
+    if (args[1] === "view") return view(args[2]);
+    if (args[1] === "publish") return publish(args[2]);
+    throw new Error(`Unexpected npm command: ${args[1]}`);
+  });
+};
+
+const lookupFirstPackage =
+  (name: string, view: () => NpmResult): ((specifier: string) => NpmResult) =>
+  (specifier) =>
+    specifier === `${name}@5.0.0-beta.2` ? view() : absent;
+
 const publishOptions = (root: string) => ({
   root,
   registry: "https://registry.npmjs.org",
@@ -315,21 +338,17 @@ test("reconciles an ambiguous E503 when the registry eventually shows the exact 
   if (!firstFile) throw new Error("Missing first release artifact");
   let firstLookups = 0;
   const publishes: string[] = [];
-  mocks.spawn.mockImplementation((_command: string, args: string[]) => {
-    if (args[1] === "view") {
-      if (args[2] === `${firstName}@5.0.0-beta.2`) {
-        firstLookups += 1;
-        if (firstLookups >= 3) {
-          return {
-            status: 0,
-            stdout: JSON.stringify(artifactIntegrity(firstFile)),
-          };
-        }
-      }
-      return absent;
-    }
-    publishes.push(args[2]);
-    return args[2] === firstFile ? failedPublish("E503") : { status: 0 };
+  mockNpm({
+    view: lookupFirstPackage(firstName, () => {
+      firstLookups += 1;
+      return firstLookups >= 3
+        ? { status: 0, stdout: JSON.stringify(artifactIntegrity(firstFile)) }
+        : absent;
+    }),
+    publish: (file) => {
+      publishes.push(file);
+      return file === firstFile ? failedPublish("E503") : { status: 0 };
+    },
   });
   vi.spyOn(console, "log").mockImplementation(() => undefined);
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
@@ -347,12 +366,13 @@ test("retries a transient publish only after repeated registry checks confirm ab
   const firstFile = filesByName.get(names[0]);
   if (!firstFile) throw new Error("Missing first release artifact");
   const publishes: string[] = [];
-  mocks.spawn.mockImplementation((_command: string, args: string[]) => {
-    if (args[1] === "view") return absent;
-    publishes.push(args[2]);
-    return args[2] === firstFile && publishes.length === 1
-      ? failedPublish("E503")
-      : { status: 0 };
+  mockNpm({
+    publish: (file) => {
+      publishes.push(file);
+      return file === firstFile && publishes.length === 1
+        ? failedPublish("E503")
+        : { status: 0 };
+    },
   });
   vi.spyOn(console, "warn").mockImplementation(() => undefined);
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
@@ -371,24 +391,16 @@ test("retries a transient publish only after repeated registry checks confirm ab
 
 test("retries transient npm view failures before publishing anything", async () => {
   const { root, names } = createReleaseFixtures();
-  let firstLookup = true;
-  let published = 0;
-  mocks.spawn.mockImplementation((_command: string, args: string[]) => {
-    if (args[1] === "view") {
-      if (firstLookup) {
-        firstLookup = false;
-        return unavailable;
-      }
-      return absent;
-    }
-    published += 1;
-    return { status: 0 };
+  const publish = vi.fn(() => ({ status: 0 }));
+  mockNpm({
+    view: vi.fn(() => absent).mockReturnValueOnce(unavailable),
+    publish,
   });
   vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
   await publishReleasePackages(publishOptions(root));
 
-  expect(published).toBe(names.length);
+  expect(publish).toHaveBeenCalledTimes(names.length);
   expect(mocks.wait).toHaveBeenCalledWith(2_000);
   expect(
     mocks.spawn.mock.calls.find(([, args]) => args[1] === "view")?.[1],
@@ -397,19 +409,11 @@ test("retries transient npm view failures before publishing anything", async () 
 
 test("does not retry a publish when registry state cannot be verified", async () => {
   const { root, names } = createReleaseFixtures();
-  let firstLookup = true;
-  let published = 0;
-  mocks.spawn.mockImplementation((_command: string, args: string[]) => {
-    if (args[1] === "view") {
-      if (args[2] !== `${names[0]}@5.0.0-beta.2`) return absent;
-      if (firstLookup) {
-        firstLookup = false;
-        return absent;
-      }
-      return unavailable;
-    }
-    published += 1;
-    return failedPublish("E503");
+  const firstPackageView = vi.fn(() => unavailable).mockReturnValueOnce(absent);
+  const publish = vi.fn(() => failedPublish("E503"));
+  mockNpm({
+    view: lookupFirstPackage(names[0], firstPackageView),
+    publish,
   });
   vi.spyOn(console, "warn").mockImplementation(() => undefined);
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
@@ -417,73 +421,58 @@ test("does not retry a publish when registry state cannot be verified", async ()
   await expect(publishReleasePackages(publishOptions(root))).rejects.toThrow(
     /registry state could not be verified/,
   );
-  expect(published).toBe(1);
+  expect(publish).toHaveBeenCalledTimes(1);
   expect(mocks.wait.mock.calls.map(([delay]) => delay)).toEqual([2_000, 4_000]);
 });
 
 test("fails closed on published tarball mismatch after E503", async () => {
   const { root, names } = createReleaseFixtures();
-  let firstLookup = true;
-  let published = 0;
-  mocks.spawn.mockImplementation((_command: string, args: string[]) => {
-    if (args[1] === "view") {
-      if (args[2] !== `${names[0]}@5.0.0-beta.2`) return absent;
-      if (firstLookup) {
-        firstLookup = false;
-        return absent;
-      }
-      return { status: 0, stdout: '"sha512-not-the-artifact"' };
-    }
-    published += 1;
-    return failedPublish("E503");
+  const firstPackageView = vi
+    .fn(() => ({ status: 0, stdout: '"sha512-not-the-artifact"' }))
+    .mockReturnValueOnce(absent);
+  const publish = vi.fn(() => failedPublish("E503"));
+  mockNpm({
+    view: lookupFirstPackage(names[0], firstPackageView),
+    publish,
   });
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 
   await expect(publishReleasePackages(publishOptions(root))).rejects.toThrow(
     /Published tarball differs from local artifact/,
   );
-  expect(published).toBe(1);
+  expect(publish).toHaveBeenCalledTimes(1);
   expect(mocks.wait).not.toHaveBeenCalled();
 });
 
 test("does not retry npm authentication failures when the version is absent", async () => {
   const { root } = createReleaseFixtures();
-  let published = 0;
-  mocks.spawn.mockImplementation((_command: string, args: string[]) => {
-    if (args[1] === "view") return absent;
-    published += 1;
-    return failedPublish("EOTP");
-  });
+  const publish = vi.fn(() => failedPublish("EOTP"));
+  mockNpm({ publish });
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 
   await expect(publishReleasePackages(publishOptions(root))).rejects.toThrow(
     /EOTP/,
   );
-  expect(published).toBe(1);
+  expect(publish).toHaveBeenCalledTimes(1);
 });
 
 test("handles an npm E403 after the version was actually published", async () => {
   const { root, names, filesByName } = createReleaseFixtures();
   const firstFile = filesByName.get(names[0]);
   if (!firstFile) throw new Error("Missing first release artifact");
-  let firstLookup = true;
   const publishes: string[] = [];
-  mocks.spawn.mockImplementation((_command: string, args: string[]) => {
-    if (args[1] === "view") {
-      if (args[2] === `${names[0]}@5.0.0-beta.2`) {
-        if (firstLookup) {
-          firstLookup = false;
-          return absent;
-        }
-        return {
-          status: 0,
-          stdout: JSON.stringify(artifactIntegrity(firstFile)),
-        };
-      }
-      return absent;
-    }
-    publishes.push(args[2]);
-    return args[2] === firstFile ? failedPublish("E403") : { status: 0 };
+  const firstPackageView = vi
+    .fn(() => ({
+      status: 0,
+      stdout: JSON.stringify(artifactIntegrity(firstFile)),
+    }))
+    .mockReturnValueOnce(absent);
+  mockNpm({
+    view: lookupFirstPackage(names[0], firstPackageView),
+    publish: (file) => {
+      publishes.push(file);
+      return file === firstFile ? failedPublish("E403") : { status: 0 };
+    },
   });
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 
@@ -499,15 +488,15 @@ test("resumes a partial release without republishing identical packages", async 
   const firstFile = filesByName.get(names[0]);
   if (!firstFile) throw new Error("Missing first release artifact");
   const publishes: string[] = [];
-  mocks.spawn.mockImplementation((_command: string, args: string[]) => {
-    if (args[1] === "view" && args[2] === `${names[0]}@5.0.0-beta.2`)
-      return {
-        status: 0,
-        stdout: JSON.stringify(artifactIntegrity(firstFile)),
-      };
-    if (args[1] === "view") return absent;
-    publishes.push(args[2]);
-    return { status: 0 };
+  mockNpm({
+    view: lookupFirstPackage(names[0], () => ({
+      status: 0,
+      stdout: JSON.stringify(artifactIntegrity(firstFile)),
+    })),
+    publish: (file) => {
+      publishes.push(file);
+      return { status: 0 };
+    },
   });
 
   await publishReleasePackages(publishOptions(root));
@@ -518,18 +507,14 @@ test("resumes a partial release without republishing identical packages", async 
 
 test("stops after three transient publish failures when the registry confirms absence", async () => {
   const { root } = createReleaseFixtures();
-  let publishes = 0;
-  mocks.spawn.mockImplementation((_command: string, args: string[]) => {
-    if (args[1] === "view") return absent;
-    publishes += 1;
-    return failedPublish("E503");
-  });
+  const publish = vi.fn(() => failedPublish("E503"));
+  mockNpm({ publish });
   vi.spyOn(console, "warn").mockImplementation(() => undefined);
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 
   await expect(publishReleasePackages(publishOptions(root))).rejects.toThrow(
     /E503/,
   );
-  expect(publishes).toBe(3);
+  expect(publish).toHaveBeenCalledTimes(3);
   expect(mocks.wait).toHaveBeenCalledTimes(8);
 });
