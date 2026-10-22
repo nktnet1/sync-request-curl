@@ -1,10 +1,52 @@
 # Releases
 
-Use Node.js 24.14+ or 26+. Commit these release-tooling changes to the default
-branch before creating a release tag. Configure npm trusted publishing for
+Use Node.js 24.14+ or 26+. Commit release tooling to the default branch
+before creating a release tag. npm Trusted Publishing must authorise
 `publish.yaml` on the main package and all native companion packages.
-For missing companion package names, use the existing `pnpm bootstrap:native`
-flow first; its placeholder version and `bootstrap` tag are separate from releases.
+
+## Bootstrap FreeBSD packages and OIDC
+
+The existing bootstrap command can create the missing FreeBSD package names and
+configure their trusted publishers in one pass. It publishes a README-only
+`0.0.0-bootstrap.0` placeholder under the non-default `bootstrap` dist-tag,
+not under `latest` or `beta`. No FreeBSD build is needed for this initial step.
+
+Use Node.js with npm 11.15.0 or newer. Sign in interactively with `npm login`,
+using an npm account with 2FA enabled and write access to `@nktnet`. An npm
+bypass-2FA automation token cannot create trusted publisher configurations.
+
+```sh
+npm login --registry=https://registry.npmjs.org/
+pnpm bootstrap:native --freebsd-only --configure-oidc
+pnpm bootstrap:native --freebsd-only --configure-oidc --publish
+```
+
+The second command previews package creation and OIDC settings. The third
+publishes any missing packages, then uses `npm trust github` to configure both
+`@nktnet/sync-request-curl-freebsd-arm64` and
+`@nktnet/sync-request-curl-freebsd-x64` with repository
+`nktnet1/sync-request-curl`, workflow `publish.yaml`, environment `Production`,
+and `--allow-publish`. It also works when both packages already exist.
+The first trust operation can require an interactive browser 2FA challenge; npm
+offers a five-minute 2FA skip option for completing the batch. The script
+inspects existing trusted publishers first: when npm allows the lookup, matching
+configurations are skipped, and conflicting ones stop the command. If npm
+requires 2FA for a captured `npm trust list --json`, the script proceeds to the
+interactive `npm trust github` command rather than retrying the captured lookup.
+In this case npm may reject an already-existing relationship rather than skip
+it, but no existing trusted publisher is revoked or overwritten.
+
+To bootstrap or configure OIDC for *all* native companion packages, omit
+`--freebsd-only`. The main `sync-request-curl` package's trusted publisher must
+also be configured separately if it does not already exist. GitHub Actions
+already supplies `id-token: write` and uses the `Production` environment in
+`publish.yaml`, so normal releases need no npm publishing token.
+
+**Important:** npm requires a successful OIDC publish within two days of
+creating a new trusted publisher, or the unvalidated configuration expires.
+Create the release tag within that window and check the Publish workflow.
+If a configuration expires, revoke it in npm settings and re-run the bootstrap
+command to register a new one.
 
 ## Prepare a beta
 
@@ -33,6 +75,22 @@ prepared version, then create and push its tag manually. Failed checks leave the
 version edit available for inspection.
 
 ## Build and publish
+
+### FreeBSD release cache
+
+`Pipeline` builds or smoke-tests both FreeBSD architectures on every relevant
+push to `main`. Once a successful run has populated the default-branch native
+addon cache, tagged releases restore the **exact** source-keyed binary and skip
+the FreeBSD VM entirely. The prebuilt binary was already loaded and HTTP-tested
+on FreeBSD before that cache entry was saved. Normal branch pushes cannot
+trigger the npm Publish job; publication still requires a release tag.
+
+**Wait for `Pipeline` on `main` to succeed before pushing a release tag**, in
+particular after changing native code or build scripts. The FreeBSD cache key
+includes the native build entrypoint (`native/build.ts`), the Rust sources and
+lockfile, and the FreeBSD CI tooling. A cache miss, expiration, or first build
+after a cache-key change falls back to the full FreeBSD build and smoke tests;
+the release still waits for that job rather than publishing a missing binary.
 
 The tag triggers Native prebuilds, which builds the native matrix and packages
 the release. Publish then invokes `scripts/publish-release-packages.ts` using

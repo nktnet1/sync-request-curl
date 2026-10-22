@@ -79,6 +79,49 @@ jobs:
       - name: Verify addon with 32-bit Node.js
         run: node scripts/verify-native-load.ts --file=native/build/sync_request_curl_native.node
 
+  freebsd-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: freebsd-x64
+            arch: x86_64
+          - platform: freebsd-arm64
+            arch: aarch64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # Keep a verified FreeBSD addon between runs. The VM prepared-image cache
+      # only caches build tools, not the Rust/AWS-LC compilation in `run`.
+      - name: Restore cached FreeBSD addon
+        id: native-cache
+        uses: actions/cache@v4
+        with:
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          key: freebsd-prebuild-v1-14.4-${{ matrix.platform }}-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml', 'native/build.rs', 'native/build.ts', 'native/src/**', 'rust-toolchain.toml', 'scripts/freebsd-ci.sh', 'scripts/build-native.ts', 'scripts/stage-native.ts') }}
+
+      - name: Build or verify ${{ matrix.platform }} prebuild
+        uses: vmactions/freebsd-vm@a2f9a41fa97f6848b8c3b791087dfcdaa5b473ff # v1.5.8
+        with:
+          release: "14.4"
+          arch: ${{ matrix.arch }}
+          mem: 8192
+          usesh: true
+          cache-after-prepare: true
+          # Include the script and pin in the input, since this action version
+          # hashes only the literal prepare command for its prepared VM cache.
+          prepare: |
+            # ${{ hashFiles('scripts/freebsd-ci.sh', 'rust-toolchain.toml') }}
+            sh scripts/freebsd-ci.sh prepare
+          # Cache hits still run the native load/HTTP smoke checks in FreeBSD.
+          run: sh scripts/freebsd-ci.sh ${{ steps.native-cache.outputs.cache-hit == 'true' && 'verify' || 'build' }} ${{ matrix.platform }}
+
+      - name: Confirm native addon was copied back
+        run: test -s prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+
   native:
     strategy:
       matrix:

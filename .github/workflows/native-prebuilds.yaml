@@ -167,8 +167,68 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  build-freebsd:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: freebsd-x64
+            arch: x86_64
+          - platform: freebsd-arm64
+            arch: aarch64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # Keep a verified FreeBSD addon between runs. The VM prepared-image cache
+      # only caches build tools, not the Rust/AWS-LC compilation in `run`.
+      - name: Restore cached FreeBSD addon
+        id: native-cache
+        uses: actions/cache@v4
+        with:
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          key: freebsd-prebuild-v1-14.4-${{ matrix.platform }}-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml', 'native/build.rs', 'native/build.ts', 'native/src/**', 'rust-toolchain.toml', 'scripts/freebsd-ci.sh', 'scripts/build-native.ts', 'scripts/stage-native.ts') }}
+
+      # Pipeline runs on main already compile and smoke-test this exact addon
+      # before writing its cache. On an exact hit, avoid starting a FreeBSD VM
+      # again just to release the already verified binary.
+      - name: Reuse verified ${{ matrix.platform }} prebuild
+        if: steps.native-cache.outputs.cache-hit == 'true'
+        run: echo "Reusing a previously verified ${{ matrix.platform }} prebuild; skipping FreeBSD VM"
+
+      - name: Build and verify ${{ matrix.platform }} on cache miss
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: vmactions/freebsd-vm@a2f9a41fa97f6848b8c3b791087dfcdaa5b473ff # v1.5.8
+        with:
+          release: "14.4"
+          arch: ${{ matrix.arch }}
+          mem: 8192
+          usesh: true
+          cache-after-prepare: true
+          # Include the script and pin in the input, since this action version
+          # hashes only the literal prepare command for its prepared VM cache.
+          prepare: |
+            # ${{ hashFiles('scripts/freebsd-ci.sh', 'rust-toolchain.toml') }}
+            sh scripts/freebsd-ci.sh prepare
+          # Cache misses still compile and run all FreeBSD smoke checks.
+          run: sh scripts/freebsd-ci.sh build ${{ matrix.platform }}
+
+      - name: Confirm native addon was copied back
+        run: test -s prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+
+      - name: Upload native addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-${{ matrix.platform }}
+          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+          if-no-files-found: error
+          retention-days: 1
+
   collect:
     needs:
+      - build-freebsd
       - build-linux
       - build-desktop
       - build-windows-x86
@@ -258,7 +318,7 @@ jobs:
             npm pack "$package_dir" --pack-destination release-tarballs --ignore-scripts
           done
           npm pack .release/main --pack-destination release-tarballs --ignore-scripts
-          test "$(find release-tarballs -maxdepth 1 -name '*.tgz' -type f | wc -l)" -eq 10
+          test "$(find release-tarballs -maxdepth 1 -name '*.tgz' -type f | wc -l)" -eq 12
 
       - name: Upload release packages
         uses: actions/upload-artifact@v4

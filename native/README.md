@@ -74,3 +74,9 @@ selection, and the distinction between prebuilt and best-effort source targets.
 and load-checks the addon in a child Node.js process before replacing local output.
 The repository's TypeScript wrapper adds the `--if-needed` freshness check.
 All other repository automation under `scripts/` requires Node.js 24.14+ or 26+.
+
+FreeBSD ARM64 source builds use the native Rust compiler supplied by FreeBSD
+(`pkg install rust`) rather than rustup. The compiler must be at least the
+version specified in `rust-toolchain.toml` (currently Rust 1.96.0). FreeBSD
+x64 continues to use the pinned rustup toolchain. Official prebuilt packages
+require no additional Rust installation.

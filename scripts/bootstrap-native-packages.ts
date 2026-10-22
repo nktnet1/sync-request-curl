@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { setTimeout } from "node:timers/promises";
 import { parseArgs, styleText } from "node:util";
 import {
   getNativePackageName,
@@ -11,28 +12,35 @@ import { parseReleasePackageJson } from "#scripts/release-package";
 
 const BOOTSTRAP_VERSION = "0.0.0-bootstrap.0";
 const BOOTSTRAP_TAG = "bootstrap";
-
-const { values } = parseArgs({
-  options: {
-    publish: { type: "boolean", default: false },
-    registry: {
-      type: "string",
-      default: "https://registry.npmjs.org/",
-    },
-    help: { type: "boolean", short: "h", default: false },
-  },
-});
+const DEFAULT_REGISTRY = "https://registry.npmjs.org/";
+const OIDC_WORKFLOW = "publish.yaml";
+const OIDC_ENVIRONMENT = "Production";
+const MINIMUM_TRUST_NPM_VERSION = [11, 15, 0] as const;
 
 const root = resolve(import.meta.dirname, "..");
-const registry = values.registry;
 const packageJson = parseReleasePackageJson(
   readFileSync(join(root, "package.json"), "utf8"),
 );
 
+export interface BootstrapOptions {
+  publish?: boolean;
+  registry?: string;
+  freebsdOnly?: boolean;
+  configureOidc?: boolean;
+}
+
+interface TrustConfiguration {
+  type: string;
+  file?: string;
+  repository?: string;
+  environment?: string;
+  permissions?: string[];
+}
+
 const status = (format: "cyan" | "green" | "yellow", text: string): string =>
   styleText([format, "bold"], text);
 
-const packageExists = (packageName: string): boolean => {
+const packageExists = (packageName: string, registry: string): boolean => {
   try {
     run(
       "pnpm",
@@ -73,7 +81,11 @@ const createBootstrapManifest = (
   publishConfig: { access: "public" },
 });
 
-const publishBootstrapPackage = (packageName: string): void => {
+const publishBootstrapPackage = (
+  packageName: string,
+  registry: string,
+  publish: boolean,
+): void => {
   const directory = mkdtempSync(join(tmpdir(), "sync-request-curl-bootstrap-"));
 
   try {
@@ -98,7 +110,7 @@ const publishBootstrapPackage = (packageName: string): void => {
       "--no-git-checks",
       "--ignore-scripts",
     ];
-    if (!values.publish) {
+    if (!publish) {
       args.push("--dry-run");
     }
     run("pnpm", args, { cwd: directory });
@@ -108,35 +120,47 @@ const publishBootstrapPackage = (packageName: string): void => {
 };
 
 const printHelp = (): void => {
-  console.log(`Usage: pnpm bootstrap:native [--publish] [options]
+  console.log(`Usage: pnpm bootstrap:native [--freebsd-only] [--configure-oidc] [--publish]
 
-Bootstraps only the platform-specific @nktnet/sync-request-curl-* package names.
-Any package name that already exists in the registry is skipped, regardless of version.
+Bootstraps platform-specific @nktnet/sync-request-curl-* names. Already published
+names are skipped regardless of their versions. --freebsd-only selects just
+freebsd-arm64 and freebsd-x64.
 
-Missing package names are created with the placeholder version ${BOOTSTRAP_VERSION}
-and the non-default "${BOOTSTRAP_TAG}" dist-tag. No native binaries are required.
+Missing names receive a placeholder version ${BOOTSTRAP_VERSION} under the
+non-default "${BOOTSTRAP_TAG}" dist-tag. No native binaries are required.
 
-Default: check the registry and dry-run each missing bootstrap package.
---publish: create the missing packages for real.
+Default: check the registry and dry-run missing bootstrap packages.
+--publish: publish missing packages (and apply OIDC when requested).
+--configure-oidc: set up npm Trusted Publishing for ${OIDC_WORKFLOW} with the
+  ${OIDC_ENVIRONMENT} environment and direct publish permission. Without --publish,
+  show the planned OIDC configuration without changing npm settings.
 --registry <url>: registry to inspect and publish to (default: npmjs.org).
 
-After publishing, configure Trusted Publishing for each package, then let the normal
-release workflow publish real beta/stable versions. Before --publish, authenticate
-with pnpm login. If npm requires 2FA, pnpm will prompt for it.`);
+OIDC setup requires npm >= 11.15, npm login with 2FA enabled, and write access
+for the package names. If a captured trust lookup requires 2FA, the interactive
+npm trust github command handles the browser challenge instead.
+Publish a release via the trusted GitHub Actions workflow within 2 days of
+creating a new trust relationship so npm can validate it.`);
 };
 
 interface PackageScanResult {
+  names: string[];
   missing: string[];
   skipped: number;
 }
 
-const scanPackages = (): PackageScanResult => {
-  const packages = supportedPlatformKeys.map(getNativePackageName);
+const scanPackages = (
+  freebsdOnly: boolean,
+  registry: string,
+): PackageScanResult => {
+  const names = supportedPlatformKeys
+    .filter((platform) => !freebsdOnly || platform.startsWith("freebsd-"))
+    .map(getNativePackageName);
   const missing: string[] = [];
   let skipped = 0;
 
-  for (const packageName of packages) {
-    if (!packageExists(packageName)) {
+  for (const packageName of names) {
+    if (!packageExists(packageName, registry)) {
       missing.push(packageName);
       console.log(
         `${status("yellow", "CREATE")} ${packageName} does not exist`,
@@ -148,30 +172,270 @@ const scanPackages = (): PackageScanResult => {
     console.log(`${status("green", "SKIP")} ${packageName} already exists`);
   }
 
-  return { missing, skipped };
+  return { names, missing, skipped };
 };
 
-const ensurePublisherAuthentication = (): boolean => {
-  if (!values.publish) {
-    return true;
-  }
-
+const ensurePublisherAuthentication = (
+  registry: string,
+  configureOidc: boolean,
+): void => {
+  const cli = configureOidc ? "npm" : "pnpm";
   try {
-    const username = run("pnpm", ["whoami", `--registry=${registry}`], {
+    const username = run(cli, ["whoami", `--registry=${registry}`], {
       cwd: root,
       capture: true,
     });
     console.log(`${status("cyan", "USER")} publishing as ${username}`);
-    return true;
   } catch {
-    console.error(
-      `${status("yellow", "LOGIN")} authentication is required to publish to ${registry}`,
+    const hint = configureOidc
+      ? " npm Trusted Publishing setup requires account 2FA."
+      : "";
+    throw new Error(
+      `Authenticate with ${cli} login --registry=${registry} before retrying.${hint}`,
     );
-    console.error(`Run: pnpm login --registry=${registry}`);
-    console.error("Then retry: pnpm bootstrap:native --publish");
-    process.exitCode = 1;
-    return false;
   }
+};
+
+const getGitHubRepository = (): string => {
+  const repository = packageJson.repository;
+  const value =
+    typeof repository === "object" && repository !== null && "url" in repository
+      ? repository.url
+      : repository;
+  if (typeof value !== "string") {
+    throw new TypeError("package.json must specify its GitHub repository URL");
+  }
+  const match =
+    /^(?:git\+)?https:\/\/github\.com\/([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/.exec(
+      value,
+    );
+  if (!match) {
+    throw new Error("package.json must specify a github.com/owner/repo URL");
+  }
+  return match[1];
+};
+
+const ensureOidcPrerequisites = (registry: string): string => {
+  const url = new URL(registry);
+  if (url.href !== DEFAULT_REGISTRY) {
+    throw new Error(
+      "npm trusted publishing requires https://registry.npmjs.org/",
+    );
+  }
+  const version = run("npm", ["--version"], { cwd: root, capture: true });
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(version);
+  const parts = match?.slice(1, 4).map(Number);
+  const firstDifference = parts?.findIndex(
+    (part, index) => part !== MINIMUM_TRUST_NPM_VERSION[index],
+  );
+  if (
+    !parts ||
+    (firstDifference !== undefined &&
+      firstDifference !== -1 &&
+      parts[firstDifference] < MINIMUM_TRUST_NPM_VERSION[firstDifference])
+  ) {
+    throw new Error(
+      `npm trust requires npm >= 11.15.0; found ${version}. Update npm before continuing.`,
+    );
+  }
+  return getGitHubRepository();
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+interface JsonObjectScanState {
+  depth: number;
+  inString: boolean;
+  escaped: boolean;
+}
+
+const advanceJsonObjectScan = (
+  state: JsonObjectScanState,
+  character: string,
+): void => {
+  if (state.inString) {
+    if (state.escaped) state.escaped = false;
+    else if (character === "\\") state.escaped = true;
+    else if (character === '"') state.inString = false;
+    return;
+  }
+
+  if (character === '"') state.inString = true;
+  else if (character === "{") state.depth += 1;
+  else if (character === "}") state.depth -= 1;
+};
+
+/** npm 11 can print adjacent JSON objects rather than a single JSON array. */
+const parseAdjacentJsonObjects = (input: string): unknown[] => {
+  const values: unknown[] = [];
+  const state: JsonObjectScanState = {
+    depth: 0,
+    inString: false,
+    escaped: false,
+  };
+  let start = -1;
+
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index];
+    if (start === -1) {
+      if (/\s/.test(character)) continue;
+      if (character !== "{")
+        throw new SyntaxError("Invalid npm trust list JSON");
+      start = index;
+    }
+
+    advanceJsonObjectScan(state, character);
+    if (state.depth === 0) {
+      values.push(JSON.parse(input.slice(start, index + 1)));
+      start = -1;
+    }
+  }
+
+  if (start !== -1) throw new SyntaxError("Incomplete npm trust list JSON");
+  return values;
+};
+
+const isTrustConfiguration = (value: unknown): value is TrustConfiguration =>
+  isRecord(value) &&
+  typeof value.type === "string" &&
+  (value.permissions === undefined ||
+    (Array.isArray(value.permissions) &&
+      value.permissions.every((permission) => typeof permission === "string")));
+
+export const parseTrustedPublishers = (
+  output: string,
+): TrustConfiguration[] => {
+  const input = output.trim();
+  if (!input) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(input);
+  } catch {
+    parsed = parseAdjacentJsonObjects(input);
+  }
+
+  const configurations: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
+  if (!configurations.every(isTrustConfiguration)) {
+    throw new TypeError("Unexpected npm trust list configuration format");
+  }
+  return configurations;
+};
+
+const readTrustedPublishers = (
+  packageName: string,
+  registry: string,
+): TrustConfiguration[] | undefined => {
+  try {
+    const output = run(
+      "npm",
+      ["trust", "list", packageName, "--json", `--registry=${registry}`],
+      { cwd: root, capture: true },
+    );
+    return parseTrustedPublishers(output);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/\bEOTP\b|one-time pass|two-factor|\b2FA\b|npm-otp/i.test(message)) {
+      if (!process.stdin.isTTY || !process.stdout.isTTY) {
+        throw new Error(
+          `An interactive terminal is required to configure npm trusted publishers for ${packageName}. ` +
+            "Run the bootstrap command from a terminal to complete browser 2FA.",
+          { cause: error },
+        );
+      }
+      // npm cannot complete browser 2FA when its output is captured. Do not
+      // repeat the captured lookup: creation below uses inherited stdio and
+      // lets `npm trust github` complete the authentication challenge.
+      console.log(
+        `${status("yellow", "2FA")} Unable to inspect trust for ${packageName}; ` +
+          "npm trust github will authenticate interactively. " +
+          "Select the 5-minute 2FA skip option when offered.",
+      );
+      return undefined;
+    }
+    throw new Error(
+      `Unable to check npm trusted publishers for ${packageName}.`,
+      { cause: error },
+    );
+  }
+};
+
+const isExpectedPublisher = (
+  configuration: TrustConfiguration,
+  repository: string,
+): boolean =>
+  configuration.type === "github" &&
+  configuration.repository === repository &&
+  configuration.file === OIDC_WORKFLOW &&
+  configuration.environment === OIDC_ENVIRONMENT &&
+  configuration.permissions?.includes("createPackage") === true;
+
+interface TrustSetupTotals {
+  created: number;
+  skipped: number;
+}
+
+const configureTrustedPublisher = async (
+  packageName: string,
+  registry: string,
+  repository: string,
+  totals: TrustSetupTotals,
+): Promise<void> => {
+  const configurations = readTrustedPublishers(packageName, registry);
+  if (
+    configurations?.some((config) => isExpectedPublisher(config, repository))
+  ) {
+    totals.skipped += 1;
+    console.log(
+      `${status("green", "SKIP")} ${packageName} OIDC already configured`,
+    );
+    return;
+  }
+  if (configurations && configurations.length > 0) {
+    throw new Error(
+      `${packageName} already has a different trusted publisher. ` +
+        `Review npm trust list ${packageName} and resolve it manually; existing trust is never revoked automatically.`,
+    );
+  }
+
+  if (totals.created > 0) await setTimeout(2_000);
+  run(
+    "npm",
+    [
+      "trust",
+      "github",
+      packageName,
+      `--repo=${repository}`,
+      `--file=${OIDC_WORKFLOW}`,
+      `--env=${OIDC_ENVIRONMENT}`,
+      "--allow-publish",
+      "--yes",
+      `--registry=${registry}`,
+    ],
+    { cwd: root },
+  );
+  totals.created += 1;
+  console.log(`${status("green", "TRUSTED")} ${packageName}`);
+};
+
+const configureTrustedPublishers = async (
+  names: string[],
+  registry: string,
+  repository: string,
+): Promise<void> => {
+  const totals: TrustSetupTotals = { created: 0, skipped: 0 };
+  // Browser 2FA prompts and npm governance changes must run sequentially.
+  await names.reduce<Promise<void>>(
+    (previous, packageName) =>
+      previous.then(() =>
+        configureTrustedPublisher(packageName, registry, repository, totals),
+      ),
+    Promise.resolve(),
+  );
+  console.log(
+    `${status("green", "OIDC")} ${totals.created} configured, ${totals.skipped} already configured`,
+  );
 };
 
 interface BootstrapResult {
@@ -183,20 +447,22 @@ interface BootstrapResult {
 const bootstrapMissingPackages = (
   missing: string[],
   initialSkipped: number,
+  registry: string,
+  publish: boolean,
 ): BootstrapResult => {
   let published = 0;
   let skipped = initialSkipped;
   let validated = 0;
 
   for (const packageName of missing) {
-    if (values.publish && packageExists(packageName)) {
+    if (publish && packageExists(packageName, registry)) {
       skipped += 1;
       console.log(`${status("green", "SKIP")} ${packageName} now exists`);
       continue;
     }
 
-    publishBootstrapPackage(packageName);
-    if (values.publish) {
+    publishBootstrapPackage(packageName, registry, publish);
+    if (publish) {
       published += 1;
       console.log(
         `${status("green", "PUBLISHED")} ${packageName}@${BOOTSTRAP_VERSION}`,
@@ -211,12 +477,13 @@ const bootstrapMissingPackages = (
   return { published, skipped, validated };
 };
 
-const printBootstrapSummary = ({
-  published,
-  skipped,
-  validated,
-}: BootstrapResult): void => {
-  if (values.publish) {
+const printBootstrapSummary = (
+  { published, skipped, validated }: BootstrapResult,
+  publish: boolean,
+  freebsdOnly: boolean,
+  configureOidc: boolean,
+): void => {
+  if (publish) {
     console.log(
       `${status("green", "DONE")} ${published} published, ${skipped} already existed`,
     );
@@ -226,30 +493,75 @@ const printBootstrapSummary = ({
   console.log(
     `${status("cyan", "READY")} ${validated} can be bootstrapped, ${skipped} already existed`,
   );
+  const options = [
+    freebsdOnly && "--freebsd-only",
+    configureOidc && "--configure-oidc",
+    "--publish",
+  ].filter(Boolean);
   console.log(
-    "Run pnpm bootstrap:native --publish to create the missing packages.",
+    `Run pnpm bootstrap:native ${options.join(" ")} to apply this plan.`,
   );
 };
 
-const main = (): void => {
-  if (values.help) {
-    printHelp();
-    return;
-  }
+export const bootstrapNativePackages = async ({
+  publish = false,
+  registry = DEFAULT_REGISTRY,
+  freebsdOnly = false,
+  configureOidc = false,
+}: BootstrapOptions = {}): Promise<void> => {
+  // Validate the OIDC requirements before any package is published.
+  const repository = configureOidc
+    ? ensureOidcPrerequisites(registry)
+    : undefined;
+  const { names, missing, skipped } = scanPackages(freebsdOnly, registry);
 
-  const { missing, skipped } = scanPackages();
+  if (publish && (missing.length > 0 || configureOidc)) {
+    ensurePublisherAuthentication(registry, configureOidc);
+  }
   if (missing.length === 0) {
     console.log(
-      `${status("green", "DONE")} all ${skipped} native packages already exist`,
+      `${status("green", "DONE")} all ${skipped} selected native packages already exist`,
     );
-    return;
+  } else {
+    const result = bootstrapMissingPackages(
+      missing,
+      skipped,
+      registry,
+      publish,
+    );
+    printBootstrapSummary(result, publish, freebsdOnly, configureOidc);
   }
 
-  if (!ensurePublisherAuthentication()) {
+  if (!configureOidc || !repository) return;
+  if (!publish) {
+    console.log(
+      `${status("cyan", "OIDC PLAN")} configure ${names.length} packages for ` +
+        `${repository} / ${OIDC_WORKFLOW} (environment: ${OIDC_ENVIRONMENT}, permission: publish)`,
+    );
+    console.log("Add --publish to apply OIDC settings (requires account 2FA).");
     return;
   }
-
-  printBootstrapSummary(bootstrapMissingPackages(missing, skipped));
+  await configureTrustedPublishers(names, registry, repository);
 };
 
-main();
+if (import.meta.main) {
+  const { values } = parseArgs({
+    options: {
+      publish: { type: "boolean", default: false },
+      registry: { type: "string", default: DEFAULT_REGISTRY },
+      "freebsd-only": { type: "boolean", default: false },
+      "configure-oidc": { type: "boolean", default: false },
+      help: { type: "boolean", short: "h", default: false },
+    },
+  });
+
+  if (values.help) printHelp();
+  else {
+    await bootstrapNativePackages({
+      publish: values.publish,
+      registry: values.registry,
+      freebsdOnly: values["freebsd-only"],
+      configureOidc: values["configure-oidc"],
+    });
+  }
+}
