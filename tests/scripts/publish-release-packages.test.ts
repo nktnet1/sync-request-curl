@@ -307,8 +307,8 @@ type NpmResult = { status: number; stdout?: string; stderr?: string };
 // Keep the command routing shared while allowing each test to supply its own
 // responses for registry lookups and publication attempts.
 const mockNpm = ({
-  view = () => absent,
-  publish = () => ({ status: 0 }),
+  view = (_specifier: string) => absent,
+  publish = (_tarball: string) => ({ status: 0 }),
 }: {
   view?: (specifier: string) => NpmResult;
   publish?: (tarball: string) => NpmResult;
