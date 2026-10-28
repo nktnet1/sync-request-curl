@@ -34,19 +34,22 @@ test("CommonJS release bundle exposes literal native package resolutions to file
     "win32-x64-msvc",
   ];
 
+  // All literal references must stay within the shared try/catch, rather
+  // than in separately invoked functions outside its lexical scope.
+  assert.match(bundle, /try\s*\{\s*switch\s*\(platformKey\)\s*\{/);
+  assert.match(
+    bundle,
+    /\}\s*catch\s*\((\w+)\)\s*\{\s*return\s+rethrowNativeResolveError\(\1\)/,
+  );
+
   for (const platform of platforms) {
     const packageName = `@nktnet/sync-request-curl-${platform}`;
     assert.match(
       bundle,
-      new RegExp(String.raw`\brequire\.resolve\(["']${packageName}["']\)`),
-      `${packageName} must be a literal require.resolve target in the published bundle`,
-    );
-    assert.match(
-      bundle,
       new RegExp(
-        String.raw`"${platform}":\s*\(\)\s*=>\s*\{\s*try\s*\{\s*return\s+require\.resolve\(["']${packageName}["']\)`,
+        String.raw`case\s+["']${platform}["']:\s*return\s+require\.resolve\(["']${packageName}["']\)`,
       ),
-      `${packageName} must be wrapped in try/catch so bundlers treat it as optional`,
+      `${packageName} must remain a literal require.resolve() inside the shared try/catch`,
     );
   }
 });

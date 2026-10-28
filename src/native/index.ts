@@ -112,7 +112,7 @@ export interface NativeBinding {
 }
 
 type NativeRequire = (path: string) => NativeBinding;
-type NativeResolve = (request: string) => string | undefined;
+type NativeResolve = (request: string) => string;
 type FileExists = (path: string) => boolean;
 
 export interface NativeLoadOptions {
@@ -174,8 +174,50 @@ const moduleDirectory = dirname(fileURLToPath(import.meta.url));
 // require alias. Only call the matching resolver in the published CJS bundle.
 // In ESM source-mode tests, fall back to createRequire(import.meta.url).
 // Other platform packages remain optional install-time dependencies.
-// A local try/catch marks each unresolved static reference as optional for
-// bundlers without changing the runtime missing-package behaviour.
+// Keep every literal require.resolve() inside a single try/catch so bundlers
+// treat missing platform-specific packages as optional. The original error is
+// rethrown for resolveOptionalNativePackage to handle at the call site.
+const rethrowNativeResolveError = (error: unknown): never => {
+  throw error;
+};
+
+const resolveTraceableNativePackage = (
+  platformKey: NativePlatformKey,
+): string => {
+  try {
+    switch (platformKey) {
+      case "darwin-arm64":
+        return require.resolve("@nktnet/sync-request-curl-darwin-arm64");
+      case "darwin-x64":
+        return require.resolve("@nktnet/sync-request-curl-darwin-x64");
+      case "freebsd-arm64":
+        return require.resolve("@nktnet/sync-request-curl-freebsd-arm64");
+      case "freebsd-x64":
+        return require.resolve("@nktnet/sync-request-curl-freebsd-x64");
+      case "linux-arm64-gnu":
+        return require.resolve("@nktnet/sync-request-curl-linux-arm64-gnu");
+      case "linux-arm64-musl":
+        return require.resolve("@nktnet/sync-request-curl-linux-arm64-musl");
+      case "linux-x64-gnu":
+        return require.resolve("@nktnet/sync-request-curl-linux-x64-gnu");
+      case "linux-x64-musl":
+        return require.resolve("@nktnet/sync-request-curl-linux-x64-musl");
+      case "win32-arm64-msvc":
+        return require.resolve("@nktnet/sync-request-curl-win32-arm64-msvc");
+      case "win32-ia32-msvc":
+        return require.resolve("@nktnet/sync-request-curl-win32-ia32-msvc");
+      case "win32-x64-msvc":
+        return require.resolve("@nktnet/sync-request-curl-win32-x64-msvc");
+      default:
+        throw new Error(
+          `Unsupported native platform: ${platformKey satisfies never}`,
+        );
+    }
+  } catch (error) {
+    return rethrowNativeResolveError(error);
+  }
+};
+
 const handleMissingNativePackage = (error: unknown): undefined => {
   if (!v.is(moduleNotFoundErrorSchema, error)) {
     throw error;
@@ -183,91 +225,13 @@ const handleMissingNativePackage = (error: unknown): undefined => {
   return undefined;
 };
 
-const traceableNativeResolvers = {
-  "darwin-arm64": () => {
-    try {
-      return require.resolve("@nktnet/sync-request-curl-darwin-arm64");
-    } catch (error) {
-      return handleMissingNativePackage(error);
-    }
-  },
-  "darwin-x64": () => {
-    try {
-      return require.resolve("@nktnet/sync-request-curl-darwin-x64");
-    } catch (error) {
-      return handleMissingNativePackage(error);
-    }
-  },
-  "freebsd-arm64": () => {
-    try {
-      return require.resolve("@nktnet/sync-request-curl-freebsd-arm64");
-    } catch (error) {
-      return handleMissingNativePackage(error);
-    }
-  },
-  "freebsd-x64": () => {
-    try {
-      return require.resolve("@nktnet/sync-request-curl-freebsd-x64");
-    } catch (error) {
-      return handleMissingNativePackage(error);
-    }
-  },
-  "linux-arm64-gnu": () => {
-    try {
-      return require.resolve("@nktnet/sync-request-curl-linux-arm64-gnu");
-    } catch (error) {
-      return handleMissingNativePackage(error);
-    }
-  },
-  "linux-arm64-musl": () => {
-    try {
-      return require.resolve("@nktnet/sync-request-curl-linux-arm64-musl");
-    } catch (error) {
-      return handleMissingNativePackage(error);
-    }
-  },
-  "linux-x64-gnu": () => {
-    try {
-      return require.resolve("@nktnet/sync-request-curl-linux-x64-gnu");
-    } catch (error) {
-      return handleMissingNativePackage(error);
-    }
-  },
-  "linux-x64-musl": () => {
-    try {
-      return require.resolve("@nktnet/sync-request-curl-linux-x64-musl");
-    } catch (error) {
-      return handleMissingNativePackage(error);
-    }
-  },
-  "win32-arm64-msvc": () => {
-    try {
-      return require.resolve("@nktnet/sync-request-curl-win32-arm64-msvc");
-    } catch (error) {
-      return handleMissingNativePackage(error);
-    }
-  },
-  "win32-ia32-msvc": () => {
-    try {
-      return require.resolve("@nktnet/sync-request-curl-win32-ia32-msvc");
-    } catch (error) {
-      return handleMissingNativePackage(error);
-    }
-  },
-  "win32-x64-msvc": () => {
-    try {
-      return require.resolve("@nktnet/sync-request-curl-win32-x64-msvc");
-    } catch (error) {
-      return handleMissingNativePackage(error);
-    }
-  },
-} satisfies Record<NativePlatformKey, () => string | undefined>;
-
 export const getDefaultNativeResolver = (
   platformKey: NativePlatformKey,
   hasCommonJsRequire: boolean = typeof require === "function",
 ): NativeResolve =>
-  hasCommonJsRequire ? traceableNativeResolvers[platformKey] : nativeResolve;
+  hasCommonJsRequire
+    ? () => resolveTraceableNativePackage(platformKey)
+    : nativeResolve;
 
 export const findPackageRoot = (
   startDirectory: string,
