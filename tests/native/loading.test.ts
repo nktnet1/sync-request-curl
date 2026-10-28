@@ -8,7 +8,10 @@ import {
   type NativeBinding,
   resolveOptionalNativePackage,
 } from "#/native/index";
-import { getNativePackageName } from "#/native/platform-key";
+import {
+  getNativePackageName,
+  type NativePlatformKey,
+} from "#/native/platform-key";
 import { supportedPlatformKeys } from "#/native/platform-key-core";
 
 const fakeBinding = (): NativeBinding => ({
@@ -308,6 +311,18 @@ describe("native binding loading", () => {
     const resolveNative = getDefaultNativeResolver("linux-x64-gnu", false);
 
     expect(resolveNative("node:fs")).toBe("node:fs");
+  });
+
+  test("rejects an unsupported runtime platform key", () => {
+    // TypeScript clients cannot produce this key, but untyped JS callers can.
+    const resolveNative = getDefaultNativeResolver(
+      "unsupported-platform" as NativePlatformKey,
+      true,
+    );
+
+    expect(() => resolveNative("ignored")).toThrow(
+      "Unsupported native platform: unsupported-platform",
+    );
   });
 
   test("throws a useful error when no matching binary exists", () => {

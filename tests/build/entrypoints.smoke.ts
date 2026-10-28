@@ -34,22 +34,37 @@ test("CommonJS release bundle exposes literal native package resolutions to file
     "win32-x64-msvc",
   ];
 
-  // All literal references must stay within the shared try/catch, rather
-  // than in separately invoked functions outside its lexical scope.
-  assert.match(bundle, /try\s*\{\s*switch\s*\(platformKey\)\s*\{/);
+  // All references must remain within the same try/catch in the emitted
+  // CommonJS bundle, even if the bundler inlines the platform table.
+  const resolverStart = bundle.indexOf("const resolveTraceableNativePackage =");
+  const resolverEnd = bundle.indexOf(
+    "const getDefaultNativeResolver =",
+    resolverStart,
+  );
+  assert.ok(resolverStart >= 0 && resolverEnd > resolverStart);
+  const resolverBlock = bundle.slice(resolverStart, resolverEnd);
+  const tryStart = resolverBlock.indexOf("try {");
+  const catchStart = resolverBlock.lastIndexOf("} catch (");
+  assert.ok(tryStart >= 0 && catchStart > tryStart);
+  const guardedResolvers = resolverBlock.slice(tryStart, catchStart);
   assert.match(
-    bundle,
-    /\}\s*catch\s*\((\w+)\)\s*\{\s*return\s+rethrowNativeResolveError\(\1\)/,
+    resolverBlock,
+    /\}\s*catch\s*\((\w+)\)\s*\{\s*return\s+handleMissingNativePackage\(\1\)/,
+  );
+  assert.equal(
+    (guardedResolvers.match(/\brequire\.resolve\(/g) ?? []).length,
+    platforms.length,
+    "each supported platform must have exactly one traceable resolver",
   );
 
   for (const platform of platforms) {
     const packageName = `@nktnet/sync-request-curl-${platform}`;
     assert.match(
-      bundle,
+      guardedResolvers,
       new RegExp(
-        String.raw`case\s+["']${platform}["']:\s*return\s+require\.resolve\(["']${packageName}["']\)`,
+        String.raw`["']${platform}["']:\s*\(\)\s*=>\s*require\.resolve\(["']${packageName}["']\)`,
       ),
-      `${packageName} must remain a literal require.resolve() inside the shared try/catch`,
+      `${packageName} must remain a lazy, literal require.resolve() inside the shared try/catch`,
     );
   }
 });
