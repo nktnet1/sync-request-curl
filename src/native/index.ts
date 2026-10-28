@@ -112,7 +112,7 @@ export interface NativeBinding {
 }
 
 type NativeRequire = (path: string) => NativeBinding;
-type NativeResolve = (request: string) => string;
+type NativeResolve = (request: string) => string | undefined;
 type FileExists = (path: string) => boolean;
 
 export interface NativeLoadOptions {
@@ -174,28 +174,94 @@ const moduleDirectory = dirname(fileURLToPath(import.meta.url));
 // require alias. Only call the matching resolver in the published CJS bundle.
 // In ESM source-mode tests, fall back to createRequire(import.meta.url).
 // Other platform packages remain optional install-time dependencies.
+// A local try/catch marks each unresolved static reference as optional for
+// bundlers without changing the runtime missing-package behaviour.
+const handleMissingNativePackage = (error: unknown): undefined => {
+  if (!v.is(moduleNotFoundErrorSchema, error)) {
+    throw error;
+  }
+  return undefined;
+};
+
 const traceableNativeResolvers = {
-  "darwin-arm64": () =>
-    require.resolve("@nktnet/sync-request-curl-darwin-arm64"),
-  "darwin-x64": () => require.resolve("@nktnet/sync-request-curl-darwin-x64"),
-  "freebsd-arm64": () =>
-    require.resolve("@nktnet/sync-request-curl-freebsd-arm64"),
-  "freebsd-x64": () => require.resolve("@nktnet/sync-request-curl-freebsd-x64"),
-  "linux-arm64-gnu": () =>
-    require.resolve("@nktnet/sync-request-curl-linux-arm64-gnu"),
-  "linux-arm64-musl": () =>
-    require.resolve("@nktnet/sync-request-curl-linux-arm64-musl"),
-  "linux-x64-gnu": () =>
-    require.resolve("@nktnet/sync-request-curl-linux-x64-gnu"),
-  "linux-x64-musl": () =>
-    require.resolve("@nktnet/sync-request-curl-linux-x64-musl"),
-  "win32-arm64-msvc": () =>
-    require.resolve("@nktnet/sync-request-curl-win32-arm64-msvc"),
-  "win32-ia32-msvc": () =>
-    require.resolve("@nktnet/sync-request-curl-win32-ia32-msvc"),
-  "win32-x64-msvc": () =>
-    require.resolve("@nktnet/sync-request-curl-win32-x64-msvc"),
-} satisfies Record<NativePlatformKey, () => string>;
+  "darwin-arm64": () => {
+    try {
+      return require.resolve("@nktnet/sync-request-curl-darwin-arm64");
+    } catch (error) {
+      return handleMissingNativePackage(error);
+    }
+  },
+  "darwin-x64": () => {
+    try {
+      return require.resolve("@nktnet/sync-request-curl-darwin-x64");
+    } catch (error) {
+      return handleMissingNativePackage(error);
+    }
+  },
+  "freebsd-arm64": () => {
+    try {
+      return require.resolve("@nktnet/sync-request-curl-freebsd-arm64");
+    } catch (error) {
+      return handleMissingNativePackage(error);
+    }
+  },
+  "freebsd-x64": () => {
+    try {
+      return require.resolve("@nktnet/sync-request-curl-freebsd-x64");
+    } catch (error) {
+      return handleMissingNativePackage(error);
+    }
+  },
+  "linux-arm64-gnu": () => {
+    try {
+      return require.resolve("@nktnet/sync-request-curl-linux-arm64-gnu");
+    } catch (error) {
+      return handleMissingNativePackage(error);
+    }
+  },
+  "linux-arm64-musl": () => {
+    try {
+      return require.resolve("@nktnet/sync-request-curl-linux-arm64-musl");
+    } catch (error) {
+      return handleMissingNativePackage(error);
+    }
+  },
+  "linux-x64-gnu": () => {
+    try {
+      return require.resolve("@nktnet/sync-request-curl-linux-x64-gnu");
+    } catch (error) {
+      return handleMissingNativePackage(error);
+    }
+  },
+  "linux-x64-musl": () => {
+    try {
+      return require.resolve("@nktnet/sync-request-curl-linux-x64-musl");
+    } catch (error) {
+      return handleMissingNativePackage(error);
+    }
+  },
+  "win32-arm64-msvc": () => {
+    try {
+      return require.resolve("@nktnet/sync-request-curl-win32-arm64-msvc");
+    } catch (error) {
+      return handleMissingNativePackage(error);
+    }
+  },
+  "win32-ia32-msvc": () => {
+    try {
+      return require.resolve("@nktnet/sync-request-curl-win32-ia32-msvc");
+    } catch (error) {
+      return handleMissingNativePackage(error);
+    }
+  },
+  "win32-x64-msvc": () => {
+    try {
+      return require.resolve("@nktnet/sync-request-curl-win32-x64-msvc");
+    } catch (error) {
+      return handleMissingNativePackage(error);
+    }
+  },
+} satisfies Record<NativePlatformKey, () => string | undefined>;
 
 export const getDefaultNativeResolver = (
   platformKey: NativePlatformKey,
@@ -271,10 +337,7 @@ export const resolveOptionalNativePackage = (
   try {
     return resolveNative(packageName);
   } catch (error) {
-    if (v.is(moduleNotFoundErrorSchema, error)) {
-      return undefined;
-    }
-    throw error;
+    return handleMissingNativePackage(error);
   }
 };
 

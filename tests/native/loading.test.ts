@@ -90,6 +90,15 @@ describe("native binding loading", () => {
     ).toBe("/node_modules/native/addon.node");
   });
 
+  test("accepts an unresolved optional native package", () => {
+    expect(
+      resolveOptionalNativePackage(
+        "@nktnet/sync-request-curl-linux-x64-gnu",
+        () => undefined,
+      ),
+    ).toBeUndefined();
+  });
+
   test("returns undefined when the optional native package is missing", () => {
     const error = Object.assign(new Error("missing"), {
       code: "MODULE_NOT_FOUND",

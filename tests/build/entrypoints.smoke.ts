@@ -41,6 +41,13 @@ test("CommonJS release bundle exposes literal native package resolutions to file
       new RegExp(String.raw`\brequire\.resolve\(["']${packageName}["']\)`),
       `${packageName} must be a literal require.resolve target in the published bundle`,
     );
+    assert.match(
+      bundle,
+      new RegExp(
+        String.raw`"${platform}":\s*\(\)\s*=>\s*\{\s*try\s*\{\s*return\s+require\.resolve\(["']${packageName}["']\)`,
+      ),
+      `${packageName} must be wrapped in try/catch so bundlers treat it as optional`,
+    );
   }
 });
 
