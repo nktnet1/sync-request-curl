@@ -313,15 +313,21 @@ describe("native binding loading", () => {
     expect(resolveNative("node:fs")).toBe("node:fs");
   });
 
-  test("rejects an unsupported runtime platform key", () => {
-    // TypeScript clients cannot produce this key, but untyped JS callers can.
+  test.each([
+    "unsupported-platform",
+    "constructor",
+    "toString",
+    "valueOf",
+    "__proto__",
+  ])("rejects an unsupported runtime platform key %s", (platformKey) => {
+    // TypeScript prevents these values, but JavaScript callers can pass them.
     const resolveNative = getDefaultNativeResolver(
-      "unsupported-platform" as NativePlatformKey,
+      platformKey as NativePlatformKey,
       true,
     );
 
     expect(() => resolveNative("ignored")).toThrow(
-      "Unsupported native platform: unsupported-platform",
+      `Unsupported native platform: ${platformKey}`,
     );
   });
 

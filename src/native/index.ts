@@ -179,58 +179,42 @@ const handleMissingNativePackage = (error: unknown): undefined => {
 };
 
 // Deployment file tracers (including Vercel's Node File Trace) recognise
-// literal require.resolve() calls, but not computed names or custom require
-// aliases. Keep the literal references within this try/catch so optional
-// platform dependencies remain traceable without requiring every package.
-// Resolve only the selected platform; source-mode ESM uses createRequire.
+// literal require.resolve() calls, but not computed package names or custom
+// require aliases. Keep each call directly inside the try block so bundlers
+// recognise other platforms' optional dependencies. Only the matching case
+// executes; ESM source-mode falls back to createRequire(import.meta.url).
 const resolveTraceableNativePackage = (
   platformKey: NativePlatformKey,
 ): string | undefined => {
   try {
-    // Keep each OS family's literal dependency references together. The
-    // completed table is checked exhaustively against NativePlatformKey.
-    const darwinResolvers = {
-      "darwin-arm64": () =>
-        require.resolve("@nktnet/sync-request-curl-darwin-arm64"),
-      "darwin-x64": () =>
-        require.resolve("@nktnet/sync-request-curl-darwin-x64"),
-    };
-    const freebsdResolvers = {
-      "freebsd-arm64": () =>
-        require.resolve("@nktnet/sync-request-curl-freebsd-arm64"),
-      "freebsd-x64": () =>
-        require.resolve("@nktnet/sync-request-curl-freebsd-x64"),
-    };
-    const linuxResolvers = {
-      "linux-arm64-gnu": () =>
-        require.resolve("@nktnet/sync-request-curl-linux-arm64-gnu"),
-      "linux-arm64-musl": () =>
-        require.resolve("@nktnet/sync-request-curl-linux-arm64-musl"),
-      "linux-x64-gnu": () =>
-        require.resolve("@nktnet/sync-request-curl-linux-x64-gnu"),
-      "linux-x64-musl": () =>
-        require.resolve("@nktnet/sync-request-curl-linux-x64-musl"),
-    };
-    const windowsResolvers = {
-      "win32-arm64-msvc": () =>
-        require.resolve("@nktnet/sync-request-curl-win32-arm64-msvc"),
-      "win32-ia32-msvc": () =>
-        require.resolve("@nktnet/sync-request-curl-win32-ia32-msvc"),
-      "win32-x64-msvc": () =>
-        require.resolve("@nktnet/sync-request-curl-win32-x64-msvc"),
-    };
-    const traceableNativeResolvers = {
-      ...darwinResolvers,
-      ...freebsdResolvers,
-      ...linuxResolvers,
-      ...windowsResolvers,
-    } satisfies Record<NativePlatformKey, () => string>;
-
-    const resolvePackage = traceableNativeResolvers[platformKey];
-    if (typeof resolvePackage !== "function") {
-      throw new Error(`Unsupported native platform: ${platformKey}`);
+    switch (platformKey) {
+      case "darwin-arm64":
+        return require.resolve("@nktnet/sync-request-curl-darwin-arm64");
+      case "darwin-x64":
+        return require.resolve("@nktnet/sync-request-curl-darwin-x64");
+      case "freebsd-arm64":
+        return require.resolve("@nktnet/sync-request-curl-freebsd-arm64");
+      case "freebsd-x64":
+        return require.resolve("@nktnet/sync-request-curl-freebsd-x64");
+      case "linux-arm64-gnu":
+        return require.resolve("@nktnet/sync-request-curl-linux-arm64-gnu");
+      case "linux-arm64-musl":
+        return require.resolve("@nktnet/sync-request-curl-linux-arm64-musl");
+      case "linux-x64-gnu":
+        return require.resolve("@nktnet/sync-request-curl-linux-x64-gnu");
+      case "linux-x64-musl":
+        return require.resolve("@nktnet/sync-request-curl-linux-x64-musl");
+      case "win32-arm64-msvc":
+        return require.resolve("@nktnet/sync-request-curl-win32-arm64-msvc");
+      case "win32-ia32-msvc":
+        return require.resolve("@nktnet/sync-request-curl-win32-ia32-msvc");
+      case "win32-x64-msvc":
+        return require.resolve("@nktnet/sync-request-curl-win32-x64-msvc");
+      default:
+        throw new Error(
+          `Unsupported native platform: ${platformKey satisfies never}`,
+        );
     }
-    return resolvePackage();
   } catch (error) {
     return handleMissingNativePackage(error);
   }
