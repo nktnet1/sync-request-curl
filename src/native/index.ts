@@ -112,7 +112,7 @@ export interface NativeBinding {
 }
 
 type NativeRequire = (path: string) => NativeBinding;
-type NativeResolve = (request: string) => string;
+type NativeResolve = (request: string) => string | undefined;
 type FileExists = (path: string) => boolean;
 
 export interface NativeLoadOptions {
@@ -169,39 +169,64 @@ const nativeRequire: NativeRequire = (path) =>
 const nativeResolve = moduleRequire.resolve.bind(moduleRequire);
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
 
+// Missing optional native dependencies are expected; other resolution errors
+// must still propagate so they cannot be mistaken for an absent package.
+const handleMissingNativePackage = (error: unknown): undefined => {
+  if (!v.is(moduleNotFoundErrorSchema, error)) {
+    throw error;
+  }
+  return undefined;
+};
+
 // Deployment file tracers (including Vercel's Node File Trace) recognise
-// literal require.resolve() calls, but not a computed name or a custom
-// require alias. Only call the matching resolver in the published CJS bundle.
-// In ESM source-mode tests, fall back to createRequire(import.meta.url).
-// Other platform packages remain optional install-time dependencies.
-const traceableNativeResolvers = {
-  "darwin-arm64": () =>
-    require.resolve("@nktnet/sync-request-curl-darwin-arm64"),
-  "darwin-x64": () => require.resolve("@nktnet/sync-request-curl-darwin-x64"),
-  "freebsd-arm64": () =>
-    require.resolve("@nktnet/sync-request-curl-freebsd-arm64"),
-  "freebsd-x64": () => require.resolve("@nktnet/sync-request-curl-freebsd-x64"),
-  "linux-arm64-gnu": () =>
-    require.resolve("@nktnet/sync-request-curl-linux-arm64-gnu"),
-  "linux-arm64-musl": () =>
-    require.resolve("@nktnet/sync-request-curl-linux-arm64-musl"),
-  "linux-x64-gnu": () =>
-    require.resolve("@nktnet/sync-request-curl-linux-x64-gnu"),
-  "linux-x64-musl": () =>
-    require.resolve("@nktnet/sync-request-curl-linux-x64-musl"),
-  "win32-arm64-msvc": () =>
-    require.resolve("@nktnet/sync-request-curl-win32-arm64-msvc"),
-  "win32-ia32-msvc": () =>
-    require.resolve("@nktnet/sync-request-curl-win32-ia32-msvc"),
-  "win32-x64-msvc": () =>
-    require.resolve("@nktnet/sync-request-curl-win32-x64-msvc"),
-} satisfies Record<NativePlatformKey, () => string>;
+// literal require.resolve() calls, but not computed package names or custom
+// require aliases. Keep each call directly inside the try block so bundlers
+// recognise other platforms' optional dependencies. Only the matching case
+// executes; ESM source-mode falls back to createRequire(import.meta.url).
+const resolveTraceableNativePackage = (
+  platformKey: NativePlatformKey,
+): string | undefined => {
+  try {
+    switch (platformKey) {
+      case "darwin-arm64":
+        return require.resolve("@nktnet/sync-request-curl-darwin-arm64");
+      case "darwin-x64":
+        return require.resolve("@nktnet/sync-request-curl-darwin-x64");
+      case "freebsd-arm64":
+        return require.resolve("@nktnet/sync-request-curl-freebsd-arm64");
+      case "freebsd-x64":
+        return require.resolve("@nktnet/sync-request-curl-freebsd-x64");
+      case "linux-arm64-gnu":
+        return require.resolve("@nktnet/sync-request-curl-linux-arm64-gnu");
+      case "linux-arm64-musl":
+        return require.resolve("@nktnet/sync-request-curl-linux-arm64-musl");
+      case "linux-x64-gnu":
+        return require.resolve("@nktnet/sync-request-curl-linux-x64-gnu");
+      case "linux-x64-musl":
+        return require.resolve("@nktnet/sync-request-curl-linux-x64-musl");
+      case "win32-arm64-msvc":
+        return require.resolve("@nktnet/sync-request-curl-win32-arm64-msvc");
+      case "win32-ia32-msvc":
+        return require.resolve("@nktnet/sync-request-curl-win32-ia32-msvc");
+      case "win32-x64-msvc":
+        return require.resolve("@nktnet/sync-request-curl-win32-x64-msvc");
+      default:
+        throw new Error(
+          `Unsupported native platform: ${platformKey satisfies never}`,
+        );
+    }
+  } catch (error) {
+    return handleMissingNativePackage(error);
+  }
+};
 
 export const getDefaultNativeResolver = (
   platformKey: NativePlatformKey,
   hasCommonJsRequire: boolean = typeof require === "function",
 ): NativeResolve =>
-  hasCommonJsRequire ? traceableNativeResolvers[platformKey] : nativeResolve;
+  hasCommonJsRequire
+    ? () => resolveTraceableNativePackage(platformKey)
+    : nativeResolve;
 
 export const findPackageRoot = (
   startDirectory: string,
@@ -271,10 +296,7 @@ export const resolveOptionalNativePackage = (
   try {
     return resolveNative(packageName);
   } catch (error) {
-    if (v.is(moduleNotFoundErrorSchema, error)) {
-      return undefined;
-    }
-    throw error;
+    return handleMissingNativePackage(error);
   }
 };
 

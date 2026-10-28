@@ -34,12 +34,39 @@ test("CommonJS release bundle exposes literal native package resolutions to file
     "win32-x64-msvc",
   ];
 
+  // The literal resolutions must be directly inside the guarded switch;
+  // putting them in nested functions changes how bundlers handle missing
+  // optional dependencies.
+  const resolverStart = bundle.indexOf("const resolveTraceableNativePackage =");
+  const resolverEnd = bundle.indexOf(
+    "const getDefaultNativeResolver =",
+    resolverStart,
+  );
+  assert.ok(resolverStart >= 0 && resolverEnd > resolverStart);
+  const resolverBlock = bundle.slice(resolverStart, resolverEnd);
+  const tryStart = resolverBlock.indexOf("try {");
+  const catchStart = resolverBlock.lastIndexOf("} catch (");
+  assert.ok(tryStart >= 0 && catchStart > tryStart);
+  const guardedResolvers = resolverBlock.slice(tryStart, catchStart);
+  assert.match(guardedResolvers, /try\s*\{\s*switch\s*\(platformKey\)\s*\{/);
+  assert.match(
+    resolverBlock,
+    /\}\s*catch\s*\((\w+)\)\s*\{\s*return\s+handleMissingNativePackage\(\1\)/,
+  );
+  assert.equal(
+    (guardedResolvers.match(/\brequire\.resolve\(/g) ?? []).length,
+    platforms.length,
+    "each supported platform must have exactly one traceable resolver",
+  );
+
   for (const platform of platforms) {
     const packageName = `@nktnet/sync-request-curl-${platform}`;
     assert.match(
-      bundle,
-      new RegExp(String.raw`\brequire\.resolve\(["']${packageName}["']\)`),
-      `${packageName} must be a literal require.resolve target in the published bundle`,
+      guardedResolvers,
+      new RegExp(
+        String.raw`case\s+["']${platform}["']:\s*return\s+require\.resolve\(["']${packageName}["']\)`,
+      ),
+      `${packageName} must remain a direct, literal require.resolve() inside the guarded switch`,
     );
   }
 });
