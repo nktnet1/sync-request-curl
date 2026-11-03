@@ -146,6 +146,8 @@ export const tlsCertificateTypeSchema = v.picklist([
  * for backwards compatibility. Client certificate format support depends on
  * the active libcurl TLS backend; the package's bundled AWS-LC build supports
  * PEM certificate/key pairs and PKCS#12 identities.
+ * Properties typed `never` prevent certificate options without `certFile` and
+ * prevent a separate `keyFile` with a PKCS#12 identity.
  *
  * @group Request
  */
@@ -208,6 +210,8 @@ export const httpAuthTypeSchema = v.picklist([
  * also reject `:` in usernames and ASCII controls in passwords. Bearer tokens
  * must use RFC 6750 b64token syntax. Negotiated authentication is not supported with
  * HEAD payloads; omit the payload or use preemptive Basic/Bearer authentication.
+ * Properties typed `never` prohibit mixing bearer authentication with
+ * username/password authentication.
  *
  * @group Request
  */

@@ -5,7 +5,7 @@ import { Application } from "typedoc";
 import { expect, test } from "vitest";
 import config from "#typedoc/typedoc.config";
 
-test("renders JSON serializers as callable properties in the API documentation", async () => {
+test("renders accurate public API types and callable signatures", async () => {
   const output = mkdtempSync(join(tmpdir(), "curl-json-docs-"));
   try {
     const app = await Application.bootstrapWithPlugins({
@@ -23,6 +23,66 @@ test("renders JSON serializers as callable properties in the API documentation",
     expect(markdown).toMatch(
       /^\| `options\??` \| \[`Options`\]\(#options\) \|/m,
     );
+
+    for (const signature of [
+      [
+        "function request(",
+        "   method: HttpVerb,",
+        "   url: string | URL,",
+        "   options?: Options",
+        "): Response;",
+      ].join("\n"),
+      "getBody(encoding: BufferEncoding): string;",
+      "getJSON<T = any>(encoding?: BufferEncoding): T;",
+      "getHeaders(userHeaders: Headers): Headers;",
+      "setBoundary(boundary: string): void;",
+      "new CurlError(code: number, message: string): CurlError;",
+      [
+        "new RequestError(",
+        "   code: RequestErrorCode,",
+        "   message: string,",
+        "   options?: ErrorOptions",
+        "): RequestError;",
+      ].join("\n"),
+      [
+        "new ResponseError(",
+        "   statusCode: number,",
+        "   headers: Headers,",
+        "   body: Buffer,",
+        "   encoding?: BufferEncoding,",
+        "   url?: string",
+        "): ResponseError;",
+      ].join("\n"),
+    ]) {
+      expect(markdown).toContain(signature);
+    }
+
+    const appendStart = markdown.indexOf("append(\n");
+    const appendEnd = markdown.indexOf("): void;", appendStart);
+    expect(appendStart).toBeGreaterThanOrEqual(0);
+    expect(appendEnd).toBeGreaterThan(appendStart);
+    const appendSignature = markdown.slice(appendStart, appendEnd);
+    for (const parameter of [
+      "key: string,",
+      "value: string | number | boolean | Buffer<ArrayBufferLike> | Blob,",
+      "options?:",
+      "filename?: string;",
+      "contentType?: string;",
+      "knownLength?: number;",
+      "header?: string;",
+    ]) {
+      expect(appendSignature).toContain(parameter);
+    }
+
+    for (const excludedProperty of [
+      "bearer?: never;",
+      "username?: never;",
+      "password?: never;",
+      "type?: never;",
+      "keyFile?: never;",
+    ]) {
+      expect(markdown).toContain(excludedProperty);
+    }
 
     for (const type of ["JsonLike", "NestedJsonLike"]) {
       expect(markdown).toContain(`toJSON: () => ${type};`);

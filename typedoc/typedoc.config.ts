@@ -46,6 +46,7 @@ const config = {
   propertyMembersFormat: "table",
   typeAliasPropertiesFormat: "list",
   expandObjects: true,
+  expandParameters: true,
   useCodeBlocks: true,
   categorizeByGroup: false,
   groupOrder: ["Request", "Response", "Multipart", "Errors", "*"],

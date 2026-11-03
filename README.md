@@ -220,9 +220,9 @@ identities; HTTP/3-enabled bundled targets use AWS-LC. `minVersion` and
 
 ```ts
 function request(
-   method,
-   url,
-   options?
+   method: HttpVerb,
+   url: string | URL,
+   options?: Options
 ): Response;
 ```
 
@@ -537,6 +537,8 @@ Existing top-level `caFile` and `rejectUnauthorized` options remain separate
 for backwards compatibility. Client certificate format support depends on
 the active libcurl TLS backend; the package's bundled AWS-LC build supports
 PEM certificate/key pairs and PKCS#12 identities.
+Properties typed `never` prevent certificate options without `certFile` and
+prevent a separate `keyFile` with a PKCS#12 identity.
 
 ##### Type Declaration
 
@@ -588,6 +590,8 @@ Usernames cannot contain ASCII control characters. Basic, Digest, and Any
 also reject `:` in usernames and ASCII controls in passwords. Bearer tokens
 must use RFC 6750 b64token syntax. Negotiated authentication is not supported with
 HEAD payloads; omit the payload or use preemptive Basic/Bearer authentication.
+Properties typed `never` prohibit mixing bearer authentication with
+username/password authentication.
 
 ***
 
@@ -640,7 +644,7 @@ callbacks receive this buffered response before the next attempt begins.
 ###### Call Signature
 
 ```ts
-getBody(encoding): string;
+getBody(encoding: BufferEncoding): string;
 ```
 
 Read the response body as a string using the requested encoding.
@@ -714,7 +718,7 @@ This is the normal public response shape for the completed GET request.
 ###### Call Signature
 
 ```ts
-getBody(encoding): string;
+getBody(encoding: BufferEncoding): string;
 ```
 
 Read the response body as a string using the requested encoding.
@@ -752,7 +756,7 @@ Read the response body as a [`Buffer`](https://nodejs.org/api/buffer.html#class-
 ###### getJSON()
 
 ```ts
-getJSON<T>(encoding?): T;
+getJSON<T = any>(encoding?: BufferEncoding): T;
 ```
 
 Parse the buffered response body as JSON.
@@ -1090,9 +1094,16 @@ new FormData(): FormData;
 
 ```ts
 append(
-   key,
-   value,
-   options?
+   key: string,
+   value: string | number | boolean | Buffer<ArrayBufferLike> | Blob,
+   options?:
+  | string
+  | {
+  filename?: string;
+  contentType?: string;
+  knownLength?: number;
+  header?: string;
+}
 ): void;
 ```
 
@@ -1137,7 +1148,7 @@ Return multipart request headers, merged with optional caller headers.
 ###### Call Signature
 
 ```ts
-getHeaders(userHeaders): Headers;
+getHeaders(userHeaders: Headers): Headers;
 ```
 
 Return multipart request headers, merged with optional caller headers.
@@ -1167,7 +1178,7 @@ Return the boundary used to serialize this form.
 ###### setBoundary()
 
 ```ts
-setBoundary(boundary): void;
+setBoundary(boundary: string): void;
 ```
 
 Set the multipart boundary used by headers and serialization.
@@ -1258,7 +1269,7 @@ The numeric `code` is retained for compatibility with earlier
 ###### Constructor
 
 ```ts
-new CurlError(code, message): CurlError;
+new CurlError(code: number, message: string): CurlError;
 ```
 
 ###### Parameters
@@ -1298,9 +1309,9 @@ Transport-neutral request failure created by the TypeScript request layer.
 
 ```ts
 new RequestError(
-   code,
-   message,
-   options?
+   code: RequestErrorCode,
+   message: string,
+   options?: ErrorOptions
 ): RequestError;
 ```
 
@@ -1345,11 +1356,11 @@ available on the error object.
 
 ```ts
 new ResponseError(
-   statusCode,
-   headers,
-   body,
-   encoding?,
-   url?
+   statusCode: number,
+   headers: Headers,
+   body: Buffer,
+   encoding?: BufferEncoding,
+   url?: string
 ): ResponseError;
 ```
 
