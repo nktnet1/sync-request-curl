@@ -1,10 +1,13 @@
 import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { digestFields } from "#tests/app/regression-auth-digest";
 import {
   later,
   responseBodyDelay,
   sendResponseBody,
 } from "#tests/app/regression-utils";
+
+export { digestFields } from "#tests/app/regression-auth-digest";
 
 const realm = "transport-regression";
 const basic = `Basic ${Buffer.from("user:secret").toString("base64")}`;
@@ -13,42 +16,6 @@ const basic = `Basic ${Buffer.from("user:secret").toString("base64")}`;
 // (including Windows SSPI); do not replace it with an incompatible challenge.
 const md5 = (value: string): string =>
   createHash("md5").update(value).digest("hex"); // NOSONAR: reviewed test-only legacy Digest computation.
-
-export const digestFields = (authorization: string): Record<string, string> => {
-  const fields: Record<string, string> = Object.create(null);
-  if (!authorization.startsWith("Digest ")) {
-    return fields;
-  }
-  // Parse names and values separately to keep both patterns small. Sticky
-  // matching never skips malformed input. The value alternatives are disjoint,
-  // as are the quoted-string escape cases, so long invalid inputs stay linear.
-  const parameterName = /[ \t]*([\w-]+)[ \t]*=[ \t]*/y;
-  const parameterValue =
-    /(?:"((?:[^"\\\r\n]|\\[^\r\n])*)"|([^",\s]+))[ \t]*(?:,|$)/y;
-  let offset = "Digest ".length;
-  while (offset < authorization.length) {
-    parameterName.lastIndex = offset;
-    const name = parameterName.exec(authorization);
-    if (!name) {
-      return {};
-    }
-    const key = name[1].toLowerCase();
-    if (Object.hasOwn(fields, key)) {
-      return {};
-    }
-    parameterValue.lastIndex = parameterName.lastIndex;
-    const value = parameterValue.exec(authorization);
-    if (!value) {
-      return {};
-    }
-    fields[key] =
-      value[1] === undefined
-        ? value[2]
-        : value[1].replace(/\\([^\r\n])/g, "$1");
-    offset = parameterValue.lastIndex;
-  }
-  return fields;
-};
 
 const createAuthChallenge = (
   scheme: string,

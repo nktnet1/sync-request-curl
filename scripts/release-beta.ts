@@ -24,7 +24,7 @@ Default: continue the manifest's v5 beta series, update package.json, and run re
            push the current branch and tag to origin, triggering release CI.
 
 Requires a clean Git checkout, Node 24.14+ or 26+, pnpm, Rust, and native build tools.
-Release publishing runs within Native prebuilds on a trusted tag push.
+Release publishing runs in the Publish workflow on a trusted tag push.
 Registry/network errors abort; they are never treated as an empty version list.
 After a failed check, the version change remains available for inspection.
 Run --publish from a clean checkout, not after an uncommitted preparation run.`;
@@ -111,14 +111,23 @@ const runReleaseChecks = (
   }
 };
 
-const publishPreparedRelease = (
-  root: string,
-  git: GitCommand,
-  manifestPath: string,
-  branch: string,
-  version: string,
-  tag: string,
-): void => {
+interface PreparedRelease {
+  root: string;
+  git: GitCommand;
+  manifestPath: string;
+  branch: string;
+  version: string;
+  tag: string;
+}
+
+const publishPreparedRelease = ({
+  root,
+  git,
+  manifestPath,
+  branch,
+  version,
+  tag,
+}: PreparedRelease): void => {
   // Do not accidentally include edits made by tools or a concurrent editor.
   const status = git(["status", "--porcelain"]);
   if (status !== "M package.json" && status !== " M package.json") {
@@ -143,7 +152,7 @@ const publishPreparedRelease = (
     ],
     { cwd: root },
   );
-  console.log(`Pushed ${tag}. Wait for the Native prebuilds publish job to finish, then run:
+  console.log(`Pushed ${tag}. Wait for the Publish workflow to finish, then run:
   pnpm smoke:release-registry --registry=https://registry.npmjs.org --version=${version} --matrix
 
 Consumer prebuilt: npm install sync-request-curl@${version}
@@ -182,7 +191,7 @@ const main = (): void => {
     );
     return;
   }
-  publishPreparedRelease(root, git, manifestPath, branch, version, tag);
+  publishPreparedRelease({ root, git, manifestPath, branch, version, tag });
 };
 
 main();

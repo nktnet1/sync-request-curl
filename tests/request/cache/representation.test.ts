@@ -63,11 +63,11 @@ describe.each(["file", "memory"] as const)(
           body: original,
           responseUrl: key,
         },
-        { requestHeaders: requestHeaders },
+        { requestHeaders },
       );
       const headers = ["X-Single: value", "X-Multi: one", "X-Multi: two"];
       const lookup = lookupCache(key, cache, {
-        headers: headers,
+        headers,
         now: 1,
         decompress: true,
         policy: {
@@ -97,7 +97,7 @@ describe.each(["file", "memory"] as const)(
       expect(lookup.useCachedResponse).toBe(true);
       expect(lookup.entry?.requestHeaders).toEqual(requestHeaders);
       expect(
-        lookupCache(key, cache, { headers: headers, now: 2 }).useCachedResponse,
+        lookupCache(key, cache, { headers, now: 2 }).useCachedResponse,
       ).toBe(true);
     });
 

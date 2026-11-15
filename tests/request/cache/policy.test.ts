@@ -70,7 +70,7 @@ const preparePermanentRedirectLookup = (
     body: Buffer.alloc(0),
     responseUrl: url,
   });
-  return lookupCache(url, "file", { headers: requestHeaders, now: now });
+  return lookupCache(url, "file", { headers: requestHeaders, now });
 };
 
 const writeBucket = (
@@ -340,7 +340,7 @@ describe("file cache policy", () => {
           "iF-uNmOdIfIeD-sInCe: Tue, 20 Oct 2015 07:28:00 GMT",
         ]) {
           const headers = [header];
-          const lookup = lookupCache(url, cache, { headers: headers, now: 1 });
+          const lookup = lookupCache(url, cache, { headers, now: 1 });
           expect(lookup.entry).toBeDefined();
           expect(lookup.useCachedResponse).toBe(false);
           expect(lookup.isRevalidation).toBe(false);

@@ -8,8 +8,8 @@ The request function is the package default export. ESM consumers can import
 `FormData` and public types from the root entry:
 
 ```typescript
-import request, { FormData } from 'sync-request-curl';
-import type { Options, Response } from 'sync-request-curl';
+import request, { FormData } from "sync-request-curl";
+import type { Options, Response } from "sync-request-curl";
 ```
 
 <details closed>
@@ -20,57 +20,57 @@ import type { Options, Response } from 'sync-request-curl';
 `GET` request without options
 
 ```typescript
-import request from 'sync-request-curl';
+import request from "sync-request-curl";
 
-const res = request('GET', 'https://comp1531namesages.alwaysdata.net');
-console.log('Status Code:', res.statusCode);
+const res = request("GET", "https://comp1531namesages.alwaysdata.net");
+console.log("Status Code:", res.statusCode);
 const jsonBody = JSON.parse(res.body.toString());
-console.log('Returned JSON object:', jsonBody);
+console.log("Returned JSON object:", jsonBody);
 ```
 
 **`GET`** request with query string parameters
 
 ```typescript
-import request from 'sync-request-curl';
+import request from "sync-request-curl";
 
-const res = request('GET', 'https://comp1531forum.alwaysdata.net/echo/echo', {
-  qs: { message: 'Hello, world!' },
+const res = request("GET", "https://comp1531forum.alwaysdata.net/echo/echo", {
+  qs: { message: "Hello, world!" },
 });
-console.log('Status Code:', res.statusCode);
+console.log("Status Code:", res.statusCode);
 const jsonBody = JSON.parse(res.body.toString());
-console.log('Returned JSON object:', jsonBody);
+console.log("Returned JSON object:", jsonBody);
 ```
 
 **`POST`** request with headers and JSON payload
 
 ```typescript
-import request from 'sync-request-curl';
+import request from "sync-request-curl";
 
-const res = request('POST', 'https://comp1531quiz.alwaysdata.net/quiz/create', {
+const res = request("POST", "https://comp1531quiz.alwaysdata.net/quiz/create", {
   headers: { lab08quizsecret: "bruno's fight club" },
   json: {
-    quizTitle: 'New Quiz',
-    quizSynopsis: 'Sync request curl example',
+    quizTitle: "New Quiz",
+    quizSynopsis: "Sync request curl example",
   },
 });
 
-console.log('Status Code:', res.statusCode);
+console.log("Status Code:", res.statusCode);
 const jsonBody = JSON.parse(res.body.toString());
-console.log('Returned JSON Object:', jsonBody);
+console.log("Returned JSON Object:", jsonBody);
 ```
 
 **`POST`** request for file upload using multipart/form-data
 
 ```typescript
-import { readFileSync } from 'node:fs';
-import request, { FormData } from 'sync-request-curl';
+import { readFileSync } from "node:fs";
+import request, { FormData } from "sync-request-curl";
 
 const form = new FormData();
-form.append('example-file', readFileSync('./path/to/file.txt'), 'file.txt');
-form.append('example-content', 'Example Content!');
+form.append("example-file", readFileSync("./path/to/file.txt"), "file.txt");
+form.append("example-content", "Example Content!");
 
-const res = request('POST', 'https://example.com/upload', { form });
-console.log('Status Code:', res.statusCode);
+const res = request("POST", "https://example.com/upload", { form });
+console.log("Status Code:", res.statusCode);
 ```
 
 `FormData` also exposes the synchronous Node `form-data` helpers used by
@@ -86,22 +86,22 @@ provided.
 Proxy request
 
 ```javascript
-import request from 'sync-request-curl';
+import request from "sync-request-curl";
 
-const res = request('GET', 'https://ipinfo.io/json', {
+const res = request("GET", "https://ipinfo.io/json", {
   proxy: {
-    url: 'http://your-proxy-url:port',
-    username: 'proxyUsername',
-    password: 'proxyPassword',
-    auth: 'any',
-    noProxy: ['localhost', '127.0.0.0/8'],
+    url: "http://your-proxy-url:port",
+    username: "proxyUsername",
+    password: "proxyPassword",
+    auth: "any",
+    noProxy: ["localhost", "127.0.0.0/8"],
     headers: {
-      'X-Proxy-Trace': 'trace-id',
+      "X-Proxy-Trace": "trace-id",
     },
   },
 });
 
-console.log('Status Code:', res.statusCode);
+console.log("Status Code:", res.statusCode);
 const jsonBody = res.getJSON();
 console.log(jsonBody);
 ```
@@ -118,18 +118,18 @@ libcurl 7.86.0 or newer.
 Mutual TLS with a client certificate
 
 ```typescript
-import request from 'sync-request-curl';
+import request from "sync-request-curl";
 
-const res = request('GET', 'https://service.example', {
-  caFile: './service-ca.pem',
+const res = request("GET", "https://service.example", {
+  caFile: "./service-ca.pem",
   tls: {
-    certFile: './client.pem',
-    keyFile: './client-key.pem',
-    minVersion: 'TLSv1.2',
+    certFile: "./client.pem",
+    keyFile: "./client-key.pem",
+    minVersion: "TLSv1.2",
   },
 });
 
-console.log('Status Code:', res.statusCode);
+console.log("Status Code:", res.statusCode);
 ```
 
 For a PKCS#12 identity, set `certType: 'p12'` and provide the `.p12` file as

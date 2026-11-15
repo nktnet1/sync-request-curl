@@ -31,7 +31,7 @@ export interface AbsoluteUrlParts {
 const isValidUrlScheme = (url: string, schemeEnd: number): boolean => {
   if (schemeEnd <= 0 || !isAsciiLetter(url.codePointAt(0))) return false;
   for (let i = 1; i < schemeEnd; i += 1) {
-    if (!isSchemeCharacter(url.charCodeAt(i))) return false;
+    if (!isSchemeCharacter(url.codePointAt(i) as number)) return false;
   }
   return true;
 };

@@ -11,6 +11,7 @@ mod options;
 mod rate_limit;
 mod request;
 mod request_config;
+mod request_limits;
 mod response_tracking;
 mod types;
 

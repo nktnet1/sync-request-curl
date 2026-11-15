@@ -10,14 +10,13 @@ use crate::callbacks::{header_callback, request_debug_callback, transfer_progres
 use crate::curl_utils::{configure_default_ca, curl_header_string, keep_first_error, set_string_option, CURLE_NOT_BUILT_IN};
 use crate::mime::{build_mime, Mime};
 use crate::options::{header_name_matches, needs_auth_response_tracking, parse_auth, parse_http_version, parse_ip_resolve, parse_tls_cert_type, parse_tls_version_range, AuthTarget};
+use crate::request_limits::configure_request_limits;
 use crate::types::NativeRequestOptions;
 
 const CURLOPT_XOAUTH2_BEARER: CURLoption = CURLOPTTYPE_OBJECTPOINT + 220;
 const CURLOPT_SUPPRESS_CONNECT_HEADERS: CURLoption = 265;
 const CURLOPT_HEADEROPT: CURLoption = 229;
-const CURLOPT_TCP_KEEPCNT: CURLoption = 326;
 const CURLHEADER_SEPARATE: c_long = 1;
-const TCP_KEEP_COUNT_UNSUPPORTED_ERROR: &str = "TCP keepalive probeCount requires libcurl 8.9.0 or newer and platform support";
 
 #[derive(Default)]
 struct HeaderList(*mut curl_slist);
@@ -348,54 +347,8 @@ impl RequestSetup {
   }
 
   fn configure_limits(&mut self, options: &NativeRequestOptions) {
-    let curl = self.curl;
-    let code = &mut self.code;
-    let verify = options.reject_unauthorized.unwrap_or(true);
-    for (option, value) in [
-      (curl_sys::CURLOPT_SSL_VERIFYPEER, Some(if verify { 1 } else { 0 })),
-      (curl_sys::CURLOPT_SSL_VERIFYHOST, Some(if verify { 2 } else { 0 })),
-      (curl_sys::CURLOPT_LOCALPORT, options.local_port),
-      (curl_sys::CURLOPT_LOCALPORTRANGE, options.local_port_range),
-      (
-        curl_sys::CURLOPT_TCP_KEEPALIVE,
-        Some(if options.tcp_keep_alive.unwrap_or(false) { 1 } else { 0 }),
-      ),
-      (curl_sys::CURLOPT_TCP_KEEPIDLE, options.tcp_keep_idle),
-      (curl_sys::CURLOPT_TCP_KEEPINTVL, options.tcp_keep_interval),
-    ] {
-      if let Some(value) = value {
-        keep_first_error(code, unsafe {
-          curl_sys::curl_easy_setopt(curl, option, value as c_long)
-        });
-      }
-    }
-    for (option, value) in [
-      (
-        curl_sys::CURLOPT_MAX_RECV_SPEED_LARGE,
-        options.max_download_speed,
-      ),
-      (
-        curl_sys::CURLOPT_MAX_SEND_SPEED_LARGE,
-        options.max_upload_speed,
-      ),
-    ] {
-      if let Some(value) = value {
-        keep_first_error(code, unsafe {
-          curl_sys::curl_easy_setopt(curl, option, value as curl_off_t)
-        });
-      }
-    }
-    if let Some(value) = options.tcp_keep_count {
-      let next = unsafe {
-        curl_sys::curl_easy_setopt(curl, CURLOPT_TCP_KEEPCNT, value as c_long)
-      };
-      if *code == CURLE_OK
-        && (next == curl_sys::CURLE_UNKNOWN_OPTION || next == CURLE_NOT_BUILT_IN)
-      {
-        self.transport_error_override = Some(TCP_KEEP_COUNT_UNSUPPORTED_ERROR);
-      }
-      keep_first_error(code, next);
-    }
+    self.transport_error_override =
+      configure_request_limits(self.curl, &mut self.code, options);
   }
 
   fn configure_headers(&mut self, options: &NativeRequestOptions) -> Result<()> {

@@ -1,11 +1,18 @@
 import type { Blob } from "node:buffer";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { performance } from "node:perf_hooks";
-import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 
-const blobReaderWorkerUrl = new URL(
-  "../../dist/internal/blob-reader-worker.cjs",
-  import.meta.url,
+// Resolve the package root rather than a path relative to this source module.
+// Bundlers relocate this module from src/form-data/ to dist/index.cjs, so a
+// relative URL silently points outside the published package after bundling.
+const packageManifest = createRequire(import.meta.url).resolve(
+  "sync-request-curl/package.json",
+);
+const blobReaderWorkerPath = join(
+  dirname(packageManifest),
+  "dist/internal/blob-reader-worker.cjs",
 );
 
 // A bootstrap catches missing/broken worker assets before the reader can signal.
@@ -37,7 +44,7 @@ export const blobToBufferSync = (blob: Blob): Buffer => {
       blob,
       data,
       state: stateBuffer,
-      readerPath: fileURLToPath(blobReaderWorkerUrl),
+      readerPath: blobReaderWorkerPath,
     },
   });
   // Startup errors arrive asynchronously, while this thread waits synchronously.

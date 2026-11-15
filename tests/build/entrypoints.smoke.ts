@@ -127,10 +127,12 @@ for (const format of ["module", "commonjs"] as const) {
     const imports =
       format === "module"
         ? `import request, { CurlError, FormData, RequestError, ResponseError } from 'sync-request-curl';
-           import assert from 'node:assert/strict';`
+           import assert from 'node:assert/strict';
+           import { Blob } from 'node:buffer';`
         : `const request = require('sync-request-curl');
            const { CurlError, FormData, RequestError, ResponseError } = request;
-           const assert = require('node:assert/strict');`;
+           const assert = require('node:assert/strict');
+           const { Blob } = require('node:buffer');`;
     runEntrypointCheck(
       format,
       `${imports}
@@ -148,6 +150,8 @@ for (const format of ["module", "commonjs"] as const) {
            form.setBoundary('entrypoint-boundary');
            form.append('message', 'hello');
            form.append('count', 3);
+           form.append('blob', new Blob(['bundled blob']), 'blob.txt');
+           assert.ok(form.getBuffer().includes(Buffer.from('bundled blob')));
            assert.equal(form.getBoundary(), 'entrypoint-boundary');
            assert.equal(form.getHeaders()['content-type'], 'multipart/form-data; boundary=entrypoint-boundary');
            assert.equal(form.getLengthSync(), form.getBuffer().length);

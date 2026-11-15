@@ -70,7 +70,6 @@ Without further progress, this allowance expires normally; a server that never
 responds still times out after the remaining allowance and inactivity budget expire.
 `overallTimeout` includes both throttling and authentication and is never extended.
 
-
 ### Proxy request headers
 
 `proxy.headers` cannot supply `Content-Length` or `Transfer-Encoding`, including

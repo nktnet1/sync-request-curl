@@ -90,6 +90,36 @@ const prepareRevalidation = (
   return { revalidationHeaders, isRevalidation };
 };
 
+interface SelectedCacheLookup {
+  matched: CacheLookup;
+  entry: CacheEntry;
+  headers: string[];
+  requestHeaders: NormalizedRequestHeaders;
+  now: number;
+  policy: Pick<Options, "isExpired">;
+}
+
+const selectCachedResponse = ({
+  matched,
+  entry,
+  headers,
+  requestHeaders,
+  now,
+  policy,
+}: SelectedCacheLookup): CacheLookup => {
+  const defaultExpired = !isFresh(entry, requestHeaders, now);
+  const expired = policy.isExpired
+    ? policy.isExpired(toCachedResponse(entry), defaultExpired)
+    : defaultExpired;
+  if (!expired) {
+    return { ...matched, useCachedResponse: true };
+  }
+  if (!hasValidator(entry)) {
+    return matched;
+  }
+  return { ...matched, ...prepareRevalidation(entry, headers) };
+};
+
 export const prepareCacheLookup = ({
   method,
   url,
@@ -128,17 +158,12 @@ export const prepareCacheLookup = ({
   const matched: CacheLookup = { ...base, entry };
   if (bypassCachedResponse(headers, requestHeaders)) return matched;
 
-  const defaultExpired = !isFresh(entry, requestHeaders, now);
-  const expired = policy.isExpired
-    ? policy.isExpired(toCachedResponse(entry), defaultExpired)
-    : defaultExpired;
-  if (!expired) {
-    return { ...matched, useCachedResponse: true };
-  }
-
-  if (!hasValidator(entry)) {
-    return matched;
-  }
-
-  return { ...matched, ...prepareRevalidation(entry, headers) };
+  return selectCachedResponse({
+    matched,
+    entry,
+    headers,
+    requestHeaders,
+    now,
+    policy,
+  });
 };

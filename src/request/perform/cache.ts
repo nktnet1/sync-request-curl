@@ -1,24 +1,22 @@
-import { assertSupportedHttpUrl, splitAbsoluteUrl } from "#/http/url";
 import {
   type CacheLookup,
   canCacheResponse,
-  invalidateCache,
   prepareCacheLookup,
   refreshCacheEntry,
   storeCacheResponse,
   updateCacheFromHead,
 } from "#/request/cache";
+import { canUseRequestCache, getRequestCacheKey } from "#/request/cache/key";
 import {
-  canUseRequestCache,
-  getRequestCacheInvalidationKeys,
-  getRequestCacheKey,
-} from "#/request/cache/key";
+  invalidateMutationCache,
+  invalidateRequestCache,
+} from "#/request/perform/invalidation";
 import {
   createRequestResult,
   type RequestResult,
 } from "#/request/perform/transport";
 import type { PreparedRequest } from "#/request/prepare";
-import type { Options, Response, UppercaseHttpVerb } from "#/types/definition";
+import type { Options, UppercaseHttpVerb } from "#/types/definition";
 
 interface RequestCacheContext {
   key: string;
@@ -49,50 +47,6 @@ export const prepareRequestCache = (
   });
 
   return { key, mode, lookup, requestTimestamp };
-};
-
-const invalidateRequestCache = (
-  url: string,
-  options: Options,
-  mode: NonNullable<Options["cache"]>,
-): void => {
-  for (const key of getRequestCacheInvalidationKeys(url, options)) {
-    invalidateCache(key, mode);
-  }
-};
-
-const getRelatedInvalidationUrl = (
-  requestUrl: string,
-  response: Response,
-  name: string,
-): string | undefined => {
-  const value = response.headers[name];
-  if (typeof value !== "string") return undefined;
-  try {
-    const resolved = new URL(value, response.url);
-    if (resolved.origin !== new URL(requestUrl).origin) return undefined;
-    // Keep absolute encoded-dot spellings so both native interpretations are
-    // invalidated. Relative references use the same base as redirect handling.
-    const target = splitAbsoluteUrl(value) ? value : resolved.href;
-    assertSupportedHttpUrl(target);
-    return target;
-  } catch {
-    // Invalid metadata must not turn a completed write into a request failure.
-    return undefined;
-  }
-};
-
-const invalidateMutationCache = (
-  url: string,
-  response: Response,
-  options: Options,
-  mode: NonNullable<Options["cache"]>,
-): void => {
-  invalidateRequestCache(url, options, mode);
-  for (const name of ["location", "content-location"]) {
-    const related = getRelatedInvalidationUrl(url, response, name);
-    if (related !== undefined) invalidateRequestCache(related, options, mode);
-  }
 };
 
 interface HeadCacheUpdate {
