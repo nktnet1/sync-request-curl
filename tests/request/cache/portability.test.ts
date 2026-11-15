@@ -23,13 +23,13 @@ describe("file cache portability", () => {
     vi.resetModules();
 
     const { prepareCacheLookup } = await import("#/request/cache");
-    const lookup = prepareCacheLookup(
-      "GET",
-      `https://cache.test/no-getuid-${process.pid}-${Date.now()}`,
-      [],
-      "file",
-      0,
-    );
+    const lookup = prepareCacheLookup({
+      method: "GET",
+      url: `https://cache.test/no-getuid-${process.pid}-${Date.now()}`,
+      headers: [],
+      cache: "file",
+      now: 0,
+    });
 
     expect(lookup.entry).toBeUndefined();
   });

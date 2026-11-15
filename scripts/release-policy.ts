@@ -32,14 +32,11 @@ export interface ReleaseArtifact {
   manifest: Record<string, unknown>;
 }
 
-/** Validate the complete release before publishing any package. */
-export const planRelease = (
+const indexReleaseArtifacts = (
   artifacts: ReleaseArtifact[],
   version: string,
-): ReleaseArtifact[] => {
-  parseReleaseVersion(version);
-  const nativeNames = supportedPlatformKeys.map(getNativePackageName);
-  const expected = [...nativeNames, "sync-request-curl"];
+  expected: string[],
+): Map<string, ReleaseArtifact> => {
   if (artifacts.length !== expected.length) {
     throw new Error(
       `Expected ${expected.length} release packages, found ${artifacts.length}`,
@@ -59,23 +56,44 @@ export const planRelease = (
       throw new Error(`Version mismatch for ${name}`);
     byName.set(name, artifact);
   }
-  const main = byName.get("sync-request-curl");
+  return byName;
+};
+
+const assertNativeDependencies = (
+  main: ReleaseArtifact | undefined,
+  nativeNames: string[],
+  version: string,
+): void => {
   const optional = main?.manifest.optionalDependencies;
   if (!optional || typeof optional !== "object" || Array.isArray(optional)) {
     throw new Error("Main package is missing optional native dependencies");
   }
   const entries = Object.entries(optional);
-  if (
-    entries.length !== nativeNames.length ||
-    entries.some(
-      ([name, dependencyVersion]) =>
-        !nativeNames.includes(name) || dependencyVersion !== version,
-    )
-  ) {
+  const invalidDependency = entries.some(
+    ([name, dependencyVersion]) =>
+      !nativeNames.includes(name) || dependencyVersion !== version,
+  );
+  if (entries.length !== nativeNames.length || invalidDependency) {
     throw new Error(
       "Main package must pin the complete native matrix to the release version",
     );
   }
+};
+
+/** Validate the complete release before publishing any package. */
+export const planRelease = (
+  artifacts: ReleaseArtifact[],
+  version: string,
+): ReleaseArtifact[] => {
+  parseReleaseVersion(version);
+  const nativeNames = supportedPlatformKeys.map(getNativePackageName);
+  const expected = [...nativeNames, "sync-request-curl"];
+  const byName = indexReleaseArtifacts(artifacts, version, expected);
+  assertNativeDependencies(
+    byName.get("sync-request-curl"),
+    nativeNames,
+    version,
+  );
   return expected.map((name) => {
     const artifact = byName.get(name);
     if (!artifact) throw new Error(`Missing package: ${name}`);

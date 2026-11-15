@@ -94,26 +94,33 @@ export const getRequestCacheInvalidationKeys = (
   ];
 };
 
+const isCacheSafeRequest = (headers: string[], options: Options): boolean => {
+  const forbiddenHeaders = [
+    "host",
+    "authorization",
+    "cookie",
+    "proxy-authorization",
+  ];
+  if (forbiddenHeaders.some((header) => hasRequestHeader(headers, header))) {
+    return false;
+  }
+  const bodyKeys = ["body", "json", "form", "auth"] as const;
+  return bodyKeys.every((key) => options[key] === undefined);
+};
+
 /** Do not persist personalized data or mix trust/routing policies in a cache. */
 export const canUseRequestCache = (
   url: string,
   headers: string[],
   options: Options,
 ): boolean => {
-  return (
-    splitAbsoluteUrl(url) !== undefined &&
-    !hasUrlCredentials(url) &&
-    !hasRequestHeader(headers, "host") &&
-    !hasRequestHeader(headers, "authorization") &&
-    !hasRequestHeader(headers, "cookie") &&
-    !hasRequestHeader(headers, "proxy-authorization") &&
-    options.body === undefined &&
-    options.json === undefined &&
-    options.form === undefined &&
-    options.auth === undefined &&
-    // Mixed encoded dots and literal parents can reach different targets on
-    // different builds. Bypass reads/stores and invalidate both possibilities.
-    getRequestCacheInvalidationKeys(url, options).length === 1 &&
-    !usesCustomTransport(options)
-  );
+  if (splitAbsoluteUrl(url) === undefined || hasUrlCredentials(url)) {
+    return false;
+  }
+  if (!isCacheSafeRequest(headers, options) || usesCustomTransport(options)) {
+    return false;
+  }
+  // Different curl builds can normalize encoded dots and literal parents to
+  // different targets. Bypass reuse when invalidation spans multiple buckets.
+  return getRequestCacheInvalidationKeys(url, options).length === 1;
 };

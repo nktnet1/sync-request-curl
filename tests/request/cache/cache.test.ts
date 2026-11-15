@@ -158,21 +158,21 @@ test.for([
     const url = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
     const cacheNamespace = "legacy-cache-regression";
     const now = Date.now();
-    storeCacheResponse(
-      JSON.stringify(
+    storeCacheResponse({
+      url: JSON.stringify(
         version === 3 ? [cacheNamespace, 3, url, url] : [cacheNamespace, url],
       ),
-      {},
-      now,
-      now,
-      {
+      requestHeaders: {},
+      requestTimestamp: now,
+      responseTimestamp: now,
+      response: {
         statusCode: 200,
         headers: { "cache-control": "max-age=3600" },
         body: Buffer.from("wrong cached resource"),
         responseUrl: url.replace("/resource", "/dir/%2e%2e/resource"),
       },
-      cache,
-    );
+      cache: cache,
+    });
     const response = request("GET", url, { cache, cacheNamespace });
     expect(response.getJSON()).toMatchObject({ hits: 1 });
     expect(response.url).toBe(url);

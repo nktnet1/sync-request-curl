@@ -40,12 +40,12 @@ const seed = (
         ? value
         : [value];
   }
-  storeCacheResponse(
-    key,
-    storedHeaders,
-    now,
-    now,
-    {
+  storeCacheResponse({
+    url: key,
+    requestHeaders: storedHeaders,
+    requestTimestamp: now,
+    responseTimestamp: now,
+    response: {
       statusCode: 200,
       headers: {
         "cache-control": "max-age=3600",
@@ -57,9 +57,9 @@ const seed = (
       body,
       responseUrl: url,
     },
-    cache,
-    { decompress: options.gzip !== false },
-  );
+    cache: cache,
+    options: { decompress: options.gzip !== false },
+  });
   return key;
 };
 
@@ -78,14 +78,16 @@ const lookupStored = (
   headers: Record<string, string> = {},
   options: Options = {},
 ) =>
-  prepareCacheLookup(
-    "GET",
-    getRequestCacheKey(url, options),
-    Object.entries(headers).map(([name, value]) => `${name}: ${value}`),
-    cache,
-    Date.now(),
-    options.gzip !== false,
-  );
+  prepareCacheLookup({
+    method: "GET",
+    url: getRequestCacheKey(url, options),
+    headers: Object.entries(headers).map(
+      ([name, value]) => `${name}: ${value}`,
+    ),
+    cache: cache,
+    now: Date.now(),
+    decompress: options.gzip !== false,
+  });
 
 const respond = (
   url: string,
@@ -305,7 +307,14 @@ describe.each(["file", "memory"] as const)(
         });
         expect(response.statusCode).toBe(304);
         expect(response.body).toHaveLength(0);
-        expect(prepareCacheLookup("GET", key, [], cache).entry).toBeUndefined();
+        expect(
+          prepareCacheLookup({
+            method: "GET",
+            url: key,
+            headers: [],
+            cache: cache,
+          }).entry,
+        ).toBeUndefined();
       },
     );
 
@@ -366,7 +375,14 @@ describe.each(["file", "memory"] as const)(
         }).statusCode,
       ).toBe(304);
       expect(canCache).toHaveBeenCalledTimes(1);
-      expect(prepareCacheLookup("GET", key, [], cache).entry).toBeUndefined();
+      expect(
+        prepareCacheLookup({
+          method: "GET",
+          url: key,
+          headers: [],
+          cache: cache,
+        }).entry,
+      ).toBeUndefined();
     });
 
     test("canCache can explicitly approve a changed no-store policy", () => {
@@ -426,9 +442,12 @@ describe.each(["file", "memory"] as const)(
             .statusCode,
         ).toBe(304);
         expect(
-          prepareCacheLookup("GET", key, [], cache).entry?.headers[
-            "cache-control"
-          ],
+          prepareCacheLookup({
+            method: "GET",
+            url: key,
+            headers: [],
+            cache: cache,
+          }).entry?.headers["cache-control"],
         ).toBe("max-age=3600");
       },
     );
@@ -445,9 +464,12 @@ describe.each(["file", "memory"] as const)(
       });
       expect(canCache).not.toHaveBeenCalled();
       expect(
-        prepareCacheLookup("GET", key, [], cache).entry?.headers[
-          "cache-control"
-        ],
+        prepareCacheLookup({
+          method: "GET",
+          url: key,
+          headers: [],
+          cache: cache,
+        }).entry?.headers["cache-control"],
       ).toBe("max-age=3600");
     });
 
@@ -697,7 +719,14 @@ describe.each(["file", "memory"] as const)(
         const key = seed(target, cache);
         respond(url, 201, { [name]: reference });
         request("POST", url, { cache, followRedirects: false });
-        expect(prepareCacheLookup("GET", key, [], cache).entry).toBeUndefined();
+        expect(
+          prepareCacheLookup({
+            method: "GET",
+            url: key,
+            headers: [],
+            cache: cache,
+          }).entry,
+        ).toBeUndefined();
       },
     );
 
@@ -721,10 +750,20 @@ describe.each(["file", "memory"] as const)(
         request("POST", new URL("write", url).href, { ...options, cache });
         for (const key of keys)
           expect(
-            prepareCacheLookup("GET", key, [], cache).entry,
+            prepareCacheLookup({
+              method: "GET",
+              url: key,
+              headers: [],
+              cache: cache,
+            }).entry,
           ).toBeUndefined();
         expect(
-          prepareCacheLookup("GET", otherNamespace, [], cache).entry,
+          prepareCacheLookup({
+            method: "GET",
+            url: otherNamespace,
+            headers: [],
+            cache: cache,
+          }).entry,
         ).toBeDefined();
       },
     );
@@ -751,7 +790,12 @@ describe.each(["file", "memory"] as const)(
           request("POST", url, { cache, followRedirects: false }).statusCode,
         ).toBe(201);
         expect(
-          prepareCacheLookup("GET", protectedKey, [], cache).entry,
+          prepareCacheLookup({
+            method: "GET",
+            url: protectedKey,
+            headers: [],
+            cache: cache,
+          }).entry,
         ).toBeDefined();
       },
     );
@@ -768,7 +812,14 @@ describe.each(["file", "memory"] as const)(
         const key = seed(target, cache);
         respond(url, status, { "Content-Location": target });
         request(method, url, { cache });
-        expect(prepareCacheLookup("GET", key, [], cache).entry).toBeDefined();
+        expect(
+          prepareCacheLookup({
+            method: "GET",
+            url: key,
+            headers: [],
+            cache: cache,
+          }).entry,
+        ).toBeDefined();
       },
     );
   },

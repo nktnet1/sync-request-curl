@@ -18,25 +18,31 @@ const seed = (
 ) => {
   const key = `https://cache-directives.test/${process.pid}-${++serial}`;
   trackCache(key, cache);
-  storeCacheResponse(
-    key,
-    {},
-    0,
-    0,
-    {
+  storeCacheResponse({
+    url: key,
+    requestHeaders: {},
+    requestTimestamp: 0,
+    responseTimestamp: 0,
+    response: {
       statusCode: 200,
       headers,
       body: Buffer.from("cached"),
       responseUrl: key,
     },
-    cache,
-  );
+    cache: cache,
+  });
   return key;
 };
 
 const expectStaleAge = (cache: CacheMode, age: string | string[]) => {
   const key = seed(cache, { "cache-control": "max-age=60", age });
-  const lookup = prepareCacheLookup("GET", key, [], cache, 0);
+  const lookup = prepareCacheLookup({
+    method: "GET",
+    url: key,
+    headers: [],
+    cache: cache,
+    now: 0,
+  });
   expect(lookup.useCachedResponse).toBe(false);
   if (!lookup.entry) throw new Error("Missing stored response");
   return getCachedResponse(lookup.entry, 0).headers.age;
@@ -61,7 +67,13 @@ describe.each(["file", "memory"] as const)(
       ({ control }) => {
         const key = seed(cache, { "cache-control": control });
         expect(
-          prepareCacheLookup("GET", key, [], cache, 1).useCachedResponse,
+          prepareCacheLookup({
+            method: "GET",
+            url: key,
+            headers: [],
+            cache: cache,
+            now: 1,
+          }).useCachedResponse,
         ).toBe(false);
       },
     );
@@ -74,7 +86,13 @@ describe.each(["file", "memory"] as const)(
     ])("real directives outside quotes still apply: %j", (control) => {
       const key = seed(cache, { "cache-control": control });
       expect(
-        prepareCacheLookup("GET", key, [], cache, 1).useCachedResponse,
+        prepareCacheLookup({
+          method: "GET",
+          url: key,
+          headers: [],
+          cache: cache,
+          now: 1,
+        }).useCachedResponse,
       ).toBe(true);
     });
 
@@ -82,13 +100,13 @@ describe.each(["file", "memory"] as const)(
       "request extensions cannot invent restrictions: %s",
       (control) => {
         const key = seed(cache, { "cache-control": "max-age=60" });
-        const lookup = prepareCacheLookup(
-          "GET",
-          key,
-          [`Cache-Control: ${control}`],
-          cache,
-          1,
-        );
+        const lookup = prepareCacheLookup({
+          method: "GET",
+          url: key,
+          headers: [`Cache-Control: ${control}`],
+          cache: cache,
+          now: 1,
+        });
         expect(lookup.allowStore).toBe(true);
         expect(lookup.useCachedResponse).toBe(true);
       },
@@ -99,7 +117,13 @@ describe.each(["file", "memory"] as const)(
         "cache-control": 'max-age=0, x-note="a, max-age=3600, b", max-age=60',
       });
       expect(
-        prepareCacheLookup("GET", key, [], cache, 1).useCachedResponse,
+        prepareCacheLookup({
+          method: "GET",
+          url: key,
+          headers: [],
+          cache: cache,
+          now: 1,
+        }).useCachedResponse,
       ).toBe(false);
     });
 
@@ -124,7 +148,13 @@ describe.each(["file", "memory"] as const)(
       (age) => {
         const key = seed(cache, { "cache-control": "max-age=60", age });
         expect(
-          prepareCacheLookup("GET", key, [], cache, 0).useCachedResponse,
+          prepareCacheLookup({
+            method: "GET",
+            url: key,
+            headers: [],
+            cache: cache,
+            now: 0,
+          }).useCachedResponse,
         ).toBe(true);
       },
     );
@@ -141,15 +171,27 @@ describe.each(["file", "memory"] as const)(
           etag: '"same"',
           age: "120",
         });
-        const lookup = prepareCacheLookup("GET", key, [], cache, 0);
-        refreshCacheEntry(
-          key,
-          lookup,
-          { etag: '"same"', age: receivedAge },
-          0,
-          cache,
-        );
-        const refreshed = prepareCacheLookup("GET", key, [], cache, 0);
+        const lookup = prepareCacheLookup({
+          method: "GET",
+          url: key,
+          headers: [],
+          cache: cache,
+          now: 0,
+        });
+        refreshCacheEntry({
+          url: key,
+          lookup: lookup,
+          responseHeaders: { etag: '"same"', age: receivedAge },
+          responseTimestamp: 0,
+          cache: cache,
+        });
+        const refreshed = prepareCacheLookup({
+          method: "GET",
+          url: key,
+          headers: [],
+          cache: cache,
+          now: 0,
+        });
         expect(refreshed.useCachedResponse).toBe(fresh);
         if (!refreshed.entry) throw new Error("Missing refreshed response");
         expect(getCachedResponse(refreshed.entry, 0).headers.age).toBe(
@@ -164,40 +206,64 @@ describe.each(["file", "memory"] as const)(
         etag: '"same"',
         age: "120",
       });
-      updateCacheFromHead(
-        key,
-        prepareCacheLookup("HEAD", key, [], cache, 0),
-        { etag: '"same"' },
-        0,
-        cache,
-        true,
-      );
+      updateCacheFromHead({
+        url: key,
+        lookup: prepareCacheLookup({
+          method: "HEAD",
+          url: key,
+          headers: [],
+          cache: cache,
+          now: 0,
+        }),
+        responseHeaders: { etag: '"same"' },
+        responseTimestamp: 0,
+        cache: cache,
+        decompress: true,
+      });
       expect(
-        prepareCacheLookup("GET", key, [], cache, 0).useCachedResponse,
+        prepareCacheLookup({
+          method: "GET",
+          url: key,
+          headers: [],
+          cache: cache,
+          now: 0,
+        }).useCachedResponse,
       ).toBe(true);
     });
 
     test("request no-store prevents refresh even when a lookup carries an entry", () => {
       const key = seed(cache, { "cache-control": "max-age=0", etag: '"same"' });
-      const original = prepareCacheLookup("GET", key, [], cache, 0);
-      const bypassed = prepareCacheLookup(
-        "GET",
-        key,
-        ["Cache-Control: no-store"],
-        cache,
-        0,
-      );
+      const original = prepareCacheLookup({
+        method: "GET",
+        url: key,
+        headers: [],
+        cache: cache,
+        now: 0,
+      });
+      const bypassed = prepareCacheLookup({
+        method: "GET",
+        url: key,
+        headers: ["Cache-Control: no-store"],
+        cache: cache,
+        now: 0,
+      });
       expect(
-        refreshCacheEntry(
-          key,
-          { ...bypassed, entry: original.entry },
-          { "cache-control": "max-age=60" },
-          0,
-          cache,
-        ),
+        refreshCacheEntry({
+          url: key,
+          lookup: { ...bypassed, entry: original.entry },
+          responseHeaders: { "cache-control": "max-age=60" },
+          responseTimestamp: 0,
+          cache: cache,
+        }),
       ).toBeUndefined();
       expect(
-        prepareCacheLookup("GET", key, [], cache, 0).useCachedResponse,
+        prepareCacheLookup({
+          method: "GET",
+          url: key,
+          headers: [],
+          cache: cache,
+          now: 0,
+        }).useCachedResponse,
       ).toBe(false);
     });
   },

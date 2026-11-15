@@ -15,21 +15,26 @@ const isFresh = (
 ) => {
   const key = `https://cache-freshness.test/${process.pid}-${++serial}`;
   trackCache(key, cache);
-  storeCacheResponse(
-    key,
-    {},
-    now,
-    now,
-    {
+  storeCacheResponse({
+    url: key,
+    requestHeaders: {},
+    requestTimestamp: now,
+    responseTimestamp: now,
+    response: {
       statusCode,
       headers,
       body: Buffer.alloc(0),
       responseUrl: key,
     },
-    cache,
-  );
-  return prepareCacheLookup("GET", key, [], cache, now + 1_000)
-    .useCachedResponse;
+    cache: cache,
+  });
+  return prepareCacheLookup({
+    method: "GET",
+    url: key,
+    headers: [],
+    cache: cache,
+    now: now + 1_000,
+  }).useCachedResponse;
 };
 
 describe.each(["file", "memory"] as const)(

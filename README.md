@@ -8,7 +8,7 @@
 &nbsp;
 [![codecov](https://codecov.io/gh/nktnet1/sync-request-curl/branch/main/graph/badge.svg?token=RAC7SKJTGU)](https://codecov.io/gh/nktnet1/sync-request-curl)
 &nbsp;
-[![Maintainability](https://api.codeclimate.com/v1/badges/3ec8c0ddebe848926277/maintainability)](https://codeclimate.com/github/nktnet1/sync-request-curl/maintainability)
+[![Maintainability](https://qlty.sh/gh/nktnet1/projects/sync-request-curl/maintainability.svg)](https://qlty.sh/gh/nktnet1/projects/sync-request-curl)
 &nbsp;
 [![Snyk Security](https://snyk.io/test/github/nktnet1/sync-request-curl/badge.svg)](https://snyk.io/test/github/nktnet1/sync-request-curl)
 &nbsp;
@@ -1063,7 +1063,7 @@ One multipart entry accepted by `FormData`.
 | <a id="property-knownlength"></a> `knownLength?` | `number` | Accepted for `form-data` append-option compatibility. |
 | <a id="property-header"></a> `header?` | `string` | Optional raw multipart header that replaces generated part headers. |
 | <a id="property-key"></a> `key` | `string` | Multipart field name. |
-| <a id="property-value"></a> `value` | `string` \| `number` \| `boolean` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) | Synchronously materialisable multipart field value. |
+| <a id="property-value"></a> `value` | `string` \| `number` \| `boolean` \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> | Synchronously materialisable multipart field value. |
 | <a id="property-filename"></a> `fileName?` | `string` | Optional file name. Path components are stripped before sending. |
 
 ***
@@ -1120,7 +1120,7 @@ path components are stripped from generated filenames before sending.
 | Parameter | Type |
 | ------ | ------ |
 | `key` | `string` |
-| `value` | `string` \| `number` \| `boolean` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) |
+| `value` | `string` \| `number` \| `boolean` \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> |
 | `options?` | \| `string` \| \{ `filename?`: `string`; `contentType?`: `string`; `knownLength?`: `number`; `header?`: `string`; \} |
 
 ###### Returns

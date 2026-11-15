@@ -16,6 +16,18 @@ const normalizeRequestedBase = (requestedBase: string): string => {
   return parsed.base;
 };
 
+const betaNumberForBase = (version: string, base: string): bigint => {
+  // Ignore unrelated release channels, including versions we cannot parse.
+  try {
+    const parsed = parseReleaseVersion(version);
+    return parsed.base === base && parsed.beta !== undefined
+      ? BigInt(parsed.beta)
+      : 0n;
+  } catch {
+    return 0n;
+  }
+};
+
 /** Select a beta above the manifest, registry versions, and existing Git tags. */
 export const nextBetaVersion = (
   current: string,
@@ -38,23 +50,14 @@ export const nextBetaVersion = (
         : "";
     throw new Error(`${base} is already released${guidance}`);
   }
-  let highest = 0n;
-  for (const version of [
+  const highest = [
     current,
     ...published,
     ...tags.map((tag) => tag.replace(/^v/, "")),
-  ]) {
-    // Other releases may use channels this publisher does not support.
-    let parsed: ReturnType<typeof parseReleaseVersion>;
-    try {
-      parsed = parseReleaseVersion(version);
-    } catch {
-      continue;
-    }
-    if (parsed.base === base && parsed.beta !== undefined) {
-      const number = BigInt(parsed.beta);
-      if (number > highest) highest = number;
-    }
-  }
+  ].reduce((highest, version) => {
+    const number = betaNumberForBase(version, base);
+    if (number > highest) return number;
+    return highest;
+  }, 0n);
   return `${base}-beta.${highest + 1n}`;
 };

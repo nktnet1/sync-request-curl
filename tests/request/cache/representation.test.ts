@@ -25,12 +25,12 @@ describe.each(["file", "memory"] as const)(
       const key = nextKey();
       trackCache(key, cache);
       const now = Date.now();
-      storeCacheResponse(
-        key,
-        { "a-im": ["diffe"], "if-none-match": ['"base"'] },
-        now,
-        now,
-        {
+      storeCacheResponse({
+        url: key,
+        requestHeaders: { "a-im": ["diffe"], "if-none-match": ['"base"'] },
+        requestTimestamp: now,
+        responseTimestamp: now,
+        response: {
           statusCode: 226,
           headers: {
             ...freshness,
@@ -41,9 +41,16 @@ describe.each(["file", "memory"] as const)(
           body: Buffer.from("delta instructions"),
           responseUrl: key,
         },
-        cache,
-      );
-      expect(prepareCacheLookup("GET", key, [], cache).entry).toBeUndefined();
+        cache: cache,
+      });
+      expect(
+        prepareCacheLookup({
+          method: "GET",
+          url: key,
+          headers: [],
+          cache: cache,
+        }).entry,
+      ).toBeUndefined();
     });
 
     test("cache policy callbacks receive independent request header copies", () => {
@@ -53,47 +60,61 @@ describe.each(["file", "memory"] as const)(
         "x-single": ["value"],
         "x-multi": ["one", "two"],
       };
-      storeCacheResponse(
-        key,
-        requestHeaders,
-        0,
-        0,
-        {
+      storeCacheResponse({
+        url: key,
+        requestHeaders: requestHeaders,
+        requestTimestamp: 0,
+        responseTimestamp: 0,
+        response: {
           statusCode: 200,
           headers: { "cache-control": "max-age=60", vary: "X-Multi" },
           body: original,
           responseUrl: key,
         },
-        cache,
-      );
+        cache: cache,
+      });
       const headers = ["X-Single: value", "X-Multi: one", "X-Multi: two"];
-      const lookup = prepareCacheLookup("GET", key, headers, cache, 1, true, {
-        isMatch: (outgoing, cached, defaultValue) => {
-          expect(defaultValue).toBe(true);
-          expect(cached.requestHeaders).toEqual({
-            "x-single": "value",
-            "x-multi": ["one", "two"],
-          });
-          const outgoingValues = outgoing["x-multi"];
-          const cachedValues = cached.requestHeaders["x-multi"];
-          if (!Array.isArray(outgoingValues) || !Array.isArray(cachedValues))
-            throw new Error("Missing repeated headers");
-          outgoingValues.push("changed");
-          cachedValues.push("changed");
-          cached.requestHeaders["x-single"] = "changed";
-          return defaultValue;
-        },
-        isExpired: (cached, defaultValue) => {
-          expect(defaultValue).toBe(false);
-          expect(cached.requestHeaders["x-single"]).toBe("value");
-          expect(cached.requestHeaders["x-multi"]).toEqual(["one", "two"]);
-          return defaultValue;
+      const lookup = prepareCacheLookup({
+        method: "GET",
+        url: key,
+        headers: headers,
+        cache: cache,
+        now: 1,
+        decompress: true,
+        policy: {
+          isMatch: (outgoing, cached, defaultValue) => {
+            expect(defaultValue).toBe(true);
+            expect(cached.requestHeaders).toEqual({
+              "x-single": "value",
+              "x-multi": ["one", "two"],
+            });
+            const outgoingValues = outgoing["x-multi"];
+            const cachedValues = cached.requestHeaders["x-multi"];
+            if (!Array.isArray(outgoingValues) || !Array.isArray(cachedValues))
+              throw new Error("Missing repeated headers");
+            outgoingValues.push("changed");
+            cachedValues.push("changed");
+            cached.requestHeaders["x-single"] = "changed";
+            return defaultValue;
+          },
+          isExpired: (cached, defaultValue) => {
+            expect(defaultValue).toBe(false);
+            expect(cached.requestHeaders["x-single"]).toBe("value");
+            expect(cached.requestHeaders["x-multi"]).toEqual(["one", "two"]);
+            return defaultValue;
+          },
         },
       });
       expect(lookup.useCachedResponse).toBe(true);
       expect(lookup.entry?.requestHeaders).toEqual(requestHeaders);
       expect(
-        prepareCacheLookup("GET", key, headers, cache, 2).useCachedResponse,
+        prepareCacheLookup({
+          method: "GET",
+          url: key,
+          headers: headers,
+          cache: cache,
+          now: 2,
+        }).useCachedResponse,
       ).toBe(true);
     });
 
@@ -120,12 +141,12 @@ describe.each(["file", "memory"] as const)(
       ])("preserves the coding of $name", ({ encoding, body, decompress }) => {
         const key = nextKey();
         trackCache(key, cache);
-        storeCacheResponse(
-          key,
-          {},
-          0,
-          0,
-          {
+        storeCacheResponse({
+          url: key,
+          requestHeaders: {},
+          requestTimestamp: 0,
+          responseTimestamp: 0,
+          response: {
             statusCode: 200,
             headers: {
               "cache-control": "max-age=0",
@@ -137,17 +158,17 @@ describe.each(["file", "memory"] as const)(
             body,
             responseUrl: key,
           },
-          cache,
-          { decompress },
-        );
-        const lookup = prepareCacheLookup(
-          method === "304" ? "GET" : "HEAD",
-          key,
-          [],
-          cache,
-          1,
-          decompress,
-        );
+          cache: cache,
+          options: { decompress },
+        });
+        const lookup = prepareCacheLookup({
+          method: method === "304" ? "GET" : "HEAD",
+          url: key,
+          headers: [],
+          cache: cache,
+          now: 1,
+          decompress: decompress,
+        });
         const headers = {
           "cache-control": "max-age=60",
           etag: 'W/"same"',
@@ -155,20 +176,33 @@ describe.each(["file", "memory"] as const)(
           "x-validated": "yes",
         };
         if (method === "304") {
-          const response = refreshCacheEntry(key, lookup, headers, 2, cache);
+          const response = refreshCacheEntry({
+            url: key,
+            lookup: lookup,
+            responseHeaders: headers,
+            responseTimestamp: 2,
+            cache: cache,
+          });
           expect(response?.body).toEqual(body);
           expect(response?.headers["content-encoding"]).toBe(encoding);
         } else {
-          updateCacheFromHead(key, lookup, headers, 2, cache, decompress);
+          updateCacheFromHead({
+            url: key,
+            lookup: lookup,
+            responseHeaders: headers,
+            responseTimestamp: 2,
+            cache: cache,
+            decompress: decompress,
+          });
         }
-        const refreshed = prepareCacheLookup(
-          "GET",
-          key,
-          [],
-          cache,
-          3,
-          decompress,
-        );
+        const refreshed = prepareCacheLookup({
+          method: "GET",
+          url: key,
+          headers: [],
+          cache: cache,
+          now: 3,
+          decompress: decompress,
+        });
         expect(refreshed.useCachedResponse).toBe(true);
         expect(refreshed.entry).toBeDefined();
         if (!refreshed.entry) throw new Error("Missing refreshed entry");

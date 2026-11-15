@@ -71,24 +71,12 @@ export function resolveNativePlatformKey(
   arch: string,
   linuxLibc: LinuxLibc,
 ): NativePlatformKey | undefined {
-  if (platform === "win32" && arch === "ia32") {
-    return "win32-ia32-msvc";
-  }
-
-  if (arch !== "x64" && arch !== "arm64") {
-    return undefined;
-  }
-
-  switch (platform) {
-    case "darwin":
-      return `darwin-${arch}`;
-    case "freebsd":
-      return `freebsd-${arch}`;
-    case "linux":
-      return `linux-${arch}-${linuxLibc}`;
-    case "win32":
-      return `win32-${arch}-msvc`;
-    default:
-      return undefined;
-  }
+  const suffix =
+    platform === "linux"
+      ? `-${linuxLibc}`
+      : platform === "win32"
+        ? "-msvc"
+        : "";
+  const key = `${platform}-${arch}${suffix}`;
+  return isNativePlatformKey(key) ? key : undefined;
 }

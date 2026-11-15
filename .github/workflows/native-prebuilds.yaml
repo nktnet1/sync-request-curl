@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   build-linux:
@@ -32,26 +32,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
           node-version: 24.x
 
-      - name: Restore cached native addon
-        id: native-cache
-        uses: actions/cache@v4
-        with:
-          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
-          key: native-prebuild-v2-${{ matrix.platform }}-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml', 'native/build.rs', 'native/build.ts', 'native/src/**', 'rust-toolchain.toml', 'scripts/linux-prebuild.ts') }}
-
       - name: Build Linux prebuild
-        if: steps.native-cache.outputs.cache-hit != 'true'
         run: node scripts/linux-prebuild.ts --libc=${{ matrix.libc }} --mode=build
-
-      - name: Verify cached Linux prebuild
-        if: steps.native-cache.outputs.cache-hit == 'true'
-        run: node scripts/linux-prebuild.ts --libc=${{ matrix.libc }} --mode=verify
 
       - name: Upload native addon
         uses: actions/upload-artifact@v4
@@ -79,33 +69,25 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
           node-version: 24.x
 
-      - name: Restore cached native addon
-        id: native-cache
-        uses: actions/cache@v4
-        with:
-          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
-          key: native-prebuild-v2-${{ matrix.platform }}-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml', 'native/build.rs', 'native/build.ts', 'native/src/**', 'rust-toolchain.toml') }}
-
       - name: Set up Rust
-        if: steps.native-cache.outputs.cache-hit != 'true'
         run: rustup toolchain install "$(node scripts/rust-toolchain.ts)" --profile minimal --no-self-update
 
       - name: Set up NASM for Windows x64
-        if: steps.native-cache.outputs.cache-hit != 'true' && matrix.platform == 'win32-x64-msvc'
+        if: matrix.platform == 'win32-x64-msvc'
         uses: ilammy/setup-nasm@72793074d3c8cdda771dba85f6deafe00623038b # v1.5.2
 
       - name: Build native addon
-        if: steps.native-cache.outputs.cache-hit != 'true'
         run: node scripts/build-native.ts
 
       - name: Stage native addon
-        if: steps.native-cache.outputs.cache-hit != 'true'
         run: node scripts/stage-native.ts --platform=${{ matrix.platform }}
 
       - name: Verify native addon loads
@@ -123,27 +105,20 @@ jobs:
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 22.x
           architecture: x86
-      - name: Restore cached native addon
-        id: native-cache
-        uses: actions/cache@v4
-        with:
-          path: prebuilds/sync_request_curl_native.win32-ia32-msvc.node
-          key: native-prebuild-v2-win32-ia32-msvc-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml', 'native/build.rs', 'native/build.ts', 'native/src/**', 'rust-toolchain.toml') }}
       - name: Set up Rust and x86 target
-        if: steps.native-cache.outputs.cache-hit != 'true'
         run: |
           $toolchain = node scripts/rust-toolchain.ts
           rustup toolchain install $toolchain --profile minimal --no-self-update
           rustup target add i686-pc-windows-msvc --toolchain $toolchain
       - name: Set up NASM for Windows x86
-        if: steps.native-cache.outputs.cache-hit != 'true'
         uses: ilammy/setup-nasm@72793074d3c8cdda771dba85f6deafe00623038b # v1.5.2
       - name: Verify bundled HTTP/3 capability on Windows x86
-        if: steps.native-cache.outputs.cache-hit != 'true'
         env:
           LIBZ_SYS_STATIC: "1"
           OPENSSL_STATIC: "1"
@@ -153,10 +128,8 @@ jobs:
           --target i686-pc-windows-msvc --lib --no-default-features
           --features bundled-curl-http3,test-noop
       - name: Build and verify with 32-bit Node.js
-        if: steps.native-cache.outputs.cache-hit != 'true'
         run: node native/build.ts
       - name: Stage native addon
-        if: steps.native-cache.outputs.cache-hit != 'true'
         run: Copy-Item native/build/sync_request_curl_native.node prebuilds/sync_request_curl_native.win32-ia32-msvc.node
       - name: Verify native addon loads
         run: node scripts/verify-native-load.ts --file=prebuilds/sync_request_curl_native.win32-ia32-msvc.node
@@ -181,38 +154,21 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-
-      # Keep a verified FreeBSD addon between runs. The VM prepared-image cache
-      # only caches build tools, not the Rust/AWS-LC compilation in `run`.
-      - name: Restore cached FreeBSD addon
-        id: native-cache
-        uses: actions/cache@v4
         with:
-          path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
-          key: freebsd-prebuild-v1-14.4-${{ matrix.platform }}-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml', 'native/build.rs', 'native/build.ts', 'native/src/**', 'rust-toolchain.toml', 'scripts/freebsd-ci.sh', 'scripts/build-native.ts', 'scripts/stage-native.ts') }}
+          persist-credentials: false
 
-      # Pipeline runs on main already compile and smoke-test this exact addon
-      # before writing its cache. On an exact hit, avoid starting a FreeBSD VM
-      # again just to release the already verified binary.
-      - name: Reuse verified ${{ matrix.platform }} prebuild
-        if: steps.native-cache.outputs.cache-hit == 'true'
-        run: echo "Reusing a previously verified ${{ matrix.platform }} prebuild; skipping FreeBSD VM"
-
-      - name: Build and verify ${{ matrix.platform }} on cache miss
-        if: steps.native-cache.outputs.cache-hit != 'true'
+      - name: Build and verify ${{ matrix.platform }}
         uses: vmactions/freebsd-vm@a2f9a41fa97f6848b8c3b791087dfcdaa5b473ff # v1.5.8
         with:
           release: "14.4"
           arch: ${{ matrix.arch }}
           mem: 8192
           usesh: true
-          cache-after-prepare: true
-          # Include the script and pin in the input, since this action version
-          # hashes only the literal prepare command for its prepared VM cache.
+          # Use the pinned FreeBSD setup script on each release run.
           prepare: |
             # ${{ hashFiles('scripts/freebsd-ci.sh', 'rust-toolchain.toml') }}
             sh scripts/freebsd-ci.sh prepare
-          # Cache misses still compile and run all FreeBSD smoke checks.
+          # Run the complete FreeBSD build and smoke checks for this release.
           run: sh scripts/freebsd-ci.sh build ${{ matrix.platform }}
 
       - name: Confirm native addon was copied back
@@ -237,6 +193,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Download native addons
         uses: actions/download-artifact@v4
@@ -282,6 +240,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Enable pnpm via corepack
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -290,8 +250,6 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24.x
-          cache: "pnpm"
-          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -328,3 +286,50 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
+
+  publish:
+    # The same trusted tag-push workflow produces and publishes the artifacts.
+    # Never elevate workflow_run artifacts from a separately triggered workflow.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-24.04
+    environment: Production
+    concurrency:
+      group: npm-release-publish
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout release tooling
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Download release packages
+        uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: release-packages
+
+      - name: Download release metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: release-metadata
+          path: release-metadata
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Validate and publish release packages
+        env:
+          BUILD_SHA: ${{ github.sha }}
+        run: >-
+          node scripts/publish-release-packages.ts
+          --registry=https://registry.npmjs.org
+          --expected-sha="$BUILD_SHA"

@@ -35,13 +35,13 @@ describe("file cache filesystem failures", () => {
       throw fsError("permission denied", "EACCES");
     });
 
-    const lookup = prepareCacheLookup(
-      "GET",
-      "https://cache.test/read-error",
-      [],
-      "file",
-      0,
-    );
+    const lookup = prepareCacheLookup({
+      method: "GET",
+      url: "https://cache.test/read-error",
+      headers: [],
+      cache: "file",
+      now: 0,
+    });
     expect(lookup.entry).toBeUndefined();
     expect(console.warn).toHaveBeenCalledWith(
       "Error reading from cache: permission denied",
@@ -85,13 +85,13 @@ describe("file cache non-Error failures", () => {
       throw nonError("read failed");
     });
 
-    const lookup = prepareCacheLookup(
-      "GET",
-      "https://cache.test/read-non-error",
-      [],
-      "file",
-      0,
-    );
+    const lookup = prepareCacheLookup({
+      method: "GET",
+      url: "https://cache.test/read-non-error",
+      headers: [],
+      cache: "file",
+      now: 0,
+    });
     expect(lookup.entry).toBeUndefined();
     expect(console.warn).toHaveBeenCalledWith(
       "Error reading from cache: read failed",
@@ -135,7 +135,12 @@ test("a failed cleanup of a malformed cache file still permits an origin fetch",
     throw new Error("denied");
   });
   expect(
-    prepareCacheLookup("GET", "https://cache.test/broken", [], "file").entry,
+    prepareCacheLookup({
+      method: "GET",
+      url: "https://cache.test/broken",
+      headers: [],
+      cache: "file",
+    }).entry,
   ).toBeUndefined();
   expect(console.warn).toHaveBeenCalledWith(
     "Error removing invalid cache entry: Error: denied",

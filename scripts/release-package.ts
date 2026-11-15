@@ -21,19 +21,22 @@ const isStringRecord = (value: unknown): value is Record<string, string> =>
   isRecord(value) &&
   Object.values(value).every((entry) => typeof entry === "string");
 
+const hasOptionalString = (
+  value: Record<string, unknown>,
+  key: string,
+): boolean => value[key] === undefined || typeof value[key] === "string";
+
 const isReleasePackageJson = (value: unknown): value is ReleasePackageJson => {
-  if (!isRecord(value)) {
+  if (!isRecord(value)) return false;
+  if (typeof value.name !== "string" || typeof value.version !== "string") {
     return false;
   }
-
-  return (
-    typeof value.name === "string" &&
-    typeof value.version === "string" &&
-    (value.description === undefined ||
-      typeof value.description === "string") &&
-    (value.license === undefined || typeof value.license === "string") &&
-    (value.engines === undefined || isStringRecord(value.engines))
+  const hasTextFields = ["description", "license"].every((key) =>
+    hasOptionalString(value, key),
   );
+  const hasValidEngines =
+    value.engines === undefined || isStringRecord(value.engines);
+  return hasTextFields && hasValidEngines;
 };
 
 export const parseReleasePackageJson = (source: string): ReleasePackageJson => {

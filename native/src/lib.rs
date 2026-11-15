@@ -6,9 +6,11 @@ mod connection_pool;
 mod curl_utils;
 mod mime;
 mod multi;
+mod multi_wait;
 mod options;
 mod rate_limit;
 mod request;
+mod request_config;
 mod response_tracking;
 mod types;
 

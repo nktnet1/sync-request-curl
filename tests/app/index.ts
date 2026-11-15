@@ -21,14 +21,23 @@ const nextCacheOriginHit = (name: string, key: string): number => {
   cacheOriginHits.set(mapKey, next);
   return next;
 };
+interface CacheValidationOptions {
+  maxAge: number;
+  requestHeader: string;
+  validatorHeader: string;
+  validatorValue: string;
+}
+
 const conditionalCacheResponse = (
   c: Context<{ Bindings: HttpBindings }>,
   name: string,
   key: string,
-  maxAge: number,
-  requestHeader: string,
-  validatorHeader: string,
-  validatorValue: string,
+  {
+    maxAge,
+    requestHeader,
+    validatorHeader,
+    validatorValue,
+  }: CacheValidationOptions,
 ) => {
   const hits = nextCacheOriginHit(name, key);
   const headers: Record<string, string> = {
@@ -290,15 +299,12 @@ app.get("/large/response", (c) => {
 
 app.get("/cache/fresh", (c) => {
   const key = c.req.query("key") ?? "default";
-  return conditionalCacheResponse(
-    c,
-    "fresh",
-    key,
-    3600,
-    "if-none-match",
-    "etag",
-    `"fresh-${key}"`,
-  );
+  return conditionalCacheResponse(c, "fresh", key, {
+    maxAge: 3600,
+    requestHeader: "if-none-match",
+    validatorHeader: "etag",
+    validatorValue: `"fresh-${key}"`,
+  });
 });
 
 app.get("/cache/no-store", (c) => {
@@ -317,28 +323,22 @@ app.get("/cache/no-store-fresh", (c) => {
 
 app.get("/cache/revalidate/etag", (c) => {
   const key = c.req.query("key") ?? "default";
-  return conditionalCacheResponse(
-    c,
-    "etag",
-    key,
-    0,
-    "if-none-match",
-    "etag",
-    '"cache-v1"',
-  );
+  return conditionalCacheResponse(c, "etag", key, {
+    maxAge: 0,
+    requestHeader: "if-none-match",
+    validatorHeader: "etag",
+    validatorValue: '"cache-v1"',
+  });
 });
 
 app.get("/cache/revalidate/last-modified", (c) => {
   const key = c.req.query("key") ?? "default";
-  return conditionalCacheResponse(
-    c,
-    "last-modified",
-    key,
-    0,
-    "if-modified-since",
-    "last-modified",
-    "Wed, 21 Oct 2015 07:28:00 GMT",
-  );
+  return conditionalCacheResponse(c, "last-modified", key, {
+    maxAge: 0,
+    requestHeader: "if-modified-since",
+    validatorHeader: "last-modified",
+    validatorValue: "Wed, 21 Oct 2015 07:28:00 GMT",
+  });
 });
 
 app.get("/cache/vary", (c) => {

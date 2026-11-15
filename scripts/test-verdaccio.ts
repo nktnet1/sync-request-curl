@@ -3,15 +3,12 @@ import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 import {
   closeSync,
-  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   openSync,
-  readdirSync,
   readFileSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -23,16 +20,17 @@ import { reserveLoopbackPort } from "#scripts/loopback-port";
 import { getCurrentPlatformKey } from "#scripts/native-platform";
 import { pollUntilReady } from "#scripts/poll-until-ready";
 import { canRun, run } from "#scripts/process";
-import {
-  createMainPackageManifest,
-  createNativePackageManifest,
-  parseReleasePackageJson,
-} from "#scripts/release-package";
+import { parseReleasePackageJson } from "#scripts/release-package";
 import { parseReleaseVersion } from "#scripts/release-policy";
-
-interface PackResult {
-  filename: string;
-}
+import {
+  packPackage,
+  type SmokeContext,
+  stagePackages,
+  verifyCleanInstall,
+  verifyPublishedDistTags,
+  verifyPublishedMetadata,
+} from "#scripts/verdaccio-smoke-packages";
+import { launchSmokeServer } from "#scripts/verdaccio-smoke-server";
 
 const VERDACCIO_VERSION = "6.10.4";
 const STARTUP_TIMEOUT_MS = 120_000;
@@ -74,7 +72,6 @@ const npmrcPath = join(temporaryRoot, ".npmrc");
 let verdaccioProcess: ChildProcess | undefined;
 let verdaccioLogFd: number | undefined;
 let smokeServerProcess: ChildProcess | undefined;
-let smokeServerOutput = "";
 
 const accent = (value: string): string => styleText("cyan", value);
 
@@ -90,52 +87,6 @@ const success = (message: string): void => {
 
 const detail = (message: string): void => {
   console.log(`       ${styleText("gray", "·")} ${message}`);
-};
-
-const writeJson = (path: string, value: unknown): void => {
-  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
-};
-
-const stagePackages = (): void => {
-  if (!existsSync(join(root, "dist"))) {
-    throw new Error("Missing dist/. The JavaScript build did not complete.");
-  }
-  if (!existsSync(nativeBinary) || statSync(nativeBinary).size === 0) {
-    throw new Error("Missing native/build/sync_request_curl_native.node");
-  }
-
-  mkdirSync(mainPackageRoot, { recursive: true });
-  mkdirSync(nativePackageRoot, { recursive: true });
-  mkdirSync(tarballsRoot, { recursive: true });
-
-  cpSync(join(root, "dist"), join(mainPackageRoot, "dist"), {
-    recursive: true,
-  });
-  cpSync(join(root, "README.md"), join(mainPackageRoot, "README.md"));
-  cpSync(join(root, "LICENSE"), join(mainPackageRoot, "LICENSE"));
-
-  writeJson(
-    join(mainPackageRoot, "package.json"),
-    createMainPackageManifest(packageJson, {
-      [nativePackageName]: packageJson.version,
-    }),
-  );
-
-  cpSync(
-    nativeBinary,
-    join(nativePackageRoot, "sync_request_curl_native.node"),
-  );
-  cpSync(join(root, "LICENSE"), join(nativePackageRoot, "LICENSE"));
-  writeFileSync(
-    join(nativePackageRoot, "README.md"),
-    `# ${nativePackageName}\n\n` +
-      `Platform-specific native binary for \`${packageJson.name}\` (${platform}). ` +
-      `Install \`${packageJson.name}\` instead of depending on this package directly.\n`,
-  );
-  writeJson(
-    join(nativePackageRoot, "package.json"),
-    createNativePackageManifest(packageJson, platform),
-  );
 };
 
 const createVerdaccioConfig = (): void => {
@@ -201,111 +152,59 @@ const startVerdaccio = (registry: string): void => {
   );
 };
 
+const checkVerdaccioStillRunning = (): void => {
+  if (!verdaccioProcess || verdaccioProcess.exitCode === null) return;
+  const log = existsSync(verdaccioLog)
+    ? readFileSync(verdaccioLog, "utf8").trim()
+    : "";
+  throw new Error(
+    `Verdaccio exited before becoming ready${log ? `:\n${log}` : ""}`,
+  );
+};
+
+const pingVerdaccio = async (registry: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`${registry}/-/ping`);
+    return response.ok;
+  } catch {
+    // Verdaccio is still starting.
+    return false;
+  }
+};
+
 const waitForVerdaccio = async (registry: string): Promise<void> => {
   const ready = await pollUntilReady(
     async () => {
-      if (verdaccioProcess && verdaccioProcess.exitCode !== null) {
-        const log = existsSync(verdaccioLog)
-          ? readFileSync(verdaccioLog, "utf8").trim()
-          : "";
-        const logSuffix = log ? `:\n${log}` : "";
-        throw new Error(`Verdaccio exited before becoming ready${logSuffix}`);
-      }
-
-      try {
-        const response = await fetch(`${registry}/-/ping`);
-        return response.ok;
-      } catch {
-        // Verdaccio is still starting.
-        return false;
-      }
+      checkVerdaccioStillRunning();
+      return pingVerdaccio(registry);
     },
     250,
     Date.now() + STARTUP_TIMEOUT_MS,
   );
-  if (!ready) {
-    throw new Error(`Timed out waiting for Verdaccio at ${registry}`);
-  }
+  if (!ready) throw new Error(`Timed out waiting for Verdaccio at ${registry}`);
 };
 
-const startSmokeServer = async (): Promise<string> => {
-  const port = await reserveLoopbackPort();
-  const serverUrl = `http://127.0.0.1:${port}`;
-  const serverPath = join(temporaryRoot, "request-smoke-server.mjs");
-  writeFileSync(
-    serverPath,
-    [
-      'import { createServer } from "node:http";',
-      'const port = Number.parseInt(process.argv[2] ?? "", 10);',
-      'if (!Number.isInteger(port)) throw new TypeError("Missing smoke-server port");',
-      "const server = createServer((request, response) => {",
-      '  if (request.method === "GET" && request.url === "/health") {',
-      "    response.writeHead(204);",
-      "    response.end();",
-      "    return;",
-      "  }",
-      '  if (request.method === "GET" && request.url === "/smoke") {',
-      "    response.writeHead(200, {",
-      '      "content-type": "application/json",',
-      '      "x-smoke-test": "ok",',
-      "    });",
-      "    response.end(JSON.stringify({",
-      "      ok: true,",
-      "      method: request.method,",
-      '      client: request.headers["x-smoke-client"] ?? null,',
-      "    }));",
-      "    return;",
-      "  }",
-      '  response.writeHead(404, { "content-type": "text/plain" });',
-      '  response.end("not found");',
-      "});",
-      'server.listen(port, "127.0.0.1");',
-      "const shutdown = () => server.close(() => process.exit(0));",
-      'process.on("SIGINT", shutdown);',
-      'process.on("SIGTERM", shutdown);',
-      "",
-    ].join("\n"),
-  );
-
-  smokeServerOutput = "";
-  const serverProcess = spawn(process.execPath, [serverPath, String(port)], {
-    cwd: temporaryRoot,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  smokeServerProcess = serverProcess;
-  serverProcess.stdout?.on("data", (chunk: Buffer) => {
-    smokeServerOutput += chunk.toString();
-  });
-  serverProcess.stderr?.on("data", (chunk: Buffer) => {
-    smokeServerOutput += chunk.toString();
+const startSmokeServer = (): Promise<string> =>
+  launchSmokeServer(temporaryRoot, (process) => {
+    smokeServerProcess = process;
   });
 
-  const ready = await pollUntilReady(
-    async () => {
-      if (serverProcess.exitCode !== null) {
-        throw new Error(
-          `Request smoke server exited before becoming ready${
-            smokeServerOutput.trim() ? `:\n${smokeServerOutput.trim()}` : ""
-          }`,
-        );
-      }
-      try {
-        const response = await fetch(`${serverUrl}/health`);
-        return response.status === 204;
-      } catch {
-        // The request smoke server is still starting.
-        return false;
-      }
-    },
-    50,
-    Date.now() + 10_000,
-  );
-  if (!ready) {
-    throw new Error(
-      `Timed out waiting for request smoke server at ${serverUrl}`,
-    );
-  }
-  return serverUrl;
+const smokeContext: SmokeContext = {
+  root,
+  mainPackageRoot,
+  nativePackageRoot,
+  tarballsRoot,
+  consumerRoot,
+  nativeBinary,
+  nativePackageName,
+  platform,
+  packageJson,
+  npmCommand,
+  stage,
+  success,
+  detail,
+  accent,
+  startSmokeServer,
 };
 
 const createVerdaccioUser = async (registry: string): Promise<string> => {
@@ -346,159 +245,6 @@ const writeNpmrc = (registry: string, token: string): void => {
       "",
     ].join("\n"),
   );
-};
-
-const packPackage = (directory: string, npmEnv: NodeJS.ProcessEnv): string => {
-  const output = run(
-    npmCommand,
-    [
-      "pack",
-      directory,
-      "--pack-destination",
-      tarballsRoot,
-      "--ignore-scripts",
-      "--json",
-    ],
-    { cwd: root, capture: true, env: npmEnv },
-  );
-  const results = JSON.parse(output) as PackResult[];
-  if (results.length !== 1 || typeof results[0]?.filename !== "string") {
-    throw new Error(`Unexpected npm pack output: ${output}`);
-  }
-  return join(tarballsRoot, results[0].filename);
-};
-
-const verifyPublishedMetadata = (
-  registry: string,
-  npmEnv: NodeJS.ProcessEnv,
-): void => {
-  const optionalDependencies = JSON.parse(
-    run(
-      npmCommand,
-      [
-        "view",
-        `${packageJson.name}@${packageJson.version}`,
-        "optionalDependencies",
-        "--json",
-        "--registry",
-        registry,
-      ],
-      { capture: true, env: npmEnv },
-    ),
-  ) as Record<string, string>;
-
-  if (optionalDependencies[nativePackageName] !== packageJson.version) {
-    throw new Error(
-      `${packageJson.name} is missing ${nativePackageName}@${packageJson.version} as an optional dependency`,
-    );
-  }
-};
-
-const verifyPublishedDistTags = (
-  registry: string,
-  npmEnv: NodeJS.ProcessEnv,
-  distTag: string,
-): void => {
-  for (const packageName of [nativePackageName, packageJson.name]) {
-    const distTags = JSON.parse(
-      run(
-        npmCommand,
-        ["view", packageName, "dist-tags", "--json", "--registry", registry],
-        { capture: true, env: npmEnv },
-      ),
-    ) as Record<string, string>;
-    if (distTags[distTag] !== packageJson.version) {
-      throw new Error(
-        `${packageName} ${distTag} dist-tag points to ${distTags[distTag] ?? "nothing"}, expected ${packageJson.version}`,
-      );
-    }
-  }
-};
-
-const verifyCleanInstall = async (
-  registry: string,
-  npmEnv: NodeJS.ProcessEnv,
-): Promise<void> => {
-  mkdirSync(consumerRoot, { recursive: true });
-  writeJson(join(consumerRoot, "package.json"), {
-    private: true,
-    name: "sync-request-curl-verdaccio-smoke",
-    version: "0.0.0",
-  });
-
-  stage("Installing the published package into a clean consumer project");
-  run(
-    npmCommand,
-    [
-      "install",
-      `${packageJson.name}@${packageJson.version}`,
-      "--registry",
-      registry,
-      "--ignore-scripts",
-      "--package-lock=false",
-    ],
-    { cwd: consumerRoot, env: npmEnv },
-  );
-
-  const nativeDirectoryName = nativePackageName.slice("@nktnet/".length);
-  const nativeDirectory = join(consumerRoot, "node_modules", "@nktnet");
-  const installedNativePackages = existsSync(nativeDirectory)
-    ? readdirSync(nativeDirectory).sort()
-    : [];
-  if (
-    installedNativePackages.length !== 1 ||
-    installedNativePackages[0] !== nativeDirectoryName
-  ) {
-    throw new Error(
-      `Expected only ${nativePackageName}, installed: ${installedNativePackages.join(", ") || "none"}`,
-    );
-  }
-
-  const installedBinary = join(
-    nativeDirectory,
-    nativeDirectoryName,
-    "sync_request_curl_native.node",
-  );
-  if (!existsSync(installedBinary) || statSync(installedBinary).size === 0) {
-    throw new Error(`Missing installed native binary: ${installedBinary}`);
-  }
-  success(`Installed ${accent(nativePackageName)} with its native binary`);
-
-  stage("Starting a local HTTP server for real request smoke tests");
-  const serverUrl = await startSmokeServer();
-  detail(accent(serverUrl));
-  success("Local HTTP server is ready");
-
-  const smokeUrl = `${serverUrl}/smoke`;
-
-  stage("Sending a CommonJS request through the freshly installed package");
-  const commonJsSmoke = [
-    `const request = require(${JSON.stringify(packageJson.name)});`,
-    'if (typeof request !== "function") throw new TypeError("Expected CommonJS export to be a function");',
-    `const response = request("GET", ${JSON.stringify(smokeUrl)}, { headers: { "x-smoke-client": "commonjs" } });`,
-    'if (response.statusCode !== 200) throw new Error("Expected status 200, received " + response.statusCode);',
-    'if (response.headers["x-smoke-test"] !== "ok") throw new Error("Missing x-smoke-test response header");',
-    'const body = JSON.parse(response.getBody("utf8"));',
-    'if (body.ok !== true || body.method !== "GET" || body.client !== "commonjs") throw new Error("Unexpected response body: " + JSON.stringify(body));',
-  ].join("\n");
-  run("node", ["-e", commonJsSmoke], { cwd: consumerRoot, env: npmEnv });
-  success("CommonJS request returned the expected status, header, and body");
-
-  stage("Sending an ESM request through the freshly installed package");
-  const esmSmoke = [
-    `import request from ${JSON.stringify(packageJson.name)};`,
-    'if (typeof request !== "function") throw new TypeError("Expected ESM export to be a function");',
-    `const response = request("GET", ${JSON.stringify(smokeUrl)}, { headers: { "x-smoke-client": "esm" } });`,
-    'if (response.statusCode !== 200) throw new Error("Expected status 200, received " + response.statusCode);',
-    'if (response.headers["x-smoke-test"] !== "ok") throw new Error("Missing x-smoke-test response header");',
-    'const body = JSON.parse(response.getBody("utf8"));',
-    'if (body.ok !== true || body.method !== "GET" || body.client !== "esm") throw new Error("Unexpected response body: " + JSON.stringify(body));',
-  ].join("\n");
-  run("node", ["--input-type=module", "-e", esmSmoke], {
-    cwd: consumerRoot,
-    env: npmEnv,
-  });
-  success("ESM request returned the expected status, header, and body");
 };
 
 const stopChildProcess = async (
@@ -555,7 +301,7 @@ const main = async (): Promise<void> => {
   success("JavaScript and current-platform native builds completed");
 
   stage("Staging the main package and current-platform optional dependency");
-  stagePackages();
+  stagePackages(smokeContext);
   success(`${accent(nativePackageSpec)} staged`);
 
   stage(
@@ -576,8 +322,8 @@ const main = async (): Promise<void> => {
   success("Temporary publisher authenticated");
 
   stage("Packing release tarballs");
-  const nativeTarball = packPackage(nativePackageRoot, npmEnv);
-  const mainTarball = packPackage(mainPackageRoot, npmEnv);
+  const nativeTarball = packPackage(smokeContext, nativePackageRoot, npmEnv);
+  const mainTarball = packPackage(smokeContext, mainPackageRoot, npmEnv);
   detail(accent(basename(nativeTarball)));
   detail(accent(basename(mainTarball)));
   success("Release tarballs created");
@@ -617,13 +363,13 @@ const main = async (): Promise<void> => {
   success(`${accent(mainPackageSpec)} published`);
 
   stage("Verifying published optional-dependency metadata");
-  verifyPublishedMetadata(registry, npmEnv);
-  verifyPublishedDistTags(registry, npmEnv, distTag);
+  verifyPublishedMetadata(smokeContext, registry, npmEnv);
+  verifyPublishedDistTags(smokeContext, registry, npmEnv, distTag);
   success(
     `Main package points to ${accent(nativePackageSpec)} and both packages use the ${accent(distTag)} dist-tag`,
   );
 
-  await verifyCleanInstall(registry, npmEnv);
+  await verifyCleanInstall(smokeContext, registry, npmEnv);
 };
 
 let passed = false;
