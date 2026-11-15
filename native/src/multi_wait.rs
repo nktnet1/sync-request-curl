@@ -2,7 +2,7 @@ use std::os::raw::{c_int, c_long};
 use std::ptr;
 use std::time::{Duration, Instant};
 
-use curl_sys::{CURLcode, CURLMcode, CURLM, CURLE_FAILED_INIT, CURLE_OPERATION_TIMEDOUT, CURLE_OUT_OF_MEMORY, CURLM_OK, CURLM_OUT_OF_MEMORY};
+use curl_sys::{CURLcode, CURLMcode, CURLM, CURLE_FAILED_INIT, CURLE_OUT_OF_MEMORY, CURLM_OK, CURLM_OUT_OF_MEMORY};
 
 pub(super) fn multi_error_to_curl(code: CURLMcode) -> CURLcode {
   if code == CURLM_OUT_OF_MEMORY { CURLE_OUT_OF_MEMORY } else { CURLE_FAILED_INIT }
