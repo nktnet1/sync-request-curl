@@ -1,21 +1,23 @@
 import { encodeQueryComponent } from "#/http/query/components";
 
-const primitiveTypes = new Set([
-  "string",
-  "number",
-  "bigint",
-  "boolean",
-  "symbol",
-  "function",
-]);
-
 const primitiveToString = (value: unknown): string | undefined => {
   if (value === null || value === undefined) {
     return value === null ? "" : undefined;
   }
   if (value instanceof Date) return value.toISOString();
   if (Buffer.isBuffer(value)) return value.toString("utf8");
-  return primitiveTypes.has(typeof value) ? String(value) : undefined;
+
+  switch (typeof value) {
+    case "string":
+    case "number":
+    case "bigint":
+    case "boolean":
+    case "symbol":
+    case "function":
+      return String(value);
+    default:
+      return undefined;
+  }
 };
 
 const appendStringifiedValue = (

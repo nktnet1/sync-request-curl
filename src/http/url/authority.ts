@@ -20,7 +20,7 @@ const schemePunctuation = new Set([43, 45, 46]);
 const isSchemeCharacter = (code: number): boolean =>
   isAsciiLetter(code) || isAsciiDigit(code) || schemePunctuation.has(code);
 
-const isDecimal = (value: string): boolean => /^[0-9]*$/.test(value);
+const isDecimal = (value: string): boolean => /^\d*$/.test(value);
 
 export interface AbsoluteUrlParts {
   prefix: string;

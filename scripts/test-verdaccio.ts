@@ -157,9 +157,8 @@ const checkVerdaccioStillRunning = (): void => {
   const log = existsSync(verdaccioLog)
     ? readFileSync(verdaccioLog, "utf8").trim()
     : "";
-  throw new Error(
-    `Verdaccio exited before becoming ready${log ? `:\n${log}` : ""}`,
-  );
+  const details = log ? `:\n${log}` : "";
+  throw new Error(`Verdaccio exited before becoming ready${details}`);
 };
 
 const pingVerdaccio = async (registry: string): Promise<boolean> => {

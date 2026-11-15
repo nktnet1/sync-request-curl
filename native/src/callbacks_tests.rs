@@ -1,4 +1,13 @@
-  use super::*;
+  use super::{
+    process_debug_event, process_header_chunk, request_debug_callback,
+    strip_header_line_ending, transfer_progress_callback, RequestState,
+    DEFAULT_MAX_RESPONSE_HEADER_SIZE,
+  };
+  use crate::rate_limit::RateLimitAllowance;
+  use curl_sys::{curl_off_t, CURL};
+  use std::os::raw::c_void;
+  use std::ptr;
+  use std::time::{Duration, Instant};
 
   #[test]
   fn oversized_status_lines_are_rejected_before_retention() {

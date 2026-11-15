@@ -47,13 +47,14 @@ export const parseCliOptions = (args: readonly string[]): CliOptions => {
   }
 
   let curlSource: CurlSource | undefined;
-  for (let index = 0; index < args.length; index += 1) {
+  let index = 0;
+  while (index < args.length) {
     const parsed = parseLibcurlArgument(args, index);
     if (curlSource !== undefined) {
       throw new Error("--libcurl may only be specified once.");
     }
     curlSource = parsed.curlSource;
-    index = parsed.nextIndex;
+    index = parsed.nextIndex + 1;
   }
   return { curlSource, help: false };
 };

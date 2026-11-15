@@ -71,12 +71,12 @@ export function resolveNativePlatformKey(
   arch: string,
   linuxLibc: LinuxLibc,
 ): NativePlatformKey | undefined {
-  const suffix =
-    platform === "linux"
-      ? `-${linuxLibc}`
-      : platform === "win32"
-        ? "-msvc"
-        : "";
+  let suffix = "";
+  if (platform === "linux") {
+    suffix = `-${linuxLibc}`;
+  } else if (platform === "win32") {
+    suffix = "-msvc";
+  }
   const key = `${platform}-${arch}${suffix}`;
   return isNativePlatformKey(key) ? key : undefined;
 }
