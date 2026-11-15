@@ -2,17 +2,17 @@ import { getCachedResponse } from "#/request/cache";
 import {
   prepareRequestCache,
   updateRequestCache,
-} from "#/request/perform-cache";
+} from "#/request/perform/cache";
 import {
   createRequestResult,
   performRequestWithRetry,
   type RequestResult,
-} from "#/request/perform-transport";
+} from "#/request/perform/transport";
 import { prepareRequest } from "#/request/prepare";
-import { prepareTransportOptions } from "#/request/transport-options";
+import { prepareTransportOptions } from "#/request/transport/options";
 import type { Options, UppercaseHttpVerb } from "#/types/definition";
 
-export type { RequestResult } from "#/request/perform-transport";
+export type { RequestResult } from "#/request/perform/transport";
 
 export const performRequest = (
   method: UppercaseHttpVerb,

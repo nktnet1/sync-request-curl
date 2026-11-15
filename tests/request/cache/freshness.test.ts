@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { prepareCacheLookup, storeCacheResponse } from "#/request/cache";
 import { createCacheTracker } from "#tests/request/cache/cleanup";
+import { lookupCache, storeCacheFixture } from "#tests/request/cache/fixtures";
 
 const now = Date.UTC(2026, 9, 5);
 const expires = "Mon, 05 Oct 2026 01:00:00 GMT";
@@ -15,26 +15,18 @@ const isFresh = (
 ) => {
   const key = `https://cache-freshness.test/${process.pid}-${++serial}`;
   trackCache(key, cache);
-  storeCacheResponse({
-    url: key,
-    requestHeaders: {},
-    requestTimestamp: now,
-    responseTimestamp: now,
-    response: {
+  storeCacheFixture(
+    key,
+    cache,
+    {
       statusCode,
       headers,
       body: Buffer.alloc(0),
       responseUrl: key,
     },
-    cache: cache,
-  });
-  return prepareCacheLookup({
-    method: "GET",
-    url: key,
-    headers: [],
-    cache: cache,
-    now: now + 1_000,
-  }).useCachedResponse;
+    { requestTimestamp: now, responseTimestamp: now },
+  );
+  return lookupCache(key, cache, { now: now + 1_000 }).useCachedResponse;
 };
 
 describe.each(["file", "memory"] as const)(

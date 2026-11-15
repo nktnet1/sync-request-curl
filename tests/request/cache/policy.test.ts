@@ -9,12 +9,11 @@ import { afterEach, describe, expect, test } from "vitest";
 import {
   getCachedRedirectUrl,
   getCachedResponse,
-  prepareCacheLookup,
   refreshFileCacheEntry,
-  storeCacheResponse,
   storeFileCacheResponse,
 } from "#/request/cache";
-import { fileCacheDirectory, getCachePath } from "#/request/cache-path";
+import { fileCacheDirectory, getCachePath } from "#/request/cache/path";
+import { lookupCache, storeCacheFixture } from "#tests/request/cache/fixtures";
 
 let nextUrl = 0;
 const touchedPaths = new Set<string>();
@@ -51,13 +50,7 @@ const prepareStaleResponse = (headers: Record<string, string | string[]>) => {
   storeFileCacheResponse(url, {}, 0, 0, response(url, headers));
   return {
     url,
-    lookup: prepareCacheLookup({
-      method: "GET",
-      url: url,
-      headers: [],
-      cache: "file",
-      now: 1,
-    }),
+    lookup: lookupCache(url, "file", { now: 1 }),
   };
 };
 
@@ -77,13 +70,7 @@ const preparePermanentRedirectLookup = (
     body: Buffer.alloc(0),
     responseUrl: url,
   });
-  return prepareCacheLookup({
-    method: "GET",
-    url: url,
-    headers: requestHeaders,
-    cache: "file",
-    now: now,
-  });
+  return lookupCache(url, "file", { headers: requestHeaders, now: now });
 };
 
 const writeBucket = (
@@ -118,24 +105,11 @@ describe("file cache policy", () => {
         age: "10",
         "x-array": ["session=original"],
       });
-      storeCacheResponse({
-        url: url,
-        requestHeaders: {},
-        requestTimestamp: 0,
-        responseTimestamp: 2_000,
-        response: original,
-        cache: cache,
-      });
+      storeCacheFixture(url, cache, original, { responseTimestamp: 2_000 });
       original.headers["cache-control"] = "no-store";
       original.headers["x-array"] = ["session=changed"];
 
-      const lookup = prepareCacheLookup({
-        method: "GET",
-        url: url,
-        headers: [],
-        cache: cache,
-        now: 5_000,
-      });
+      const lookup = lookupCache(url, cache, { now: 5_000 });
       expect(lookup.useCachedResponse).toBe(true);
       if (!lookup.entry) throw new Error("Missing cache entry");
       const first = getCachedResponse(lookup.entry, 5_000);
@@ -159,9 +133,7 @@ describe("file cache policy", () => {
   );
 
   test("ignores malformed request headers and accumulates duplicate values", () => {
-    const lookup = prepareCacheLookup({
-      method: "GET",
-      url: cacheUrl(),
+    const lookup = lookupCache(cacheUrl(), "file", {
       headers: [
         "malformed",
         "X-Feature;",
@@ -170,7 +142,6 @@ describe("file cache policy", () => {
         "Cache-Control: max-age=3600",
         "Cache-Control: no-store",
       ],
-      cache: "file",
       now: 0,
     });
 
@@ -196,20 +167,12 @@ describe("file cache policy", () => {
     );
 
     expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: url,
-        headers: ["X-A: a", "X-B: b"],
-        cache: "file",
-        now: 1,
-      }).useCachedResponse,
+      lookupCache(url, "file", { headers: ["X-A: a", "X-B: b"], now: 1 })
+        .useCachedResponse,
     ).toBe(true);
     expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: url,
+      lookupCache(url, "file", {
         headers: ["X-A: a", "X-A: extra", "X-B: b"],
-        cache: "file",
         now: 1,
       }).useCachedResponse,
     ).toBe(false);
@@ -225,15 +188,7 @@ describe("file cache policy", () => {
       response(url, { "cache-control": 'max-age="60"' }),
     );
 
-    expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: url,
-        headers: [],
-        cache: "file",
-        now: 1,
-      }).useCachedResponse,
-    ).toBe(true);
+    expect(lookupCache(url, "file", { now: 1 }).useCachedResponse).toBe(true);
   });
 
   test("rejects delta-seconds outside the safe integer range", () => {
@@ -248,15 +203,7 @@ describe("file cache policy", () => {
       }),
     );
 
-    expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: url,
-        headers: [],
-        cache: "file",
-        now: 1,
-      }).useCachedResponse,
-    ).toBe(false);
+    expect(lookupCache(url, "file", { now: 1 }).useCachedResponse).toBe(false);
   });
 
   test("matches and replaces Vary entries when the varied header is absent", () => {
@@ -269,13 +216,7 @@ describe("file cache policy", () => {
     storeFileCacheResponse(url, {}, 0, 0, variedResponse);
     storeFileCacheResponse(url, {}, 1, 1, variedResponse);
 
-    const lookup = prepareCacheLookup({
-      method: "GET",
-      url: url,
-      headers: [],
-      cache: "file",
-      now: 2,
-    });
+    const lookup = lookupCache(url, "file", { now: 2 });
     const bucket = JSON.parse(readFileSync(getCachePath(url), "utf8")) as {
       entries: unknown[];
     };
@@ -300,13 +241,8 @@ describe("file cache policy", () => {
     );
 
     expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: url,
-        headers: [],
-        cache: "file",
-        now: Date.parse(responseDate) + 59_000,
-      }).useCachedResponse,
+      lookupCache(url, "file", { now: Date.parse(responseDate) + 59_000 })
+        .useCachedResponse,
     ).toBe(true);
   });
 
@@ -361,11 +297,8 @@ describe("file cache policy", () => {
     const url = cacheUrl();
     storeFreshResponse(url);
 
-    const lookup = prepareCacheLookup({
-      method: "GET",
-      url: url,
+    const lookup = lookupCache(url, "file", {
       headers: ["Cache-Control: max-age=0, , max-age=3600"],
-      cache: "file",
       now: 1,
     });
 
@@ -378,11 +311,8 @@ describe("file cache policy", () => {
     const url = cacheUrl();
     storeFreshResponse(url);
 
-    const lookup = prepareCacheLookup({
-      method: "GET",
-      url: url,
+    const lookup = lookupCache(url, "file", {
       headers: ["Pragma: no-cache"],
-      cache: "file",
       now: 1,
     });
 
@@ -396,30 +326,21 @@ describe("file cache policy", () => {
     (cache) => {
       for (const maxAge of [0, 3600]) {
         const url = cacheUrl();
-        storeCacheResponse({
-          url: url,
-          requestHeaders: {},
-          requestTimestamp: 0,
-          responseTimestamp: 0,
-          response: response(url, {
+        storeCacheFixture(
+          url,
+          cache,
+          response(url, {
             "cache-control": `max-age=${maxAge}`,
             etag: '"v1"',
             "last-modified": "Wed, 21 Oct 2015 07:28:00 GMT",
           }),
-          cache: cache,
-        });
+        );
         for (const header of [
           'If-Match: "different"',
           "iF-uNmOdIfIeD-sInCe: Tue, 20 Oct 2015 07:28:00 GMT",
         ]) {
           const headers = [header];
-          const lookup = prepareCacheLookup({
-            method: "GET",
-            url: url,
-            headers: headers,
-            cache: cache,
-            now: 1,
-          });
+          const lookup = lookupCache(url, cache, { headers: headers, now: 1 });
           expect(lookup.entry).toBeDefined();
           expect(lookup.useCachedResponse).toBe(false);
           expect(lookup.isRevalidation).toBe(false);
@@ -500,15 +421,7 @@ describe("file cache policy", () => {
       "cache-control": "max-age=60",
       etag: '"v1"',
     });
-    expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: url,
-        headers: [],
-        cache: "file",
-        now: 3,
-      }).useCachedResponse,
-    ).toBe(true);
+    expect(lookupCache(url, "file", { now: 3 }).useCachedResponse).toBe(true);
   });
 
   test("uses Expires freshness when Cache-Control max-age is absent", () => {
@@ -522,13 +435,7 @@ describe("file cache policy", () => {
       response(url, { expires: "Wed, 21 Oct 2015 07:29:00 GMT" }),
     );
 
-    const lookup = prepareCacheLookup({
-      method: "GET",
-      url: url,
-      headers: [],
-      cache: "file",
-      now: storedAt + 30_000,
-    });
+    const lookup = lookupCache(url, "file", { now: storedAt + 30_000 });
 
     expect(lookup.useCachedResponse).toBe(true);
   });
@@ -546,24 +453,12 @@ describe("file cache policy", () => {
       response(invalidUrl, { expires: "not-a-date" }),
     );
 
-    expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: missingUrl,
-        headers: [],
-        cache: "file",
-        now: 1,
-      }).useCachedResponse,
-    ).toBe(false);
-    expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: invalidUrl,
-        headers: [],
-        cache: "file",
-        now: 1,
-      }).useCachedResponse,
-    ).toBe(false);
+    expect(lookupCache(missingUrl, "file", { now: 1 }).useCachedResponse).toBe(
+      false,
+    );
+    expect(lookupCache(invalidUrl, "file", { now: 1 }).useCachedResponse).toBe(
+      false,
+    );
   });
 
   test("ignores manually persisted entries with Vary: *", () => {
@@ -581,15 +476,7 @@ describe("file cache policy", () => {
       },
     ]);
 
-    expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: url,
-        headers: [],
-        cache: "file",
-        now: 1,
-      }).entry,
-    ).toBeUndefined();
+    expect(lookupCache(url, "file", { now: 1 }).entry).toBeUndefined();
   });
 
   test("does not store responses with Vary: *", () => {
@@ -611,13 +498,7 @@ describe("file cache policy", () => {
     mkdirSync(fileCacheDirectory, { recursive: true });
     writeFileSync(getCachePath(url), "{", "utf8");
 
-    const lookup = prepareCacheLookup({
-      method: "GET",
-      url: url,
-      headers: [],
-      cache: "file",
-      now: 0,
-    });
+    const lookup = lookupCache(url, "file", { now: 0 });
 
     expect(lookup.entry).toBeUndefined();
     expect(existsSync(getCachePath(url))).toBe(false);
@@ -710,36 +591,32 @@ describe("file cache policy", () => {
           };
           if (firstDate !== undefined) firstHeaders.date = firstDate;
           if (secondDate !== undefined) secondHeaders.date = secondDate;
-          storeCacheResponse({
-            url: url,
-            requestHeaders: {},
-            requestTimestamp: timestamp + 2_000,
-            responseTimestamp: timestamp + 2_000,
-            response: {
+          storeCacheFixture(
+            url,
+            cache,
+            {
               ...response(url, firstHeaders),
               body: Buffer.from("first"),
             },
-            cache: cache,
-          });
-          storeCacheResponse({
-            url: url,
-            requestHeaders: {},
-            requestTimestamp: timestamp + 3_000,
-            responseTimestamp: timestamp + 3_000,
-            response: {
+            {
+              requestTimestamp: timestamp + 2_000,
+              responseTimestamp: timestamp + 2_000,
+            },
+          );
+          storeCacheFixture(
+            url,
+            cache,
+            {
               ...response(url, secondHeaders),
               body: Buffer.from("second"),
             },
-            cache: cache,
-          });
+            {
+              requestTimestamp: timestamp + 3_000,
+              responseTimestamp: timestamp + 3_000,
+            },
+          );
 
-          const lookup = prepareCacheLookup({
-            method: "GET",
-            url: url,
-            headers: [],
-            cache: cache,
-            now: timestamp + 4_000,
-          });
+          const lookup = lookupCache(url, cache, { now: timestamp + 4_000 });
           expect(lookup.useCachedResponse).toBe(true);
           if (!lookup.entry) throw new Error("Missing cache entry");
           expect(
@@ -751,12 +628,10 @@ describe("file cache policy", () => {
       test("filters newer nonmatching variants before comparing Dates", () => {
         const url = cacheUrl();
         const timestamp = Date.parse(earlier);
-        storeCacheResponse({
-          url: url,
-          requestHeaders: { "x-a": ["match"] },
-          requestTimestamp: timestamp,
-          responseTimestamp: timestamp,
-          response: {
+        storeCacheFixture(
+          url,
+          cache,
+          {
             ...response(url, {
               "cache-control": "max-age=3600",
               vary: "X-A",
@@ -764,14 +639,16 @@ describe("file cache policy", () => {
             }),
             body: Buffer.from("matching"),
           },
-          cache: cache,
-        });
-        storeCacheResponse({
-          url: url,
-          requestHeaders: { "x-a": ["other"] },
-          requestTimestamp: timestamp,
-          responseTimestamp: timestamp,
-          response: {
+          {
+            requestHeaders: { "x-a": ["match"] },
+            requestTimestamp: timestamp,
+            responseTimestamp: timestamp,
+          },
+        );
+        storeCacheFixture(
+          url,
+          cache,
+          {
             ...response(url, {
               "cache-control": "max-age=3600",
               vary: "X-A",
@@ -779,13 +656,14 @@ describe("file cache policy", () => {
             }),
             body: Buffer.from("nonmatching"),
           },
-          cache: cache,
-        });
-        const lookup = prepareCacheLookup({
-          method: "GET",
-          url: url,
+          {
+            requestHeaders: { "x-a": ["other"] },
+            requestTimestamp: timestamp,
+            responseTimestamp: timestamp,
+          },
+        );
+        const lookup = lookupCache(url, cache, {
           headers: ["X-A: match"],
-          cache: cache,
           now: timestamp + 2_000,
         });
         if (!lookup.entry) throw new Error("Missing cache entry");
@@ -810,15 +688,7 @@ describe("cache revalidation integrity", () => {
     expect(() => refreshFileCacheEntry(url, lookup, headers, 2)).toThrow(
       "304 validator",
     );
-    expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: url,
-        headers: [],
-        cache: "file",
-        now: 3,
-      }).entry,
-    ).toBeUndefined();
+    expect(lookupCache(url, "file", { now: 3 }).entry).toBeUndefined();
   });
 
   test("accepts a weak matching tag and copies updated header arrays", () => {
@@ -861,15 +731,7 @@ describe("cache revalidation integrity", () => {
       expect(
         refreshFileCacheEntry(url, lookup, headers, 2)?.body.toString(),
       ).toBe("cached");
-      expect(
-        prepareCacheLookup({
-          method: "GET",
-          url: url,
-          headers: [],
-          cache: "file",
-          now: 3,
-        }).entry,
-      ).toBeUndefined();
+      expect(lookupCache(url, "file", { now: 3 }).entry).toBeUndefined();
     },
   );
 });
@@ -884,13 +746,5 @@ test("an origin no-store response replaces a previously reusable entry", () => {
     1,
     response(url, { "cache-control": "no-store" }),
   );
-  expect(
-    prepareCacheLookup({
-      method: "GET",
-      url: url,
-      headers: [],
-      cache: "file",
-      now: 2,
-    }).entry,
-  ).toBeUndefined();
+  expect(lookupCache(url, "file", { now: 2 }).entry).toBeUndefined();
 });

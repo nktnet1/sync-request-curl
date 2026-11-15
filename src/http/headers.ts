@@ -5,18 +5,18 @@ export {
   rejectMultipartContentLength,
   setContentLengthHeader,
   validateRequestFraming,
-} from "#/http/request-framing";
+} from "#/http/headers/request/framing";
 export {
   hasNonEmptyRequestHeader,
   hasRequestHeader,
   type ParsedRequestHeaderLine,
   parseRequestHeaderLine,
   setRequestHeader,
-} from "#/http/request-headers";
+} from "#/http/headers/request/headers";
 export {
   serializeProxyHeaders,
   serializeRequestHeaders,
-} from "#/http/request-serialization";
-export { throwForResponseFramingTransportError } from "#/http/response-framing";
-export { parseResponseHeaders } from "#/http/response-headers";
-export { throwForResponseHeaderTransportError } from "#/http/response-transport";
+} from "#/http/headers/request/serialization";
+export { throwForResponseFramingTransportError } from "#/http/headers/response/framing";
+export { parseResponseHeaders } from "#/http/headers/response/headers";
+export { throwForResponseHeaderTransportError } from "#/http/headers/response/transport";

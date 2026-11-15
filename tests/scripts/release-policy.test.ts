@@ -8,7 +8,7 @@ import {
   planRelease,
   releaseLabel,
   versionFromReleaseTag,
-} from "#scripts/release-policy";
+} from "#scripts/release/policy";
 
 const version = "5.0.0-beta.2";
 const fixture = () => {

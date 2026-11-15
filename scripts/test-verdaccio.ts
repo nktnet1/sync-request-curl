@@ -20,8 +20,8 @@ import { reserveLoopbackPort } from "#scripts/loopback-port";
 import { getCurrentPlatformKey } from "#scripts/native-platform";
 import { pollUntilReady } from "#scripts/poll-until-ready";
 import { canRun, run } from "#scripts/process";
-import { parseReleasePackageJson } from "#scripts/release-package";
-import { parseReleaseVersion } from "#scripts/release-policy";
+import { parseReleasePackageJson } from "#scripts/release/package";
+import { parseReleaseVersion } from "#scripts/release/policy";
 import {
   packPackage,
   type SmokeContext,
@@ -29,8 +29,8 @@ import {
   verifyCleanInstall,
   verifyPublishedDistTags,
   verifyPublishedMetadata,
-} from "#scripts/verdaccio-smoke-packages";
-import { launchSmokeServer } from "#scripts/verdaccio-smoke-server";
+} from "#scripts/verdaccio/packages";
+import { launchSmokeServer } from "#scripts/verdaccio/server";
 
 const VERDACCIO_VERSION = "6.10.4";
 const STARTUP_TIMEOUT_MS = 120_000;
@@ -174,7 +174,7 @@ const pingVerdaccio = async (registry: string): Promise<boolean> => {
 
 const waitForVerdaccio = async (registry: string): Promise<void> => {
   const ready = await pollUntilReady(
-    async () => {
+    () => {
       checkVerdaccioStillRunning();
       return pingVerdaccio(registry);
     },

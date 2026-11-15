@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { nextBetaVersion } from "#scripts/beta-version";
 import { run } from "#scripts/process";
-import { releaseLabel } from "#scripts/release-policy";
+import { releaseLabel } from "#scripts/release/policy";
 
 const { values } = parseArgs({
   options: {

@@ -4,13 +4,15 @@ import {
   canCacheResponse,
   getCachedResponse,
   invalidateCache,
-  prepareCacheLookup,
   refreshCacheEntry,
-  storeCacheResponse,
-  updateCacheFromHead,
 } from "#/request/cache";
-import { getCacheBucketKey, getRequestCacheKey } from "#/request/cache-key";
-import { fileCacheDirectory, getCachePath } from "#/request/cache-path";
+import { getCacheBucketKey, getRequestCacheKey } from "#/request/cache/key";
+import { fileCacheDirectory, getCachePath } from "#/request/cache/path";
+import {
+  lookupCache,
+  storeCacheFixture,
+  updateHeadFixture,
+} from "#tests/request/cache/fixtures";
 
 let nextTarget = 0;
 const touchedPaths = new Set<string>();
@@ -50,48 +52,26 @@ describe.each(["file", "memory"] as const)("%s cache regressions", (cache) => {
       vary: "X-Variant",
       etag: '"same"',
     };
-    storeCacheResponse({
-      url: plain,
+    storeCacheFixture(plain, cache, response("plain a", headers), {
       requestHeaders: { "x-variant": ["a"] },
-      requestTimestamp: 0,
-      responseTimestamp: 0,
-      response: response("plain a", headers),
-      cache: cache,
     });
-    storeCacheResponse({
-      url: encoded,
+    storeCacheFixture(encoded, cache, response("encoded a", headers), {
       requestHeaders: { "x-variant": ["a"] },
-      requestTimestamp: 0,
-      responseTimestamp: 0,
-      response: response("encoded a", headers),
-      cache: cache,
     });
-    storeCacheResponse({
-      url: encoded,
+    storeCacheFixture(encoded, cache, response("encoded b", headers), {
       requestHeaders: { "x-variant": ["b"] },
-      requestTimestamp: 0,
-      responseTimestamp: 0,
-      response: response("encoded b", headers),
-      cache: cache,
     });
-    storeCacheResponse({
-      url: plain,
+    storeCacheFixture(plain, cache, response("plain replacement", headers), {
       requestHeaders: { "x-variant": ["a"] },
-      requestTimestamp: 0,
       responseTimestamp: 1,
-      response: response("plain replacement", headers),
-      cache: cache,
     });
     for (const [key, variant, body] of [
       [plain, "a", "plain replacement"],
       [encoded, "a", "encoded a"],
       [encoded, "b", "encoded b"],
     ]) {
-      const lookup = prepareCacheLookup({
-        method: "GET",
-        url: key,
+      const lookup = lookupCache(key, cache, {
         headers: [`X-Variant: ${variant}`],
-        cache: cache,
         now: 2,
       });
       expect(lookup.useCachedResponse).toBe(true);
@@ -99,38 +79,30 @@ describe.each(["file", "memory"] as const)("%s cache regressions", (cache) => {
         lookup.entry && getCachedResponse(lookup.entry, 2).body.toString(),
       ).toBe(body);
     }
-    storeCacheResponse({
-      url: plain,
-      requestHeaders: { "x-variant": ["a"] },
-      requestTimestamp: 0,
-      responseTimestamp: 2,
-      response: response("plain stale", {
+    storeCacheFixture(
+      plain,
+      cache,
+      response("plain stale", {
         ...headers,
         "cache-control": "max-age=0",
       }),
-      cache: cache,
-    });
-    const lookup = prepareCacheLookup({
-      method: "GET",
-      url: plain,
+      { requestHeaders: { "x-variant": ["a"] }, responseTimestamp: 2 },
+    );
+    const lookup = lookupCache(plain, cache, {
       headers: ["X-Variant: a"],
-      cache: cache,
       now: 3,
     });
     expect(
       refreshCacheEntry({
         url: plain,
-        lookup: lookup,
+        lookup,
         responseHeaders: { etag: '"same"', "cache-control": "max-age=60" },
         responseTimestamp: 4,
-        cache: cache,
+        cache,
       })?.body.toString(),
     ).toBe("plain stale");
-    const sibling = prepareCacheLookup({
-      method: "GET",
-      url: encoded,
+    const sibling = lookupCache(encoded, cache, {
       headers: ["X-Variant: b"],
-      cache: cache,
       now: 5,
     });
     expect(
@@ -152,35 +124,12 @@ describe.each(["file", "memory"] as const)("%s cache regressions", (cache) => {
       keyFor(url.replace("cache.test", "other.test")),
     ];
     for (const key of [...keys, ...unrelated])
-      storeCacheResponse({
-        url: key,
-        requestHeaders: {},
-        requestTimestamp: 0,
-        responseTimestamp: 0,
-        response: response(key),
-        cache: cache,
-      });
+      storeCacheFixture(key, cache, response(key));
     invalidateCache(keys[1], cache);
     for (const key of keys)
-      expect(
-        prepareCacheLookup({
-          method: "GET",
-          url: key,
-          headers: [],
-          cache: cache,
-          now: 1,
-        }).entry,
-      ).toBeUndefined();
+      expect(lookupCache(key, cache, { now: 1 }).entry).toBeUndefined();
     for (const key of unrelated)
-      expect(
-        prepareCacheLookup({
-          method: "GET",
-          url: key,
-          headers: [],
-          cache: cache,
-          now: 1,
-        }).useCachedResponse,
-      ).toBe(true);
+      expect(lookupCache(key, cache, { now: 1 }).useCachedResponse).toBe(true);
   });
 
   test.each([
@@ -195,51 +144,20 @@ describe.each(["file", "memory"] as const)("%s cache regressions", (cache) => {
         statusCode: 412,
       };
       expect(canCacheResponse(failed)).toBe(false);
-      storeCacheResponse({
-        url: key,
-        requestHeaders: {},
-        requestTimestamp: 0,
-        responseTimestamp: 0,
-        response: response("good body"),
-        cache: cache,
-      });
-      storeCacheResponse({
-        url: key,
+      storeCacheFixture(key, cache, response("good body"));
+      storeCacheFixture(key, cache, failed, {
         requestHeaders: { "if-match": ['"missing"'] },
         requestTimestamp: 1,
         responseTimestamp: 1,
-        response: failed,
-        cache: cache,
       });
-      const lookup = prepareCacheLookup({
-        method: "GET",
-        url: key,
-        headers: [],
-        cache: cache,
-        now: 2,
-      });
+      const lookup = lookupCache(key, cache, { now: 2 });
       expect(lookup.entry?.statusCode).toBe(200);
       expect(
         lookup.entry && getCachedResponse(lookup.entry, 2).body.toString(),
       ).toBe("good body");
       const cold = keyFor(target());
-      storeCacheResponse({
-        url: cold,
-        requestHeaders: {},
-        requestTimestamp: 0,
-        responseTimestamp: 0,
-        response: failed,
-        cache: cache,
-      });
-      expect(
-        prepareCacheLookup({
-          method: "GET",
-          url: cold,
-          headers: [],
-          cache: cache,
-          now: 1,
-        }).entry,
-      ).toBeUndefined();
+      storeCacheFixture(cold, cache, failed);
+      expect(lookupCache(cold, cache, { now: 1 }).entry).toBeUndefined();
     },
   );
 
@@ -250,51 +168,23 @@ describe.each(["file", "memory"] as const)("%s cache regressions", (cache) => {
     "the first response max-age wins across duplicate directives %j",
     (headers) => {
       const key = keyFor(target());
-      storeCacheResponse({
-        url: key,
-        requestHeaders: {},
-        requestTimestamp: 0,
-        responseTimestamp: 0,
-        response: response("stale", headers),
-        cache: cache,
-      });
-      expect(
-        prepareCacheLookup({
-          method: "GET",
-          url: key,
-          headers: [],
-          cache: cache,
-          now: 1,
-        }).useCachedResponse,
-      ).toBe(false);
+      storeCacheFixture(key, cache, response("stale", headers));
+      expect(lookupCache(key, cache, { now: 1 }).useCachedResponse).toBe(false);
     },
   );
 
   test("request max-age also uses its first occurrence", () => {
     const key = keyFor(target());
-    storeCacheResponse({
-      url: key,
-      requestHeaders: {},
-      requestTimestamp: 0,
-      responseTimestamp: 0,
-      response: response("cached"),
-      cache: cache,
-    });
+    storeCacheFixture(key, cache, response("cached"));
     expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: key,
+      lookupCache(key, cache, {
         headers: ["Cache-Control: max-age=0", "Cache-Control: max-age=3600"],
-        cache: cache,
         now: 1,
       }).useCachedResponse,
     ).toBe(false);
     expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: key,
+      lookupCache(key, cache, {
         headers: ["Cache-Control: max-age=3600, max-age=0"],
-        cache: cache,
         now: 1,
       }).useCachedResponse,
     ).toBe(true);
@@ -309,84 +199,50 @@ describe.each(["file", "memory"] as const)("%s cache regressions", (cache) => {
     { "set-cookie": ["session=secret"] },
   ])("HEAD metadata %j invalidates the matching GET", (headers) => {
     const key = keyFor(target());
-    storeCacheResponse({
-      url: key,
-      requestHeaders: {},
-      requestTimestamp: 0,
-      responseTimestamp: 0,
-      response: response("cached", {
+    storeCacheFixture(
+      key,
+      cache,
+      response("cached", {
         "cache-control": "max-age=3600",
         etag: '"original"',
         "last-modified": "Wed, 21 Oct 2015 07:28:00 GMT",
         "content-length": "6",
       }),
-      cache: cache,
-    });
-    updateCacheFromHead({
-      url: key,
-      lookup: prepareCacheLookup({
-        method: "HEAD",
-        url: key,
-        headers: [],
-        cache: cache,
-        now: 1,
-      }),
-      responseHeaders: headers,
-      responseTimestamp: 2,
-      cache: cache,
-      decompress: true,
-    });
-    expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: key,
-        headers: [],
-        cache: cache,
-        now: 3,
-      }).entry,
-    ).toBeUndefined();
+    );
+    updateHeadFixture(
+      key,
+      cache,
+      lookupCache(key, cache, { method: "HEAD", now: 1 }),
+      headers,
+      2,
+    );
+    expect(lookupCache(key, cache, { now: 3 }).entry).toBeUndefined();
   });
 
   test("matching HEAD metadata freshens a stale GET while preserving its body", () => {
     const key = keyFor(target());
-    storeCacheResponse({
-      url: key,
-      requestHeaders: {},
-      requestTimestamp: 0,
-      responseTimestamp: 0,
-      response: response("cached", {
+    storeCacheFixture(
+      key,
+      cache,
+      response("cached", {
         "cache-control": "max-age=0",
         etag: '"original"',
         "content-length": "6",
       }),
-      cache: cache,
-    });
-    updateCacheFromHead({
-      url: key,
-      lookup: prepareCacheLookup({
-        method: "HEAD",
-        url: key,
-        headers: [],
-        cache: cache,
-        now: 1_000,
-      }),
-      responseHeaders: {
+    );
+    updateHeadFixture(
+      key,
+      cache,
+      lookupCache(key, cache, { method: "HEAD", now: 1_000 }),
+      {
         "cache-control": "max-age=60",
         etag: '"original"',
         "content-length": "6",
         "x-head": "updated",
       },
-      responseTimestamp: 1_010,
-      cache: cache,
-      decompress: true,
-    });
-    const lookup = prepareCacheLookup({
-      method: "GET",
-      url: key,
-      headers: [],
-      cache: cache,
-      now: 1_020,
-    });
+      1_010,
+    );
+    const lookup = lookupCache(key, cache, { now: 1_020 });
     expect(lookup.useCachedResponse).toBe(true);
     expect(lookup.entry?.headers["x-head"]).toBe("updated");
     expect(
@@ -396,165 +252,97 @@ describe.each(["file", "memory"] as const)("%s cache regressions", (cache) => {
 
   test("HEAD on an empty cache never creates a bodyless GET entry", () => {
     const key = keyFor(target());
-    updateCacheFromHead({
-      url: key,
-      lookup: prepareCacheLookup({
-        method: "HEAD",
-        url: key,
-        headers: [],
-        cache: cache,
-        now: 1,
-      }),
-      responseHeaders: {
+    updateHeadFixture(
+      key,
+      cache,
+      lookupCache(key, cache, { method: "HEAD", now: 1 }),
+      {
         "cache-control": "max-age=60",
         etag: '"original"',
         "content-length": "6",
       },
-      responseTimestamp: 2,
-      cache: cache,
-      decompress: true,
-    });
-    expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: key,
-        headers: [],
-        cache: cache,
-        now: 3,
-      }).entry,
-    ).toBeUndefined();
+      2,
+    );
+    expect(lookupCache(key, cache, { now: 3 }).entry).toBeUndefined();
     expect(existsSync(getCachePath(getCacheBucketKey(key)))).toBe(false);
   });
 
   test("HEAD request no-store invalidates without refreshing stored metadata", () => {
     const key = keyFor(target());
-    storeCacheResponse({
-      url: key,
-      requestHeaders: {},
-      requestTimestamp: 0,
-      responseTimestamp: 0,
-      response: response("cached"),
-      cache: cache,
-    });
-    updateCacheFromHead({
-      url: key,
-      lookup: prepareCacheLookup({
+    storeCacheFixture(key, cache, response("cached"));
+    updateHeadFixture(
+      key,
+      cache,
+      lookupCache(key, cache, {
         method: "HEAD",
-        url: key,
         headers: ["Cache-Control: no-store"],
-        cache: cache,
         now: 1,
       }),
-      responseHeaders: { "cache-control": "max-age=60" },
-      responseTimestamp: 2,
-      cache: cache,
-      decompress: true,
-    });
-    expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: key,
-        headers: [],
-        cache: cache,
-        now: 3,
-      }).entry,
-    ).toBeUndefined();
+      { "cache-control": "max-age=60" },
+      2,
+    );
+    expect(lookupCache(key, cache, { now: 3 }).entry).toBeUndefined();
   });
 
   test("HEAD updates the request headers used by a changed Vary definition", () => {
     const key = keyFor(target());
-    storeCacheResponse({
-      url: key,
-      requestHeaders: { "x-variant": ["old"] },
-      requestTimestamp: 0,
-      responseTimestamp: 0,
-      response: response("cached", {
+    storeCacheFixture(
+      key,
+      cache,
+      response("cached", {
         "cache-control": "max-age=0",
         etag: '"same"',
       }),
-      cache: cache,
-    });
-    updateCacheFromHead({
-      url: key,
-      lookup: prepareCacheLookup({
+      { requestHeaders: { "x-variant": ["old"] } },
+    );
+    updateHeadFixture(
+      key,
+      cache,
+      lookupCache(key, cache, {
         method: "HEAD",
-        url: key,
         headers: ["X-Variant: new"],
-        cache: cache,
         now: 1,
       }),
-      responseHeaders: {
+      {
         etag: '"same"',
         vary: "X-Variant",
         "cache-control": "max-age=60",
       },
-      responseTimestamp: 2,
-      cache: cache,
-      decompress: true,
-    });
+      2,
+    );
     expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: key,
-        headers: ["X-Variant: new"],
-        cache: cache,
-        now: 3,
-      }).useCachedResponse,
+      lookupCache(key, cache, { headers: ["X-Variant: new"], now: 3 })
+        .useCachedResponse,
     ).toBe(true);
     expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: key,
-        headers: ["X-Variant: old"],
-        cache: cache,
-        now: 3,
-      }).useCachedResponse,
+      lookupCache(key, cache, { headers: ["X-Variant: old"], now: 3 })
+        .useCachedResponse,
     ).toBe(false);
   });
 
   test("HEAD respects the custom variant matching policy", () => {
     const key = keyFor(target());
-    storeCacheResponse({
-      url: key,
-      requestHeaders: {},
-      requestTimestamp: 0,
-      responseTimestamp: 0,
-      response: response("cached"),
-      cache: cache,
-    });
+    storeCacheFixture(key, cache, response("cached"));
     let calls = 0;
-    updateCacheFromHead({
-      url: key,
-      lookup: prepareCacheLookup({
-        method: "HEAD",
-        url: key,
-        headers: [],
-        cache: cache,
-        now: 1,
-      }),
-      responseHeaders: { etag: '"changed"' },
-      responseTimestamp: 2,
-      cache: cache,
-      decompress: true,
-      policy: {
-        isMatch: (_headers, cached, defaultValue) => {
-          calls += 1;
-          expect(defaultValue).toBe(true);
-          expect(cached.body.toString()).toBe("cached");
-          return false;
+    updateHeadFixture(
+      key,
+      cache,
+      lookupCache(key, cache, { method: "HEAD", now: 1 }),
+      { etag: '"changed"' },
+      2,
+      {
+        policy: {
+          isMatch: (_headers, cached, defaultValue) => {
+            calls += 1;
+            expect(defaultValue).toBe(true);
+            expect(cached.body.toString()).toBe("cached");
+            return false;
+          },
         },
       },
-    });
+    );
     expect(calls).toBe(1);
-    expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: key,
-        headers: [],
-        cache: cache,
-        now: 3,
-      }).useCachedResponse,
-    ).toBe(true);
+    expect(lookupCache(key, cache, { now: 3 }).useCachedResponse).toBe(true);
   });
 
   test("HEAD preserves unmatched Vary and decompression variants", () => {
@@ -565,61 +353,34 @@ describe.each(["file", "memory"] as const)("%s cache regressions", (cache) => {
       etag: '"original"',
     };
     for (const variant of ["a", "b"])
-      storeCacheResponse({
-        url: key,
+      storeCacheFixture(key, cache, response(variant, headers), {
         requestHeaders: { "x-variant": [variant] },
-        requestTimestamp: 0,
-        responseTimestamp: 0,
-        response: response(variant, headers),
-        cache: cache,
       });
-    storeCacheResponse({
-      url: key,
+    storeCacheFixture(key, cache, response("undecoded", headers), {
       requestHeaders: { "x-variant": ["a"] },
-      requestTimestamp: 0,
-      responseTimestamp: 0,
-      response: response("undecoded", headers),
-      cache: cache,
       options: { decompress: false },
     });
-    updateCacheFromHead({
-      url: key,
-      lookup: prepareCacheLookup({
+    updateHeadFixture(
+      key,
+      cache,
+      lookupCache(key, cache, {
         method: "HEAD",
-        url: key,
         headers: ["X-Variant: a"],
-        cache: cache,
         now: 1,
       }),
-      responseHeaders: { etag: '"changed"' },
-      responseTimestamp: 2,
-      cache: cache,
-      decompress: true,
-    });
+      { etag: '"changed"' },
+      2,
+    );
     expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: key,
-        headers: ["X-Variant: a"],
-        cache: cache,
-        now: 3,
-      }).entry,
+      lookupCache(key, cache, { headers: ["X-Variant: a"], now: 3 }).entry,
     ).toBeUndefined();
     expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: key,
-        headers: ["X-Variant: b"],
-        cache: cache,
-        now: 3,
-      }).useCachedResponse,
+      lookupCache(key, cache, { headers: ["X-Variant: b"], now: 3 })
+        .useCachedResponse,
     ).toBe(true);
     expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: key,
+      lookupCache(key, cache, {
         headers: ["X-Variant: a"],
-        cache: cache,
         now: 3,
         decompress: false,
       }).useCachedResponse,
@@ -633,91 +394,43 @@ describe.each(["file", "memory"] as const)("%s cache regressions", (cache) => {
       url.replace("/regressions/", "/regressions/dir/%2e%2e/"),
     );
     for (const key of [plain, encoded])
-      storeCacheResponse({
-        url: key,
-        requestHeaders: {},
-        requestTimestamp: 0,
-        responseTimestamp: 0,
-        response: response("body", {
+      storeCacheFixture(
+        key,
+        cache,
+        response("body", {
           "cache-control": "max-age=60",
           etag: '"same"',
         }),
-        cache: cache,
-      });
-    updateCacheFromHead({
-      url: plain,
-      lookup: prepareCacheLookup({
-        method: "HEAD",
-        url: plain,
-        headers: [],
-        cache: cache,
-        now: 1,
-      }),
-      responseHeaders: { etag: '"same"' },
-      responseTimestamp: 2,
-      cache: cache,
-      decompress: true,
-    });
-    expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: plain,
-        headers: [],
-        cache: cache,
-        now: 3,
-      }).useCachedResponse,
-    ).toBe(true);
-    expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: encoded,
-        headers: [],
-        cache: cache,
-        now: 3,
-      }).entry,
-    ).toBeUndefined();
+      );
+    updateHeadFixture(
+      plain,
+      cache,
+      lookupCache(plain, cache, { method: "HEAD", now: 1 }),
+      { etag: '"same"' },
+      2,
+    );
+    expect(lookupCache(plain, cache, { now: 3 }).useCachedResponse).toBe(true);
+    expect(lookupCache(encoded, cache, { now: 3 }).entry).toBeUndefined();
   });
 
   test("a successful HEAD cannot freshen a cached redirect body", () => {
     const key = keyFor(target());
-    storeCacheResponse({
-      url: key,
-      requestHeaders: {},
-      requestTimestamp: 0,
-      responseTimestamp: 0,
-      response: {
-        ...response("redirect", {
-          "cache-control": "max-age=60",
-          etag: '"same"',
-          location: "https://cache.test/next",
-        }),
-        statusCode: 301,
-      },
-      cache: cache,
-    });
-    updateCacheFromHead({
-      url: key,
-      lookup: prepareCacheLookup({
-        method: "HEAD",
-        url: key,
-        headers: [],
-        cache: cache,
-        now: 1,
+    storeCacheFixture(key, cache, {
+      ...response("redirect", {
+        "cache-control": "max-age=60",
+        etag: '"same"',
+        location: "https://cache.test/next",
       }),
-      responseHeaders: { etag: '"same"' },
-      responseTimestamp: 2,
-      cache: cache,
-      decompress: true,
+      statusCode: 301,
     });
-    expect(
-      prepareCacheLookup({
-        method: "GET",
-        url: key,
-        headers: [],
-        cache: cache,
-        now: 3,
-      }).entry,
-    ).toBeUndefined();
+    updateHeadFixture(
+      key,
+      cache,
+      lookupCache(key, cache, { method: "HEAD", now: 1 }),
+      { etag: '"same"' },
+      2,
+    );
+    expect(lookupCache(key, cache, { now: 3 }).entry).toBeUndefined();
   });
 });
 
@@ -726,14 +439,6 @@ test("old file buckets without target identities are discarded", () => {
   const path = getCachePath(getCacheBucketKey(key));
   mkdirSync(fileCacheDirectory, { recursive: true });
   writeFileSync(path, JSON.stringify({ version: 1, entries: [] }));
-  expect(
-    prepareCacheLookup({
-      method: "GET",
-      url: key,
-      headers: [],
-      cache: "file",
-      now: 1,
-    }).entry,
-  ).toBeUndefined();
+  expect(lookupCache(key, "file", { now: 1 }).entry).toBeUndefined();
   expect(existsSync(path)).toBe(false);
 });

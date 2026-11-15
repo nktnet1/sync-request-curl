@@ -338,7 +338,7 @@ test("releases rebuild and smoke-test FreeBSD addons rather than trusting CI cac
   expect(release).toContain("if-no-files-found: error");
 });
 
-test("main warms the FreeBSD cache but only a tag-push release can publish", () => {
+test("main warms the FreeBSD cache but only the dedicated tag workflow publishes", () => {
   const pipeline = readFileSync(
     resolve(import.meta.dirname, "../../.github/workflows/pipeline.yaml"),
     "utf8",
@@ -350,20 +350,28 @@ test("main warms the FreeBSD cache but only a tag-push release can publish", () 
     ),
     "utf8",
   );
-  const publishJob = release.split("\n  publish:\n")[1];
+  const publish = readFileSync(
+    resolve(import.meta.dirname, "../../.github/workflows/publish.yaml"),
+    "utf8",
+  );
+  const publishJob = publish.split("\n  publish:\n")[1];
 
   expect(pipeline).toMatch(/on:\n {2}push:\n {4}branches:\n {6}- main\n/);
   expect(pipeline).toContain("key: freebsd-prebuild-");
   expect(pipeline).not.toContain("id-token: write");
-  expect(release).toMatch(
-    /on:\n {2}workflow_dispatch:\n {2}push:\n {4}tags:\n {6}- ["']v\*["']/,
-  );
+  expect(release).toMatch(/on:\n {2}workflow_call:\n {2}workflow_dispatch:/);
   expect(release).not.toContain("workflow_run:");
+  expect(release).not.toContain("id-token: write");
+  expect(release).not.toContain("\n  publish:\n");
+  expect(publish).toMatch(/on:\n {2}push:\n {4}tags:\n {6}- ["']v\*["']/);
+  expect(publish).not.toContain("workflow_run:");
+  expect(publish).toContain("uses: ./.github/workflows/native-prebuilds.yaml");
   expect(publishJob).toBeDefined();
   expect(publishJob).toContain(
     "if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')",
   );
-  expect(publishJob).toContain("needs: package");
+  expect(publishJob).toContain("needs: build-release");
   expect(publishJob).toContain("environment: Production");
   expect(publishJob).toContain("id-token: write");
+  expect(publishJob).toContain('--expected-sha="$BUILD_SHA"');
 });

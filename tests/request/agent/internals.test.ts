@@ -13,7 +13,7 @@ vi.mock("#/native/index", () => ({
   },
 }));
 
-import { getAgentPoolId, releaseAgentPool } from "#/request/agent";
+import { getAgentPoolId, releaseAgentPool } from "#/request/transport/agent";
 
 beforeEach(() => {
   createConnectionPool.mockReset();

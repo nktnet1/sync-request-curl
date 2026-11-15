@@ -1,24 +1,24 @@
-import { getCurrentAge } from "#/request/cache-freshness";
+import { getCurrentAge } from "#/request/cache/freshness";
 import {
   type CacheableResponse,
   type CacheLookup,
   copyHeaders,
   getHeaderValue,
-} from "#/request/cache-types";
+} from "#/request/cache/types";
 
-export { updateCacheFromHead } from "#/request/cache-head";
-export { prepareCacheLookup } from "#/request/cache-lookup";
-export { canCacheResponse } from "#/request/cache-response-policy";
+export { updateCacheFromHead } from "#/request/cache/head";
+export { prepareCacheLookup } from "#/request/cache/lookup";
+export { canCacheResponse } from "#/request/cache/response-policy";
 export {
   refreshCacheEntry,
   refreshFileCacheEntry,
-} from "#/request/cache-revalidation";
-export { invalidateCache, invalidateFileCache } from "#/request/cache-storage";
-export type { CacheableResponse, CacheLookup } from "#/request/cache-types";
+} from "#/request/cache/revalidation";
+export { invalidateCache, invalidateFileCache } from "#/request/cache/storage";
+export type { CacheableResponse, CacheLookup } from "#/request/cache/types";
 export {
   storeCacheResponse,
   storeFileCacheResponse,
-} from "#/request/cache-write";
+} from "#/request/cache/write";
 
 const redirectStatusCodes = new Set([301, 302, 303, 307, 308]);
 

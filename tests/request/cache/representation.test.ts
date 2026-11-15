@@ -1,13 +1,12 @@
 import { brotliCompressSync, gzipSync } from "node:zlib";
 import { describe, expect, test } from "vitest";
-import {
-  getCachedResponse,
-  prepareCacheLookup,
-  refreshCacheEntry,
-  storeCacheResponse,
-  updateCacheFromHead,
-} from "#/request/cache";
+import { getCachedResponse, refreshCacheEntry } from "#/request/cache";
 import { createCacheTracker } from "#tests/request/cache/cleanup";
+import {
+  lookupCache,
+  storeCacheFixture,
+  updateHeadFixture,
+} from "#tests/request/cache/fixtures";
 
 const trackCache = createCacheTracker();
 const original = Buffer.from("original representation");
@@ -25,12 +24,10 @@ describe.each(["file", "memory"] as const)(
       const key = nextKey();
       trackCache(key, cache);
       const now = Date.now();
-      storeCacheResponse({
-        url: key,
-        requestHeaders: { "a-im": ["diffe"], "if-none-match": ['"base"'] },
-        requestTimestamp: now,
-        responseTimestamp: now,
-        response: {
+      storeCacheFixture(
+        key,
+        cache,
+        {
           statusCode: 226,
           headers: {
             ...freshness,
@@ -41,16 +38,13 @@ describe.each(["file", "memory"] as const)(
           body: Buffer.from("delta instructions"),
           responseUrl: key,
         },
-        cache: cache,
-      });
-      expect(
-        prepareCacheLookup({
-          method: "GET",
-          url: key,
-          headers: [],
-          cache: cache,
-        }).entry,
-      ).toBeUndefined();
+        {
+          requestHeaders: { "a-im": ["diffe"], "if-none-match": ['"base"'] },
+          requestTimestamp: now,
+          responseTimestamp: now,
+        },
+      );
+      expect(lookupCache(key, cache).entry).toBeUndefined();
     });
 
     test("cache policy callbacks receive independent request header copies", () => {
@@ -60,25 +54,20 @@ describe.each(["file", "memory"] as const)(
         "x-single": ["value"],
         "x-multi": ["one", "two"],
       };
-      storeCacheResponse({
-        url: key,
-        requestHeaders: requestHeaders,
-        requestTimestamp: 0,
-        responseTimestamp: 0,
-        response: {
+      storeCacheFixture(
+        key,
+        cache,
+        {
           statusCode: 200,
           headers: { "cache-control": "max-age=60", vary: "X-Multi" },
           body: original,
           responseUrl: key,
         },
-        cache: cache,
-      });
+        { requestHeaders: requestHeaders },
+      );
       const headers = ["X-Single: value", "X-Multi: one", "X-Multi: two"];
-      const lookup = prepareCacheLookup({
-        method: "GET",
-        url: key,
+      const lookup = lookupCache(key, cache, {
         headers: headers,
-        cache: cache,
         now: 1,
         decompress: true,
         policy: {
@@ -108,13 +97,7 @@ describe.each(["file", "memory"] as const)(
       expect(lookup.useCachedResponse).toBe(true);
       expect(lookup.entry?.requestHeaders).toEqual(requestHeaders);
       expect(
-        prepareCacheLookup({
-          method: "GET",
-          url: key,
-          headers: headers,
-          cache: cache,
-          now: 2,
-        }).useCachedResponse,
+        lookupCache(key, cache, { headers: headers, now: 2 }).useCachedResponse,
       ).toBe(true);
     });
 
@@ -141,12 +124,10 @@ describe.each(["file", "memory"] as const)(
       ])("preserves the coding of $name", ({ encoding, body, decompress }) => {
         const key = nextKey();
         trackCache(key, cache);
-        storeCacheResponse({
-          url: key,
-          requestHeaders: {},
-          requestTimestamp: 0,
-          responseTimestamp: 0,
-          response: {
+        storeCacheFixture(
+          key,
+          cache,
+          {
             statusCode: 200,
             headers: {
               "cache-control": "max-age=0",
@@ -158,14 +139,10 @@ describe.each(["file", "memory"] as const)(
             body,
             responseUrl: key,
           },
-          cache: cache,
-          options: { decompress },
-        });
-        const lookup = prepareCacheLookup({
+          { options: { decompress } },
+        );
+        const lookup = lookupCache(key, cache, {
           method: method === "304" ? "GET" : "HEAD",
-          url: key,
-          headers: [],
-          cache: cache,
           now: 1,
           decompress: decompress,
         });
@@ -178,28 +155,19 @@ describe.each(["file", "memory"] as const)(
         if (method === "304") {
           const response = refreshCacheEntry({
             url: key,
-            lookup: lookup,
+            lookup,
             responseHeaders: headers,
             responseTimestamp: 2,
-            cache: cache,
+            cache,
           });
           expect(response?.body).toEqual(body);
           expect(response?.headers["content-encoding"]).toBe(encoding);
         } else {
-          updateCacheFromHead({
-            url: key,
-            lookup: lookup,
-            responseHeaders: headers,
-            responseTimestamp: 2,
-            cache: cache,
+          updateHeadFixture(key, cache, lookup, headers, 2, {
             decompress: decompress,
           });
         }
-        const refreshed = prepareCacheLookup({
-          method: "GET",
-          url: key,
-          headers: [],
-          cache: cache,
+        const refreshed = lookupCache(key, cache, {
           now: 3,
           decompress: decompress,
         });

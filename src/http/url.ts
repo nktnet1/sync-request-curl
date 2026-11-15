@@ -1,7 +1,7 @@
 import { URL } from "node:url";
-import { splitAbsoluteUrl } from "#/http/url-authority";
+import { splitAbsoluteUrl } from "#/http/url/authority";
 
-export { normalizeUrlHostname, splitAbsoluteUrl } from "#/http/url-authority";
+export { normalizeUrlHostname, splitAbsoluteUrl } from "#/http/url/authority";
 
 import * as v from "valibot";
 import { CurlError } from "#/errors";

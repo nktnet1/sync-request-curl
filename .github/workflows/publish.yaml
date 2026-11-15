@@ -1,0 +1,66 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: npm-release-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-release:
+    # Calling the build as a reusable workflow keeps release artifacts in this
+    # trusted tag-push run; no privileged workflow_run downloads are involved.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/native-prebuilds.yaml
+    permissions:
+      contents: read
+
+  publish:
+    # The tag-triggered caller is also the npm OIDC trusted publisher.
+    # Release artifacts are produced within this same workflow run.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build-release
+    runs-on: ubuntu-24.04
+    environment: Production
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout release tooling
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Download release packages
+        uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: release-packages
+
+      - name: Download release metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: release-metadata
+          path: release-metadata
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Validate and publish release packages
+        env:
+          BUILD_SHA: ${{ github.sha }}
+        run: >-
+          node scripts/publish-release-packages.ts
+          --registry=https://registry.npmjs.org
+          --expected-sha="$BUILD_SHA"

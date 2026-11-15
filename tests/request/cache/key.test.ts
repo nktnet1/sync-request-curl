@@ -4,7 +4,7 @@ import {
   getCacheBucketKey,
   getRequestCacheInvalidationKeys,
   getRequestCacheKey,
-} from "#/request/cache-key";
+} from "#/request/cache/key";
 import type { Options } from "#/types/definition";
 
 test("cache targets ignore fragments, credentials, and default ports", () => {

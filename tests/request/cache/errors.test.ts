@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { lookupCache } from "#tests/request/cache/fixtures";
 
 const fsMock = vi.hoisted(() => ({
   mkdirSync: vi.fn(),
@@ -9,11 +10,7 @@ const fsMock = vi.hoisted(() => ({
 
 vi.mock("node:fs", () => fsMock);
 
-import {
-  invalidateFileCache,
-  prepareCacheLookup,
-  storeFileCacheResponse,
-} from "#/request/cache";
+import { invalidateFileCache, storeFileCacheResponse } from "#/request/cache";
 
 const fsError = (message: string, code: string): NodeJS.ErrnoException =>
   Object.assign(new Error(message), { code });
@@ -35,11 +32,7 @@ describe("file cache filesystem failures", () => {
       throw fsError("permission denied", "EACCES");
     });
 
-    const lookup = prepareCacheLookup({
-      method: "GET",
-      url: "https://cache.test/read-error",
-      headers: [],
-      cache: "file",
+    const lookup = lookupCache("https://cache.test/read-error", "file", {
       now: 0,
     });
     expect(lookup.entry).toBeUndefined();
@@ -85,11 +78,7 @@ describe("file cache non-Error failures", () => {
       throw nonError("read failed");
     });
 
-    const lookup = prepareCacheLookup({
-      method: "GET",
-      url: "https://cache.test/read-non-error",
-      headers: [],
-      cache: "file",
+    const lookup = lookupCache("https://cache.test/read-non-error", "file", {
       now: 0,
     });
     expect(lookup.entry).toBeUndefined();
@@ -135,12 +124,7 @@ test("a failed cleanup of a malformed cache file still permits an origin fetch",
     throw new Error("denied");
   });
   expect(
-    prepareCacheLookup({
-      method: "GET",
-      url: "https://cache.test/broken",
-      headers: [],
-      cache: "file",
-    }).entry,
+    lookupCache("https://cache.test/broken", "file").entry,
   ).toBeUndefined();
   expect(console.warn).toHaveBeenCalledWith(
     "Error removing invalid cache entry: Error: denied",

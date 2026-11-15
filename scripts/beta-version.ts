@@ -1,4 +1,4 @@
-import { parseReleaseVersion } from "#scripts/release-policy";
+import { parseReleaseVersion } from "#scripts/release/policy";
 
 const normalizeRequestedBase = (requestedBase: string): string => {
   const normalized = requestedBase.startsWith("v")

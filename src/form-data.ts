@@ -2,7 +2,7 @@ import { Blob } from "node:buffer";
 import { randomBytes } from "node:crypto";
 import { basename } from "node:path";
 import * as v from "valibot";
-import { blobToBufferSync } from "#/form-data-blob";
+import { blobToBufferSync } from "#/form-data/blob";
 import { lookupMimeType } from "#/http/mime-type";
 import type { Headers } from "#/types/headers";
 import { parseSchema } from "#/validate";

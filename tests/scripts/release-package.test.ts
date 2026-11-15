@@ -3,7 +3,7 @@ import { supportedPlatformKeys } from "#/native/platform-key-core";
 import {
   createNativePackageManifest,
   type ReleasePackageJson,
-} from "#scripts/release-package";
+} from "#scripts/release/package";
 
 const packageJson: ReleasePackageJson = {
   name: "sync-request-curl",
