@@ -1,10 +1,13 @@
 import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { resolveNativePlatformKey } from "#/native/platform-key-core";
-import { getLinuxLibc, getPrebuildFilename } from "#scripts/native-platform";
-import { run } from "#scripts/process";
+import {
+  getLinuxLibc,
+  getPrebuildFilename,
+} from "#scripts/build/native-platform";
+import { run } from "#scripts/shared/process";
 
-const root = resolve(import.meta.dirname, "..");
+const root = resolve(import.meta.dirname, "../..");
 const nativeDir = join(root, "native");
 const buildDir = join(nativeDir, "build");
 const localOutput = join(buildDir, "sync_request_curl_native.node");

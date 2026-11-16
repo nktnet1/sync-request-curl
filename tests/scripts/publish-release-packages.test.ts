@@ -199,9 +199,9 @@ test.each(["--directory=elsewhere", "--metadata=elsewhere"])(
       option,
       "--tag=v5.0.0-beta.2",
     ];
-    await expect(import("#scripts/publish-release-packages")).rejects.toThrow(
-      /Unknown option/,
-    );
+    await expect(
+      import("#scripts/release/publish-release-packages"),
+    ).rejects.toThrow(/Unknown option/);
   },
 );
 

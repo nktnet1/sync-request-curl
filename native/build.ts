@@ -6,7 +6,7 @@ import {
   type CurlSource,
   parseCliOptions,
   usage,
-} from "#scripts/native/build-options";
+} from "#scripts/build/native/build-options";
 
 const nativeDir = dirname(fileURLToPath(import.meta.url));
 const root = dirname(nativeDir);

@@ -17,8 +17,8 @@ import {
   type NativeTarget,
   supportedPlatformKeys,
 } from "#/native/platform-key-core";
-import { getCurrentPlatformKey } from "#scripts/native-platform";
-import { run } from "#scripts/process";
+import { getCurrentPlatformKey } from "#scripts/build/native-platform";
+import { run } from "#scripts/shared/process";
 
 interface PackageJson {
   version: string;
@@ -37,7 +37,7 @@ if (!registry) {
   throw new Error("--registry is required");
 }
 
-const root = resolve(import.meta.dirname, "..");
+const root = resolve(import.meta.dirname, "../..");
 const packageJson = JSON.parse(
   readFileSync(join(root, "package.json"), "utf8"),
 ) as PackageJson;

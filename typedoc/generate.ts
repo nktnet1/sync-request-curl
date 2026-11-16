@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Application } from "typedoc";
-import { getRustVersionLabel } from "#scripts/rust-toolchain";
+import { getRustVersionLabel } from "#scripts/build/rust-toolchain";
 import {
   buildApiSection,
   buildTableOfContents,

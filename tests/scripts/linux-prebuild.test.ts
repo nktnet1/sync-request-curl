@@ -7,15 +7,15 @@ const mocks = vi.hoisted(() => ({
   mkdirSync: vi.fn(),
   getLinuxLibc: vi.fn(),
 }));
-vi.mock("#scripts/process", () => ({ run: mocks.run }));
+vi.mock("#scripts/shared/process", () => ({ run: mocks.run }));
 vi.mock("node:fs", async () => ({
   ...(await vi.importActual<typeof import("node:fs")>("node:fs")),
   existsSync: mocks.existsSync,
   mkdirSync: mocks.mkdirSync,
 }));
-vi.mock("#scripts/native-platform", async () => ({
-  ...(await vi.importActual<typeof import("#scripts/native-platform")>(
-    "#scripts/native-platform",
+vi.mock("#scripts/build/native-platform", async () => ({
+  ...(await vi.importActual<typeof import("#scripts/build/native-platform")>(
+    "#scripts/build/native-platform",
   )),
   getLinuxLibc: mocks.getLinuxLibc,
 }));
@@ -45,11 +45,11 @@ test.each(["gnu", "musl"])(
   async (libc) => {
     process.argv = [
       process.execPath,
-      "scripts/linux-prebuild.ts",
+      "scripts/build/linux-prebuild.ts",
       `--libc=${libc}`,
       "--mode=test",
     ];
-    await import("#scripts/linux-prebuild");
+    await import("#scripts/build/linux-prebuild");
     expect(mocks.run).toHaveBeenCalledOnce();
     const [command, args] = mocks.run.mock.calls[0];
     expect(command).toBe("docker");
@@ -71,12 +71,12 @@ test("pins musl tests to the prebuild even when the host environment selects ano
   vi.stubEnv("SYNC_REQUEST_CURL_NATIVE_PATH", "/host/native/build/addon.node");
   process.argv = [
     process.execPath,
-    "scripts/linux-prebuild.ts",
+    "scripts/build/linux-prebuild.ts",
     "--libc=musl",
     "--mode=test",
     "--inside",
   ];
-  await import("#scripts/linux-prebuild");
+  await import("#scripts/build/linux-prebuild");
   const prebuild = join(
     root,
     "prebuilds",
@@ -99,12 +99,12 @@ test("fails before installing dependencies if the requested prebuild is missing"
   mocks.existsSync.mockReturnValue(false);
   process.argv = [
     process.execPath,
-    "scripts/linux-prebuild.ts",
+    "scripts/build/linux-prebuild.ts",
     "--libc=musl",
     "--mode=test",
     "--inside",
   ];
-  await expect(import("#scripts/linux-prebuild")).rejects.toThrow(
+  await expect(import("#scripts/build/linux-prebuild")).rejects.toThrow(
     "Missing prebuild for container test",
   );
   expect(mocks.run).not.toHaveBeenCalled();

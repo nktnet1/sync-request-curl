@@ -96,7 +96,7 @@ it cannot trigger npm publication.
 
 There is no privileged `workflow_run` trigger or cross-run artifact download.
 The publishing job checks out code from the tag, validates the expected SHA,
-and invokes `scripts/publish-release-packages.ts` without installing npm
+and invokes `scripts/release/publish-release-packages.ts` without installing npm
 dependencies. It uses OIDC from `publish.yaml` with the `Production`
 environment, matching the existing npm Trusted Publisher configuration. CI
 does not increment the version.

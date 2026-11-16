@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, expect, test } from "vitest";
+import { crossBuildFreebsdArm64 } from "#scripts/build/freebsd/cross";
 
 const repository = resolve(import.meta.dirname, "../..");
 const directories: string[] = [];
@@ -38,17 +39,27 @@ const createFixture = (): {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "freebsd-cross-test-")));
   directories.push(root);
   const bin = join(root, "bin");
-  const scripts = join(root, "scripts");
+  const scripts = join(root, "scripts/build/freebsd");
   mkdirSync(bin);
-  mkdirSync(scripts);
+  mkdirSync(scripts, { recursive: true });
+  mkdirSync(join(root, "scripts/shared"), { recursive: true });
   mkdirSync(join(root, "native"));
-  for (const name of [
-    "freebsd-cross.sh",
-    "freebsd-cross-cc.sh",
-    "freebsd-cross-cxx.sh",
-    "freebsd-cross-toolchain.cmake",
-  ]) {
-    copyFileSync(join(repository, "scripts", name), join(scripts, name));
+  writeFileSync(
+    join(root, "package.json"),
+    JSON.stringify({
+      type: "module",
+      imports: { "#scripts/*": "./scripts/*.ts" },
+    }),
+  );
+  copyFileSync(
+    join(repository, "scripts/shared/process.ts"),
+    join(root, "scripts/shared/process.ts"),
+  );
+  for (const name of ["cross.ts", "cc.sh", "cxx.sh", "toolchain.cmake"]) {
+    copyFileSync(
+      join(repository, "scripts/build/freebsd", name),
+      join(scripts, name),
+    );
   }
   const log = join(root, "commands.log");
   writeFileSync(log, "");
@@ -73,8 +84,8 @@ const createFixture = (): {
     bin,
     "sha256sum",
     [
-      'cat >> "$LOG_FILE"',
-      'if [ "$FAIL_CHECKSUM" = yes ]; then exit 1; fi',
+      'if [ "$FAIL_CHECKSUM" = yes ]; then digest=invalid; else digest=c456bf75ee3d0b4da0b0b527402b0a9e61497f02756b2cc5801b51e80b3f90c4; fi',
+      'printf "%s  %s\n" "$digest" "$1" | tee -a "$LOG_FILE"',
     ].join("\n"),
   );
   mockCommand(
@@ -131,24 +142,43 @@ const createFixture = (): {
 const execute = (
   fixture: ReturnType<typeof createFixture>,
   options: MockOptions = {},
-  script = "freebsd-cross.sh",
+  script = "cross.ts",
+  args: string[] = [],
 ) => {
-  const result = spawnSync("sh", [join(fixture.root, "scripts", script)], {
-    cwd: fixture.root,
-    env: {
-      ...process.env,
-      HOME: fixture.root,
-      PATH: `${fixture.bin}:${process.env.PATH}`,
-      LOG_FILE: fixture.log,
-      RUNNER_TEMP: fixture.root,
-      FREEBSD_CROSS_SYSROOT: fixture.sysroot,
-      FAIL_CHECKSUM: options.failChecksum ? "yes" : "no",
-      FAIL_CARGO: options.failCargo ? "yes" : "no",
-      FAIL_READELF: options.failReadelf ? "yes" : "no",
-    },
-    encoding: "utf8",
-  });
-  return { ...result, log: readFileSync(fixture.log, "utf8") };
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    HOME: fixture.root,
+    PATH: `${fixture.bin}:${process.env.PATH}`,
+    LOG_FILE: fixture.log,
+    RUNNER_TEMP: fixture.root,
+    FREEBSD_CROSS_SYSROOT: fixture.sysroot,
+    FAIL_CHECKSUM: options.failChecksum ? "yes" : "no",
+    FAIL_CARGO: options.failCargo ? "yes" : "no",
+    FAIL_READELF: options.failReadelf ? "yes" : "no",
+  };
+  if (script !== "cross.ts") {
+    const result = spawnSync(
+      "sh",
+      [join(fixture.root, "scripts/build/freebsd", script), ...args],
+      { cwd: fixture.root, env, encoding: "utf8" },
+    );
+    return { ...result, log: readFileSync(fixture.log, "utf8") };
+  }
+
+  try {
+    crossBuildFreebsdArm64({
+      root: fixture.root,
+      sysroot: fixture.sysroot,
+      env,
+    });
+    return { status: 0, stderr: "", log: readFileSync(fixture.log, "utf8") };
+  } catch (error) {
+    return {
+      status: 1,
+      stderr: String(error),
+      log: readFileSync(fixture.log, "utf8"),
+    };
+  }
 };
 
 afterEach(() => {
@@ -172,16 +202,16 @@ test("cross-build uses the official 14.4 sysroot and keeps all bundled HTTP/3 fe
   );
   expect(result.log).toContain("target=aarch64-unknown-freebsd");
   expect(result.log).toContain(
-    `CC=${join(fixture.root, "scripts/freebsd-cross-cc.sh")}`,
+    `CC=${join(fixture.root, "scripts/build/freebsd/cc.sh")}`,
   );
   expect(result.log).toContain(
-    `CXX=${join(fixture.root, "scripts/freebsd-cross-cxx.sh")}`,
+    `CXX=${join(fixture.root, "scripts/build/freebsd/cxx.sh")}`,
   );
   expect(result.log).toContain(
-    `linker=${join(fixture.root, "scripts/freebsd-cross-cc.sh")}`,
+    `linker=${join(fixture.root, "scripts/build/freebsd/cc.sh")}`,
   );
   expect(result.log).toContain(
-    `cmake=${join(fixture.root, "scripts/freebsd-cross-toolchain.cmake")}`,
+    `cmake=${join(fixture.root, "scripts/build/freebsd/toolchain.cmake")}`,
   );
   expect(result.log).toContain(
     `bindgen=--target=aarch64-unknown-freebsd14.4 --sysroot=${fixture.sysroot}`,
@@ -194,6 +224,33 @@ test("cross-build uses the official 14.4 sysroot and keeps all bundled HTTP/3 fe
   expect(readFileSync(join(fixture.sysroot, "usr/lib/libc.so"), "utf8")).toBe(
     "",
   );
+});
+
+test("cross-build TypeScript CLI works without a shell runner", () => {
+  const fixture = createFixture();
+  const result = spawnSync(
+    process.execPath,
+    [join(fixture.root, "scripts/build/freebsd/cross.ts")],
+    {
+      cwd: fixture.root,
+      env: {
+        ...process.env,
+        HOME: fixture.root,
+        PATH: `${fixture.bin}:${process.env.PATH}`,
+        LOG_FILE: fixture.log,
+        RUNNER_TEMP: fixture.root,
+        FREEBSD_CROSS_SYSROOT: fixture.sysroot,
+        FAIL_CHECKSUM: "no",
+        FAIL_CARGO: "no",
+        FAIL_READELF: "no",
+      },
+      encoding: "utf8",
+    },
+  );
+  const log = readFileSync(fixture.log, "utf8");
+  expect(result.status, result.stderr + log).toBe(0);
+  expect(log).toContain("cargo build --locked");
+  expect(readFileSync(fixture.addon, "utf8")).toBe("arm64-native-addon");
 });
 
 test("reuses an already verified sysroot without fetching it again", () => {
@@ -233,8 +290,8 @@ test("does not stage an addon that is not a FreeBSD ARM64 shared library", () =>
 });
 
 test.each([
-  ["freebsd-cross-cc.sh", "clang-18"],
-  ["freebsd-cross-cxx.sh", "clang++-18"],
+  ["cc.sh", "clang-18"],
+  ["cxx.sh", "clang++-18"],
 ])("%s targets FreeBSD instead of the Linux host", (script, compiler) => {
   const fixture = createFixture();
   const result = execute(fixture, {}, script);
@@ -245,13 +302,13 @@ test.each([
 });
 
 test.each([
-  ["freebsd-cross-cc.sh", "clang-18"],
-  ["freebsd-cross-cxx.sh", "clang++-18"],
+  ["cc.sh", "clang-18"],
+  ["cxx.sh", "clang++-18"],
 ])("%s does not pass link-only flags to compilation", (script, compiler) => {
   const fixture = createFixture();
   const result = spawnSync(
     "sh",
-    [join(fixture.root, "scripts", script), "-c", "example.c"],
+    [join(fixture.root, "scripts/build/freebsd", script), "-c", "example.c"],
     {
       env: {
         ...process.env,

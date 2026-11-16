@@ -3,9 +3,9 @@ import { join, resolve } from "node:path";
 import {
   getPrebuildFilename,
   supportedPlatformKeys,
-} from "#scripts/native-platform";
+} from "#scripts/build/native-platform";
 
-const root = resolve(import.meta.dirname, "..");
+const root = resolve(import.meta.dirname, "../..");
 const prebuilds = join(root, "prebuilds");
 const missing = supportedPlatformKeys.filter((platform) => {
   const path = join(prebuilds, getPrebuildFilename(platform));

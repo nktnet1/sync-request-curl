@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { run } from "#scripts/process";
+import { run } from "#scripts/shared/process";
 
 const { values } = parseArgs({
   options: {

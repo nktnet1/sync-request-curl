@@ -4,10 +4,10 @@ import { getNativePackageName } from "#/native/platform-key-core";
 import {
   bootstrapNativePackages,
   parseTrustedPublishers,
-} from "#scripts/bootstrap-native-packages";
+} from "#scripts/release/bootstrap-native-packages";
 
 const mocks = vi.hoisted(() => ({ run: vi.fn() }));
-vi.mock("#scripts/process", () => ({ run: mocks.run }));
+vi.mock("#scripts/shared/process", () => ({ run: mocks.run }));
 
 const arm64 = getNativePackageName("freebsd-arm64");
 const x64 = getNativePackageName("freebsd-x64");

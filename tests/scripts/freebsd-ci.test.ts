@@ -1,16 +1,22 @@
 import { spawnSync } from "node:child_process";
 import {
+  copyFileSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, expect, test } from "vitest";
+import { runFreebsdCi } from "#scripts/build/freebsd/ci";
 
-const script = resolve(import.meta.dirname, "../../scripts/freebsd-ci.sh");
+const script = resolve(
+  import.meta.dirname,
+  "../../scripts/build/freebsd/prepare.sh",
+);
 const directories: string[] = [];
 
 const runFreebsdScript = (
@@ -24,10 +30,13 @@ const runFreebsdScript = (
     failPkg?: boolean;
     failRustup?: boolean;
     failVerify?: boolean;
+    invalidLibrary?: boolean;
+    mismatchNodeArch?: boolean;
+    useCli?: boolean;
     pinnedToolchain?: string;
   } = {},
 ) => {
-  const root = mkdtempSync(join(tmpdir(), "freebsd-ci-test-"));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "freebsd-ci-test-")));
   directories.push(root);
   const bin = join(root, "bin");
   mkdirSync(bin);
@@ -66,7 +75,7 @@ const runFreebsdScript = (
       "  toolchain=system",
       '  if [ -n "$RUSTUP_TOOLCHAIN" ]; then toolchain="$RUSTUP_TOOLCHAIN"; fi',
       '  printf "node %s toolchain=%s\\n" "$*" "$toolchain" >> "$LOG_FILE"',
-      '  if [ "$FAIL_VERIFY" = "yes" ] && [ "$1" = "scripts/verify-native-http.ts" ]; then exit 1; fi',
+      '  if [ "$FAIL_VERIFY" = "yes" ] && [ "$1" = "scripts/build/verify-native-http.ts" ]; then exit 1; fi',
       "fi",
     ].join("\n"),
   );
@@ -76,32 +85,83 @@ const runFreebsdScript = (
     'printf "rustup %s\\n" "$*" >> "$LOG_FILE"; if [ "$FAIL_RUSTUP" = "yes" ]; then exit 1; fi',
   );
   mock("rustc", 'printf "rustc %s (mock)\\n" "$FAKE_RUST_VERSION"');
-  mock("ldd", 'printf "libc.so.7 => /lib/libc.so.7\\n"');
-
-  const result = spawnSync(
-    "sh",
-    [script, command, `freebsd-${arch === "amd64" ? "x64" : "arm64"}`],
-    {
-      cwd: root,
-      env: {
-        PATH: `${bin}:${process.env.PATH}`,
-        HOME: root,
-        LOG_FILE: log,
-        MOCK_BIN: bin,
-        FAKE_ARCH: arch,
-        FAKE_NODE_ARCH: arch === "amd64" ? "x64" : "arm64",
-        FAKE_RUST_VERSION:
-          options.rustVersion ?? (arch === "arm64" ? "1.97.1" : "1.96.0"),
-        FAIL_RUST_PACKAGE: options.failRustPackage ? "yes" : "no",
-        FAIL_PKG: options.failPkg ? "yes" : "no",
-        FAIL_RUSTUP: options.failRustup ? "yes" : "no",
-        FAIL_VERIFY: options.failVerify ? "yes" : "no",
-      },
-      encoding: "utf8",
-    },
+  mock(
+    "ldd",
+    'if [ "$INVALID_LIBRARY" = "yes" ]; then printf "libcrypto.so => /usr/local/lib/libcrypto.so\\n"; else printf "libc.so.7 => /lib/libc.so.7\\n"; fi',
   );
 
-  return { ...result, log: readFileSync(log, "utf8") };
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    PATH: `${bin}:${process.env.PATH}`,
+    HOME: root,
+    LOG_FILE: log,
+    MOCK_BIN: bin,
+    FAKE_ARCH: arch,
+    FAKE_NODE_ARCH: options.mismatchNodeArch
+      ? "unknown"
+      : arch === "amd64"
+        ? "x64"
+        : "arm64",
+    FAKE_RUST_VERSION:
+      options.rustVersion ?? (arch === "arm64" ? "1.97.1" : "1.96.0"),
+    FAIL_RUST_PACKAGE: options.failRustPackage ? "yes" : "no",
+    FAIL_PKG: options.failPkg ? "yes" : "no",
+    FAIL_RUSTUP: options.failRustup ? "yes" : "no",
+    FAIL_VERIFY: options.failVerify ? "yes" : "no",
+    INVALID_LIBRARY: options.invalidLibrary ? "yes" : "no",
+  };
+  if (command === "prepare") {
+    const result = spawnSync("sh", [script], {
+      cwd: root,
+      env,
+      encoding: "utf8",
+    });
+    return { ...result, log: readFileSync(log, "utf8") };
+  }
+
+  if (options.useCli) {
+    const scriptFolder = join(root, "scripts/build/freebsd");
+    mkdirSync(scriptFolder, { recursive: true });
+    mkdirSync(join(root, "scripts/build"), { recursive: true });
+    mkdirSync(join(root, "scripts/shared"), { recursive: true });
+    for (const file of [
+      "scripts/build/freebsd/ci.ts",
+      "scripts/build/rust-toolchain.ts",
+      "scripts/shared/process.ts",
+    ]) {
+      copyFileSync(
+        resolve(import.meta.dirname, "../..", file),
+        join(root, file),
+      );
+    }
+    writeFileSync(
+      join(root, "package.json"),
+      JSON.stringify({
+        type: "module",
+        imports: { "#scripts/*": "./scripts/*.ts" },
+      }),
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(scriptFolder, "ci.ts"),
+        command,
+        `freebsd-${arch === "amd64" ? "x64" : "arm64"}`,
+      ],
+      { cwd: root, env, encoding: "utf8" },
+    );
+    return { ...result, log: readFileSync(log, "utf8") };
+  }
+
+  try {
+    runFreebsdCi(command, `freebsd-${arch === "amd64" ? "x64" : "arm64"}`, {
+      root,
+      env,
+    });
+    return { status: 0, stderr: "", log: readFileSync(log, "utf8") };
+  } catch (error) {
+    return { status: 1, stderr: String(error), log: readFileSync(log, "utf8") };
+  }
 };
 
 afterEach(() => {
@@ -117,7 +177,7 @@ test("FreeBSD x64 uses the packaged installer and pinned toolchain", () => {
   expect(result.log).toContain("rustup-init -y --no-modify-path");
   expect(result.log).toContain("rustup toolchain install 1.96.0");
   expect(result.log).not.toContain("downloaded-rustup");
-  expect(result.log).not.toContain("node scripts/rust-toolchain.ts");
+  expect(result.log).not.toContain("node scripts/build/rust-toolchain.ts");
 });
 
 test("FreeBSD x64 reads changes to the pinned Rust version", () => {
@@ -226,10 +286,10 @@ test.each([
   const result = runFreebsdScript(arch, "build");
   expect(result.status, result.stderr + result.log).toBe(0);
   expect(result.log).toContain(
-    `node scripts/build-native.ts toolchain=${version}`,
+    `node scripts/build/build-native.ts toolchain=${version}`,
   );
   expect(result.log).toContain(
-    `node scripts/verify-native-http.ts --file=prebuilds/sync_request_curl_native.freebsd-${arch === "amd64" ? "x64" : "arm64"}.node toolchain=${version}`,
+    `node scripts/build/verify-native-http.ts --file=prebuilds/sync_request_curl_native.freebsd-${arch === "amd64" ? "x64" : "arm64"}.node toolchain=${version}`,
   );
 });
 
@@ -239,7 +299,7 @@ test("FreeBSD arm64 refuses to build with an outdated Rust package", () => {
   });
   expect(result.status).toBe(1);
   expect(result.stderr).toContain("requires Rust 1.96.0 or newer");
-  expect(result.log).not.toContain("node scripts/build-native.ts");
+  expect(result.log).not.toContain("node scripts/build/build-native.ts");
 });
 
 test.each([
@@ -251,21 +311,46 @@ test.each([
     const result = runFreebsdScript(arch, "verify");
     expect(result.status, result.stderr + result.log).toBe(0);
     expect(result.log).toContain(
-      `node scripts/verify-native-load.ts --file=prebuilds/sync_request_curl_native.freebsd-${key}.node`,
+      `node scripts/build/verify-native-load.ts --file=prebuilds/sync_request_curl_native.freebsd-${key}.node`,
     );
     expect(result.log).toContain(
-      `node scripts/verify-native-http.ts --file=prebuilds/sync_request_curl_native.freebsd-${key}.node`,
+      `node scripts/build/verify-native-http.ts --file=prebuilds/sync_request_curl_native.freebsd-${key}.node`,
     );
-    expect(result.log).not.toContain("node scripts/build-native.ts");
-    expect(result.log).not.toContain("node scripts/stage-native.ts");
+    expect(result.log).not.toContain("node scripts/build/build-native.ts");
+    expect(result.log).not.toContain("node scripts/build/stage-native.ts");
   },
 );
 
 test("FreeBSD cached addon verification fails on an HTTP smoke-test error", () => {
   const result = runFreebsdScript("arm64", "verify", { failVerify: true });
   expect(result.status).not.toBe(0);
-  expect(result.log).toContain("node scripts/verify-native-http.ts");
-  expect(result.log).not.toContain("node scripts/build-native.ts");
+  expect(result.log).toContain("node scripts/build/verify-native-http.ts");
+  expect(result.log).not.toContain("node scripts/build/build-native.ts");
+});
+
+test("FreeBSD native verification CLI runs as an independent TypeScript script", () => {
+  const result = runFreebsdScript("arm64", "verify", { useCli: true });
+  expect(result.status, result.stderr + result.log).toBe(0);
+  expect(result.log).toContain("node scripts/build/verify-native-http.ts");
+});
+
+test("FreeBSD native build checks Node architecture before attempting compilation", () => {
+  const result = runFreebsdScript("arm64", "build", {
+    mismatchNodeArch: true,
+  });
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toContain("Expected Node platform freebsd-arm64");
+  expect(result.log).not.toContain("node scripts/build/build-native.ts");
+});
+
+test("FreeBSD verification rejects host-linked native dependencies", () => {
+  const result = runFreebsdScript("amd64", "verify", {
+    invalidLibrary: true,
+  });
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toContain(
+    "unexpected runtime dependencies under /usr/local",
+  );
 });
 
 const freebsdWorkflowJob = (
@@ -301,9 +386,7 @@ test("main FreeBSD cache keys cover native inputs without sharing binaries with 
   expect(pipelineKey).toBeDefined();
   expect(pipelineKey).toContain("'native/build.ts'");
   expect(pipelineKey).toContain("'native/src/**'");
-  expect(pipelineKey).toContain("'scripts/freebsd-ci.sh'");
-  expect(pipelineKey).toContain("'scripts/freebsd-cross*.sh'");
-  expect(pipelineKey).toContain("'scripts/freebsd-cross-toolchain.cmake'");
+  expect(pipelineKey).toContain("'scripts/build/freebsd/**'");
   expect(release).not.toMatch(key);
   expect(release).not.toContain("uses: actions/cache@");
 });
@@ -316,7 +399,7 @@ test("main pipeline smoke-tests FreeBSD artifacts before caching them", () => {
   );
   expect(pipeline).toContain("uses: actions/cache@v4");
   expect(pipeline).toContain("uses: vmactions/freebsd-vm@");
-  expect(pipeline).toContain("run: sh scripts/freebsd-cross.sh");
+  expect(pipeline).toContain("run: node scripts/build/freebsd/cross.ts");
   expect(pipeline).toContain("steps.native-cache.outputs.cache-hit != 'true'");
   expect(pipeline).toContain("continue-on-error: true");
   expect(pipeline).toContain("steps.cross-node.outcome == 'success'");
@@ -324,10 +407,10 @@ test("main pipeline smoke-tests FreeBSD artifacts before caching them", () => {
   expect(pipeline).toContain("steps.cross-node.outcome == 'failure'");
   expect(pipeline).toContain("steps.cross-setup.outcome == 'failure'");
   expect(pipeline).toContain("steps.cross.outcome == 'success'");
-  expect(pipeline).toContain("run: sh scripts/freebsd-ci.sh");
+  expect(pipeline).toContain("run: node scripts/build/freebsd/ci.ts");
   expect(pipeline).toContain("&& 'verify' || 'build'");
   expect(pipeline).toContain(
-    "run: sh scripts/freebsd-ci.sh build freebsd-arm64",
+    "run: node scripts/build/freebsd/ci.ts build freebsd-arm64",
   );
   expect(pipeline).toContain("run: test -s prebuilds/");
 });
@@ -342,15 +425,15 @@ test("releases rebuild and smoke-test FreeBSD addons rather than trusting CI cac
   expect(release).not.toContain("native-cache");
   expect(release).not.toContain("cache-hit");
   expect(release).toContain("uses: vmactions/freebsd-vm@");
-  expect(release).toContain("sh scripts/freebsd-ci.sh prepare");
-  expect(release).toContain("run: sh scripts/freebsd-cross.sh");
+  expect(release).toContain("sh scripts/build/freebsd/prepare.sh");
+  expect(release).toContain("run: node scripts/build/freebsd/cross.ts");
   expect(release).toContain("steps.cross-setup.outcome == 'success'");
   expect(release).toContain("steps.cross-setup.outcome == 'failure'");
   expect(release).toContain(
     "steps.cross.outcome == 'success' && 'verify' || 'build'",
   );
   expect(release).toContain(
-    "run: sh scripts/freebsd-ci.sh build freebsd-arm64",
+    "run: node scripts/build/freebsd/ci.ts build freebsd-arm64",
   );
   expect(release).toContain("run: test -s prebuilds/");
   expect(release).toContain("uses: actions/upload-artifact@v4");

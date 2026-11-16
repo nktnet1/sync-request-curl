@@ -16,7 +16,7 @@ const registry = values.registry;
 if (!registry) throw new Error("--registry is required");
 
 await publishReleasePackages({
-  root: realpathSync(resolve(import.meta.dirname, "..")),
+  root: realpathSync(resolve(import.meta.dirname, "../..")),
   registry,
   tag: values.tag,
   expectedSha: values["expected-sha"],

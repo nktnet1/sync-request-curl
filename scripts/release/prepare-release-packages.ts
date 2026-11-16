@@ -13,14 +13,14 @@ import {
   type NativePlatformKey,
   supportedPlatformKeys,
 } from "#/native/platform-key-core";
-import { getPrebuildFilename } from "#scripts/native-platform";
+import { getPrebuildFilename } from "#scripts/build/native-platform";
 import {
   createMainPackageManifest,
   createNativePackageManifest,
   parseReleasePackageJson,
 } from "#scripts/release/package";
 
-const root = resolve(import.meta.dirname, "..");
+const root = resolve(import.meta.dirname, "../..");
 const releaseRoot = join(root, ".release");
 const mainOutput = join(releaseRoot, "main");
 const nativeOutput = join(releaseRoot, "native");

@@ -2,8 +2,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = resolve(import.meta.dirname, "..");
-const toolchainPath = join(root, "rust-toolchain.toml");
+const root = resolve(import.meta.dirname, "../..");
 
 const readQuotedValue = (line: string, key: string): string | undefined => {
   const separator = line.indexOf("=");
@@ -18,7 +17,8 @@ const readQuotedValue = (line: string, key: string): string | undefined => {
   return value.slice(1, -1);
 };
 
-export const getRustToolchain = (): string => {
+export const getRustToolchain = (projectRoot = root): string => {
+  const toolchainPath = join(projectRoot, "rust-toolchain.toml");
   const contents = readFileSync(toolchainPath, "utf8");
   for (const line of contents.split("\n")) {
     const channel = readQuotedValue(line, "channel");
