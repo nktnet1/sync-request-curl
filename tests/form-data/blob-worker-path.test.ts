@@ -38,26 +38,24 @@ vi.mock("node:module", async (importOriginal) => {
 });
 
 vi.mock("node:worker_threads", () => ({
-  Worker: class {
-    constructor(
-      _script: string,
-      options: { workerData: { readerPath: string; state: SharedArrayBuffer } },
-    ) {
-      workerPathState.readerPath = options.workerData.readerPath;
-      const state = new Int32Array(options.workerData.state);
-      Atomics.store(state, 0, -1);
-      Atomics.notify(state, 0);
-    }
+  Worker: function MockWorker(
+    _script: string,
+    options: { workerData: { readerPath: string; state: SharedArrayBuffer } },
+  ) {
+    workerPathState.readerPath = options.workerData.readerPath;
+    const state = new Int32Array(options.workerData.state);
+    Atomics.store(state, 0, -1);
+    Atomics.notify(state, 0);
 
-    on() {
-      return this;
-    }
-
-    unref() {
-      return this;
-    }
-
-    terminate = () => Promise.resolve(0);
+    return {
+      on() {
+        return this;
+      },
+      unref() {
+        return this;
+      },
+      terminate: () => Promise.resolve(0),
+    };
   },
 }));
 
