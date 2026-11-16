@@ -9,6 +9,10 @@ import {
 import { join, resolve } from "node:path";
 import { expect, test } from "vitest";
 import { crossBuildFreebsdArm64 } from "#scripts/build/freebsd/cross";
+import {
+  freebsdArm64CrossRustToolchain,
+  getRustToolchain,
+} from "#scripts/build/rust-toolchain";
 import { useTemporaryDirectories } from "./helpers/temp-directories";
 
 const repository = resolve(import.meta.dirname, "../..");
@@ -50,6 +54,10 @@ const createFixture = (): {
   copyFileSync(
     join(repository, "scripts/shared/process.ts"),
     join(root, "scripts/shared/process.ts"),
+  );
+  copyFileSync(
+    join(repository, "scripts/build/rust-toolchain.ts"),
+    join(root, "scripts/build/rust-toolchain.ts"),
   );
   for (const name of ["cross.ts", "cc.sh", "cxx.sh", "toolchain.cmake"]) {
     copyFileSync(
@@ -104,6 +112,7 @@ const createFixture = (): {
     [
       'printf "cargo %s\\n" "$*" >> "$LOG_FILE"',
       'printf "target=%s\\n" "$CARGO_BUILD_TARGET" >> "$LOG_FILE"',
+      'printf "rustup=%s\\n" "$RUSTUP_TOOLCHAIN" >> "$LOG_FILE"',
       'printf "CC=%s\\n" "$CC_aarch64_unknown_freebsd" >> "$LOG_FILE"',
       'printf "CXX=%s\\n" "$CXX_aarch64_unknown_freebsd" >> "$LOG_FILE"',
       'printf "linker=%s\\n" "$CARGO_TARGET_AARCH64_UNKNOWN_FREEBSD_LINKER" >> "$LOG_FILE"',
@@ -151,10 +160,26 @@ const mockEnvironment = (
   ...compilerEnvironment(fixture),
   HOME: fixture.root,
   RUNNER_TEMP: fixture.root,
+  RUSTUP_TOOLCHAIN: "1.96.0",
   FAIL_CHECKSUM: options.failChecksum ? "yes" : "no",
   FAIL_CARGO: options.failCargo ? "yes" : "no",
   FAIL_READELF: options.failReadelf ? "yes" : "no",
 });
+
+const runStandaloneScript = (
+  fixture: Fixture,
+  command: string,
+  script: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+) => {
+  const result = spawnSync(
+    command,
+    [join(fixture.root, "scripts/build/freebsd", script), ...args],
+    { cwd: fixture.root, env, encoding: "utf8" },
+  );
+  return { ...result, log: readFileSync(fixture.log, "utf8") };
+};
 
 const execute = (
   fixture: Fixture,
@@ -164,12 +189,7 @@ const execute = (
 ) => {
   const env = mockEnvironment(fixture, options);
   if (script !== "cross.ts") {
-    const result = spawnSync(
-      "sh",
-      [join(fixture.root, "scripts/build/freebsd", script), ...args],
-      { cwd: fixture.root, env, encoding: "utf8" },
-    );
-    return { ...result, log: readFileSync(fixture.log, "utf8") };
+    return runStandaloneScript(fixture, "sh", script, args, env);
   }
 
   try {
@@ -188,6 +208,20 @@ const execute = (
   }
 };
 
+test("FreeBSD ARM64 cross-toolchain CLI selects a newer stable compiler", () => {
+  const result = spawnSync(
+    process.execPath,
+    [
+      join(repository, "scripts/build/rust-toolchain.ts"),
+      "--freebsd-arm64-cross",
+    ],
+    { encoding: "utf8" },
+  );
+  expect(result.status, result.stderr).toBe(0);
+  expect(result.stdout.trim()).toBe(freebsdArm64CrossRustToolchain);
+  expect(freebsdArm64CrossRustToolchain).not.toBe(getRustToolchain());
+});
+
 test("cross-build uses the official 14.4 sysroot and keeps all bundled HTTP/3 features", () => {
   const fixture = createFixture();
   const result = execute(fixture);
@@ -202,6 +236,7 @@ test("cross-build uses the official 14.4 sysroot and keeps all bundled HTTP/3 fe
     "cargo build --locked --manifest-path native/Cargo.toml --release --target aarch64-unknown-freebsd --no-default-features --features bundled-curl-http3",
   );
   expect(result.log).toContain("target=aarch64-unknown-freebsd");
+  expect(result.log).toContain("rustup=1.100.0");
   expect(result.log).toContain(
     `CC=${join(fixture.root, "scripts/build/freebsd/cc.sh")}`,
   );
@@ -229,18 +264,15 @@ test("cross-build uses the official 14.4 sysroot and keeps all bundled HTTP/3 fe
 
 test("cross-build TypeScript CLI works without a shell runner", () => {
   const fixture = createFixture();
-  const result = spawnSync(
+  const result = runStandaloneScript(
+    fixture,
     process.execPath,
-    [join(fixture.root, "scripts/build/freebsd/cross.ts")],
-    {
-      cwd: fixture.root,
-      env: mockEnvironment(fixture),
-      encoding: "utf8",
-    },
+    "cross.ts",
+    [],
+    mockEnvironment(fixture),
   );
-  const log = readFileSync(fixture.log, "utf8");
-  expect(result.status, result.stderr + log).toBe(0);
-  expect(log).toContain("cargo build --locked");
+  expect(result.status, result.stderr + result.log).toBe(0);
+  expect(result.log).toContain("cargo build --locked");
   expect(readFileSync(fixture.addon, "utf8")).toBe("arm64-native-addon");
 });
 
@@ -297,18 +329,16 @@ test.each([
   ["cxx.sh", "clang++-18"],
 ])("%s does not pass link-only flags to compilation", (script, compiler) => {
   const fixture = createFixture();
-  const result = spawnSync(
+  const result = runStandaloneScript(
+    fixture,
     "sh",
-    [join(fixture.root, "scripts/build/freebsd", script), "-c", "example.c"],
-    {
-      env: compilerEnvironment(fixture),
-      encoding: "utf8",
-    },
+    script,
+    ["-c", "example.c"],
+    compilerEnvironment(fixture),
   );
-  const log = readFileSync(fixture.log, "utf8");
-  expect(result.status, result.stderr + log).toBe(0);
-  expect(log).toContain(
+  expect(result.status, result.stderr + result.log).toBe(0);
+  expect(result.log).toContain(
     `${compiler} --target=aarch64-unknown-freebsd14.4 --sysroot=${fixture.sysroot} -c example.c`,
   );
-  expect(log).not.toContain("-fuse-ld=lld");
+  expect(result.log).not.toContain("-fuse-ld=lld");
 });

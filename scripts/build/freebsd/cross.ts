@@ -13,6 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { freebsdArm64CrossRustToolchain } from "#scripts/build/rust-toolchain";
 import { run } from "#scripts/shared/process";
 
 const release = "14.4";
@@ -103,6 +104,7 @@ export const crossBuildFreebsdArm64 = (
   const compilerDirectory = join(root, "scripts/build/freebsd");
   const env: NodeJS.ProcessEnv = {
     ...inheritedEnv,
+    RUSTUP_TOOLCHAIN: freebsdArm64CrossRustToolchain,
     FREEBSD_CROSS_SYSROOT: sysroot,
     CARGO_BUILD_TARGET: target,
     CARGO_TARGET_AARCH64_UNKNOWN_FREEBSD_LINKER: join(

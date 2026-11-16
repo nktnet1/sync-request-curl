@@ -372,6 +372,7 @@ test("main FreeBSD cache keys cover native inputs without sharing binaries with 
   expect(pipelineKey).toContain("'native/build.ts'");
   expect(pipelineKey).toContain("'native/src/**'");
   expect(pipelineKey).toContain("'scripts/build/freebsd/**'");
+  expect(pipelineKey).toContain("'scripts/build/rust-toolchain.ts'");
   expect(release).not.toMatch(key);
   expect(release).not.toContain("uses: actions/cache@");
 });
@@ -386,7 +387,19 @@ test("main pipeline smoke-tests FreeBSD artifacts before caching them", () => {
   expect(pipeline).toContain("uses: vmactions/freebsd-vm@");
   expect(pipeline).toContain("run: node scripts/build/freebsd/cross.ts");
   expect(pipeline).toContain("steps.native-cache.outputs.cache-hit != 'true'");
-  expect(pipeline).toContain("continue-on-error: true");
+  expect(pipeline).toContain(
+    'toolchain="$(node scripts/build/rust-toolchain.ts --freebsd-arm64-cross)"',
+  );
+  expect(pipeline).toContain(
+    `continue-on-error: \${{ github.event_name != 'pull_request' }}`,
+  );
+  expect(pipeline).not.toContain("continue-on-error: true");
+  expect(pipeline).toContain(
+    `continue-on-error: \${{ github.event_name != 'pull_request' && matrix.platform == 'freebsd-arm64' && steps.cross.outcome == 'success' }}`,
+  );
+  expect(pipeline).toContain(
+    "if: github.event_name != 'pull_request' && matrix.platform == 'freebsd-arm64' && steps.cross.outcome == 'success' && steps.freebsd-vm.outcome == 'failure'",
+  );
   expect(pipeline).toContain("steps.cross-node.outcome == 'success'");
   expect(pipeline).toContain("steps.cross-setup.outcome == 'success'");
   expect(pipeline).toContain("steps.cross-node.outcome == 'failure'");
@@ -412,6 +425,10 @@ test("releases rebuild and smoke-test FreeBSD addons rather than trusting CI cac
   expect(release).toContain("uses: vmactions/freebsd-vm@");
   expect(release).toContain("sh scripts/build/freebsd/prepare.sh");
   expect(release).toContain("run: node scripts/build/freebsd/cross.ts");
+  expect(release).toContain(
+    'toolchain="$(node scripts/build/rust-toolchain.ts --freebsd-arm64-cross)"',
+  );
+  expect(release).toContain("continue-on-error: true");
   expect(release).toContain("steps.cross-setup.outcome == 'success'");
   expect(release).toContain("steps.cross-setup.outcome == 'failure'");
   expect(release).toContain(

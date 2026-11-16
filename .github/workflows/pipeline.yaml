@@ -107,14 +107,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
-          key: freebsd-prebuild-v1-14.4-${{ matrix.platform }}-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml', 'native/build.rs', 'native/build.ts', 'native/src/**', 'rust-toolchain.toml', 'scripts/build/freebsd/**', 'scripts/build/build-native.ts', 'scripts/build/stage-native.ts') }}
+          key: freebsd-prebuild-v1-14.4-${{ matrix.platform }}-${{ hashFiles('native/Cargo.lock', 'native/Cargo.toml', 'native/build.rs', 'native/build.ts', 'native/src/**', 'rust-toolchain.toml', 'scripts/build/freebsd/**', 'scripts/build/rust-toolchain.ts', 'scripts/build/build-native.ts', 'scripts/build/stage-native.ts') }}
 
       # Cross-compile only ARM64 on Linux so that Rust, AWS-LC and libcurl
       # do not spend an hour compiling inside an emulated FreeBSD VM.
       - name: Set up Node.js for FreeBSD ARM64 cross-compilation
         if: matrix.platform == 'freebsd-arm64' && steps.native-cache.outputs.cache-hit != 'true'
         id: cross-node
-        continue-on-error: true
+        continue-on-error: ${{ github.event_name != 'pull_request' }}
         uses: actions/setup-node@v7
         with:
           node-version: 24.x
@@ -122,31 +122,31 @@ jobs:
       - name: Install FreeBSD ARM64 cross-compilation tools
         if: matrix.platform == 'freebsd-arm64' && steps.native-cache.outputs.cache-hit != 'true' && steps.cross-node.outcome == 'success'
         id: cross-setup
-        continue-on-error: true
+        continue-on-error: ${{ github.event_name != 'pull_request' }}
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends clang-18 lld-18 llvm-18 libclang-18-dev cmake ninja-build perl pkg-config
-          toolchain="$(node scripts/build/rust-toolchain.ts)"
+          toolchain="$(node scripts/build/rust-toolchain.ts --freebsd-arm64-cross)"
           rustup toolchain install "$toolchain" --profile minimal --no-self-update
           rustup target add aarch64-unknown-freebsd --toolchain "$toolchain"
 
-      # A failed experimental cross-build falls back to the existing native
-      # path. Never ship a cross-built artifact without testing it in FreeBSD.
+      # Cross-build failures fail fast on pull requests. Main retains the native
+      # fallback, and all cross-built addons must pass FreeBSD verification.
       - name: Cross-compile FreeBSD ARM64 addon on Linux
         if: matrix.platform == 'freebsd-arm64' && steps.native-cache.outputs.cache-hit != 'true' && steps.cross-setup.outcome == 'success'
         id: cross
-        continue-on-error: true
+        continue-on-error: ${{ github.event_name != 'pull_request' }}
         run: node scripts/build/freebsd/cross.ts
 
       - name: Report cross-compilation fallback
-        if: matrix.platform == 'freebsd-arm64' && (steps.cross-node.outcome == 'failure' || steps.cross-setup.outcome == 'failure' || steps.cross.outcome == 'failure')
+        if: github.event_name != 'pull_request' && matrix.platform == 'freebsd-arm64' && (steps.cross-node.outcome == 'failure' || steps.cross-setup.outcome == 'failure' || steps.cross.outcome == 'failure')
         run: echo "::warning::FreeBSD ARM64 cross-build or setup failed, using the existing native build"
 
       - name: Build or verify ${{ matrix.platform }} prebuild
         id: freebsd-vm
         # If a cross-built addon fails the native smoke checks, rebuild it in
         # FreeBSD rather than publishing an unverified cross-built binary.
-        continue-on-error: ${{ matrix.platform == 'freebsd-arm64' && steps.cross.outcome == 'success' }}
+        continue-on-error: ${{ github.event_name != 'pull_request' && matrix.platform == 'freebsd-arm64' && steps.cross.outcome == 'success' }}
         uses: vmactions/freebsd-vm@a2f9a41fa97f6848b8c3b791087dfcdaa5b473ff # v1.5.8
         with:
           release: "14.4"
@@ -163,7 +163,7 @@ jobs:
           run: node scripts/build/freebsd/ci.ts ${{ (steps.native-cache.outputs.cache-hit == 'true' || steps.cross.outcome == 'success') && 'verify' || 'build' }} ${{ matrix.platform }}
 
       - name: Rebuild FreeBSD ARM64 when cross-built addon fails verification
-        if: matrix.platform == 'freebsd-arm64' && steps.cross.outcome == 'success' && steps.freebsd-vm.outcome == 'failure'
+        if: github.event_name != 'pull_request' && matrix.platform == 'freebsd-arm64' && steps.cross.outcome == 'success' && steps.freebsd-vm.outcome == 'failure'
         uses: vmactions/freebsd-vm@a2f9a41fa97f6848b8c3b791087dfcdaa5b473ff # v1.5.8
         with:
           release: "14.4"

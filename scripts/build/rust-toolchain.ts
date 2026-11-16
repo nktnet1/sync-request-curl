@@ -4,6 +4,9 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(import.meta.dirname, "../..");
 
+// FreeBSD ARM64 needs a release with published rust-std artifacts.
+export const freebsdArm64CrossRustToolchain = "1.100.0";
+
 const readQuotedValue = (line: string, key: string): string | undefined => {
   const separator = line.indexOf("=");
   if (separator === -1 || line.slice(0, separator).trim() !== key) {
@@ -38,5 +41,9 @@ if (
   process.argv[1] !== undefined &&
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  process.stdout.write(`${getRustToolchain()}\n`);
+  const toolchain =
+    process.argv[2] === "--freebsd-arm64-cross"
+      ? freebsdArm64CrossRustToolchain
+      : getRustToolchain();
+  process.stdout.write(`${toolchain}\n`);
 }

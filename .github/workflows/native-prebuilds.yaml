@@ -172,7 +172,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends clang-18 lld-18 llvm-18 libclang-18-dev cmake ninja-build perl pkg-config
-          toolchain="$(node scripts/build/rust-toolchain.ts)"
+          toolchain="$(node scripts/build/rust-toolchain.ts --freebsd-arm64-cross)"
           rustup toolchain install "$toolchain" --profile minimal --no-self-update
           rustup target add aarch64-unknown-freebsd --toolchain "$toolchain"
 
