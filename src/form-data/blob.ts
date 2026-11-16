@@ -1,19 +1,38 @@
 import type { Blob } from "node:buffer";
+import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { performance } from "node:perf_hooks";
+import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 
-// Resolve the package root rather than a path relative to this source module.
-// Bundlers relocate this module from src/form-data/ to dist/index.cjs, so a
-// relative URL silently points outside the published package after bundling.
-const packageManifest = createRequire(import.meta.url).resolve(
-  "sync-request-curl/package.json",
-);
-const blobReaderWorkerPath = join(
-  dirname(packageManifest),
-  "dist/internal/blob-reader-worker.cjs",
-);
+// The compiled entrypoint lives alongside dist/internal, but source imports
+// and relocated application bundles may need the installed package's worker.
+// Resolve lazily so standalone bundles can be imported without the package.
+const getBlobReaderWorkerPath = (): string => {
+  const localWorkerPath = fileURLToPath(
+    new URL("./internal/blob-reader-worker.cjs", import.meta.url),
+  );
+  if (existsSync(localWorkerPath)) {
+    return localWorkerPath;
+  }
+
+  try {
+    const packageManifest = createRequire(import.meta.url).resolve(
+      "sync-request-curl/package.json",
+    );
+    return join(
+      dirname(packageManifest),
+      "dist/internal/blob-reader-worker.cjs",
+    );
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND") {
+      // Let the worker report a missing asset through the existing Blob error.
+      return localWorkerPath;
+    }
+    throw error;
+  }
+};
 
 // A bootstrap catches missing/broken worker assets before the reader can signal.
 // Do not inherit CLI loaders or --input-type into this plain CommonJS worker.
@@ -44,7 +63,7 @@ export const blobToBufferSync = (blob: Blob): Buffer => {
       blob,
       data,
       state: stateBuffer,
-      readerPath: blobReaderWorkerPath,
+      readerPath: getBlobReaderWorkerPath(),
     },
   });
   // Startup errors arrive asynchronously, while this thread waits synchronously.
