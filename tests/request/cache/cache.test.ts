@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import request from "#/index";
-import { storeCacheResponse } from "#/request/cache";
 import { FRAMING_SERVER_URL, SERVER_URL } from "#tests/app/config";
+import { storeCacheFixture } from "#tests/request/cache/fixtures";
 
 let nextCacheKey = 0;
 const cacheUrl = (path: string, baseUrl = SERVER_URL): string => {
@@ -158,20 +158,18 @@ test.for([
     const url = cacheUrl("/regressions/cache/resource", FRAMING_SERVER_URL);
     const cacheNamespace = "legacy-cache-regression";
     const now = Date.now();
-    storeCacheResponse(
+    storeCacheFixture(
       JSON.stringify(
         version === 3 ? [cacheNamespace, 3, url, url] : [cacheNamespace, url],
       ),
-      {},
-      now,
-      now,
+      cache,
       {
         statusCode: 200,
         headers: { "cache-control": "max-age=3600" },
         body: Buffer.from("wrong cached resource"),
         responseUrl: url.replace("/resource", "/dir/%2e%2e/resource"),
       },
-      cache,
+      { requestTimestamp: now, responseTimestamp: now },
     );
     const response = request("GET", url, { cache, cacheNamespace });
     expect(response.getJSON()).toMatchObject({ hits: 1 });

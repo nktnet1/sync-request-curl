@@ -8,7 +8,7 @@ import {
   supportedPlatformKeys,
 } from "#/native/platform-key-core";
 import { run } from "#scripts/process";
-import { parseReleasePackageJson } from "#scripts/release-package";
+import { parseReleasePackageJson } from "#scripts/release/package";
 
 const BOOTSTRAP_VERSION = "0.0.0-bootstrap.0";
 const BOOTSTRAP_TAG = "bootstrap";

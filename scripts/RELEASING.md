@@ -36,7 +36,7 @@ interactive `npm trust github` command rather than retrying the captured lookup.
 In this case npm may reject an already-existing relationship rather than skip
 it, but no existing trusted publisher is revoked or overwritten.
 
-To bootstrap or configure OIDC for *all* native companion packages, omit
+To bootstrap or configure OIDC for _all_ native companion packages, omit
 `--freebsd-only`. The main `sync-request-curl` package's trusted publisher must
 also be configured separately if it does not already exist. GitHub Actions
 already supplies `id-token: write` and uses the `Production` environment in
@@ -76,27 +76,30 @@ version edit available for inspection.
 
 ## Build and publish
 
-### FreeBSD release cache
+### FreeBSD builds and trusted publication
 
-`Pipeline` builds or smoke-tests both FreeBSD architectures on every relevant
-push to `main`. Once a successful run has populated the default-branch native
-addon cache, tagged releases restore the **exact** source-keyed binary and skip
-the FreeBSD VM entirely. The prebuilt binary was already loaded and HTTP-tested
-on FreeBSD before that cache entry was saved. Normal branch pushes cannot
-trigger the npm Publish job; publication still requires a release tag.
+`Pipeline` builds or smoke-tests both FreeBSD architectures on relevant pushes
+on `main` and maintains a source-keyed cache for its own CI runs. **Release
+builds do not restore cached native binaries:** the release rebuilds and
+smoke-tests both FreeBSD targets before packaging, avoiding the risk of
+publishing an artifact supplied by a less-trusted cache writer. FreeBSD VM
+setup is still cached separately by the FreeBSD action.
 
 **Wait for `Pipeline` on `main` to succeed before pushing a release tag**, in
-particular after changing native code or build scripts. The FreeBSD cache key
-includes the native build entrypoint (`native/build.ts`), the Rust sources and
-lockfile, and the FreeBSD CI tooling. A cache miss, expiration, or first build
-after a cache-key change falls back to the full FreeBSD build and smoke tests;
-the release still waits for that job rather than publishing a missing binary.
+particular after changing native code or build scripts. The tag directly
+triggers the `Publish` workflow in `publish.yaml`. That workflow invokes
+`native-prebuilds.yaml` as a reusable build-and-package workflow in the **same
+trusted tag run**. Only after all native targets and release artifacts succeed
+does the publishing job run, using the verified release tarballs and metadata
+from that run. Running `Native prebuilds` manually only builds the artifacts;
+it cannot trigger npm publication.
 
-The tag triggers Native prebuilds, which builds the native matrix and packages
-the release. Publish then invokes `scripts/publish-release-packages.ts` using
-release metadata and the upstream run's expected SHA. CI does not increment the
-version. It checks out release tooling from the trusted publishing workflow
-revision, not from downloaded artifacts, and installs no npm dependencies.
+There is no privileged `workflow_run` trigger or cross-run artifact download.
+The publishing job checks out code from the tag, validates the expected SHA,
+and invokes `scripts/publish-release-packages.ts` without installing npm
+dependencies. It uses OIDC from `publish.yaml` with the `Production`
+environment, matching the existing npm Trusted Publisher configuration. CI
+does not increment the version.
 
 The same publisher can be run locally against the downloaded `release-packages`
 artifact (extract its `.tgz` files into `release-packages/`):

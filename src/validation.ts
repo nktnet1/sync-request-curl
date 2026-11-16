@@ -510,17 +510,17 @@ const httpBearerAuthObjectSchema = v.object({
   bearer: authBearerSchema,
 });
 
+const isCredentialAuthentication = (input: object): boolean =>
+  v.is(httpCredentialAuthObjectSchema, input) && !("bearer" in input);
+
+const isBearerAuthentication = (input: object): boolean =>
+  v.is(httpBearerAuthObjectSchema, input) &&
+  !["username", "password", "type"].some((key) => key in input);
+
 export const httpAuthSchema = v.custom<HttpAuthOptions>((input) => {
-  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+  if (input === null || typeof input !== "object" || Array.isArray(input))
     return false;
-  }
-  return (
-    (v.is(httpCredentialAuthObjectSchema, input) && !("bearer" in input)) ||
-    (v.is(httpBearerAuthObjectSchema, input) &&
-      !("username" in input) &&
-      !("password" in input) &&
-      !("type" in input))
-  );
+  return isCredentialAuthentication(input) || isBearerAuthentication(input);
 }, "Invalid HTTP authentication configuration");
 
 const noProxyEntrySchema = v.pipe(

@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { join, parse, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
@@ -157,6 +158,26 @@ describe("native binding loading", () => {
     );
     expect(exists).not.toHaveBeenCalled();
     expect(resolveNative).not.toHaveBeenCalled();
+  });
+
+  test("finds the current package root when no explicit root is supplied", () => {
+    const root = realpathSync(resolve(import.meta.dirname, "../.."));
+    const localBuild = join(
+      root,
+      "native",
+      "build",
+      "sync_request_curl_native.node",
+    );
+    const binding = fakeBinding();
+    const requireNative = vi.fn(() => binding);
+
+    expect(
+      loadBinding({
+        exists: (candidate) => candidate === localBuild,
+        requireNative,
+      }),
+    ).toBe(binding);
+    expect(requireNative).toHaveBeenCalledExactlyOnceWith(localBuild);
   });
 
   test("prefers the package-local build output over a matching prebuild", () => {

@@ -285,7 +285,7 @@ const freebsdWorkflowJob = (
   return workflow.slice(start, end);
 };
 
-test("FreeBSD release and pipeline jobs share the exact cache key", () => {
+test("main FreeBSD cache keys cover native inputs without sharing binaries with releases", () => {
   const release = freebsdWorkflowJob(
     "native-prebuilds.yaml",
     "build-freebsd",
@@ -297,12 +297,13 @@ test("FreeBSD release and pipeline jobs share the exact cache key", () => {
     "native",
   );
   const key = /\bkey: (freebsd-prebuild-[^\n]+)/;
-  const releaseKey = release.match(key)?.[1];
   const pipelineKey = pipeline.match(key)?.[1];
-  expect(releaseKey).toBeDefined();
-  expect(releaseKey).toBe(pipelineKey);
-  expect(releaseKey).toContain("'native/build.ts'");
-  expect(releaseKey).toContain("'scripts/freebsd-ci.sh'");
+  expect(pipelineKey).toBeDefined();
+  expect(pipelineKey).toContain("'native/build.ts'");
+  expect(pipelineKey).toContain("'native/src/**'");
+  expect(pipelineKey).toContain("'scripts/freebsd-ci.sh'");
+  expect(release).not.toMatch(key);
+  expect(release).not.toContain("uses: actions/cache@");
 });
 
 test("main pipeline smoke-tests FreeBSD artifacts before caching them", () => {
@@ -318,24 +319,26 @@ test("main pipeline smoke-tests FreeBSD artifacts before caching them", () => {
   expect(pipeline).toContain("run: test -s prebuilds/");
 });
 
-test("release skips the FreeBSD VM only for an exact cache hit", () => {
+test("releases rebuild and smoke-test FreeBSD addons rather than trusting CI caches", () => {
   const release = freebsdWorkflowJob(
     "native-prebuilds.yaml",
     "build-freebsd",
     "collect",
   );
+  expect(release).toContain("persist-credentials: false");
+  expect(release).not.toContain("native-cache");
+  expect(release).not.toContain("cache-hit");
+  expect(release).toContain("uses: vmactions/freebsd-vm@");
+  expect(release).toContain("sh scripts/freebsd-ci.sh prepare");
   expect(release).toMatch(
-    /if: steps\.native-cache\.outputs\.cache-hit == 'true'\n\s+run: echo /,
+    /run: sh scripts\/freebsd-ci\.sh build \$\{\{ matrix\.platform \}\}/,
   );
-  expect(release).toMatch(
-    /if: steps\.native-cache\.outputs\.cache-hit != 'true'\n\s+uses: vmactions\/freebsd-vm@/,
-  );
-  expect(release).toContain("run: sh scripts/freebsd-ci.sh build");
   expect(release).toContain("run: test -s prebuilds/");
+  expect(release).toContain("uses: actions/upload-artifact@v4");
   expect(release).toContain("if-no-files-found: error");
 });
 
-test("the FreeBSD cache is warmed on main without triggering npm publication", () => {
+test("main warms the FreeBSD cache but only the dedicated tag workflow publishes", () => {
   const pipeline = readFileSync(
     resolve(import.meta.dirname, "../../.github/workflows/pipeline.yaml"),
     "utf8",
@@ -351,9 +354,24 @@ test("the FreeBSD cache is warmed on main without triggering npm publication", (
     resolve(import.meta.dirname, "../../.github/workflows/publish.yaml"),
     "utf8",
   );
+  const publishJob = publish.split("\n  publish:\n")[1];
+
   expect(pipeline).toMatch(/on:\n {2}push:\n {4}branches:\n {6}- main\n/);
-  expect(release).toMatch(
-    /on:\n {2}workflow_dispatch:\n {2}push:\n {4}tags:\n {6}- 'v\*'/,
+  expect(pipeline).toContain("key: freebsd-prebuild-");
+  expect(pipeline).not.toContain("id-token: write");
+  expect(release).toMatch(/on:\n {2}workflow_call:\n {2}workflow_dispatch:/);
+  expect(release).not.toContain("workflow_run:");
+  expect(release).not.toContain("id-token: write");
+  expect(release).not.toContain("\n  publish:\n");
+  expect(publish).toMatch(/on:\n {2}push:\n {4}tags:\n {6}- ["']v\*["']/);
+  expect(publish).not.toContain("workflow_run:");
+  expect(publish).toContain("uses: ./.github/workflows/native-prebuilds.yaml");
+  expect(publishJob).toBeDefined();
+  expect(publishJob).toContain(
+    "if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')",
   );
-  expect(publish).toContain("github.event.workflow_run.event == 'push'");
+  expect(publishJob).toContain("needs: build-release");
+  expect(publishJob).toContain("environment: Production");
+  expect(publishJob).toContain("id-token: write");
+  expect(publishJob).toContain('--expected-sha="$BUILD_SHA"');
 });

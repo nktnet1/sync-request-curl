@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -71,6 +72,93 @@ test("CommonJS release bundle exposes literal native package resolutions to file
   }
 });
 
+// Exercise the compiled CommonJS implementation after relocating it away from
+// the package and its self-reference. Dependencies remain available, as in an
+// application bundle whose original package directory has been removed.
+test("relocated CommonJS entrypoint imports without its package manifest", () => {
+  const directory = realpathSync(
+    mkdtempSync(join(tmpdir(), "curl-relocated-")),
+  );
+  const entrypoint = join(directory, "app.cjs");
+  const binding = join(directory, "binding.cjs");
+  const localWorker = join(directory, "internal", "blob-reader-worker.cjs");
+  const installedPackage = join(directory, "node_modules", "sync-request-curl");
+
+  cpSync(join(root, "dist", "index.cjs"), entrypoint);
+  writeFileSync(
+    binding,
+    "module.exports = { request() {}, createConnectionPool() { return 1; }, releaseConnectionPool() {} };",
+  );
+  mkdirSync(join(directory, "node_modules"));
+  cpSync(
+    join(root, "node_modules", "valibot"),
+    join(directory, "node_modules", "valibot"),
+    {
+      recursive: true,
+      dereference: true,
+    },
+  );
+
+  const run = (script: string): void => {
+    const result = spawnSync(process.execPath, ["-e", script], {
+      cwd: directory,
+      env: {
+        ...process.env,
+        NODE_PATH: "",
+        SYNC_REQUEST_CURL_NATIVE_PATH: binding,
+      },
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  };
+
+  const importAndReadBlob = `
+    const assert = require("node:assert/strict");
+    const { Blob } = require("node:buffer");
+    const { FormData } = require(${JSON.stringify(entrypoint)});
+    const form = new FormData();
+    form.append("text", "hello");
+    form.append("blob", new Blob(["blob content"]));
+    assert.ok(form.getBuffer().includes(Buffer.from("blob content")));
+  `;
+
+  try {
+    // No self-package is installed, but a worker next to the bundle works.
+    mkdirSync(join(directory, "internal"));
+    cpSync(
+      join(root, "dist", "internal", "blob-reader-worker.cjs"),
+      localWorker,
+    );
+    run(importAndReadBlob);
+
+    // Import and non-Blob use must still work without any worker or manifest.
+    rmSync(localWorker);
+    run(`
+      const assert = require("node:assert/strict");
+      const { Blob } = require("node:buffer");
+      const { FormData } = require(${JSON.stringify(entrypoint)});
+      const form = new FormData();
+      form.append("text", "hello");
+      form.append("empty", new Blob([]));
+      assert.throws(() => form.append("blob", new Blob(["data"])),
+        /Unable to synchronously read Blob data/);
+    `);
+
+    // When the application retains the installed package, its worker is used.
+    mkdirSync(join(installedPackage, "dist", "internal"), { recursive: true });
+    cpSync(join(root, "package.json"), join(installedPackage, "package.json"));
+    cpSync(
+      join(root, "dist", "internal", "blob-reader-worker.cjs"),
+      join(installedPackage, "dist", "internal", "blob-reader-worker.cjs"),
+    );
+    run(importAndReadBlob);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 // Exercise the published export map in fresh Node processes. Source imports
 // cannot detect constructors or state duplicated by separate bundler invocations.
 const runEntrypointCheck = (format: ModuleFormat, script: string): void => {
@@ -127,10 +215,12 @@ for (const format of ["module", "commonjs"] as const) {
     const imports =
       format === "module"
         ? `import request, { CurlError, FormData, RequestError, ResponseError } from 'sync-request-curl';
-           import assert from 'node:assert/strict';`
+           import assert from 'node:assert/strict';
+           import { Blob } from 'node:buffer';`
         : `const request = require('sync-request-curl');
            const { CurlError, FormData, RequestError, ResponseError } = request;
-           const assert = require('node:assert/strict');`;
+           const assert = require('node:assert/strict');
+           const { Blob } = require('node:buffer');`;
     runEntrypointCheck(
       format,
       `${imports}
@@ -148,6 +238,8 @@ for (const format of ["module", "commonjs"] as const) {
            form.setBoundary('entrypoint-boundary');
            form.append('message', 'hello');
            form.append('count', 3);
+           form.append('blob', new Blob(['bundled blob']), 'blob.txt');
+           assert.ok(form.getBuffer().includes(Buffer.from('bundled blob')));
            assert.equal(form.getBoundary(), 'entrypoint-boundary');
            assert.equal(form.getHeaders()['content-type'], 'multipart/form-data; boundary=entrypoint-boundary');
            assert.equal(form.getLengthSync(), form.getBuffer().length);

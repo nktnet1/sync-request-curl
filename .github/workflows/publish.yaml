@@ -1,11 +1,9 @@
 name: Publish
 
 on:
-  workflow_run:
-    workflows:
-      - Native prebuilds
-    types:
-      - completed
+  push:
+    tags:
+      - "v*"
 
 concurrency:
   group: npm-release-publish
@@ -15,24 +13,29 @@ permissions:
   contents: read
 
 jobs:
+  build-release:
+    # Calling the build as a reusable workflow keeps release artifacts in this
+    # trusted tag-push run; no privileged workflow_run downloads are involved.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/native-prebuilds.yaml
+    permissions:
+      contents: read
+
   publish:
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
+    # The tag-triggered caller is also the npm OIDC trusted publisher.
+    # Release artifacts are produced within this same workflow run.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build-release
     runs-on: ubuntu-24.04
     environment: Production
     permissions:
-      actions: read
       contents: read
       id-token: write
 
     steps:
-      # Use the trusted publishing workflow revision, never scripts from artifacts.
       - name: Checkout release tooling
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.workflow_sha }}
           persist-credentials: false
 
       - name: Download release packages
@@ -40,16 +43,12 @@ jobs:
         with:
           name: release-packages
           path: release-packages
-          github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Download release metadata
         uses: actions/download-artifact@v4
         with:
           name: release-metadata
           path: release-metadata
-          github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -60,7 +59,7 @@ jobs:
 
       - name: Validate and publish release packages
         env:
-          BUILD_SHA: ${{ github.event.workflow_run.head_sha }}
+          BUILD_SHA: ${{ github.sha }}
         run: >-
           node scripts/publish-release-packages.ts
           --registry=https://registry.npmjs.org

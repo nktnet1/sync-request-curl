@@ -14,7 +14,7 @@ import {
   getNativePackageName,
   supportedPlatformKeys,
 } from "#/native/platform-key-core";
-import { publishReleasePackages } from "#scripts/release-publisher";
+import { publishReleasePackages } from "#scripts/release/publisher";
 
 const mocks = vi.hoisted(() => ({
   spawn: vi.fn(),

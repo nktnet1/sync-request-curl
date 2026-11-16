@@ -18,7 +18,7 @@ import {
   createMainPackageManifest,
   createNativePackageManifest,
   parseReleasePackageJson,
-} from "#scripts/release-package";
+} from "#scripts/release/package";
 
 const root = resolve(import.meta.dirname, "..");
 const releaseRoot = join(root, ".release");

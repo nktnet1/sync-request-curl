@@ -5,7 +5,7 @@ import request from "#/index";
 import {
   prepareTransportOptions,
   usesCustomTransport,
-} from "#/request/transport-options";
+} from "#/request/transport/options";
 import type { Options } from "#/types/definition";
 import { reserveLoopbackPort } from "#scripts/loopback-port";
 import { PROXY_URL, SERVER_URL, TLS_URL } from "#tests/app/config";

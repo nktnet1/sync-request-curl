@@ -1,5 +1,6 @@
 import { Agent } from "node:http";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { lookupCache } from "#tests/request/cache/fixtures";
 
 const { nativeRequest, createConnectionPool, releaseConnectionPool } =
   vi.hoisted(() => ({
@@ -16,8 +17,8 @@ vi.mock("#/native/index", () => ({
 }));
 
 import request from "#/index";
-import { invalidateCache, prepareCacheLookup } from "#/request/cache";
-import { getRequestCacheKey } from "#/request/cache-key";
+import { invalidateCache } from "#/request/cache";
+import { getRequestCacheKey } from "#/request/cache/key";
 import type { CacheCanCacheFunction, Options } from "#/types/definition";
 
 let serial = 0;
@@ -91,7 +92,7 @@ const expectOriginalStaleMetadata = (
   key: string,
   cache: NonNullable<Options["cache"]>,
 ): void => {
-  const lookup = prepareCacheLookup("GET", key, [], cache);
+  const lookup = lookupCache(key, cache);
   expect(lookup.useCachedResponse).toBe(false);
   expect(lookup.entry?.headers["x-updated"]).toBeUndefined();
   expect(lookup.entry?.headers["cache-control"]).toBe("max-age=0");
@@ -119,7 +120,7 @@ describe.each(["file", "memory"] as const)(
       expect(nativeRequest.mock.calls[1]?.[0].headers).toContain(
         'If-None-Match: "same"',
       );
-      expect(prepareCacheLookup("GET", key, [], cache).entry).toBeUndefined();
+      expect(lookupCache(key, cache).entry).toBeUndefined();
     });
 
     test.each(approvalCases)(
@@ -170,7 +171,7 @@ describe.each(["file", "memory"] as const)(
       );
       expect(isExpired).not.toHaveBeenCalled();
       expect(nativeRequest).toHaveBeenCalledTimes(1);
-      expect(prepareCacheLookup("GET", key, [], cache).entry).toBeDefined();
+      expect(lookupCache(key, cache).entry).toBeDefined();
     });
 
     test("a caller's conditional HEAD response does not refresh GET metadata", () => {
@@ -199,9 +200,7 @@ describe.each(["file", "memory"] as const)(
         body: Buffer.alloc(0),
       });
       expect(request("POST", url, { cache }).statusCode).toBe(500);
-      expect(prepareCacheLookup("GET", key, [], cache).entry?.body).toBe(
-        body.toString("base64"),
-      );
+      expect(lookupCache(key, cache).entry?.body).toBe(body.toString("base64"));
     });
 
     test("revalidation uses the configured agent's connection pool", () => {

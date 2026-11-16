@@ -8,7 +8,7 @@
 &nbsp;
 [![codecov](https://codecov.io/gh/nktnet1/sync-request-curl/branch/main/graph/badge.svg?token=RAC7SKJTGU)](https://codecov.io/gh/nktnet1/sync-request-curl)
 &nbsp;
-[![Maintainability](https://api.codeclimate.com/v1/badges/3ec8c0ddebe848926277/maintainability)](https://codeclimate.com/github/nktnet1/sync-request-curl/maintainability)
+[![Maintainability](https://qlty.sh/gh/nktnet1/projects/sync-request-curl/maintainability.svg)](https://qlty.sh/gh/nktnet1/projects/sync-request-curl)
 &nbsp;
 [![Snyk Security](https://snyk.io/test/github/nktnet1/sync-request-curl/badge.svg)](https://snyk.io/test/github/nktnet1/sync-request-curl)
 &nbsp;
@@ -75,8 +75,8 @@ The request function is the package default export. ESM consumers can import
 `FormData` and public types from the root entry:
 
 ```typescript
-import request, { FormData } from 'sync-request-curl';
-import type { Options, Response } from 'sync-request-curl';
+import request, { FormData } from "sync-request-curl";
+import type { Options, Response } from "sync-request-curl";
 ```
 
 <details closed>
@@ -87,57 +87,57 @@ import type { Options, Response } from 'sync-request-curl';
 `GET` request without options
 
 ```typescript
-import request from 'sync-request-curl';
+import request from "sync-request-curl";
 
-const res = request('GET', 'https://comp1531namesages.alwaysdata.net');
-console.log('Status Code:', res.statusCode);
+const res = request("GET", "https://comp1531namesages.alwaysdata.net");
+console.log("Status Code:", res.statusCode);
 const jsonBody = JSON.parse(res.body.toString());
-console.log('Returned JSON object:', jsonBody);
+console.log("Returned JSON object:", jsonBody);
 ```
 
 **`GET`** request with query string parameters
 
 ```typescript
-import request from 'sync-request-curl';
+import request from "sync-request-curl";
 
-const res = request('GET', 'https://comp1531forum.alwaysdata.net/echo/echo', {
-  qs: { message: 'Hello, world!' },
+const res = request("GET", "https://comp1531forum.alwaysdata.net/echo/echo", {
+  qs: { message: "Hello, world!" },
 });
-console.log('Status Code:', res.statusCode);
+console.log("Status Code:", res.statusCode);
 const jsonBody = JSON.parse(res.body.toString());
-console.log('Returned JSON object:', jsonBody);
+console.log("Returned JSON object:", jsonBody);
 ```
 
 **`POST`** request with headers and JSON payload
 
 ```typescript
-import request from 'sync-request-curl';
+import request from "sync-request-curl";
 
-const res = request('POST', 'https://comp1531quiz.alwaysdata.net/quiz/create', {
+const res = request("POST", "https://comp1531quiz.alwaysdata.net/quiz/create", {
   headers: { lab08quizsecret: "bruno's fight club" },
   json: {
-    quizTitle: 'New Quiz',
-    quizSynopsis: 'Sync request curl example',
+    quizTitle: "New Quiz",
+    quizSynopsis: "Sync request curl example",
   },
 });
 
-console.log('Status Code:', res.statusCode);
+console.log("Status Code:", res.statusCode);
 const jsonBody = JSON.parse(res.body.toString());
-console.log('Returned JSON Object:', jsonBody);
+console.log("Returned JSON Object:", jsonBody);
 ```
 
 **`POST`** request for file upload using multipart/form-data
 
 ```typescript
-import { readFileSync } from 'node:fs';
-import request, { FormData } from 'sync-request-curl';
+import { readFileSync } from "node:fs";
+import request, { FormData } from "sync-request-curl";
 
 const form = new FormData();
-form.append('example-file', readFileSync('./path/to/file.txt'), 'file.txt');
-form.append('example-content', 'Example Content!');
+form.append("example-file", readFileSync("./path/to/file.txt"), "file.txt");
+form.append("example-content", "Example Content!");
 
-const res = request('POST', 'https://example.com/upload', { form });
-console.log('Status Code:', res.statusCode);
+const res = request("POST", "https://example.com/upload", { form });
+console.log("Status Code:", res.statusCode);
 ```
 
 `FormData` also exposes the synchronous Node `form-data` helpers used by
@@ -153,22 +153,22 @@ provided.
 Proxy request
 
 ```javascript
-import request from 'sync-request-curl';
+import request from "sync-request-curl";
 
-const res = request('GET', 'https://ipinfo.io/json', {
+const res = request("GET", "https://ipinfo.io/json", {
   proxy: {
-    url: 'http://your-proxy-url:port',
-    username: 'proxyUsername',
-    password: 'proxyPassword',
-    auth: 'any',
-    noProxy: ['localhost', '127.0.0.0/8'],
+    url: "http://your-proxy-url:port",
+    username: "proxyUsername",
+    password: "proxyPassword",
+    auth: "any",
+    noProxy: ["localhost", "127.0.0.0/8"],
     headers: {
-      'X-Proxy-Trace': 'trace-id',
+      "X-Proxy-Trace": "trace-id",
     },
   },
 });
 
-console.log('Status Code:', res.statusCode);
+console.log("Status Code:", res.statusCode);
 const jsonBody = res.getJSON();
 console.log(jsonBody);
 ```
@@ -185,18 +185,18 @@ libcurl 7.86.0 or newer.
 Mutual TLS with a client certificate
 
 ```typescript
-import request from 'sync-request-curl';
+import request from "sync-request-curl";
 
-const res = request('GET', 'https://service.example', {
-  caFile: './service-ca.pem',
+const res = request("GET", "https://service.example", {
+  caFile: "./service-ca.pem",
   tls: {
-    certFile: './client.pem',
-    keyFile: './client-key.pem',
-    minVersion: 'TLSv1.2',
+    certFile: "./client.pem",
+    keyFile: "./client-key.pem",
+    minVersion: "TLSv1.2",
   },
 });
 
-console.log('Status Code:', res.statusCode);
+console.log("Status Code:", res.statusCode);
 ```
 
 For a PKCS#12 identity, set `certType: 'p12'` and provide the `.p12` file as
@@ -1063,7 +1063,7 @@ One multipart entry accepted by `FormData`.
 | <a id="property-knownlength"></a> `knownLength?` | `number` | Accepted for `form-data` append-option compatibility. |
 | <a id="property-header"></a> `header?` | `string` | Optional raw multipart header that replaces generated part headers. |
 | <a id="property-key"></a> `key` | `string` | Multipart field name. |
-| <a id="property-value"></a> `value` | `string` \| `number` \| `boolean` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) | Synchronously materialisable multipart field value. |
+| <a id="property-value"></a> `value` | `string` \| `number` \| `boolean` \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> | Synchronously materialisable multipart field value. |
 | <a id="property-filename"></a> `fileName?` | `string` | Optional file name. Path components are stripped before sending. |
 
 ***
@@ -1120,7 +1120,7 @@ path components are stripped from generated filenames before sending.
 | Parameter | Type |
 | ------ | ------ |
 | `key` | `string` |
-| `value` | `string` \| `number` \| `boolean` \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) |
+| `value` | `string` \| `number` \| `boolean` \| [`Blob`](https://nodejs.org/api/buffer.html#class-blob) \| [`Buffer`](https://nodejs.org/api/buffer.html#class-buffer)\<`ArrayBufferLike`\> |
 | `options?` | \| `string` \| \{ `filename?`: `string`; `contentType?`: `string`; `knownLength?`: `number`; `header?`: `string`; \} |
 
 ###### Returns
@@ -1664,7 +1664,6 @@ libcurl can still pause for its upload rate limit before reading the response.
 Without further progress, this allowance expires normally; a server that never
 responds still times out after the remaining allowance and inactivity budget expire.
 `overallTimeout` includes both throttling and authentication and is never extended.
-
 
 <a id="caveats-proxy-request-headers"></a>
 ### 7.3. Proxy request headers

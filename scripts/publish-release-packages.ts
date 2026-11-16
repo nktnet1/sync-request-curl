@@ -1,7 +1,7 @@
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { publishReleasePackages } from "#scripts/release-publisher";
+import { publishReleasePackages } from "#scripts/release/publisher";
 
 const { values } = parseArgs({
   options: {

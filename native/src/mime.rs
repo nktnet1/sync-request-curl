@@ -55,77 +55,67 @@ impl Drop for Mime {
     }
   }
 }
+type MimeStringSetter = unsafe extern "C" fn(*mut CurlMimePart, *const c_char) -> CURLcode;
+
+fn set_mime_string(
+  part: *mut CurlMimePart,
+  value: &str,
+  keepalive: &mut Vec<CString>,
+  setter: MimeStringSetter,
+) -> std::result::Result<(), CURLcode> {
+  keepalive.push(curl_string(value));
+  let pointer = keepalive.last().expect("just pushed MIME string").as_ptr();
+  let code = unsafe { setter(part, pointer) };
+  if code == CURLE_OK { Ok(()) } else { Err(code) }
+}
+
+fn add_mime_part(
+  mime: &Mime,
+  field: &NativeFormDataEntry,
+  keepalive: &mut Vec<CString>,
+) -> std::result::Result<(), CURLcode> {
+  let part = unsafe { curl_mime_addpart(mime.0) };
+  if part.is_null() {
+    return Err(CURLE_OUT_OF_MEMORY);
+  }
+
+  set_mime_string(part, &field.key, keepalive, curl_mime_name)?;
+
+  let data: &[u8] = match &field.value {
+    Either::A(text) => text.as_bytes(),
+    Either::B(buffer) => buffer.as_ref(),
+  };
+  let data_pointer = if data.is_empty() {
+    c"".as_ptr()
+  } else {
+    data.as_ptr().cast::<c_char>()
+  };
+  let code = unsafe { curl_mime_data(part, data_pointer, data.len()) };
+  if code != CURLE_OK {
+    return Err(code);
+  }
+
+  if let Some(file_name) = field.file_name.as_deref().filter(|value| !value.is_empty()) {
+    set_mime_string(part, file_name, keepalive, curl_mime_filename)?;
+  }
+  if let Some(content_type) = field.content_type.as_deref().filter(|value| !value.is_empty()) {
+    set_mime_string(part, content_type, keepalive, curl_mime_type)?;
+  }
+  Ok(())
+}
+
 pub(crate) fn build_mime(
   curl: *mut CURL,
   fields: &[NativeFormDataEntry],
   keepalive: &mut Vec<CString>,
 ) -> std::result::Result<Mime, CURLcode> {
   let mime = Mime::new(curl)?;
-
   for field in fields {
-    let part = unsafe { curl_mime_addpart(mime.0) };
-    if part.is_null() {
-      return Err(CURLE_OUT_OF_MEMORY);
-    }
-
-    keepalive.push(curl_string(&field.key));
-    let name = keepalive.last().expect("just pushed MIME name").as_ptr();
-    let mut code = unsafe { curl_mime_name(part, name) };
-    if code != CURLE_OK {
-      return Err(code);
-    }
-
-    let data: &[u8] = match &field.value {
-      Either::A(text) => text.as_bytes(),
-      Either::B(buffer) => buffer.as_ref(),
-    };
-    let data_pointer = if data.is_empty() {
-      c"".as_ptr()
-    } else {
-      data.as_ptr().cast::<c_char>()
-    };
-    code = unsafe { curl_mime_data(part, data_pointer, data.len()) };
-    if code != CURLE_OK {
-      return Err(code);
-    }
-
-    if let Some(file_name) = field
-      .file_name
-      .as_deref()
-      .filter(|value| !value.is_empty())
-    {
-      keepalive.push(curl_string(file_name));
-      let file_name = keepalive
-        .last()
-        .expect("just pushed MIME filename")
-        .as_ptr();
-      code = unsafe { curl_mime_filename(part, file_name) };
-      if code != CURLE_OK {
-        return Err(code);
-      }
-    }
-
-    if let Some(content_type) = field
-      .content_type
-      .as_deref()
-      .filter(|value| !value.is_empty())
-    {
-      keepalive.push(curl_string(content_type));
-      let content_type = keepalive
-        .last()
-        .expect("just pushed MIME content type")
-        .as_ptr();
-      code = unsafe { curl_mime_type(part, content_type) };
-      if code != CURLE_OK {
-        return Err(code);
-      }
-    }
+    add_mime_part(&mime, field, keepalive)?;
   }
-
   let code = unsafe { curl_sys::curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime.0) };
   if code != CURLE_OK {
     return Err(code);
   }
-
   Ok(mime)
 }

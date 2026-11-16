@@ -44,6 +44,11 @@ describe("stripUrlCredentials", () => {
 });
 
 describe("normalizeUrlHostname", () => {
+  test("leaves an entirely ASCII URL byte-for-byte unchanged", () => {
+    const asciiUrl = "https://example.com:8443/a/%2e?q=%2f#fragment";
+    expect(normalizeUrlHostname(asciiUrl)).toBe(asciiUrl);
+  });
+
   test.each([1, 3])(
     "normalizes the hostname with %i scheme slashes without rewriting the target",
     (slashes) => {
