@@ -3,19 +3,16 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
-  realpathSync,
-  rmSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { afterEach, expect, test } from "vitest";
+import { expect, test } from "vitest";
 import { crossBuildFreebsdArm64 } from "#scripts/build/freebsd/cross";
+import { useTemporaryDirectories } from "./helpers/temp-directories";
 
 const repository = resolve(import.meta.dirname, "../..");
-const directories: string[] = [];
+const makeTemporaryDirectory = useTemporaryDirectories();
 
 type MockOptions = {
   failChecksum?: boolean;
@@ -36,8 +33,7 @@ const createFixture = (): {
   sysroot: string;
   addon: string;
 } => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "freebsd-cross-test-")));
-  directories.push(root);
+  const root = makeTemporaryDirectory("freebsd-cross-test-");
   const bin = join(root, "bin");
   const scripts = join(root, "scripts/build/freebsd");
   mkdirSync(bin);
@@ -139,23 +135,34 @@ const createFixture = (): {
   return { root, bin, log, sysroot, addon };
 };
 
+type Fixture = ReturnType<typeof createFixture>;
+
+const compilerEnvironment = (fixture: Fixture): NodeJS.ProcessEnv => ({
+  ...process.env,
+  PATH: `${fixture.bin}:${process.env.PATH}`,
+  LOG_FILE: fixture.log,
+  FREEBSD_CROSS_SYSROOT: fixture.sysroot,
+});
+
+const mockEnvironment = (
+  fixture: Fixture,
+  options: MockOptions = {},
+): NodeJS.ProcessEnv => ({
+  ...compilerEnvironment(fixture),
+  HOME: fixture.root,
+  RUNNER_TEMP: fixture.root,
+  FAIL_CHECKSUM: options.failChecksum ? "yes" : "no",
+  FAIL_CARGO: options.failCargo ? "yes" : "no",
+  FAIL_READELF: options.failReadelf ? "yes" : "no",
+});
+
 const execute = (
-  fixture: ReturnType<typeof createFixture>,
+  fixture: Fixture,
   options: MockOptions = {},
   script = "cross.ts",
   args: string[] = [],
 ) => {
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    HOME: fixture.root,
-    PATH: `${fixture.bin}:${process.env.PATH}`,
-    LOG_FILE: fixture.log,
-    RUNNER_TEMP: fixture.root,
-    FREEBSD_CROSS_SYSROOT: fixture.sysroot,
-    FAIL_CHECKSUM: options.failChecksum ? "yes" : "no",
-    FAIL_CARGO: options.failCargo ? "yes" : "no",
-    FAIL_READELF: options.failReadelf ? "yes" : "no",
-  };
+  const env = mockEnvironment(fixture, options);
   if (script !== "cross.ts") {
     const result = spawnSync(
       "sh",
@@ -180,12 +187,6 @@ const execute = (
     };
   }
 };
-
-afterEach(() => {
-  for (const directory of directories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
 
 test("cross-build uses the official 14.4 sysroot and keeps all bundled HTTP/3 features", () => {
   const fixture = createFixture();
@@ -233,17 +234,7 @@ test("cross-build TypeScript CLI works without a shell runner", () => {
     [join(fixture.root, "scripts/build/freebsd/cross.ts")],
     {
       cwd: fixture.root,
-      env: {
-        ...process.env,
-        HOME: fixture.root,
-        PATH: `${fixture.bin}:${process.env.PATH}`,
-        LOG_FILE: fixture.log,
-        RUNNER_TEMP: fixture.root,
-        FREEBSD_CROSS_SYSROOT: fixture.sysroot,
-        FAIL_CHECKSUM: "no",
-        FAIL_CARGO: "no",
-        FAIL_READELF: "no",
-      },
+      env: mockEnvironment(fixture),
       encoding: "utf8",
     },
   );
@@ -310,12 +301,7 @@ test.each([
     "sh",
     [join(fixture.root, "scripts/build/freebsd", script), "-c", "example.c"],
     {
-      env: {
-        ...process.env,
-        PATH: `${fixture.bin}:${process.env.PATH}`,
-        LOG_FILE: fixture.log,
-        FREEBSD_CROSS_SYSROOT: fixture.sysroot,
-      },
+      env: compilerEnvironment(fixture),
       encoding: "utf8",
     },
   );

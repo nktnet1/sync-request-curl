@@ -7,6 +7,9 @@ for argument do
       exec clang++-18 --target=aarch64-unknown-freebsd14.4 \
         "--sysroot=$FREEBSD_CROSS_SYSROOT" "$@"
       ;;
+    *)
+      :
+      ;;
   esac
 done
 exec clang++-18 --target=aarch64-unknown-freebsd14.4 \

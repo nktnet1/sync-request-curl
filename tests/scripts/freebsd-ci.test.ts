@@ -1,23 +1,15 @@
 import { spawnSync } from "node:child_process";
-import {
-  copyFileSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { afterEach, expect, test } from "vitest";
+import { expect, test } from "vitest";
 import { runFreebsdCi } from "#scripts/build/freebsd/ci";
+import { useTemporaryDirectories } from "./helpers/temp-directories";
 
 const script = resolve(
   import.meta.dirname,
   "../../scripts/build/freebsd/prepare.sh",
 );
-const directories: string[] = [];
+const makeTemporaryDirectory = useTemporaryDirectories();
 
 const runFreebsdScript = (
   arch: "amd64" | "arm64" | "other",
@@ -36,8 +28,7 @@ const runFreebsdScript = (
     pinnedToolchain?: string;
   } = {},
 ) => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "freebsd-ci-test-")));
-  directories.push(root);
+  const root = makeTemporaryDirectory("freebsd-ci-test-");
   const bin = join(root, "bin");
   mkdirSync(bin);
   const log = join(root, "commands.log");
@@ -163,12 +154,6 @@ const runFreebsdScript = (
     return { status: 1, stderr: String(error), log: readFileSync(log, "utf8") };
   }
 };
-
-afterEach(() => {
-  for (const directory of directories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
 
 test("FreeBSD x64 uses the packaged installer and pinned toolchain", () => {
   const result = runFreebsdScript("amd64", "prepare");
