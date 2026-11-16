@@ -73,29 +73,19 @@ const createFixture = (): {
     "prebuilds/sync_request_curl_native.freebsd-arm64.node",
   );
 
-  mockCommand(
-    bin,
-    "curl",
-    [
+  const mockedCommands: Record<string, string[]> = {
+    curl: [
       'printf "curl %s\\n" "$*" >> "$LOG_FILE"',
       'while [ "$#" -gt 0 ]; do',
       '  if [ "$1" = "--output" ]; then shift; printf "mock-archive" > "$1"; break; fi',
       "  shift",
       "done",
-    ].join("\n"),
-  );
-  mockCommand(
-    bin,
-    "sha256sum",
-    [
+    ],
+    sha256sum: [
       'if [ "$FAIL_CHECKSUM" = yes ]; then digest=invalid; else digest=c456bf75ee3d0b4da0b0b527402b0a9e61497f02756b2cc5801b51e80b3f90c4; fi',
       'printf "%s  %s\n" "$digest" "$1" | tee -a "$LOG_FILE"',
-    ].join("\n"),
-  );
-  mockCommand(
-    bin,
-    "tar",
-    [
+    ],
+    tar: [
       'printf "tar %s\\n" "$*" >> "$LOG_FILE"',
       'while [ "$#" -gt 0 ]; do',
       '  if [ "$1" = "-C" ]; then shift; break; fi',
@@ -104,12 +94,8 @@ const createFixture = (): {
       'mkdir -p "$1/usr/include/sys" "$1/usr/lib" "$1/lib"',
       'touch "$1/usr/include/sys/types.h" "$1/lib/libc.so.7"',
       'ln -s /lib/libc.so.7 "$1/usr/lib/libc.so"',
-    ].join("\n"),
-  );
-  mockCommand(
-    bin,
-    "cargo",
-    [
+    ],
+    cargo: [
       'printf "cargo %s\\n" "$*" >> "$LOG_FILE"',
       'printf "target=%s\\n" "$CARGO_BUILD_TARGET" >> "$LOG_FILE"',
       'printf "rustup=%s\\n" "$RUSTUP_TOOLCHAIN" >> "$LOG_FILE"',
@@ -123,23 +109,20 @@ const createFixture = (): {
       'if [ "$FAIL_CARGO" = yes ]; then exit 1; fi',
       "mkdir -p native/target/aarch64-unknown-freebsd/release",
       'printf "arm64-native-addon" > native/target/aarch64-unknown-freebsd/release/libsync_request_curl_native.so',
-    ].join("\n"),
-  );
-  mockCommand(
-    bin,
-    "readelf",
-    [
+    ],
+    readelf: [
       'printf "readelf %s\\n" "$*" >> "$LOG_FILE"',
       'if [ "$FAIL_READELF" = yes ]; then exit 1; fi',
       'printf "Type: DYN (Shared object file)\\nMachine: AArch64\\n"',
-    ].join("\n"),
-  );
+    ],
+  };
   for (const compiler of ["clang-18", "clang++-18"]) {
-    mockCommand(
-      bin,
-      compiler,
+    mockedCommands[compiler] = [
       `printf "${compiler} %s\\n" "$*" >> "$LOG_FILE"`,
-    );
+    ];
+  }
+  for (const [name, statements] of Object.entries(mockedCommands)) {
+    mockCommand(bin, name, statements.join("\n"));
   }
   return { root, bin, log, sysroot, addon };
 };
