@@ -144,7 +144,7 @@ describe.each(["file", "memory"] as const)(
         const lookup = lookupCache(key, cache, {
           method: method === "304" ? "GET" : "HEAD",
           now: 1,
-          decompress: decompress,
+          decompress,
         });
         const headers = {
           "cache-control": "max-age=60",
@@ -164,12 +164,12 @@ describe.each(["file", "memory"] as const)(
           expect(response?.headers["content-encoding"]).toBe(encoding);
         } else {
           updateHeadFixture(key, cache, lookup, headers, 2, {
-            decompress: decompress,
+            decompress,
           });
         }
         const refreshed = lookupCache(key, cache, {
           now: 3,
-          decompress: decompress,
+          decompress,
         });
         expect(refreshed.useCachedResponse).toBe(true);
         expect(refreshed.entry).toBeDefined();

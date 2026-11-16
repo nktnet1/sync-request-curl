@@ -25,6 +25,15 @@ describe("query value stringification", () => {
     );
   });
 
+  test("decodes Buffer bytes as UTF-8 without losing BOMs or replacement characters", () => {
+    const bytes = Buffer.from([
+      0xef, 0xbb, 0xbf, 0, 0xf0, 0x9f, 0x92, 0xa9, 0xff,
+    ]);
+    expect(stringifyQuery({ bytes })).toBe(
+      `bytes=${encodeQueryComponent("\uFEFF\u0000💩�")}`,
+    );
+  });
+
   test("handles dates, buffers, null, undefined and nested objects", () => {
     expect(
       stringifyQuery({

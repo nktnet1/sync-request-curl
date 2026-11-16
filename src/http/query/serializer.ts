@@ -5,7 +5,8 @@ const primitiveToString = (value: unknown): string | undefined => {
     return value === null ? "" : undefined;
   }
   if (value instanceof Date) return value.toISOString();
-  if (Buffer.isBuffer(value)) return value.toString("utf8");
+  if (Buffer.isBuffer(value))
+    return Buffer.prototype.toString.call(value, "utf8");
 
   switch (typeof value) {
     case "string":
