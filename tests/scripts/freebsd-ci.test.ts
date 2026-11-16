@@ -302,6 +302,8 @@ test("main FreeBSD cache keys cover native inputs without sharing binaries with 
   expect(pipelineKey).toContain("'native/build.ts'");
   expect(pipelineKey).toContain("'native/src/**'");
   expect(pipelineKey).toContain("'scripts/freebsd-ci.sh'");
+  expect(pipelineKey).toContain("'scripts/freebsd-cross*.sh'");
+  expect(pipelineKey).toContain("'scripts/freebsd-cross-toolchain.cmake'");
   expect(release).not.toMatch(key);
   expect(release).not.toContain("uses: actions/cache@");
 });
@@ -314,8 +316,19 @@ test("main pipeline smoke-tests FreeBSD artifacts before caching them", () => {
   );
   expect(pipeline).toContain("uses: actions/cache@v4");
   expect(pipeline).toContain("uses: vmactions/freebsd-vm@");
+  expect(pipeline).toContain("run: sh scripts/freebsd-cross.sh");
+  expect(pipeline).toContain("steps.native-cache.outputs.cache-hit != 'true'");
+  expect(pipeline).toContain("continue-on-error: true");
+  expect(pipeline).toContain("steps.cross-node.outcome == 'success'");
+  expect(pipeline).toContain("steps.cross-setup.outcome == 'success'");
+  expect(pipeline).toContain("steps.cross-node.outcome == 'failure'");
+  expect(pipeline).toContain("steps.cross-setup.outcome == 'failure'");
+  expect(pipeline).toContain("steps.cross.outcome == 'success'");
   expect(pipeline).toContain("run: sh scripts/freebsd-ci.sh");
   expect(pipeline).toContain("&& 'verify' || 'build'");
+  expect(pipeline).toContain(
+    "run: sh scripts/freebsd-ci.sh build freebsd-arm64",
+  );
   expect(pipeline).toContain("run: test -s prebuilds/");
 });
 
@@ -330,8 +343,14 @@ test("releases rebuild and smoke-test FreeBSD addons rather than trusting CI cac
   expect(release).not.toContain("cache-hit");
   expect(release).toContain("uses: vmactions/freebsd-vm@");
   expect(release).toContain("sh scripts/freebsd-ci.sh prepare");
-  expect(release).toMatch(
-    /run: sh scripts\/freebsd-ci\.sh build \$\{\{ matrix\.platform \}\}/,
+  expect(release).toContain("run: sh scripts/freebsd-cross.sh");
+  expect(release).toContain("steps.cross-setup.outcome == 'success'");
+  expect(release).toContain("steps.cross-setup.outcome == 'failure'");
+  expect(release).toContain(
+    "steps.cross.outcome == 'success' && 'verify' || 'build'",
+  );
+  expect(release).toContain(
+    "run: sh scripts/freebsd-ci.sh build freebsd-arm64",
   );
   expect(release).toContain("run: test -s prebuilds/");
   expect(release).toContain("uses: actions/upload-artifact@v4");
