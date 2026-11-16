@@ -1,4 +1,5 @@
 import { realpathSync } from "node:fs";
+import Module from "node:module";
 import { join, parse, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
@@ -325,6 +326,31 @@ describe("native binding loading", () => {
         );
         expect(requireNative).not.toHaveBeenCalled();
       }
+    }
+  });
+
+  test("resolves every literal optional package when CommonJS require is available", () => {
+    const moduleResolver = Module as typeof Module & {
+      _resolveFilename: (request: string, ...args: unknown[]) => string;
+    };
+    const originalResolve = moduleResolver._resolveFilename;
+    const resolveFilename = vi
+      .spyOn(moduleResolver, "_resolveFilename")
+      .mockImplementation((name, ...args) =>
+        name.startsWith("@nktnet/sync-request-curl-")
+          ? `/installed/${name}`
+          : originalResolve(name, ...args),
+      );
+
+    try {
+      for (const platformKey of supportedPlatformKeys) {
+        const packageName = getNativePackageName(platformKey);
+        const resolveNative = getDefaultNativeResolver(platformKey, true);
+        expect(resolveNative(packageName)).toBe(`/installed/${packageName}`);
+        expect(resolveFilename.mock.lastCall?.[0]).toBe(packageName);
+      }
+    } finally {
+      resolveFilename.mockRestore();
     }
   });
 

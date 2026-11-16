@@ -35,8 +35,8 @@ test("CommonJS release bundle exposes literal native package resolutions to file
     "win32-x64-msvc",
   ];
 
-  // The literal resolutions must be directly inside the guarded switch;
-  // putting them in nested functions changes how bundlers handle missing
+  // The literal resolutions must be directly inside the guarded switch.
+  // Putting them in nested functions changes how bundlers handle missing
   // optional dependencies.
   const resolverStart = bundle.indexOf("const resolveTraceableNativePackage =");
   const resolverEnd = bundle.indexOf(
@@ -49,7 +49,10 @@ test("CommonJS release bundle exposes literal native package resolutions to file
   const catchStart = resolverBlock.lastIndexOf("} catch (");
   assert.ok(tryStart >= 0 && catchStart > tryStart);
   const guardedResolvers = resolverBlock.slice(tryStart, catchStart);
-  assert.match(guardedResolvers, /try\s*\{\s*switch\s*\(platformKey\)\s*\{/);
+  assert.match(
+    guardedResolvers,
+    /try\s*\{\s*let\s+resolved;\s*switch\s*\(platformKey\)\s*\{/,
+  );
   assert.match(
     resolverBlock,
     /\}\s*catch\s*\((\w+)\)\s*\{\s*return\s+handleMissingNativePackage\(\1\)/,
@@ -65,7 +68,7 @@ test("CommonJS release bundle exposes literal native package resolutions to file
     assert.match(
       guardedResolvers,
       new RegExp(
-        String.raw`case\s+["']${platform}["']:\s*return\s+require\.resolve\(["']${packageName}["']\)`,
+        String.raw`case\s+["']${platform}["']:\s*resolved\s*=\s*require\.resolve\(["']${packageName}["']\);\s*break;`,
       ),
       `${packageName} must remain a direct, literal require.resolve() inside the guarded switch`,
     );
