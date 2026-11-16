@@ -328,6 +328,30 @@ test("accepts npm 12 and rejects non-npm registries for OIDC", async () => {
   expect(mocks.run).not.toHaveBeenCalled();
 });
 
+test.each([
+  ["11.15.0", true],
+  ["11.15.0-beta.1", true],
+  ["11.14.99", false],
+  ["10.99.99", false],
+  ["invalid", false],
+])(
+  "enforces npm's trusted-publishing minimum for %s",
+  async (version, supported) => {
+    const { commands } = createCommandMock({ version });
+    const result = bootstrapNativePackages({
+      freebsdOnly: true,
+      configureOidc: true,
+    });
+    if (supported) {
+      await expect(result).resolves.toBeUndefined();
+      expect(commands.some(({ args }) => args[0] === "view")).toBe(true);
+    } else {
+      await expect(result).rejects.toThrow(/npm >= 11\.15\.0/);
+      expect(commands).toHaveLength(1);
+    }
+  },
+);
+
 test("parses npm trust list JSON including separate pretty-printed objects", () => {
   expect(parseTrustedPublishers("\n")).toEqual([]);
   expect(parseTrustedPublishers(JSON.stringify(expectedTrust))).toEqual([

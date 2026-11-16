@@ -187,34 +187,51 @@ const resolveTraceableNativePackage = (
   platformKey: NativePlatformKey,
 ): string | undefined => {
   try {
+    let resolved: string;
     switch (platformKey) {
       case "darwin-arm64":
-        return require.resolve("@nktnet/sync-request-curl-darwin-arm64");
+        resolved = require.resolve("@nktnet/sync-request-curl-darwin-arm64");
+        break;
       case "darwin-x64":
-        return require.resolve("@nktnet/sync-request-curl-darwin-x64");
+        resolved = require.resolve("@nktnet/sync-request-curl-darwin-x64");
+        break;
       case "freebsd-arm64":
-        return require.resolve("@nktnet/sync-request-curl-freebsd-arm64");
+        resolved = require.resolve("@nktnet/sync-request-curl-freebsd-arm64");
+        break;
       case "freebsd-x64":
-        return require.resolve("@nktnet/sync-request-curl-freebsd-x64");
+        resolved = require.resolve("@nktnet/sync-request-curl-freebsd-x64");
+        break;
       case "linux-arm64-gnu":
-        return require.resolve("@nktnet/sync-request-curl-linux-arm64-gnu");
+        resolved = require.resolve("@nktnet/sync-request-curl-linux-arm64-gnu");
+        break;
       case "linux-arm64-musl":
-        return require.resolve("@nktnet/sync-request-curl-linux-arm64-musl");
+        resolved = require.resolve(
+          "@nktnet/sync-request-curl-linux-arm64-musl",
+        );
+        break;
       case "linux-x64-gnu":
-        return require.resolve("@nktnet/sync-request-curl-linux-x64-gnu");
+        resolved = require.resolve("@nktnet/sync-request-curl-linux-x64-gnu");
+        break;
       case "linux-x64-musl":
-        return require.resolve("@nktnet/sync-request-curl-linux-x64-musl");
+        resolved = require.resolve("@nktnet/sync-request-curl-linux-x64-musl");
+        break;
       case "win32-arm64-msvc":
-        return require.resolve("@nktnet/sync-request-curl-win32-arm64-msvc");
+        resolved = require.resolve(
+          "@nktnet/sync-request-curl-win32-arm64-msvc",
+        );
+        break;
       case "win32-ia32-msvc":
-        return require.resolve("@nktnet/sync-request-curl-win32-ia32-msvc");
+        resolved = require.resolve("@nktnet/sync-request-curl-win32-ia32-msvc");
+        break;
       case "win32-x64-msvc":
-        return require.resolve("@nktnet/sync-request-curl-win32-x64-msvc");
+        resolved = require.resolve("@nktnet/sync-request-curl-win32-x64-msvc");
+        break;
       default:
         throw new Error(
           `Unsupported native platform: ${platformKey satisfies never}`,
         );
     }
+    return resolved;
   } catch (error) {
     return handleMissingNativePackage(error);
   }
