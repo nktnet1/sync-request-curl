@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { parseCliOptions } from "#scripts/native/build-options";
+import { parseCliOptions } from "#scripts/build/native/build-options";
 
 describe("native build CLI options", () => {
   test("accepts --help and the default build options", () => {

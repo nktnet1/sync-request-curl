@@ -1,9 +1,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { nextBetaVersion } from "#scripts/beta-version";
-import { run } from "#scripts/process";
+import { nextBetaVersion } from "#scripts/release/beta-version";
 import { releaseLabel } from "#scripts/release/policy";
+import { run } from "#scripts/shared/process";
 
 const { values } = parseArgs({
   options: {
@@ -168,7 +168,7 @@ const main = (): void => {
     return;
   }
   assertReleaseOptions();
-  const root = resolve(import.meta.dirname, "..");
+  const root = resolve(import.meta.dirname, "../..");
   const git: GitCommand = (args) =>
     run("git", args, { cwd: root, capture: true });
   if (git(["status", "--porcelain"])) {

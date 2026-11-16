@@ -16,12 +16,12 @@ import { basename, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { parseArgs, styleText } from "node:util";
 import { getNativePackageName } from "#/native/platform-key-core";
-import { reserveLoopbackPort } from "#scripts/loopback-port";
-import { getCurrentPlatformKey } from "#scripts/native-platform";
-import { pollUntilReady } from "#scripts/poll-until-ready";
-import { canRun, run } from "#scripts/process";
+import { getCurrentPlatformKey } from "#scripts/build/native-platform";
 import { parseReleasePackageJson } from "#scripts/release/package";
 import { parseReleaseVersion } from "#scripts/release/policy";
+import { canRun, run } from "#scripts/shared/process";
+import { reserveLoopbackPort } from "#scripts/test/loopback-port";
+import { pollUntilReady } from "#scripts/test/poll-until-ready";
 import {
   packPackage,
   type SmokeContext,
@@ -29,12 +29,12 @@ import {
   verifyCleanInstall,
   verifyPublishedDistTags,
   verifyPublishedMetadata,
-} from "#scripts/verdaccio/packages";
-import { launchSmokeServer } from "#scripts/verdaccio/server";
+} from "#scripts/test/verdaccio/packages";
+import { launchSmokeServer } from "#scripts/test/verdaccio/server";
 
 const VERDACCIO_VERSION = "6.10.4";
 const STARTUP_TIMEOUT_MS = 120_000;
-const root = resolve(import.meta.dirname, "..");
+const root = resolve(import.meta.dirname, "../..");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const packageJson = parseReleasePackageJson(

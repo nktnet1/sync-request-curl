@@ -7,8 +7,8 @@ import {
   getNativePackageName,
   supportedPlatformKeys,
 } from "#/native/platform-key-core";
-import { run } from "#scripts/process";
 import { parseReleasePackageJson } from "#scripts/release/package";
+import { run } from "#scripts/shared/process";
 
 const BOOTSTRAP_VERSION = "0.0.0-bootstrap.0";
 const BOOTSTRAP_TAG = "bootstrap";
@@ -17,7 +17,7 @@ const OIDC_WORKFLOW = "publish.yaml";
 const OIDC_ENVIRONMENT = "Production";
 const MINIMUM_TRUST_NPM_VERSION = [11, 15, 0] as const;
 
-const root = resolve(import.meta.dirname, "..");
+const root = resolve(import.meta.dirname, "../..");
 const packageJson = parseReleasePackageJson(
   readFileSync(join(root, "package.json"), "utf8"),
 );

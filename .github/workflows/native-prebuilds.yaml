@@ -39,7 +39,7 @@ jobs:
           node-version: 24.x
 
       - name: Build Linux prebuild
-        run: node scripts/linux-prebuild.ts --libc=${{ matrix.libc }} --mode=build
+        run: node scripts/build/linux-prebuild.ts --libc=${{ matrix.libc }} --mode=build
 
       - name: Upload native addon
         uses: actions/upload-artifact@v4
@@ -76,20 +76,20 @@ jobs:
           node-version: 24.x
 
       - name: Set up Rust
-        run: rustup toolchain install "$(node scripts/rust-toolchain.ts)" --profile minimal --no-self-update
+        run: rustup toolchain install "$(node scripts/build/rust-toolchain.ts)" --profile minimal --no-self-update
 
       - name: Set up NASM for Windows x64
         if: matrix.platform == 'win32-x64-msvc'
         uses: ilammy/setup-nasm@72793074d3c8cdda771dba85f6deafe00623038b # v1.5.2
 
       - name: Build native addon
-        run: node scripts/build-native.ts
+        run: node scripts/build/build-native.ts
 
       - name: Stage native addon
-        run: node scripts/stage-native.ts --platform=${{ matrix.platform }}
+        run: node scripts/build/stage-native.ts --platform=${{ matrix.platform }}
 
       - name: Verify native addon loads
-        run: node scripts/verify-native-load.ts --file=prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
+        run: node scripts/build/verify-native-load.ts --file=prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
 
       - name: Upload native addon
         uses: actions/upload-artifact@v4
@@ -111,7 +111,7 @@ jobs:
           architecture: x86
       - name: Set up Rust and x86 target
         run: |
-          $toolchain = node scripts/rust-toolchain.ts
+          $toolchain = node scripts/build/rust-toolchain.ts
           rustup toolchain install $toolchain --profile minimal --no-self-update
           rustup target add i686-pc-windows-msvc --toolchain $toolchain
       - name: Set up NASM for Windows x86
@@ -130,7 +130,7 @@ jobs:
       - name: Stage native addon
         run: Copy-Item native/build/sync_request_curl_native.node prebuilds/sync_request_curl_native.win32-ia32-msvc.node
       - name: Verify native addon loads
-        run: node scripts/verify-native-load.ts --file=prebuilds/sync_request_curl_native.win32-ia32-msvc.node
+        run: node scripts/build/verify-native-load.ts --file=prebuilds/sync_request_curl_native.win32-ia32-msvc.node
       - uses: actions/upload-artifact@v4
         with:
           name: prebuild-win32-ia32-msvc
@@ -155,19 +155,72 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Build and verify ${{ matrix.platform }}
+      # Cross-compile only ARM64 on Linux so that Rust, AWS-LC and libcurl
+      # do not spend an hour compiling inside an emulated FreeBSD VM.
+      - name: Set up Node.js for FreeBSD ARM64 cross-compilation
+        if: matrix.platform == 'freebsd-arm64'
+        id: cross-node
+        continue-on-error: true
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+
+      - name: Install FreeBSD ARM64 cross-compilation tools
+        if: matrix.platform == 'freebsd-arm64' && steps.cross-node.outcome == 'success'
+        id: cross-setup
+        continue-on-error: true
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-18 lld-18 llvm-18 libclang-18-dev cmake ninja-build perl pkg-config
+          toolchain="$(node scripts/build/rust-toolchain.ts --freebsd-arm64-cross)"
+          rustup toolchain install "$toolchain" --profile minimal --no-self-update
+          rustup target add aarch64-unknown-freebsd --toolchain "$toolchain"
+
+      # A failed experimental cross-build falls back to the existing native
+      # path. Never ship a cross-built artifact without testing it in FreeBSD.
+      - name: Cross-compile FreeBSD ARM64 addon on Linux
+        if: matrix.platform == 'freebsd-arm64' && steps.cross-setup.outcome == 'success'
+        id: cross
+        continue-on-error: true
+        run: node scripts/build/freebsd/cross.ts
+
+      - name: Report cross-compilation fallback
+        if: matrix.platform == 'freebsd-arm64' && (steps.cross-node.outcome == 'failure' || steps.cross-setup.outcome == 'failure' || steps.cross.outcome == 'failure')
+        run: echo "::warning::FreeBSD ARM64 cross-build or setup failed, using the existing native build"
+
+      - name: Build or verify ${{ matrix.platform }} release addon
+        id: freebsd-vm
+        # If a cross-built addon fails the native smoke checks, rebuild it in
+        # FreeBSD rather than publishing an unverified cross-built binary.
+        continue-on-error: ${{ matrix.platform == 'freebsd-arm64' && steps.cross.outcome == 'success' }}
         uses: vmactions/freebsd-vm@a2f9a41fa97f6848b8c3b791087dfcdaa5b473ff # v1.5.8
         with:
           release: "14.4"
           arch: ${{ matrix.arch }}
           mem: 8192
           usesh: true
-          # Use the pinned FreeBSD setup script on each release run.
+          cache-after-prepare: true
+          # Include the script and pin in the input, since this action version
+          # hashes only the literal prepare command for its prepared VM cache.
           prepare: |
-            # ${{ hashFiles('scripts/freebsd-ci.sh', 'rust-toolchain.toml') }}
-            sh scripts/freebsd-ci.sh prepare
-          # Run the complete FreeBSD build and smoke checks for this release.
-          run: sh scripts/freebsd-ci.sh build ${{ matrix.platform }}
+            # ${{ hashFiles('scripts/build/freebsd/prepare.sh', 'rust-toolchain.toml') }}
+            sh scripts/build/freebsd/prepare.sh
+          # Cached and cross-built artifacts are always verified on FreeBSD.
+          run: node scripts/build/freebsd/ci.ts ${{ steps.cross.outcome == 'success' && 'verify' || 'build' }} ${{ matrix.platform }}
+
+      - name: Rebuild FreeBSD ARM64 when cross-built addon fails verification
+        if: matrix.platform == 'freebsd-arm64' && steps.cross.outcome == 'success' && steps.freebsd-vm.outcome == 'failure'
+        uses: vmactions/freebsd-vm@a2f9a41fa97f6848b8c3b791087dfcdaa5b473ff # v1.5.8
+        with:
+          release: "14.4"
+          arch: aarch64
+          mem: 8192
+          usesh: true
+          cache-after-prepare: true
+          prepare: |
+            # ${{ hashFiles('scripts/build/freebsd/prepare.sh', 'rust-toolchain.toml') }}
+            sh scripts/build/freebsd/prepare.sh
+          run: node scripts/build/freebsd/ci.ts build freebsd-arm64
 
       - name: Confirm native addon was copied back
         run: test -s prebuilds/sync_request_curl_native.${{ matrix.platform }}.node
@@ -207,7 +260,7 @@ jobs:
           node-version: 24.x
 
       - name: Verify release matrix
-        run: node scripts/verify-prebuilds.ts
+        run: node scripts/build/verify-prebuilds.ts
 
       - name: Upload release prebuilds
         uses: actions/upload-artifact@v4
@@ -259,7 +312,7 @@ jobs:
           path: prebuilds
 
       - name: Verify release matrix
-        run: node scripts/verify-prebuilds.ts
+        run: node scripts/build/verify-prebuilds.ts
 
       - name: Build JavaScript package
         run: pnpm build

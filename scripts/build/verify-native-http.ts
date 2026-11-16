@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { styleText } from "node:util";
 import { Worker } from "node:worker_threads";
 
-import { resolveNativeAddonFile } from "#scripts/native-addon-file";
+import { resolveNativeAddonFile } from "#scripts/build/native-addon-file";
 
 const file = resolveNativeAddonFile();
 

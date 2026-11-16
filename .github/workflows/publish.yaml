@@ -61,6 +61,6 @@ jobs:
         env:
           BUILD_SHA: ${{ github.sha }}
         run: >-
-          node scripts/publish-release-packages.ts
+          node scripts/release/publish-release-packages.ts
           --registry=https://registry.npmjs.org
           --expected-sha="$BUILD_SHA"

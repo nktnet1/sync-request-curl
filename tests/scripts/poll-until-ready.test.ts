@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { pollUntilReady } from "#scripts/poll-until-ready";
+import { pollUntilReady } from "#scripts/test/poll-until-ready";
 
 // Vitest fake timers do not advance Node's timers/promises directly.
 vi.mock("node:timers/promises", () => ({

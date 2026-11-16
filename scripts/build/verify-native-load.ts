@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 
-import { resolveNativeAddonFile } from "#scripts/native-addon-file";
+import { resolveNativeAddonFile } from "#scripts/build/native-addon-file";
 
 const file = resolveNativeAddonFile();
 

@@ -1,8 +1,8 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { reserveLoopbackPort } from "#scripts/loopback-port";
-import { pollUntilReady } from "#scripts/poll-until-ready";
+import { reserveLoopbackPort } from "#scripts/test/loopback-port";
+import { pollUntilReady } from "#scripts/test/poll-until-ready";
 
 export const launchSmokeServer = async (
   temporaryRoot: string,

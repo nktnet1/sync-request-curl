@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { nextBetaVersion } from "#scripts/beta-version";
+import { nextBetaVersion } from "#scripts/release/beta-version";
 
 test.each([
   ["5.0.0", [], [], undefined, "5.0.0-beta.1"],

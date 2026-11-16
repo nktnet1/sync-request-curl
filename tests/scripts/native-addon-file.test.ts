@@ -1,6 +1,6 @@
 import { relative, resolve } from "node:path";
 import { expect, test } from "vitest";
-import { resolveNativeAddonFile } from "#scripts/native-addon-file";
+import { resolveNativeAddonFile } from "#scripts/build/native-addon-file";
 
 const existingFile = resolve(import.meta.dirname, "../../package.json");
 

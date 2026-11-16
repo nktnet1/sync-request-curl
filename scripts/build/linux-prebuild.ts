@@ -9,12 +9,18 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import type { LinuxLibc, NativePlatformKey } from "#scripts/native-platform";
-import { getLinuxLibc, getPrebuildFilename } from "#scripts/native-platform";
-import { run } from "#scripts/process";
-import { getRustToolchain } from "#scripts/rust-toolchain";
+import type {
+  LinuxLibc,
+  NativePlatformKey,
+} from "#scripts/build/native-platform";
+import {
+  getLinuxLibc,
+  getPrebuildFilename,
+} from "#scripts/build/native-platform";
+import { getRustToolchain } from "#scripts/build/rust-toolchain";
+import { run } from "#scripts/shared/process";
 
-const root = resolve(import.meta.dirname, "..");
+const root = resolve(import.meta.dirname, "../..");
 const rustToolchain = getRustToolchain();
 const cmakeVersion = "3.31.12";
 const cmakeRelease = cmakeVersion.split(".").slice(0, 2).join(".");
@@ -131,7 +137,7 @@ const runInContainer = (): void => {
   dockerArgs.push(
     imageFor(libc, nodeVersion),
     "node",
-    "scripts/linux-prebuild.ts",
+    "scripts/build/linux-prebuild.ts",
     "--inside",
     `--libc=${libc}`,
     `--mode=${mode}`,
@@ -262,7 +268,7 @@ const verifyPrebuild = (targetLibc: LinuxLibc): void => {
   const platform = getPlatform(targetLibc);
   const prebuild = join(root, "prebuilds", getPrebuildFilename(platform));
   const verifyArgs = [
-    "scripts/verify-native-deps.ts",
+    "scripts/build/verify-native-deps.ts",
     `--file=${prebuild}`,
     `--libc=${targetLibc}`,
   ];
@@ -272,7 +278,7 @@ const verifyPrebuild = (targetLibc: LinuxLibc): void => {
   run(process.execPath, verifyArgs, { cwd: root });
   run(
     process.execPath,
-    ["scripts/verify-native-load.ts", `--file=${prebuild}`],
+    ["scripts/build/verify-native-load.ts", `--file=${prebuild}`],
     { cwd: root },
   );
 };
@@ -289,15 +295,19 @@ const buildInsideContainer = (targetLibc: LinuxLibc): void => {
     buildEnv.CMAKE = join(cmakeBin, "cmake");
     buildEnv.PATH = `${cmakeBin}:${buildEnv.PATH ?? ""}`;
   }
-  run(process.execPath, ["scripts/build-native.ts"], {
+  run(process.execPath, ["scripts/build/build-native.ts"], {
     cwd: root,
     env: buildEnv,
   });
 
   const platform = getPlatform(targetLibc);
-  run(process.execPath, ["scripts/stage-native.ts", `--platform=${platform}`], {
-    cwd: root,
-  });
+  run(
+    process.execPath,
+    ["scripts/build/stage-native.ts", `--platform=${platform}`],
+    {
+      cwd: root,
+    },
+  );
   verifyPrebuild(targetLibc);
 };
 

@@ -8,12 +8,12 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import type { NativePlatformKey } from "#/native/platform-key-core";
-import { run } from "#scripts/process";
 import {
   createMainPackageManifest,
   createNativePackageManifest,
   type ReleasePackageJson,
 } from "#scripts/release/package";
+import { run } from "#scripts/shared/process";
 
 interface PackResult {
   filename: string;
