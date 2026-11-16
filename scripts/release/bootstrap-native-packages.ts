@@ -1,30 +1,25 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { parseArgs, styleText } from "node:util";
+import { parseArgs } from "node:util";
 import {
-  getNativePackageName,
-  supportedPlatformKeys,
-} from "#/native/platform-key-core";
+  BOOTSTRAP_TAG,
+  BOOTSTRAP_VERSION,
+  type BootstrapResult,
+  bootstrapMissingPackages,
+  bootstrapRepository,
+  bootstrapRoot,
+  scanPackages,
+  status,
+} from "#scripts/release/bootstrap-native-operations";
 import {
   configureTrustedPublishers,
   ensureOidcPrerequisites,
   OIDC_ENVIRONMENT,
   OIDC_WORKFLOW,
 } from "#scripts/release/npm-trusted-publishers";
-import { parseReleasePackageJson } from "#scripts/release/package";
 import { run } from "#scripts/shared/process";
 
 export { parseTrustedPublishers } from "#scripts/release/npm-trusted-publishers";
 
-const BOOTSTRAP_VERSION = "0.0.0-bootstrap.0";
-const BOOTSTRAP_TAG = "bootstrap";
 const DEFAULT_REGISTRY = "https://registry.npmjs.org/";
-
-const root = resolve(import.meta.dirname, "../..");
-const packageJson = parseReleasePackageJson(
-  readFileSync(join(root, "package.json"), "utf8"),
-);
 
 export interface BootstrapOptions {
   publish?: boolean;
@@ -32,88 +27,6 @@ export interface BootstrapOptions {
   freebsdOnly?: boolean;
   configureOidc?: boolean;
 }
-
-const status = (format: "cyan" | "green" | "yellow", text: string): string =>
-  styleText([format, "bold"], text);
-
-const packageExists = (packageName: string, registry: string): boolean => {
-  try {
-    run(
-      "pnpm",
-      ["view", packageName, "versions", "--json", `--registry=${registry}`],
-      { cwd: root, capture: true },
-    );
-    return true;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const isNotFound =
-      /\b404\b/.test(message) &&
-      /(not found|not in the npm registry|failed to fetch metadata)/i.test(
-        message,
-      );
-    if (isNotFound) {
-      return false;
-    }
-    throw new Error(
-      `Unable to determine whether ${packageName} exists in ${registry}`,
-      { cause: error },
-    );
-  }
-};
-
-const createBootstrapManifest = (
-  packageName: string,
-): Record<string, unknown> => ({
-  name: packageName,
-  version: BOOTSTRAP_VERSION,
-  description:
-    `Bootstrap placeholder for ${packageName}. ` +
-    `Install ${packageJson.name} instead of depending on this package directly.`,
-  repository: packageJson.repository,
-  license: packageJson.license,
-  author: packageJson.author,
-  engines: packageJson.engines,
-  files: ["README.md"],
-  publishConfig: { access: "public" },
-});
-
-const publishBootstrapPackage = (
-  packageName: string,
-  registry: string,
-  publish: boolean,
-): void => {
-  const directory = mkdtempSync(join(tmpdir(), "sync-request-curl-bootstrap-"));
-
-  try {
-    writeFileSync(
-      join(directory, "package.json"),
-      `${JSON.stringify(createBootstrapManifest(packageName), null, 2)}\n`,
-    );
-    writeFileSync(
-      join(directory, "README.md"),
-      `# ${packageName}\n\n` +
-        `Bootstrap placeholder for \`${packageName}\`. ` +
-        `Install \`${packageJson.name}\` instead of depending on this package directly.\n`,
-    );
-
-    const args = [
-      "publish",
-      "--access",
-      "public",
-      "--tag",
-      BOOTSTRAP_TAG,
-      `--registry=${registry}`,
-      "--no-git-checks",
-      "--ignore-scripts",
-    ];
-    if (!publish) {
-      args.push("--dry-run");
-    }
-    run("pnpm", args, { cwd: directory });
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
-};
 
 const printHelp = (): void => {
   console.log(`Usage: pnpm bootstrap:native [--freebsd-only] [--configure-oidc] [--publish]
@@ -139,38 +52,6 @@ Publish a release via the trusted GitHub Actions workflow within 2 days of
 creating a new trust relationship so npm can validate it.`);
 };
 
-interface PackageScanResult {
-  names: string[];
-  missing: string[];
-  skipped: number;
-}
-
-const scanPackages = (
-  freebsdOnly: boolean,
-  registry: string,
-): PackageScanResult => {
-  const names = supportedPlatformKeys
-    .filter((platform) => !freebsdOnly || platform.startsWith("freebsd-"))
-    .map(getNativePackageName);
-  const missing: string[] = [];
-  let skipped = 0;
-
-  for (const packageName of names) {
-    if (!packageExists(packageName, registry)) {
-      missing.push(packageName);
-      console.log(
-        `${status("yellow", "CREATE")} ${packageName} does not exist`,
-      );
-      continue;
-    }
-
-    skipped += 1;
-    console.log(`${status("green", "SKIP")} ${packageName} already exists`);
-  }
-
-  return { names, missing, skipped };
-};
-
 const ensurePublisherAuthentication = (
   registry: string,
   configureOidc: boolean,
@@ -178,7 +59,7 @@ const ensurePublisherAuthentication = (
   const cli = configureOidc ? "npm" : "pnpm";
   try {
     const username = run(cli, ["whoami", `--registry=${registry}`], {
-      cwd: root,
+      cwd: bootstrapRoot,
       capture: true,
     });
     console.log(`${status("cyan", "USER")} publishing as ${username}`);
@@ -190,45 +71,6 @@ const ensurePublisherAuthentication = (
       `Authenticate with ${cli} login --registry=${registry} before retrying.${hint}`,
     );
   }
-};
-
-interface BootstrapResult {
-  published: number;
-  skipped: number;
-  validated: number;
-}
-
-const bootstrapMissingPackages = (
-  missing: string[],
-  initialSkipped: number,
-  registry: string,
-  publish: boolean,
-): BootstrapResult => {
-  let published = 0;
-  let skipped = initialSkipped;
-  let validated = 0;
-
-  for (const packageName of missing) {
-    if (publish && packageExists(packageName, registry)) {
-      skipped += 1;
-      console.log(`${status("green", "SKIP")} ${packageName} now exists`);
-      continue;
-    }
-
-    publishBootstrapPackage(packageName, registry, publish);
-    if (publish) {
-      published += 1;
-      console.log(
-        `${status("green", "PUBLISHED")} ${packageName}@${BOOTSTRAP_VERSION}`,
-      );
-      continue;
-    }
-
-    validated += 1;
-    console.log(`${status("cyan", "DRY-RUN")} ${packageName} is publishable`);
-  }
-
-  return { published, skipped, validated };
 };
 
 const printBootstrapSummary = (
@@ -265,7 +107,7 @@ export const bootstrapNativePackages = async ({
 }: BootstrapOptions = {}): Promise<void> => {
   // Validate the OIDC requirements before any package is published.
   const repository = configureOidc
-    ? ensureOidcPrerequisites(registry, packageJson.repository)
+    ? ensureOidcPrerequisites(registry, bootstrapRepository)
     : undefined;
   const { names, missing, skipped } = scanPackages(freebsdOnly, registry);
 
