@@ -57,9 +57,7 @@ vi.mock("node:worker_threads", () => ({
       return this;
     }
 
-    terminate() {
-      return Promise.resolve(0);
-    }
+    terminate = () => Promise.resolve(0);
   },
 }));
 
