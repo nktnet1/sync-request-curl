@@ -378,6 +378,8 @@ test("main FreeBSD cache keys cover native inputs without sharing binaries with 
 });
 
 test("main pipeline smoke-tests FreeBSD artifacts before caching them", () => {
+  const expectedContinueOnError = (condition: string) =>
+    `continue-on-error: \${{ ${condition} }}`;
   const pipeline = freebsdWorkflowJob(
     "pipeline.yaml",
     "freebsd-native",
@@ -391,11 +393,13 @@ test("main pipeline smoke-tests FreeBSD artifacts before caching them", () => {
     'toolchain="$(node scripts/build/rust-toolchain.ts --freebsd-arm64-cross)"',
   );
   expect(pipeline).toContain(
-    `continue-on-error: \${{ github.event_name != 'pull_request' }}`,
+    expectedContinueOnError("github.event_name != 'pull_request'"),
   );
   expect(pipeline).not.toContain("continue-on-error: true");
   expect(pipeline).toContain(
-    `continue-on-error: \${{ github.event_name != 'pull_request' && matrix.platform == 'freebsd-arm64' && steps.cross.outcome == 'success' }}`,
+    expectedContinueOnError(
+      "github.event_name != 'pull_request' && matrix.platform == 'freebsd-arm64' && steps.cross.outcome == 'success'",
+    ),
   );
   expect(pipeline).toContain(
     "if: github.event_name != 'pull_request' && matrix.platform == 'freebsd-arm64' && steps.cross.outcome == 'success' && steps.freebsd-vm.outcome == 'failure'",
